@@ -1,7 +1,7 @@
 use crate::DekuReceiver;
 use proc_macro2::TokenStream;
 
-pub(crate) fn emit_deku_read(input: &DekuReceiver) -> TokenStream {
+pub(crate) fn emit_deku_write(input: &DekuReceiver) -> TokenStream {
     let mut tokens = TokenStream::new();
 
     let ident = &input.ident;
@@ -13,7 +13,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> TokenStream {
         .expect("expected `struct` type")
         .fields;
 
-    let field_reads = fields
+    let field_writes = fields
         .into_iter()
         .enumerate()
         .map(|(i, f)| {
@@ -38,30 +38,32 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> TokenStream {
 
             let endian_flip = field_endian != input.endian;
 
-            let field_read = quote! {
-                #field_ident: {
-                    let (ret_idx, res) = #field_type::read(idx, #field_bits);
-                    let res = if (#endian_flip) {
-                        res.swap_bytes()
+            let field_write = quote! {
+                // Reverse to write from MSB -> LSB
+                for i in (0..#field_bits).rev() {
+                    let field_val = if (#endian_flip) {
+                        input.#field_ident.swap_bytes()
                     } else {
-                        res
+                        input.#field_ident
                     };
-                    idx = ret_idx;
-                    res
+
+                    let bit = (field_val & 1 << i) != 0;
+                    acc.push(bit)
                 }
             };
 
-            field_read
+            field_write
         })
         .collect::<Vec<_>>();
 
     tokens.extend(quote! {
-        impl From<&[u8]> for #ident {
-            fn from(input: &[u8]) -> Self {
-                let mut idx = (input, 0usize);
-                Self {
-                    #(#field_reads),*
-                }
+        impl From<#ident> for Vec<u8> {
+            fn from(input: #ident) -> Self {
+                let mut acc: BitVec<Msb0, u8> = BitVec::new();
+
+                #(#field_writes)*
+
+                acc.into_vec()
             }
         }
     });

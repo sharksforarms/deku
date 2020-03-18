@@ -41,14 +41,17 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> TokenStream {
 
             let field_write = quote! {
                 // Reverse to write from MSB -> LSB
-                for i in (0..#field_bits).rev() {
-                    let field_val = if (#endian_flip) {
-                        input.#field_ident.swap_bytes()
-                    } else {
-                        input.#field_ident
-                    };
+                let field_val = if (#endian_flip) {
+                    input.#field_ident.swap_endian()
+                } else {
+                    input.#field_ident
+                };
 
-                    let bit = (field_val & 1 << i) != 0;
+                let field_bytes = field_val.write();
+
+                for i in (0..#field_bits).rev() {
+                    let field_val = field_bytes[i/8];
+                    let bit = (field_val & 1 << (i%8)) != 0;
                     acc.push(bit)
                 }
             };

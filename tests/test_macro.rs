@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use bitvec::prelude::*;
-    use deku::{BitsReader, DekuRead, DekuWrite};
+    use deku::{BitsReader, BitsWriter, DekuRead, DekuWrite};
 
     #[test]
     fn it_works() {

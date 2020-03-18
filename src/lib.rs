@@ -11,6 +11,7 @@ pub trait BitsReader: BitsSize {
 
 pub trait BitsWriter: BitsSize {
     fn write(self) -> Vec<u8>;
+    fn swap_endian(self) -> Self;
 }
 
 macro_rules! ImplDekuTraits {
@@ -41,6 +42,10 @@ macro_rules! ImplDekuTraits {
                 let res = self.to_be_bytes();
 
                 res.to_vec()
+            }
+
+            fn swap_endian(self) -> $typ {
+                self.swap_bytes()
             }
         }
     };

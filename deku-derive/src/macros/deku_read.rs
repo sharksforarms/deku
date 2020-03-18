@@ -1,7 +1,9 @@
 use crate::DekuReceiver;
+use darling;
 use proc_macro2::TokenStream;
+use quote::quote;
 
-pub(crate) fn emit_deku_read(input: &DekuReceiver) -> TokenStream {
+pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let mut tokens = TokenStream::new();
 
     let ident = &input.ident;
@@ -13,7 +15,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> TokenStream {
         .expect("expected `struct` type")
         .fields;
 
-    let field_reads = fields
+    let field_reads: Result<Vec<_>, _> = fields
         .into_iter()
         .enumerate()
         .map(|(i, f)| {
@@ -23,11 +25,16 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> TokenStream {
             let field_bytes = f.bytes;
 
             // Support named or indexed fields
-            let field_ident = f
-                .ident
-                .as_ref()
-                .map(|v| quote!(#v))
-                .unwrap_or_else(|| quote!(#i));
+            let field_ident = f.ident.as_ref().map(|v| quote!(#v)).unwrap_or_else(|| {
+                let ret = syn::Index::from(i);
+                quote! { #ret }
+            });
+
+            if field_bits.is_some() && field_bytes.is_some() {
+                return Err(darling::Error::duplicate_field(
+                    "both \"bits\" and \"bytes\" specified",
+                ));
+            }
 
             let field_bits = field_bits.or_else(|| field_bytes.map(|v| v * 8usize));
             let field_bits = if field_bits.is_some() {
@@ -40,7 +47,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> TokenStream {
 
             let field_read = quote! {
                 #field_ident: {
-                    let (ret_idx, res) = #field_type::read(idx, #field_bits);
+                    let (ret_idx, res) = #field_type::read(idx, #field_bits)?;
                     let res = if (#endian_flip) {
                         res.swap_bytes()
                     } else {
@@ -51,20 +58,24 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> TokenStream {
                 }
             };
 
-            field_read
+            Ok(field_read)
         })
-        .collect::<Vec<_>>();
+        .collect();
+
+    let field_reads = field_reads?;
 
     tokens.extend(quote! {
-        impl From<&[u8]> for #ident {
-            fn from(input: &[u8]) -> Self {
+        impl TryFrom<&[u8]> for #ident {
+            type Error = DekuError;
+
+            fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
                 let mut idx = (input, 0usize);
-                Self {
+                Ok(Self {
                     #(#field_reads),*
-                }
+                })
             }
         }
     });
 
-    tokens
+    Ok(tokens)
 }

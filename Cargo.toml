@@ -3,6 +3,12 @@ authors = ["sharks <sharks@sharks>"]
 edition = "2018"
 name = "deku"
 version = "0.1.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/sharksforarms/deku"
+keywords = ["deku", "bits", "bytes", "nom", "bitvec", "parse", "serialization", "deserialization", "struct"]
+categories = ["parsing"]
+description = "bit level serialization/deserialization proc-macro for structs"
+readme = "README.md"
 
 [workspace]
 members = [
@@ -10,10 +16,11 @@ members = [
 ]
 
 [dependencies]
-deku_derive = { path = "deku-derive" }
+deku_derive = { version = "0.1.0", path = "deku-derive" }
 nom = "5.0"
-bitvec = "*"
+bitvec = "0.17"
 
 
 [dev-dependencies]
 hex-literal = "0.2"
+rstest = "0.6"

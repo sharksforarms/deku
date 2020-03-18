@@ -1,0 +1,14 @@
+[package]
+authors = ["sharks <sharks@sharks>"]
+edition = "2018"
+name = "deku_derive"
+version = "0.1.0"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "1.0"
+# extra-traits gives use Debug
+syn = {version = "1.0", features = ["extra-traits"]}
+proc-macro2 = "1.0"

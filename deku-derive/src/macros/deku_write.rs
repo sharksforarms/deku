@@ -1,5 +1,6 @@
 use crate::DekuReceiver;
 use proc_macro2::TokenStream;
+use quote::quote;
 
 pub(crate) fn emit_deku_write(input: &DekuReceiver) -> TokenStream {
     let mut tokens = TokenStream::new();

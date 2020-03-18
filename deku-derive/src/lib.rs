@@ -1,15 +1,10 @@
 //! Deku is a data-to-struct serialization/deserialization library supporting bit level granularity,
 //! uses the nom crate as the consumer or “Reader” and BitVec as the “Writer”
 
-#[macro_use]
-extern crate darling;
-extern crate proc_macro;
-extern crate proc_macro2;
-#[macro_use]
-extern crate quote;
-
 use darling::ast;
 use darling::FromDeriveInput;
+use darling::FromField;
+use darling::FromMeta;
 use proc_macro2::TokenStream;
 
 mod macros;
@@ -46,6 +41,7 @@ struct DekuReceiver {
     #[darling(default)]
     endian: EndianNess,
 }
+
 impl DekuReceiver {
     fn emit_reader(&self) -> TokenStream {
         emit_deku_read(self)

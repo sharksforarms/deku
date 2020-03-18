@@ -1,6 +1,6 @@
 pub use deku_derive::*;
-
 use nom::{bits, IResult};
+
 pub trait BitsSize {
     fn bit_size() -> usize;
 }

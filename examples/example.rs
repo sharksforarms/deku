@@ -21,7 +21,7 @@ struct DekuTest {
 }
 
 fn main() {
-    let test_data: &[u8] = [0xAB, 0b1010_0101, 0xAB, 0xCD].as_ref();
+    let test_data: &[u8] = [0xAB, 0b1010010_1, 0xAB, 0xCD].as_ref();
 
     let test_deku: DekuTest = test_data.into();
 
@@ -30,7 +30,7 @@ fn main() {
         DekuTest {
             field_a: 0xAB,
             field_b: 0b0_1010010,
-            field_c: 0b1,
+            field_c: 0b0000000_1,
             field_d: 0xCDAB,
         }
     );

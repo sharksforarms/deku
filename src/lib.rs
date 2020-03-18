@@ -14,10 +14,10 @@ pub trait BitsWriter: BitsSize {
 }
 
 macro_rules! ImplDekuTraits {
-    ($typ:ty, $bits:tt) => {
+    ($typ:ty) => {
         impl BitsSize for $typ {
             fn bit_size() -> usize {
-                $bits
+                std::mem::size_of::<$typ>() * 8
             }
         }
 
@@ -46,6 +46,9 @@ macro_rules! ImplDekuTraits {
     };
 }
 
-ImplDekuTraits!(u8, 8usize);
-ImplDekuTraits!(u16, 16usize);
-ImplDekuTraits!(u32, 32usize);
+ImplDekuTraits!(u8);
+ImplDekuTraits!(u16);
+ImplDekuTraits!(u32);
+ImplDekuTraits!(u64);
+ImplDekuTraits!(u128);
+ImplDekuTraits!(usize);

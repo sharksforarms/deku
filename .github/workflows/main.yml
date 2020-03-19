@@ -15,7 +15,8 @@ jobs:
           override: true
       - uses: actions-rs/cargo@v1
         with:
-          command: build --all
+          command: build
+          args: --all
 
   test:
     name: Test Suite
@@ -29,7 +30,8 @@ jobs:
           override: true
       - uses: actions-rs/cargo@v1
         with:
-          command: test --all
+          command: test
+          args: --all
 
   fmt:
     name: Rustfmt
@@ -62,3 +64,24 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features --no-fail-fast
+        env:
+          CARGO_INCREMENTAL: "0"
+          RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zno-landing-pads"
+      - uses: actions-rs/grcov@v0.1
+      - uses: codecov/codecov-action@v1
+        with:
+          file: ${{ steps.coverage.outputs.report }}

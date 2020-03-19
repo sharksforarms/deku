@@ -1,8 +1,9 @@
 use crate::DekuReceiver;
+use darling;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-pub(crate) fn emit_deku_write(input: &DekuReceiver) -> TokenStream {
+pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let mut tokens = TokenStream::new();
 
     let ident = &input.ident;
@@ -14,7 +15,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> TokenStream {
         .expect("expected `struct` type")
         .fields;
 
-    let field_writes = fields
+    let field_writes: Result<Vec<_>, _> = fields
         .into_iter()
         .enumerate()
         .map(|(i, f)| {
@@ -29,6 +30,12 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> TokenStream {
                 .as_ref()
                 .map(|v| quote!(#v))
                 .unwrap_or_else(|| quote!(#i));
+
+            if field_bits.is_some() && field_bytes.is_some() {
+                return Err(darling::Error::duplicate_field(
+                    "both \"bits\" and \"bytes\" specified",
+                ));
+            }
 
             let field_bits = field_bits.or_else(|| field_bytes.map(|v| v * 8usize));
             let field_bits = if field_bits.is_some() {
@@ -56,9 +63,11 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> TokenStream {
                 }
             };
 
-            field_write
+            Ok(field_write)
         })
-        .collect::<Vec<_>>();
+        .collect();
+
+    let field_writes = field_writes?;
 
     tokens.extend(quote! {
         impl From<#ident> for Vec<u8> {
@@ -72,5 +81,5 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> TokenStream {
         }
     });
 
-    tokens
+    Ok(tokens)
 }

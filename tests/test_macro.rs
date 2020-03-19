@@ -40,7 +40,6 @@ mod tests {
             }
         );
 
-        dbg!(&test_deku);
         let test_deku: Vec<u8> = test_deku.into();
         assert_eq!(test_data.to_vec(), test_deku);
     }

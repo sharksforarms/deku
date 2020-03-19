@@ -125,7 +125,10 @@ mod tests {
         let parsed = parse_str(input).unwrap();
 
         let receiver = DekuReceiver::from_derive_input(&parsed).unwrap();
-        receiver.emit_reader().unwrap();
-        receiver.emit_writer().unwrap();
+        let res_reader = receiver.emit_reader();
+        let res_writer = receiver.emit_writer();
+
+        res_reader.unwrap();
+        res_writer.unwrap();
     }
 }

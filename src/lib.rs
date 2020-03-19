@@ -113,4 +113,10 @@ mod tests {
         // BUG: This should pass?
         //assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
     }
+
+    #[test]
+    fn test_swap_endian() {
+        let input = 0xAABBCCDDu32;
+        assert_eq!(0xDDCCBBAA, input.swap_endian());
+    }
 }

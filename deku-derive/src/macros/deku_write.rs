@@ -47,15 +47,15 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
             let endian_flip = field_endian != input.endian;
 
             let field_write = quote! {
-                // Reverse to write from MSB -> LSB
                 let field_val = if (#endian_flip) {
-                    input.#field_ident.swap_endian()
-                } else {
                     input.#field_ident
+                } else {
+                    input.#field_ident.swap_endian()
                 };
 
                 let field_bytes = field_val.write();
 
+                // Reverse to write from MSB -> LSB
                 for i in (0..#field_bits).rev() {
                     let field_val = field_bytes[i/8];
                     let bit = (field_val & 1 << (i%8)) != 0;

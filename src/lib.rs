@@ -36,10 +36,10 @@ macro_rules! ImplDekuTraits {
         impl BitsWriter for $typ {
             fn write(self) -> Vec<u8> {
                 #[cfg(target_endian = "little")]
-                let res = self.to_le_bytes();
+                let res = self.to_be_bytes();
 
                 #[cfg(target_endian = "big")]
-                let res = self.to_be_bytes();
+                let res = self.to_le_bytes();
 
                 res.to_vec()
             }
@@ -86,7 +86,7 @@ mod tests {
     }
 
     #[rstest(input,expected,
-        case::normal(0xAABBCCDD, vec![0xDD, 0xCC, 0xBB, 0xAA]),
+        case::normal(0xAABBCCDD, vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
     fn test_bit_write(input: u32, expected: Vec<u8>) {
         let res_write = input.write();
@@ -94,7 +94,7 @@ mod tests {
     }
 
     #[rstest(input,read_bits,expected,expected_rest,expected_write,
-        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, ([].as_ref(), 0), vec![0xDD, 0xCC, 0xBB, 0xAA]),
+        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, ([].as_ref(), 0), vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
     fn test_bit_read_write(
         input: &[u8],
@@ -110,8 +110,7 @@ mod tests {
         let res_write = res_read.1.write();
         assert_eq!(expected_write, res_write);
 
-        // BUG: This should pass?
-        //assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
+        assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
     }
 
     #[test]

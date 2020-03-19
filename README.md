@@ -1,6 +1,6 @@
 # Deku
 
-[![Actions Status](https://github.com/sharksforarms/deku/workflows/{workflow_name}/badge.svg)](https://github.com/sharksforarms/deku/actions)
+[![Actions Status](https://github.com/sharksforarms/deku/workflows/CI/badge.svg)](https://github.com/sharksforarms/deku/actions)
 [![codecov](https://codecov.io/gh/sharksforarms/deku/branch/master/graph/badge.svg)](https://codecov.io/gh/sharksforarms/deku)
 
 Deku provides bit level serialization/deserialization proc-macro for structs

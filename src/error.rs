@@ -4,14 +4,12 @@ use std::fmt;
 #[derive(Debug, PartialEq)]
 pub enum DekuError {
     Parse(String),
-    Unexpected(String),
 }
 
 impl fmt::Display for DekuError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             DekuError::Parse(ref err) => write!(f, "Parse error: {}", err),
-            DekuError::Unexpected(ref err) => write!(f, "Unexpected error: {}", err),
         }
     }
 }

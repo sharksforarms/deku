@@ -5,15 +5,22 @@
 [![Actions Status](https://github.com/sharksforarms/deku/workflows/CI/badge.svg)](https://github.com/sharksforarms/deku/actions)
 [![codecov](https://codecov.io/gh/sharksforarms/deku/branch/master/graph/badge.svg)](https://codecov.io/gh/sharksforarms/deku)
 
-Deku provides bit level serialization/deserialization proc-macro for structs
+Deku provides bit level serialization/deserialization proc-macros for structs
 
 Under the hood, it uses [nom](https://crates.io/crates/nom) as the consumer or “Reader” and [bitvec](https://crates.io/crates/bitvec) as the “Writer”
+
+## Usage
+
+```toml
+[dependencies]
+deku = "0.1"
+```
 
 ## Example
 
 ```rust
-use bitvec::prelude::*;
-use deku::{BitsReader, BitsSize, BitsWriter, DekuRead, DekuWrite};
+use deku::prelude::*;
+use std::convert::TryFrom;
 
 /// DekuTest Struct
 //   0                   1                   2                   3
@@ -37,7 +44,7 @@ struct DekuTest {
 fn main() {
     let test_data: &[u8] = [0xAB, 0b1010010_1, 0xAB, 0xCD].as_ref();
 
-    let test_deku: DekuTest = test_data.into();
+    let test_deku = DekuTest::try_from(test_data).unwrap();
 
     assert_eq!(
         test_deku,

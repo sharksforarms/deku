@@ -85,6 +85,8 @@ mod tests {
         case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF].as_ref(), 32, 0xAABBCCDD, ([0xEE, 0xFF].as_ref(), 0)),
 
         // TODO: Better error message for these
+        #[should_panic(expected="Parse(\"Parsing Error: (([], 0), Eof)\")")]
+        case::not_enough_data([].as_ref(), 32, 0xFF, ([].as_ref(), 0)),
         #[should_panic(expected="Parse(\"Parsing Error: (([170, 187], 0), Eof)\")")]
         case::not_enough_data([0xAA, 0xBB].as_ref(), 32, 0xFF, ([].as_ref(), 0)),
     )]

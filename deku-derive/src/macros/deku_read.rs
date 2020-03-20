@@ -25,11 +25,10 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
             let field_bytes = f.bytes;
 
             // Support named or indexed fields
-            let field_ident = f
-                .ident
-                .as_ref()
-                .map(|v| quote!(#v))
-                .unwrap_or_else(|| quote!(#i));
+            let field_ident = f.ident.as_ref().map(|v| quote!(#v)).unwrap_or_else(|| {
+                let ret = syn::Index::from(i);
+                quote! { #ret }
+            });
 
             if field_bits.is_some() && field_bytes.is_some() {
                 return Err(darling::Error::duplicate_field(

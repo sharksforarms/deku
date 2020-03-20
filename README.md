@@ -1,5 +1,7 @@
 # Deku
 
+[![Latest Version](https://img.shields.io/crates/v/deku.svg)](https://crates.io/crates/deku)
+[![Rust Documentation](https://docs.rs/deku/badge.svg)](https://docs.rs/deku)
 [![Actions Status](https://github.com/sharksforarms/deku/workflows/CI/badge.svg)](https://github.com/sharksforarms/deku/actions)
 [![codecov](https://codecov.io/gh/sharksforarms/deku/branch/master/graph/badge.svg)](https://codecov.io/gh/sharksforarms/deku)
 

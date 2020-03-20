@@ -1,7 +1,5 @@
+use deku::prelude::*;
 use hex_literal::hex;
-
-use bitvec::prelude::*;
-use deku::{BitsReader, BitsWriter, DekuRead, DekuWrite};
 
 /// Ipv4 Header
 /// ```text

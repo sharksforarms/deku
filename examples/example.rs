@@ -1,5 +1,4 @@
-use bitvec::prelude::*;
-use deku::{BitsReader, BitsSize, BitsWriter, DekuRead, DekuWrite};
+use deku::prelude::*;
 
 /// DekuTest Struct
 //   0                   1                   2                   3

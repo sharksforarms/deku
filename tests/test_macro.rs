@@ -1,46 +1,68 @@
 #[cfg(test)]
 mod tests {
-    use bitvec::prelude::*;
-    use deku::{BitsReader, BitsWriter, DekuRead, DekuWrite};
+    use deku::prelude::*;
 
-    #[test]
-    fn it_works() {
+    pub mod samples {
+        use super::*;
+
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        struct DekuTest {
-            #[deku(endian = "little", bits = "7")]
-            id: u8,
-            #[deku(endian = "little", bytes = "4")]
-            field: u32,
-            #[deku(endian = "little", bits = "1")]
-            field2: u8,
-            #[deku(endian = "big", bytes = "2")]
-            field3: u16,
-        }
-
-        let test_data: &[u8] = [
-            0b1000_0011,
-            0b0000_0000,
-            0x00,
-            0x00,
-            0b0000_0011,
-            0b1010_1010, //0xAA
-            0b1011_1011, //0xBB
-        ]
-        .as_ref();
-
-        let test_deku: DekuTest = test_data.into();
-
-        assert_eq!(
-            test_deku,
-            DekuTest {
-                id: 0b0100_0001,
-                field: 0b1000_0000_0000_0000_0000_0000_0000_0001,
-                field2: 1,
-                field3: 0xBBAA,
-            }
+        pub struct UnNamedDeku(
+            pub u8,
+            #[deku(bits = "2")] pub u8,
+            #[deku(bits = "6")] pub u8,
+            #[deku(bytes = "2")] pub u16,
+            #[deku(endian = "big")] pub u16,
         );
 
-        let test_deku: Vec<u8> = test_deku.into();
-        assert_eq!(test_data.to_vec(), test_deku);
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        pub struct NamedDeku {
+            pub field_a: u8,
+            #[deku(bits = "2")]
+            pub field_b: u8,
+            #[deku(bits = "6")]
+            pub field_c: u8,
+            #[deku(bytes = "2")]
+            pub field_d: u16,
+            #[deku(endian = "big")]
+            pub field_e: u16,
+        }
+    }
+
+    #[test]
+    fn test_unnamed_struct() {
+        let test_data: Vec<u8> = [0xFF, 0b1001_0110, 0xAA, 0xBB, 0xCC, 0xDD].to_vec();
+
+        // Read
+        let ret_read = samples::UnNamedDeku::from(test_data.as_ref());
+        assert_eq!(
+            samples::UnNamedDeku(0xFF, 0b0000_0010, 0b0001_0110, 0xAABB, 0xDDCC),
+            ret_read
+        );
+
+        // Write
+        let ret_write: Vec<u8> = ret_read.into();
+        assert_eq!(test_data, ret_write);
+    }
+
+    #[test]
+    fn test_named_struct() {
+        let test_data: Vec<u8> = [0xFF, 0b1001_0110, 0xAA, 0xBB, 0xCC, 0xDD].to_vec();
+
+        // Read
+        let ret_read = samples::NamedDeku::from(test_data.as_ref());
+        assert_eq!(
+            samples::NamedDeku {
+                field_a: 0xFF,
+                field_b: 0b0000_0010,
+                field_c: 0b0001_0110,
+                field_d: 0xAABB,
+                field_e: 0xDDCC,
+            },
+            ret_read
+        );
+
+        // Write
+        let ret_write: Vec<u8> = ret_read.into();
+        assert_eq!(test_data, ret_write);
     }
 }

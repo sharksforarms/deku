@@ -1,5 +1,6 @@
 use deku::prelude::*;
 use hex_literal::hex;
+use std::convert::TryFrom;
 
 /// Ipv4 Header
 /// ```text
@@ -54,7 +55,7 @@ pub struct Ipv4Header {
 fn main() {
     let test_data = hex!("450000502bc1400040068f37c0a8016bc01efd7d").to_vec();
 
-    let ip_header = Ipv4Header::from(test_data.as_ref());
+    let ip_header = Ipv4Header::try_from(test_data.as_ref()).unwrap();
 
     assert_eq!(
         Ipv4Header {

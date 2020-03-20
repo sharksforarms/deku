@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use deku::prelude::*;
+    use std::convert::TryFrom;
 
     pub mod samples {
         use super::*;
@@ -33,7 +34,7 @@ mod tests {
         let test_data: Vec<u8> = [0xFF, 0b1001_0110, 0xAA, 0xBB, 0xCC, 0xDD].to_vec();
 
         // Read
-        let ret_read = samples::UnNamedDeku::from(test_data.as_ref());
+        let ret_read = samples::UnNamedDeku::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
             samples::UnNamedDeku(0xFF, 0b0000_0010, 0b0001_0110, 0xAABB, 0xDDCC),
             ret_read
@@ -49,7 +50,7 @@ mod tests {
         let test_data: Vec<u8> = [0xFF, 0b1001_0110, 0xAA, 0xBB, 0xCC, 0xDD].to_vec();
 
         // Read
-        let ret_read = samples::NamedDeku::from(test_data.as_ref());
+        let ret_read = samples::NamedDeku::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
             samples::NamedDeku {
                 field_a: 0xFF,

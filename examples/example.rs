@@ -1,4 +1,5 @@
 use deku::prelude::*;
+use std::convert::TryFrom;
 
 /// DekuTest Struct
 //   0                   1                   2                   3
@@ -22,7 +23,7 @@ struct DekuTest {
 fn main() {
     let test_data: &[u8] = [0xAB, 0b1010010_1, 0xAB, 0xCD].as_ref();
 
-    let test_deku: DekuTest = test_data.into();
+    let test_deku = DekuTest::try_from(test_data).unwrap();
 
     assert_eq!(
         test_deku,

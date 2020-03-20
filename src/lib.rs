@@ -1,14 +1,18 @@
 pub use deku_derive::*;
 use nom::{bits, IResult};
 
+pub mod error;
 pub mod prelude;
+use crate::error::DekuError;
 
 pub trait BitsSize {
     fn bit_size() -> usize;
 }
 
 pub trait BitsReader: BitsSize {
-    fn read(input: (&[u8], usize), bits: usize) -> ((&[u8], usize), Self);
+    fn read(input: (&[u8], usize), bits: usize) -> Result<((&[u8], usize), Self), DekuError>
+    where
+        Self: Sized;
 }
 
 pub trait BitsWriter: BitsSize {
@@ -25,12 +29,15 @@ macro_rules! ImplDekuTraits {
         }
 
         impl BitsReader for $typ {
-            fn read(input: (&[u8], usize), bits: usize) -> ((&[u8], usize), Self) {
+            fn read(
+                input: (&[u8], usize),
+                bits: usize,
+            ) -> Result<((&[u8], usize), Self), DekuError> {
                 fn parser(input: (&[u8], usize), bits: usize) -> IResult<(&[u8], usize), $typ> {
                     bits::complete::take(bits)(input)
                 }
 
-                let res = parser(input, bits).unwrap();
+                let res = parser(input, bits).map_err(|e| DekuError::Parse(e.to_string()));
                 res
             }
         }
@@ -78,11 +85,11 @@ mod tests {
         case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF].as_ref(), 32, 0xAABBCCDD, ([0xEE, 0xFF].as_ref(), 0)),
 
         // TODO: Better error message for these
-        #[should_panic(expected="Error((([170, 187], 0), Eof))")]
+        #[should_panic(expected="Parse(\"Parsing Error: (([170, 187], 0), Eof)\")")]
         case::not_enough_data([0xAA, 0xBB].as_ref(), 32, 0xFF, ([].as_ref(), 0)),
     )]
     fn test_bit_read(input: &[u8], read_bits: usize, expected: u32, expected_rest: (&[u8], usize)) {
-        let res_read = u32::read((input, 0usize), read_bits);
+        let res_read = u32::read((input, 0usize), read_bits).unwrap();
         assert_eq!(expected, res_read.1);
         assert_eq!(expected_rest, res_read.0);
     }
@@ -105,7 +112,7 @@ mod tests {
         expected_rest: (&[u8], usize),
         expected_write: Vec<u8>,
     ) {
-        let res_read = u32::read((input, 0usize), read_bits);
+        let res_read = u32::read((input, 0usize), read_bits).unwrap();
         assert_eq!(expected, res_read.1);
         assert_eq!(expected_rest, res_read.0);
 

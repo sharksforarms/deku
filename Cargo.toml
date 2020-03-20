@@ -18,7 +18,7 @@ members = [
 [dependencies]
 deku_derive = { path = "deku-derive" }
 nom = "5.0"
-bitvec = "*"
+bitvec = "0.17"
 
 
 [dev-dependencies]

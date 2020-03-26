@@ -14,9 +14,8 @@ pub trait BitsSize {
 pub trait BitsReader: BitsSize {
     fn read(
         input: &BitSlice<Msb0, u8>,
-        bit_index: &mut usize,
-        bits: usize,
-    ) -> Result<Self, DekuError>
+        len: usize,
+    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized;
 }
@@ -37,30 +36,25 @@ macro_rules! ImplDekuTraits {
         impl BitsReader for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
-                bit_index: &mut usize,
-                bits: usize,
-            ) -> Result<Self, DekuError> {
-                let lower_idx = *bit_index;
-                let upper_idx = *bit_index + bits;
-                if upper_idx > input.len() || lower_idx > input.len() {
-                    return Err(DekuError::Parse(format!("Not enough data")));
+                len: usize,
+            ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+                if input.len() < len {
+                    return Err(DekuError::Parse(format!("not enough data")));
                 }
-                let read_bits = &input[lower_idx..upper_idx];
-                *bit_index += bits; // TODO: overflow?
 
-                if read_bits.len() > <$typ>::bit_size() {
-                    return Err(DekuError::Parse(format!(
-                        "Parsed bits cannot fit container"
-                    )));
+                let (bits, rest) = input.split_at(len);
+
+                if len > <$typ>::bit_size() {
+                    return Err(DekuError::Parse(format!("too much data")));
                 }
 
                 #[cfg(target_endian = "little")]
-                let res: $typ = read_bits.load_be();
+                let value: $typ = bits.load_be();
 
                 #[cfg(target_endian = "big")]
-                let res: $typ = read_bits.load_le();
+                let value: $typ = bits.load_le();
 
-                Ok(res)
+                Ok((rest, value))
             }
         }
 
@@ -101,26 +95,30 @@ mod tests {
         // assert_eq!(128, u128::bit_size());
     }
 
-    #[rstest(input,read_bits,expected,
-        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD),
-        case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD].as_ref(), 12, 0b1001_0110_1110),
-        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF].as_ref(), 32, 0xAABBCCDD),
+    #[rstest(input,read_bits,expected,expected_rest,
+        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8;]),
+        case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD].as_ref(), 12, 0b1001_0110_1110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
+        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8; 1,1,1,0,1,1,1,0, 1,1,1,1,1,1,1,1]),
 
         // TODO: Better error message for these
-        #[should_panic(expected="Parse(\"Not enough data\")")]
-        case::not_enough_data([].as_ref(), 32, 0xFF),
-        #[should_panic(expected="Parse(\"Not enough data\")")]
-        case::not_enough_data([0xAA, 0xBB].as_ref(), 32, 0xFF),
-        #[should_panic(expected="Parse(\"Parsed bits cannot fit container\")")]
-        case::requesting_more_then_size([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0xAA, 0xBB].as_ref(), 64, 0xFF),
+        #[should_panic(expected="Parse(\"not enough data\")")]
+        case::not_enough_data([].as_ref(), 32, 0xFF, bits![Msb0, u8;]),
+        #[should_panic(expected="Parse(\"not enough data\")")]
+        case::not_enough_data([0xAA, 0xBB].as_ref(), 32, 0xFF, bits![Msb0, u8;]),
+        #[should_panic(expected="Parse(\"too much data\")")]
+        case::not_enough_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 64, 0xFF, bits![Msb0, u8;]),
     )]
-    fn test_bit_read(input: &[u8], read_bits: usize, expected: u32) {
+    fn test_bit_read(
+        input: &[u8],
+        read_bits: usize,
+        expected: u32,
+        expected_rest: &BitSlice<Msb0, u8>,
+    ) {
         let bit_slice = input.bits::<Msb0>();
-        let mut bit_index = 0usize;
 
-        let res_read = u32::read(bit_slice, &mut bit_index, read_bits).unwrap();
+        let (rest, res_read) = u32::read(bit_slice, read_bits).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(bit_index, read_bits);
+        assert_eq!(expected_rest, rest);
     }
 
     #[rstest(input,expected,
@@ -131,15 +129,21 @@ mod tests {
         assert_eq!(expected, res_write);
     }
 
-    #[rstest(input,read_bits,expected,expected_write,
-        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, vec![0xAA, 0xBB, 0xCC, 0xDD]),
+    #[rstest(input,read_bits,expected,expected_rest,expected_write,
+        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
-    fn test_bit_read_write(input: &[u8], read_bits: usize, expected: u32, expected_write: Vec<u8>) {
+    fn test_bit_read_write(
+        input: &[u8],
+        read_bits: usize,
+        expected: u32,
+        expected_rest: &BitSlice<Msb0, u8>,
+        expected_write: Vec<u8>,
+    ) {
         let bit_slice = input.bits::<Msb0>();
-        let mut bit_index = 0usize;
 
-        let res_read = u32::read(bit_slice, &mut bit_index, read_bits).unwrap();
+        let (rest, res_read) = u32::read(bit_slice, read_bits).unwrap();
         assert_eq!(expected, res_read);
+        assert_eq!(expected_rest, rest);
 
         let res_write = res_read.write();
         assert_eq!(expected_write, res_write);

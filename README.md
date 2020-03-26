@@ -7,7 +7,7 @@
 
 Deku provides bit level serialization/deserialization proc-macros for structs
 
-Under the hood, it uses [nom](https://crates.io/crates/nom) as the consumer or “Reader” and [bitvec](https://crates.io/crates/bitvec) as the “Writer”
+Under the hood, it uses [bitvec](https://crates.io/crates/bitvec) as the "Reader" and “Writer”
 
 ## Usage
 

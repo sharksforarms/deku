@@ -21,25 +21,3 @@ impl error::Error for DekuError {
         }
     }
 }
-
-macro_rules! nom_to_layererr {
-    ($typ:ty) => {
-        impl From<::nom::Err<($typ, ::nom::error::ErrorKind)>> for DekuError {
-            fn from(err: ::nom::Err<($typ, ::nom::error::ErrorKind)>) -> Self {
-                let msg = match err {
-                    ::nom::Err::Incomplete(needed) => match needed {
-                        ::nom::Needed::Size(_v) => format!("incomplete data, needs more"),
-                        ::nom::Needed::Unknown => format!("incomplete data"),
-                    },
-                    ::nom::Err::Error(e) | ::nom::Err::Failure(e) => {
-                        format!("parsing error has occurred: {}", e.1.description())
-                    }
-                };
-
-                DekuError::Parse(msg)
-            }
-        }
-    };
-}
-
-nom_to_layererr!((&[u8], usize));

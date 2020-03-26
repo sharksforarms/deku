@@ -1,6 +1,8 @@
-pub use deku_derive::*;
-use nom::{bits, IResult};
+//! Deku is a data-to-struct serialization/deserialization library supporting bit level granularity,
+//! Makes use of the [bitvec](https://crates.io/crates/bitvec) crate as the "Reader" and “Writer”
 
+use bitvec::prelude::*;
+pub use deku_derive::*;
 pub mod error;
 pub mod prelude;
 use crate::error::DekuError;
@@ -10,7 +12,10 @@ pub trait BitsSize {
 }
 
 pub trait BitsReader: BitsSize {
-    fn read(input: (&[u8], usize), bits: usize) -> Result<((&[u8], usize), Self), DekuError>
+    fn read(
+        input: &BitSlice<Msb0, u8>,
+        len: usize,
+    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized;
 }
@@ -30,15 +35,26 @@ macro_rules! ImplDekuTraits {
 
         impl BitsReader for $typ {
             fn read(
-                input: (&[u8], usize),
-                bits: usize,
-            ) -> Result<((&[u8], usize), Self), DekuError> {
-                fn parser(input: (&[u8], usize), bits: usize) -> IResult<(&[u8], usize), $typ> {
-                    bits::complete::take(bits)(input)
+                input: &BitSlice<Msb0, u8>,
+                len: usize,
+            ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+                if input.len() < len {
+                    return Err(DekuError::Parse(format!("not enough data")));
                 }
 
-                let res = parser(input, bits).map_err(|e| DekuError::Parse(e.to_string()));
-                res
+                let (bits, rest) = input.split_at(len);
+
+                if len > <$typ>::bit_size() {
+                    return Err(DekuError::Parse(format!("too much data")));
+                }
+
+                #[cfg(target_endian = "little")]
+                let value: $typ = bits.load_be();
+
+                #[cfg(target_endian = "big")]
+                let value: $typ = bits.load_le();
+
+                Ok((rest, value))
             }
         }
 
@@ -64,7 +80,7 @@ ImplDekuTraits!(u8);
 ImplDekuTraits!(u16);
 ImplDekuTraits!(u32);
 ImplDekuTraits!(u64);
-ImplDekuTraits!(u128);
+// ImplDekuTraits!(u128);
 ImplDekuTraits!(usize);
 
 #[cfg(test)]
@@ -76,24 +92,33 @@ mod tests {
     #[test]
     fn test_bit_size() {
         assert_eq!(8, u8::bit_size());
-        assert_eq!(128, u128::bit_size());
+        // assert_eq!(128, u128::bit_size());
     }
 
     #[rstest(input,read_bits,expected,expected_rest,
-        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, ([].as_ref(), 0)),
-        case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD].as_ref(), 12, 0b1001_0110_1110, ([0b1110_0000, 0xCC, 0xDD].as_ref(), 4)),
-        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF].as_ref(), 32, 0xAABBCCDD, ([0xEE, 0xFF].as_ref(), 0)),
+        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8;]),
+        case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD].as_ref(), 12, 0b1001_0110_1110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
+        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8; 1,1,1,0,1,1,1,0, 1,1,1,1,1,1,1,1]),
 
         // TODO: Better error message for these
-        #[should_panic(expected="Parse(\"Parsing Error: (([], 0), Eof)\")")]
-        case::not_enough_data([].as_ref(), 32, 0xFF, ([].as_ref(), 0)),
-        #[should_panic(expected="Parse(\"Parsing Error: (([170, 187], 0), Eof)\")")]
-        case::not_enough_data([0xAA, 0xBB].as_ref(), 32, 0xFF, ([].as_ref(), 0)),
+        #[should_panic(expected="Parse(\"not enough data\")")]
+        case::not_enough_data([].as_ref(), 32, 0xFF, bits![Msb0, u8;]),
+        #[should_panic(expected="Parse(\"not enough data\")")]
+        case::not_enough_data([0xAA, 0xBB].as_ref(), 32, 0xFF, bits![Msb0, u8;]),
+        #[should_panic(expected="Parse(\"too much data\")")]
+        case::not_enough_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 64, 0xFF, bits![Msb0, u8;]),
     )]
-    fn test_bit_read(input: &[u8], read_bits: usize, expected: u32, expected_rest: (&[u8], usize)) {
-        let res_read = u32::read((input, 0usize), read_bits).unwrap();
-        assert_eq!(expected, res_read.1);
-        assert_eq!(expected_rest, res_read.0);
+    fn test_bit_read(
+        input: &[u8],
+        read_bits: usize,
+        expected: u32,
+        expected_rest: &BitSlice<Msb0, u8>,
+    ) {
+        let bit_slice = input.bits::<Msb0>();
+
+        let (rest, res_read) = u32::read(bit_slice, read_bits).unwrap();
+        assert_eq!(expected, res_read);
+        assert_eq!(expected_rest, rest);
     }
 
     #[rstest(input,expected,
@@ -105,20 +130,22 @@ mod tests {
     }
 
     #[rstest(input,read_bits,expected,expected_rest,expected_write,
-        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, ([].as_ref(), 0), vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
     fn test_bit_read_write(
         input: &[u8],
         read_bits: usize,
         expected: u32,
-        expected_rest: (&[u8], usize),
+        expected_rest: &BitSlice<Msb0, u8>,
         expected_write: Vec<u8>,
     ) {
-        let res_read = u32::read((input, 0usize), read_bits).unwrap();
-        assert_eq!(expected, res_read.1);
-        assert_eq!(expected_rest, res_read.0);
+        let bit_slice = input.bits::<Msb0>();
 
-        let res_write = res_read.1.write();
+        let (rest, res_read) = u32::read(bit_slice, read_bits).unwrap();
+        assert_eq!(expected, res_read);
+        assert_eq!(expected_rest, rest);
+
+        let res_write = res_read.write();
         assert_eq!(expected_write, res_write);
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);

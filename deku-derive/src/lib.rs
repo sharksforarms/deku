@@ -1,6 +1,3 @@
-//! Deku is a data-to-struct serialization/deserialization library supporting bit level granularity,
-//! uses the nom crate as the consumer or “Reader” and BitVec as the “Writer”
-
 use darling;
 use darling::ast;
 use darling::FromDeriveInput;

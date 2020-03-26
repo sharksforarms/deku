@@ -47,14 +47,16 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
 
             let field_read = quote! {
                 #field_ident: {
-                    let (ret_idx, res) = #field_type::read(idx, #field_bits)?;
-                    let res = if (#endian_flip) {
-                        res.swap_bytes()
+                    let (rest, value) = #field_type::read(input, #field_bits)?;
+                    let value = if (#endian_flip) {
+                        value.swap_bytes()
                     } else {
-                        res
+                        value
                     };
-                    idx = ret_idx;
-                    res
+
+                    input = rest;
+
+                    value
                 }
             };
 
@@ -69,7 +71,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
-                let mut idx = (input, 0usize);
+                let mut input = input.bits::<Msb0>();
                 Ok(Self {
                     #(#field_reads),*
                 })

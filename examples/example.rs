@@ -28,14 +28,14 @@ fn main() {
     let test_deku = DekuTest::try_from(test_data).unwrap();
 
     assert_eq!(
-        test_deku,
         DekuTest {
             field_a: 0xAB,
             field_b: 0b0_1010010,
             field_c: 0b0000000_1,
             field_d: 0xCDAB,
             field_e: 0b0000_0011,
-        }
+        },
+        test_deku
     );
 
     let test_deku: Vec<u8> = test_deku.into();

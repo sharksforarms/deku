@@ -1,5 +1,4 @@
 use crate::DekuReceiver;
-use darling;
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -46,6 +45,10 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
             let endian_flip = field_endian != input.endian;
 
             let field_write = quote! {
+                // TODO: Can this somehow be compile time?
+                // Assert if we're writing more then what the type supports
+                assert!(#field_bits <= #field_type::bit_size());
+
                 let field_val = if (#endian_flip) {
                     input.#field_ident
                 } else {
@@ -69,13 +72,38 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
     let field_writes = field_writes?;
 
     tokens.extend(quote! {
-        impl From<#ident> for Vec<u8> {
+        impl<P> From<#ident> for BitVec<P, u8> where P: BitOrder {
             fn from(input: #ident) -> Self {
-                let mut acc: BitVec<Msb0, u8> = BitVec::new();
+                let mut acc: BitVec<P, u8> = BitVec::new();
 
                 #(#field_writes)*
 
+                acc
+            }
+        }
+
+        impl From<#ident> for Vec<u8> {
+            fn from(input: #ident) -> Self {
+                let acc: BitVec<Msb0, u8> = input.into();
                 acc.into_vec()
+            }
+        }
+
+        impl BitsWriter for #ident {
+            fn write(self) -> Vec<u8> {
+                // TODO: This could be improved I think.
+
+                // Accumulate the result for the struct and reverse the bits
+                let mut acc: BitVec::<Lsb0, u8> = self.into();
+                let bs = acc.as_mut_bitslice();
+                bs[..].reverse();
+
+                acc.into_vec()
+            }
+
+            fn swap_endian(self) -> Self {
+                // do nothing
+                self
             }
         }
     });

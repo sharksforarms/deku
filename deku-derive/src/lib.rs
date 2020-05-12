@@ -1,4 +1,3 @@
-use darling;
 use darling::ast;
 use darling::FromDeriveInput;
 use darling::FromField;

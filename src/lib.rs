@@ -39,14 +39,22 @@ macro_rules! ImplDekuTraits {
                 len: usize,
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 if input.len() < len {
-                    return Err(DekuError::Parse(format!("not enough data")));
+                    return Err(DekuError::Parse(format!(
+                        "not enough data: expected {} got {}",
+                        len,
+                        input.len()
+                    )));
+                }
+
+                if len > <$typ>::bit_size() {
+                    return Err(DekuError::Parse(format!(
+                        "too much data: container of {} cannot hold {}",
+                        <$typ>::bit_size(),
+                        len
+                    )));
                 }
 
                 let (bits, rest) = input.split_at(len);
-
-                if len > <$typ>::bit_size() {
-                    return Err(DekuError::Parse(format!("too much data")));
-                }
 
                 #[cfg(target_endian = "little")]
                 let value: $typ = bits.load_be();
@@ -101,12 +109,12 @@ mod tests {
         case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8; 1,1,1,0,1,1,1,0, 1,1,1,1,1,1,1,1]),
 
         // TODO: Better error message for these
-        #[should_panic(expected="Parse(\"not enough data\")")]
+        #[should_panic(expected="Parse(\"not enough data: expected 32 got 0\")")]
         case::not_enough_data([].as_ref(), 32, 0xFF, bits![Msb0, u8;]),
-        #[should_panic(expected="Parse(\"not enough data\")")]
+        #[should_panic(expected="Parse(\"not enough data: expected 32 got 16\")")]
         case::not_enough_data([0xAA, 0xBB].as_ref(), 32, 0xFF, bits![Msb0, u8;]),
-        #[should_panic(expected="Parse(\"too much data\")")]
-        case::not_enough_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 64, 0xFF, bits![Msb0, u8;]),
+        #[should_panic(expected="Parse(\"too much data: container of 32 cannot hold 64\")")]
+        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 64, 0xFF, bits![Msb0, u8;]),
     )]
     fn test_bit_read(
         input: &[u8],

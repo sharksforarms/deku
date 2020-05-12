@@ -1,5 +1,4 @@
 use crate::DekuReceiver;
-use darling;
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -15,56 +14,65 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         .expect("expected `struct` type")
         .fields;
 
-    let field_reads: Result<Vec<_>, _> = fields
-        .into_iter()
-        .enumerate()
-        .map(|(i, f)| {
-            let field_type = &f.ty;
-            let field_endian = f.endian.unwrap_or(input.endian);
-            let field_bits = f.bits;
-            let field_bytes = f.bytes;
+    let mut field_reads = vec![];
+    let mut field_bit_sizes = vec![];
 
-            // Support named or indexed fields
-            let field_ident = f.ident.as_ref().map(|v| quote!(#v)).unwrap_or_else(|| {
-                let ret = syn::Index::from(i);
-                quote! { #ret }
-            });
+    // Iterate each field, creating tokens for implementations
+    for (i, f) in fields.into_iter().enumerate() {
+        let field_type = &f.ty;
+        let field_endian = f.endian.unwrap_or(input.endian);
+        let field_bits = f.bits;
+        let field_bytes = f.bytes;
 
-            if field_bits.is_some() && field_bytes.is_some() {
-                return Err(darling::Error::duplicate_field(
-                    "both \"bits\" and \"bytes\" specified",
-                ));
-            }
+        // Support named or indexed fields
+        let field_ident = f.ident.as_ref().map(|v| quote!(#v)).unwrap_or_else(|| {
+            let ret = syn::Index::from(i);
+            quote! { #ret }
+        });
 
-            let field_bits = field_bits.or_else(|| field_bytes.map(|v| v * 8usize));
-            let field_bits = if field_bits.is_some() {
-                quote! { #field_bits }
-            } else {
-                quote! { #field_type::bit_size() }
-            };
+        if field_bits.is_some() && field_bytes.is_some() {
+            return Err(darling::Error::duplicate_field(
+                "both \"bits\" and \"bytes\" specified",
+            ));
+        }
 
-            let endian_flip = field_endian != input.endian;
+        let field_bits = field_bits.or_else(|| field_bytes.map(|v| v * 8usize));
+        let field_bits = if field_bits.is_some() {
+            quote! { #field_bits }
+        } else {
+            quote! { #field_type::bit_size() }
+        };
 
-            let field_read = quote! {
-                #field_ident: {
-                    let (rest, value) = #field_type::read(input, #field_bits)?;
-                    let value = if (#endian_flip) {
-                        value.swap_bytes()
-                    } else {
-                        value
-                    };
+        let endian_flip = field_endian != input.endian;
 
-                    input = rest;
+        // Create field read token for TryFrom trait
+        let field_read = quote! {
+            #field_ident: {
+                // TODO: Can this somehow be compile time?
+                assert!(#field_bits <= #field_type::bit_size());
 
+                let (rest, value) = #field_type::read(input, #field_bits)?;
+                let value = if (#endian_flip) {
+                    value.swap_bytes()
+                } else {
                     value
-                }
-            };
+                };
 
-            Ok(field_read)
-        })
-        .collect();
+                input = rest;
 
-    let field_reads = field_reads?;
+                value
+            }
+        };
+
+        field_reads.push(field_read);
+
+        // Create bit size token for BitSize trait
+        let field_bit_size = quote! {
+            #field_bits
+        };
+
+        field_bit_sizes.push(field_bit_size);
+    }
 
     tokens.extend(quote! {
         impl TryFrom<&[u8]> for #ident {
@@ -72,9 +80,48 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
                 let mut input = input.bits::<Msb0>();
-                Ok(Self {
+
+                if input.len() < #ident::bit_size() {
+                    return Err(DekuError::Parse(format!("not enough data: expected {} got {}", #ident::bit_size(), input.len())));
+                }
+
+                if input.len() > #ident::bit_size() {
+                    return Err(DekuError::Parse(format!("too much data: expected {} got {}", #ident::bit_size(), input.len())));
+                }
+
+                let res = Ok(Self {
                     #(#field_reads),*
-                })
+                });
+
+                if !input.is_empty() {
+                    unreachable!();
+                }
+
+
+                res
+            }
+        }
+
+        impl #ident {
+            fn swap_bytes(self) -> Self {
+                self
+            }
+        }
+        impl BitsSize for #ident {
+            fn bit_size() -> usize {
+                #(#field_bit_sizes)+*
+            }
+        }
+
+        impl BitsReader for #ident {
+            fn read(input: &BitSlice<Msb0, u8>, len: usize) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+                let (bits, rest) = input.split_at(len);
+                let mut input = bits;
+                let res = Self {
+                    #(#field_reads),*
+                };
+
+                Ok((rest, res))
             }
         }
     });

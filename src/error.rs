@@ -16,8 +16,6 @@ impl fmt::Display for DekuError {
 
 impl error::Error for DekuError {
     fn cause(&self) -> Option<&dyn error::Error> {
-        match *self {
-            _ => Some(self),
-        }
+        Some(self)
     }
 }

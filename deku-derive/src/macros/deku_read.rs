@@ -14,7 +14,11 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         .expect("expected `struct` type")
         .fields;
 
-    let mut field_reads = vec![];
+    // check if the first field has an ident, if not, it's a unnamed struct
+    let is_unnamed_struct = fields.get(0).and_then(|v| v.ident.as_ref()).is_none();
+
+    let mut field_variables = vec![];
+    let mut field_idents = vec![];
     let mut field_bit_sizes = vec![];
 
     // Iterate each field, creating tokens for implementations
@@ -23,12 +27,28 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         let field_endian = f.endian.unwrap_or(input.endian);
         let field_bits = f.bits;
         let field_bytes = f.bytes;
+        let field_reader = &f.reader;
+
+        let field_reader = field_reader.as_ref().map(|fn_str| {
+            let fn_ident: TokenStream = fn_str.parse().unwrap();
+
+            // TODO: Assert the shape of fn_ident? Only allow a structured function call instead of anything?
+
+            quote! { #fn_ident; }
+        });
 
         // Support named or indexed fields
         let field_ident = f.ident.as_ref().map(|v| quote!(#v)).unwrap_or_else(|| {
-            let ret = syn::Index::from(i);
-            quote! { #ret }
+            let index = syn::Index::from(i);
+            let field_ident = syn::Ident::new(
+                &format!("field_{}", quote! { #index }),
+                syn::export::Span::call_site(),
+            );
+
+            quote! { #field_ident }
         });
+
+        field_idents.push(field_ident.clone());
 
         if field_bits.is_some() && field_bytes.is_some() {
             return Err(darling::Error::duplicate_field(
@@ -45,26 +65,36 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
 
         let endian_flip = field_endian != input.endian;
 
+        let field_read_func = if field_reader.is_some() {
+            quote! { #field_reader }
+        } else {
+            quote! { #field_type::read(rest, field_bits) }
+        };
+
         // Create field read token for TryFrom trait
         let field_read = quote! {
-            #field_ident: {
-                // TODO: Can this somehow be compile time?
-                assert!(#field_bits <= #field_type::bit_size());
+            let #field_ident = {
+                let field_bits = #field_bits;
 
-                let (rest, value) = #field_type::read(input, #field_bits)?;
+                // TODO: Can this somehow be compile time?
+                assert!(field_bits <= #field_type::bit_size());
+
+                let read_ret = #field_read_func;
+                let (new_rest, value) = read_ret?;
+
                 let value = if (#endian_flip) {
-                    value.swap_bytes()
+                    value.swap_endian()
                 } else {
                     value
                 };
 
-                input = rest;
+                rest = new_rest;
 
                 value
-            }
+            };
         };
 
-        field_reads.push(field_read);
+        field_variables.push(field_read);
 
         // Create bit size token for BitSize trait
         let field_bit_size = quote! {
@@ -74,39 +104,57 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         field_bit_sizes.push(field_bit_size);
     }
 
+    let initialize_struct = if is_unnamed_struct {
+        quote! {
+            Self (
+                #(#field_idents),*
+            )
+        }
+    } else {
+        quote! {
+            Self {
+                #(#field_idents),*
+            }
+        }
+    };
+
     tokens.extend(quote! {
         impl TryFrom<&[u8]> for #ident {
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
-                let mut input = input.bits::<Msb0>();
 
-                if input.len() < #ident::bit_size() {
-                    return Err(DekuError::Parse(format!("not enough data: expected {} got {}", #ident::bit_size(), input.len())));
+                let input_bits = input.len() * 8;
+                if input_bits > #ident::bit_size() {
+                    return Err(DekuError::Parse(format!("too much data: expected {} got {}", #ident::bit_size(), input_bits)));
                 }
 
-                if input.len() > #ident::bit_size() {
-                    return Err(DekuError::Parse(format!("too much data: expected {} got {}", #ident::bit_size(), input.len())));
-                }
+                let (rest, res) = Self::from_bytes(input)?;
 
-                let res = Ok(Self {
-                    #(#field_reads),*
-                });
-
-                if !input.is_empty() {
+                // This should always be empty due to the check above
+                if !rest.is_empty() {
                     unreachable!();
                 }
 
-
-                res
+                Ok(res)
             }
         }
 
         impl #ident {
-            fn swap_bytes(self) -> Self {
-                self
+            fn from_bytes(input: &[u8]) -> Result<(&[u8], Self), DekuError> {
+                let mut rest = input.bits::<Msb0>();
+
+                if rest.len() < #ident::bit_size() {
+                    return Err(DekuError::Parse(format!("not enough data: expected {} got {}", #ident::bit_size(), rest.len())));
+                }
+
+                #(#field_variables)*
+                let value = #initialize_struct;
+
+                Ok((rest.as_slice(), value))
             }
         }
+
         impl BitsSize for #ident {
             fn bit_size() -> usize {
                 #(#field_bit_sizes)+*
@@ -116,15 +164,16 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         impl BitsReader for #ident {
             fn read(input: &BitSlice<Msb0, u8>, len: usize) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 let (bits, rest) = input.split_at(len);
-                let mut input = bits;
-                let res = Self {
-                    #(#field_reads),*
-                };
 
-                Ok((rest, res))
+                let mut rest = bits;
+                #(#field_variables)*
+                let value = #initialize_struct;
+
+                Ok((rest, value))
             }
         }
     });
 
+    // println!("{}", tokens.to_string());
     Ok(tokens)
 }

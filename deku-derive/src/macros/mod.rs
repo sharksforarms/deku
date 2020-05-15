@@ -6,19 +6,25 @@ pub(crate) mod deku_read;
 pub(crate) mod deku_write;
 
 /// Attempts to extract the concrete item type from a Vec (e.g Vec<u8> -> u8)
-fn extract_vec_item_type(field_type: &syn::Type) -> Option<&syn::Type> {
+fn extract_vec_item_type(field_type: &syn::Type) -> Result<&syn::Type, darling::Error> {
     let path = match field_type {
         syn::Type::Path(syn::TypePath { path, .. }) => path,
-        _ => return None,
+        _ => return Err(darling::Error::unexpected_type(
+            "deku(vec_len) applied on invalid type",
+        )),
     };
     if path.segments.len() != 1 {
-        return None;
+        return Err(darling::Error::unexpected_type(
+            "deku(vec_len) applied on invalid type",
+        ));
     }
     let seg = &path.segments[0];
 
     // Make sure its a vec
-    if seg.ident.to_string() != "Vec" {
-        return None;
+    if seg.ident != "Vec" {
+        return Err(darling::Error::unexpected_type(
+            "deku(vec_len) applied on non Vec type",
+        ));
     }
 
     // Extract the generic item
@@ -28,19 +34,25 @@ fn extract_vec_item_type(field_type: &syn::Type) -> Option<&syn::Type> {
             ..
         }) => {
             if args.len() != 1 {
-                return None;
+                return Err(darling::Error::unexpected_type(
+                    "deku(vec_len) could not parse vec item type",
+                ));
             }
             &args[0]
         }
-        _ => return None,
+        _ => return Err(darling::Error::unexpected_type(
+            "deku(vec_len) could not parse vec item type",
+        )),
     };
 
     // It was a type, not lifetime, etc...
     if let syn::GenericArgument::Type(t) = arg {
-        return Some(t);
+        Ok(t)
+    } else {
+        Err(darling::Error::unexpected_type(
+            "deku(vec_len) Vec's item type is invalid",
+        ))
     }
-
-    None
 }
 
 /// Validates the use of deku(vec_len) and returns the vec_ident on success.
@@ -56,21 +68,13 @@ fn validate_vec_len(
 
     // The field containing the length must have been parsed already
     if !existing_fields.contains(len_field_name) {
-        // TODO : Create real error for this
-        return Err(darling::Error::duplicate_field(
+        return Err(darling::Error::missing_field(
             "deku(vec_len) references an invalid field",
         ));
     }
 
     // field_type now points to the type of item the Vec is holding
-    *field_type = match extract_vec_item_type(field_type) {
-        Some(t) => t,
-        None => {
-            return Err(darling::Error::duplicate_field(
-                "Unable to extract vector type for deku(vec_len) field",
-            ))
-        }
-    };
+    *field_type = extract_vec_item_type(field_type)?;
 
     // Rename field_ident to [vec_field]_tmp to use inside the loop
     vec_ident = field_ident.clone();

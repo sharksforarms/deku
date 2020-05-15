@@ -56,36 +56,15 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
 
         field_idents.push(field_ident.clone());
 
-        // All the fields names we've seen so far
-        seen_field_names.insert(field_ident.to_string());
-
         if let Some(len_field_name) = field_vec_len {
-            // The field containing the length must have been parsed already
-            if !seen_field_names.contains(len_field_name) {
-                // TODO : Create real error for this
-                return Err(darling::Error::duplicate_field(
-                    "deku(vec_len) references an invalid field",
-                ));
-            }
-            // field_type now points to the type of item the Vec is holding
-            field_type = match super::extract_vec_generic(&field_type) {
-                Some(t) => t,
-                None => {
-                    return Err(darling::Error::duplicate_field(
-                        "Unable to extract vector type for deku(vec_len) field",
-                    ))
-                }
-            };
-
-            // Rename field_ident to [vec_field]_tmp to use inside the loop
-            vec_ident = Some(field_ident.clone());
-            let tmp_field_ident = syn::Ident::new(
-                &format!("{}_tmp", quote! { #field_ident }),
-                syn::export::Span::call_site(),
-            );
-            field_ident = quote!{
-                #tmp_field_ident
-            }
+            vec_ident = Some(super::validate_vec_len(
+                &mut field_ident,
+                &mut field_type,
+                len_field_name,
+                &mut seen_field_names,
+            )?);
+        } else {
+            seen_field_names.insert(field_ident.to_string());
         }
 
         if field_bits.is_some() && field_bytes.is_some() {
@@ -132,22 +111,23 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
             };
         };
 
-        if let Some(vec_field) = vec_ident {
+        if let Some(vec_name) = vec_ident {
             let len_field_name = field_vec_len.as_ref().map(|v| {
                 let len_field_name: TokenStream = v.parse().unwrap();
                 quote! { #len_field_name }
             });
             field_read = quote! {
-                let mut #vec_field = Vec::with_capacity(#len_field_name as usize);
+                let mut #vec_name = Vec::with_capacity(#len_field_name as usize);
                 for _ in 0..#len_field_name {
-                    
+
                     #field_read
 
-                    #vec_field.push(#field_ident);
+                    #vec_name.push(#field_ident);
                 }
             };
         }
 
+        //println!("{}", field_read.to_string());
         field_variables.push(field_read);
 
         // Create bit size token for BitSize trait
@@ -218,11 +198,12 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         impl BitsReader for #ident {
             fn read(input: &BitSlice<Msb0, u8>, len: usize) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 let (bits, rest) = input.split_at(len);
-
-                let mut rest = bits;
-                #(#field_variables)*
-                let value = #initialize_struct;
-
+                let value;
+                {
+                    let mut rest = bits;
+                    #(#field_variables)*
+                    value = #initialize_struct;
+                }
                 Ok((rest, value))
             }
         }

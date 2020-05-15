@@ -14,7 +14,7 @@ struct FieldF {
 //  |    field_a    |   field_b   |c|            field_d              | e |     f     |
 //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //
-#[derive(Debug, PartialEq, DekuRead/*, DekuWrite*/)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 // #[deku(endian = "little")] // By default it uses the system endianess, but can be overwritten
 struct DekuTest {
     field_a: u8,
@@ -27,13 +27,13 @@ struct DekuTest {
     #[deku(bits = "2")]
     field_e: u8,
     field_f: FieldF,
-    #[deku(vec_len="field_e")]
-    field_g: Vec<u8>,
-    field_h: u8,
+    num_items: u8,
+    #[deku(vec_len = "num_items")]
+    items: Vec<u16>,
 }
 
 fn main() {
-    let test_data: &[u8] = [0xAB, 0b1010010_1, 0xAB, 0xCD, 0b1100_0110].as_ref();
+    let test_data: &[u8] = [0xAB, 0b1010010_1, 0xAB, 0xCD, 0b1100_0110, 0x01, 0xBE, 0xEF].as_ref();
 
     let test_deku = DekuTest::try_from(test_data).unwrap();
 
@@ -45,13 +45,12 @@ fn main() {
             field_d: 0xCDAB,
             field_e: 0b0000_0011,
             field_f: FieldF { data: 0b00_000110 },
-            field_g: Vec::new(),
-            field_h: 0,
+            num_items: 1,
+            items: vec![0xBEEF],
         },
         test_deku
     );
-    /*
+
     let test_deku: Vec<u8> = test_deku.into();
     assert_eq!(test_data.to_vec(), test_deku);
-    */
 }

@@ -28,15 +28,13 @@ struct DekuTest {
     field_e: u8,
     field_f: FieldF,
     num_items: u8,
-    #[deku(vec_len="num_items")]
+    #[deku(vec_len = "num_items")]
     items: Vec<u16>,
 }
 
 fn main() {
-    
-    let test_data: &[u8] = [0xAB, 0b1010010_1, 0xAB, 0xCD, 0b1100_0110, 0x01, 0xBE,0xEF].as_ref();
-    println!("{}/{}", test_data.len()*8, DekuTest::bit_size());
-    
+    let test_data: &[u8] = [0xAB, 0b1010010_1, 0xAB, 0xCD, 0b1100_0110, 0x01, 0xBE, 0xEF].as_ref();
+
     let test_deku = DekuTest::try_from(test_data).unwrap();
 
     assert_eq!(

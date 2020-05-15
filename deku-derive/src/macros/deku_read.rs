@@ -127,6 +127,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
             };
         }
 
+        //println!("{}", field_read.to_string());
         field_variables.push(field_read);
 
         // Create bit size token for BitSize trait
@@ -197,11 +198,12 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         impl BitsReader for #ident {
             fn read(input: &BitSlice<Msb0, u8>, len: usize) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 let (bits, rest) = input.split_at(len);
-
-                let mut rest = bits;
-                #(#field_variables)*
-                let value = #initialize_struct;
-
+                let value;
+                {
+                    let mut rest = bits;
+                    #(#field_variables)*
+                    value = #initialize_struct;
+                }
                 Ok((rest, value))
             }
         }

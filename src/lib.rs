@@ -14,7 +14,17 @@ pub trait BitsSize {
 pub trait BitsReader: BitsSize {
     fn read(
         input: &BitSlice<Msb0, u8>,
-        len: usize,
+        bit_size: usize,
+    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    where
+        Self: Sized;
+}
+
+pub trait BitsReaderItems {
+    fn read(
+        input: &BitSlice<Msb0, u8>,
+        bit_size: usize,
+        count: usize,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized;
@@ -22,6 +32,7 @@ pub trait BitsReader: BitsSize {
 
 pub trait BitsWriter: BitsSize {
     fn write(self) -> Vec<u8>;
+    // TODO: swap_endian Should probably be another trait because the reader also uses this
     fn swap_endian(self) -> Self;
 }
 
@@ -36,25 +47,25 @@ macro_rules! ImplDekuTraits {
         impl BitsReader for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
-                len: usize,
+                bit_size: usize,
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-                if input.len() < len {
+                if input.len() < bit_size {
                     return Err(DekuError::Parse(format!(
                         "not enough data: expected {} got {}",
-                        len,
+                        bit_size,
                         input.len()
                     )));
                 }
 
-                if len > <$typ>::bit_size() {
+                if bit_size > <$typ>::bit_size() {
                     return Err(DekuError::Parse(format!(
                         "too much data: container of {} cannot hold {}",
                         <$typ>::bit_size(),
-                        len
+                        bit_size
                     )));
                 }
 
-                let (bits, rest) = input.split_at(len);
+                let (bits, rest) = input.split_at(bit_size);
 
                 #[cfg(target_endian = "little")]
                 let value: $typ = bits.load_be();
@@ -63,6 +74,65 @@ macro_rules! ImplDekuTraits {
                 let value: $typ = bits.load_le();
 
                 Ok((rest, value))
+            }
+        }
+
+        impl BitsReaderItems for Vec<$typ> {
+            fn read(
+                input: &BitSlice<Msb0, u8>,
+                bit_size: usize,
+                count: usize,
+            ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+            where
+                Self: Sized,
+            {
+                let expected_bits_total = bit_size * count;
+                if input.len() < bit_size * count {
+                    return Err(DekuError::Parse(format!(
+                        "not enough data for Vec<{}>: expected {}*{}={} got {}",
+                        stringify!($typ),
+                        count,
+                        bit_size,
+                        expected_bits_total,
+                        input.len()
+                    )));
+                }
+
+                let mut res = Vec::with_capacity(count);
+                let mut rest = input;
+                for _i in 0..count {
+                    let (new_rest, val) = <$typ>::read(rest, bit_size)?;
+                    res.push(val);
+                    rest = new_rest;
+                }
+
+                Ok((rest, res))
+            }
+        }
+
+        impl BitsWriter for Vec<$typ> {
+            fn write(self) -> Vec<u8> {
+                let mut acc = vec![];
+
+                for v in self {
+                    let r = v.write();
+                    acc.extend(r);
+                }
+
+                acc.reverse();
+
+                acc
+            }
+
+            fn swap_endian(self) -> Self {
+                // TODO: should flip endian for each item?
+                self
+            }
+        }
+
+        impl BitsSize for Vec<$typ> {
+            fn bit_size() -> usize {
+                <$typ>::bit_size()
             }
         }
 

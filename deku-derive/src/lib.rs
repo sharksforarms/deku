@@ -62,6 +62,9 @@ struct DekuFieldReceiver {
     bits: Option<usize>,
 
     #[darling(default)]
+    vec_len: Option<String>,
+
+    #[darling(default)]
     bytes: Option<usize>,
 
     #[darling(default)]

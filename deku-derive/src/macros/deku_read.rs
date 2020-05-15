@@ -1,6 +1,7 @@
 use crate::DekuReceiver;
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::collections::HashSet;
 
 pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let mut tokens = TokenStream::new();
@@ -21,14 +22,19 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
     let mut field_idents = vec![];
     let mut field_bit_sizes = vec![];
 
+    let mut seen_field_names: HashSet<String> = HashSet::new();
+
     // Iterate each field, creating tokens for implementations
     for (i, f) in fields.into_iter().enumerate() {
-        let field_type = &f.ty;
+        let mut field_type = &f.ty;
+        //println!("{:?}", field_type);
         let field_endian = f.endian.unwrap_or(input.endian);
         let field_bits = f.bits;
         let field_bytes = f.bytes;
         let field_reader = &f.reader;
-
+        let field_vec_len = &f.vec_len;
+        let mut vec_ident = None;
+        // Holds the generated code to read into a field
         let field_reader = field_reader.as_ref().map(|fn_str| {
             let fn_ident: TokenStream = fn_str.parse().unwrap();
 
@@ -38,7 +44,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         });
 
         // Support named or indexed fields
-        let field_ident = f.ident.as_ref().map(|v| quote!(#v)).unwrap_or_else(|| {
+        let mut field_ident = f.ident.as_ref().map(|v| quote!(#v)).unwrap_or_else(|| {
             let index = syn::Index::from(i);
             let field_ident = syn::Ident::new(
                 &format!("field_{}", quote! { #index }),
@@ -49,6 +55,38 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         });
 
         field_idents.push(field_ident.clone());
+
+        // All the fields names we've seen so far
+        seen_field_names.insert(field_ident.to_string());
+
+        if let Some(len_field_name) = field_vec_len {
+            // The field containing the length must have been parsed already
+            if !seen_field_names.contains(len_field_name) {
+                // TODO : Create real error for this
+                return Err(darling::Error::duplicate_field(
+                    "deku(vec_len) references an invalid field",
+                ));
+            }
+            // field_type now points to the type of item the Vec is holding
+            field_type = match super::extract_vec_generic(&field_type) {
+                Some(t) => t,
+                None => {
+                    return Err(darling::Error::duplicate_field(
+                        "Unable to extract vector type for deku(vec_len) field",
+                    ))
+                }
+            };
+
+            // Rename field_ident to [vec_field]_tmp to use inside the loop
+            vec_ident = Some(field_ident.clone());
+            let tmp_field_ident = syn::Ident::new(
+                &format!("{}_tmp", quote! { #field_ident }),
+                syn::export::Span::call_site(),
+            );
+            field_ident = quote!{
+                #tmp_field_ident
+            }
+        }
 
         if field_bits.is_some() && field_bytes.is_some() {
             return Err(darling::Error::duplicate_field(
@@ -72,7 +110,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         };
 
         // Create field read token for TryFrom trait
-        let field_read = quote! {
+        let mut field_read = quote! {
             let #field_ident = {
                 let field_bits = #field_bits;
 
@@ -93,6 +131,22 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
                 value
             };
         };
+
+        if let Some(vec_field) = vec_ident {
+            let len_field_name = field_vec_len.as_ref().map(|v| {
+                let len_field_name: TokenStream = v.parse().unwrap();
+                quote! { #len_field_name }
+            });
+            field_read = quote! {
+                let mut #vec_field = Vec::with_capacity(#len_field_name as usize);
+                for _ in 0..#len_field_name {
+                    
+                    #field_read
+
+                    #vec_field.push(#field_ident);
+                }
+            };
+        }
 
         field_variables.push(field_read);
 
@@ -174,6 +228,6 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         }
     });
 
-    // println!("{}", tokens.to_string());
+    //println!("{}", tokens.to_string());
     Ok(tokens)
 }

@@ -9,9 +9,11 @@ pub(crate) mod deku_write;
 fn extract_vec_item_type(field_type: &syn::Type) -> Result<&syn::Type, darling::Error> {
     let path = match field_type {
         syn::Type::Path(syn::TypePath { path, .. }) => path,
-        _ => return Err(darling::Error::unexpected_type(
-            "deku(vec_len) applied on invalid type",
-        )),
+        _ => {
+            return Err(darling::Error::unexpected_type(
+                "deku(vec_len) applied on invalid type",
+            ))
+        }
     };
     if path.segments.len() != 1 {
         return Err(darling::Error::unexpected_type(
@@ -40,9 +42,11 @@ fn extract_vec_item_type(field_type: &syn::Type) -> Result<&syn::Type, darling::
             }
             &args[0]
         }
-        _ => return Err(darling::Error::unexpected_type(
-            "deku(vec_len) could not parse vec item type",
-        )),
+        _ => {
+            return Err(darling::Error::unexpected_type(
+                "deku(vec_len) could not parse vec item type",
+            ))
+        }
     };
 
     // It was a type, not lifetime, etc...

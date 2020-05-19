@@ -28,11 +28,6 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
                 .len
                 .as_ref()
                 .map(|v| syn::Ident::new(&v, syn::export::Span::call_site()));
-            let field_len = if let Some(v) = field_len {
-                quote! { * input.#v as usize }
-            } else {
-                quote! {}
-            };
 
             // Support named or indexed fields
             let field_ident = f.ident.as_ref().map(|v| quote!(#v)).unwrap_or_else(|| {
@@ -55,6 +50,12 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
                 quote! { #field_type::bit_size() }
             };
 
+            let mul_len = if let Some(v) = field_len {
+                quote! { * input.#v as usize }
+            } else {
+                quote! {}
+            };
+
             let field_write = quote! {
                 // TODO: Can this somehow be compile time?
                 // Assert if we're writing more then what the type supports
@@ -69,7 +70,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
                 let field_bytes = field_val.write();
 
                 let mut bits: BitVec<P, u8> = field_bytes.into();
-                let index = bits.len() - #field_bits #field_len;
+                let index = bits.len() - #field_bits #mul_len;
                 acc.extend_from_slice(&bits.as_bitslice()[index..]);
             };
 

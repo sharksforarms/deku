@@ -42,7 +42,6 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
             let fn_ident: TokenStream = fn_str.parse().unwrap();
 
             // TODO: Assert the shape of fn_ident? Only allow a structured function call instead of anything?
-
             quote! { #fn_ident; }
         });
 

@@ -244,6 +244,8 @@ mod tests {
         case::not_enough_data([].as_ref(), 9, 1, vec![], bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"not enough data for Vec<u8>: expected 1*9=9 got 8\")")]
         case::not_enough_data([0xAA].as_ref(), 9, 1, vec![], bits![Msb0, u8;]),
+        #[should_panic(expected="Parse(\"not enough data for Vec<u8>: expected 2*8=16 got 8\")")]
+        case::not_enough_data([0xAA].as_ref(), 8, 2, vec![], bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"too much data: container of 8 cannot hold 9\")")]
         case::too_much_data([0xAA, 0xBB].as_ref(), 9, 1, vec![], bits![Msb0, u8;]),
     )]

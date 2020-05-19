@@ -77,63 +77,6 @@ macro_rules! ImplDekuTraits {
             }
         }
 
-        impl BitsReaderItems for Vec<$typ> {
-            fn read(
-                input: &BitSlice<Msb0, u8>,
-                bit_size: usize,
-                count: usize,
-            ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
-            where
-                Self: Sized,
-            {
-                let expected_bits_total = bit_size * count;
-                if input.len() < bit_size * count {
-                    return Err(DekuError::Parse(format!(
-                        "not enough data for Vec<{}>: expected {}*{}={} got {}",
-                        stringify!($typ),
-                        count,
-                        bit_size,
-                        expected_bits_total,
-                        input.len()
-                    )));
-                }
-
-                let mut res = Vec::with_capacity(count);
-                let mut rest = input;
-                for _i in 0..count {
-                    let (new_rest, val) = <$typ>::read(rest, bit_size)?;
-                    res.push(val);
-                    rest = new_rest;
-                }
-
-                Ok((rest, res))
-            }
-        }
-
-        impl BitsWriter for Vec<$typ> {
-            fn write(self) -> Vec<u8> {
-                let mut acc = vec![];
-
-                for v in self {
-                    let r = v.write();
-                    acc.extend(r);
-                }
-
-                acc
-            }
-
-            fn swap_endian(self) -> Self {
-                // TODO: should flip endian for each item?
-                self
-            }
-        }
-
-        impl BitsSize for Vec<$typ> {
-            fn bit_size() -> usize {
-                <$typ>::bit_size()
-            }
-        }
-
         impl BitsWriter for $typ {
             fn write(self) -> Vec<u8> {
                 #[cfg(target_endian = "little")]
@@ -150,6 +93,63 @@ macro_rules! ImplDekuTraits {
             }
         }
     };
+}
+
+impl<T: BitsSize> BitsSize for Vec<T> {
+    fn bit_size() -> usize {
+        T::bit_size()
+    }
+}
+
+impl<T: BitsReader> BitsReaderItems for Vec<T> {
+    fn read(
+        input: &BitSlice<Msb0, u8>,
+        bit_size: usize,
+        count: usize,
+    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    where
+        Self: Sized,
+    {
+        let expected_bits_total = bit_size * count;
+        if input.len() < bit_size * count {
+            return Err(DekuError::Parse(format!(
+                "not enough data for Vec<{}>: expected {}*{}={} got {}",
+                stringify!(T),
+                count,
+                bit_size,
+                expected_bits_total,
+                input.len()
+            )));
+        }
+
+        let mut res = Vec::with_capacity(count);
+        let mut rest = input;
+        for _i in 0..count {
+            let (new_rest, val) = <T>::read(rest, bit_size)?;
+            res.push(val);
+            rest = new_rest;
+        }
+
+        Ok((rest, res))
+    }
+}
+
+impl<T: BitsWriter> BitsWriter for Vec<T> {
+    fn write(self) -> Vec<u8> {
+        let mut acc = vec![];
+
+        for v in self {
+            let r = v.write();
+            acc.extend(r);
+        }
+
+        acc
+    }
+
+    fn swap_endian(self) -> Self {
+        // TODO: should flip endian for each item?
+        self
+    }
 }
 
 ImplDekuTraits!(u8);

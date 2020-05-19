@@ -61,19 +61,16 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
                 assert!(#field_bits <= #field_type::bit_size());
 
                 let field_val = if (#endian_flip) {
-                    input.#field_ident
-                } else {
                     input.#field_ident.swap_endian()
+                } else {
+                    input.#field_ident
                 };
 
                 let field_bytes = field_val.write();
 
-                // Reverse to write from MSB -> LSB
-                for i in (0..#field_bits #field_len).rev() {
-                    let field_val = field_bytes[i/8];
-                    let bit = (field_val & 1 << (i%8)) != 0;
-                    acc.push(bit)
-                }
+                let mut bits: BitVec<P, u8> = field_bytes.into();
+                let index = bits.len() - #field_bits #field_len;
+                acc.extend_from_slice(&bits.as_bitslice()[index..]);
             };
 
             Ok(field_write)
@@ -95,21 +92,21 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
 
         impl From<#ident> for Vec<u8> {
             fn from(input: #ident) -> Self {
-                let acc: BitVec<Msb0, u8> = input.into();
+                let mut acc: BitVec<Msb0, u8> = input.into();
+
+                // pad to next byte
+                let pad_amt = 8 * ((acc.len() + 7) / 8) - acc.len();
+                for _i in 0..pad_amt {
+                    acc.insert(0, false);
+                }
+
                 acc.into_vec()
             }
         }
 
         impl BitsWriter for #ident {
             fn write(self) -> Vec<u8> {
-                // TODO: This could be improved I think.
-
-                // Accumulate the result for the struct and reverse the bits
-                let mut acc: BitVec::<Lsb0, u8> = self.into();
-                let bs = acc.as_mut_bitslice();
-                bs[..].reverse();
-
-                acc.into_vec()
+                self.into()
             }
 
             fn swap_endian(self) -> Self {

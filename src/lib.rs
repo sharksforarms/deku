@@ -119,8 +119,6 @@ macro_rules! ImplDekuTraits {
                     acc.extend(r);
                 }
 
-                acc.reverse();
-
                 acc
             }
 
@@ -173,7 +171,7 @@ mod tests {
         // assert_eq!(128, u128::bit_size());
     }
 
-    #[rstest(input,read_bits,expected,expected_rest,
+    #[rstest(input,bit_size,expected,expected_rest,
         case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8;]),
         case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD].as_ref(), 12, 0b1001_0110_1110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
         case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8; 1,1,1,0,1,1,1,0, 1,1,1,1,1,1,1,1]),
@@ -188,13 +186,13 @@ mod tests {
     )]
     fn test_bit_read(
         input: &[u8],
-        read_bits: usize,
+        bit_size: usize,
         expected: u32,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
 
-        let (rest, res_read) = u32::read(bit_slice, read_bits).unwrap();
+        let (rest, res_read) = u32::read(bit_slice, bit_size).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
     }
@@ -207,19 +205,19 @@ mod tests {
         assert_eq!(expected, res_write);
     }
 
-    #[rstest(input,read_bits,expected,expected_rest,expected_write,
+    #[rstest(input,bit_size,expected,expected_rest,expected_write,
         case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
     fn test_bit_read_write(
         input: &[u8],
-        read_bits: usize,
+        bit_size: usize,
         expected: u32,
         expected_rest: &BitSlice<Msb0, u8>,
         expected_write: Vec<u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
 
-        let (rest, res_read) = u32::read(bit_slice, read_bits).unwrap();
+        let (rest, res_read) = u32::read(bit_slice, bit_size).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
@@ -233,5 +231,28 @@ mod tests {
     fn test_swap_endian() {
         let input = 0xAABBCCDDu32;
         assert_eq!(0xDDCCBBAA, input.swap_endian());
+    }
+
+    #[rstest(input,bit_size,count,expected,expected_rest,expected_write,
+        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 8, 4, vec![0xAA, 0xBB, 0xCC, 0xDD], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+    )]
+    fn test_vec_read_write(
+        input: &[u8],
+        bit_size: usize,
+        count: usize,
+        expected: Vec<u8>,
+        expected_rest: &BitSlice<Msb0, u8>,
+        expected_write: Vec<u8>,
+    ) {
+        let bit_slice = input.bits::<Msb0>();
+
+        let (rest, res_read) = Vec::<u8>::read(bit_slice, bit_size, count).unwrap();
+        assert_eq!(expected, res_read);
+        assert_eq!(expected_rest, rest);
+
+        let res_write = res_read.write();
+        assert_eq!(expected_write, res_write);
+
+        assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
     }
 }

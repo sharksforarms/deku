@@ -27,10 +27,9 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
             quote! { #fn_ident; }
         });
 
-        let field_len = &f
-            .len
-            .as_ref()
-            .map(|v| syn::Ident::new(&v, syn::export::Span::call_site()));
+        let field_len = &f.len.as_ref().map(|v| {
+            syn::Ident::new(v, syn::export::Span::call_site())
+        });
 
         // Support named or indexed fields
         let field_ident = f

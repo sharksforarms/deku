@@ -106,9 +106,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
                 #field_ident
             };
 
-            let field_bytes = field_val.write();
-
-            let mut bits: BitVec<P, u8> = field_bytes.into();
+            let bits = field_val.write();
             let index = bits.len() - #field_bits #mul_len;
             acc.extend_from_slice(&bits.as_bitslice()[index..]);
         };
@@ -132,19 +130,12 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
         impl From<#ident> for Vec<u8> {
             fn from(input: #ident) -> Self {
                 let mut acc: BitVec<Msb0, u8> = input.into();
-
-                // pad to next byte
-                let pad_amt = 8 * ((acc.len() + 7) / 8) - acc.len();
-                for _i in 0..pad_amt {
-                    acc.insert(0, false);
-                }
-
                 acc.into_vec()
             }
         }
 
         impl BitsWriter for #ident {
-            fn write(self) -> Vec<u8> {
+            fn write(self) -> BitVec<Msb0, u8> {
                 self.into()
             }
 

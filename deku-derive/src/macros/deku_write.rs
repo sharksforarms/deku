@@ -27,9 +27,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
             quote! { #fn_ident; }
         });
 
-        let field_len = &f.len.as_ref().map(|v| {
-            v.parse::<TokenStream>().unwrap()
-        });
+        let field_len = &f.len.as_ref().map(|v| v.parse::<TokenStream>().unwrap());
 
         // Support named or indexed fields
         let field_ident = f

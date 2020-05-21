@@ -107,7 +107,6 @@ impl<T: BitsReader> BitsReaderItems for Vec<T> {
     where
         Self: Sized,
     {
-
         let mut res = Vec::with_capacity(count);
         let mut rest = input;
         for _i in 0..count {
@@ -152,21 +151,21 @@ mod tests {
     use rstest::rstest;
 
     #[rstest(input,bit_size,expected,expected_rest,
-        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8;]),
-        case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD].as_ref(), 12, 0b1001_0110_1110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
-        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8; 1,1,1,0,1,1,1,0, 1,1,1,1,1,1,1,1]),
+        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Some(32), 0xAABBCCDD, bits![Msb0, u8;]),
+        case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD].as_ref(), Some(12), 0b1001_0110_1110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
+        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF].as_ref(), Some(32), 0xAABBCCDD, bits![Msb0, u8; 1,1,1,0,1,1,1,0, 1,1,1,1,1,1,1,1]),
 
         // TODO: Better error message for these
         #[should_panic(expected="Parse(\"not enough data: expected 32 got 0\")")]
-        case::not_enough_data([].as_ref(), 32, 0xFF, bits![Msb0, u8;]),
+        case::not_enough_data([].as_ref(), Some(32), 0xFF, bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"not enough data: expected 32 got 16\")")]
-        case::not_enough_data([0xAA, 0xBB].as_ref(), 32, 0xFF, bits![Msb0, u8;]),
+        case::not_enough_data([0xAA, 0xBB].as_ref(), Some(32), 0xFF, bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"too much data: container of 32 cannot hold 64\")")]
-        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 64, 0xFF, bits![Msb0, u8;]),
+        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Some(64), 0xFF, bits![Msb0, u8;]),
     )]
     fn test_bit_read(
         input: &[u8],
-        bit_size: usize,
+        bit_size: Option<usize>,
         expected: u32,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
@@ -177,20 +176,20 @@ mod tests {
         assert_eq!(expected_rest, rest);
     }
 
-    #[rstest(input,expected,
-        case::normal(0xAABBCCDD, vec![0xAA, 0xBB, 0xCC, 0xDD]),
+    #[rstest(input,bit_size,expected,
+        case::normal(0xAABBCCDD, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
-    fn test_bit_write(input: u32, expected: Vec<u8>) {
-        let res_write = input.write().into_vec();
+    fn test_bit_write(input: u32, bit_size: Option<usize>, expected: Vec<u8>) {
+        let res_write = input.write(bit_size).into_vec();
         assert_eq!(expected, res_write);
     }
 
     #[rstest(input,bit_size,expected,expected_rest,expected_write,
-        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Some(32), 0xAABBCCDD, bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
     fn test_bit_read_write(
         input: &[u8],
-        bit_size: usize,
+        bit_size: Option<usize>,
         expected: u32,
         expected_rest: &BitSlice<Msb0, u8>,
         expected_write: Vec<u8>,
@@ -201,7 +200,7 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write = res_read.write().into_vec();
+        let res_write = res_read.write(bit_size).into_vec();
         assert_eq!(expected_write, res_write);
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
@@ -214,24 +213,24 @@ mod tests {
     }
 
     #[rstest(input,bit_size,count,expected,expected_rest,
-        case::count_0([0xAA].as_ref(), 8, 0, vec![], bits![Msb0, u8; 1,0,1,0,1,0,1,0]),
-        case::count_1([0xAA, 0xBB].as_ref(), 8, 1, vec![0xAA], bits![Msb0, u8; 1,0,1,1,1,0,1,1]),
-        case::count_2([0xAA, 0xBB, 0xCC].as_ref(), 8, 2, vec![0xAA, 0xBB], bits![Msb0, u8; 1,1,0,0,1,1,0,0]),
+        case::count_0([0xAA].as_ref(), Some(8), 0, vec![], bits![Msb0, u8; 1,0,1,0,1,0,1,0]),
+        case::count_1([0xAA, 0xBB].as_ref(), Some(8), 1, vec![0xAA], bits![Msb0, u8; 1,0,1,1,1,0,1,1]),
+        case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Some(8), 2, vec![0xAA, 0xBB], bits![Msb0, u8; 1,1,0,0,1,1,0,0]),
 
-        case::bits_6([0b0110_1001, 0b0110_1001].as_ref(), 6, 2, vec![0b00_011010, 0b00_010110], bits![Msb0, u8; 1,0,0,1]),
+        case::bits_6([0b0110_1001, 0b0110_1001].as_ref(), Some(6), 2, vec![0b00_011010, 0b00_010110], bits![Msb0, u8; 1,0,0,1]),
 
-        #[should_panic(expected="Parse(\"not enough data for Vec: expected 1*9=9 got 0\")")]
-        case::not_enough_data([].as_ref(), 9, 1, vec![], bits![Msb0, u8;]),
-        #[should_panic(expected="Parse(\"not enough data for Vec: expected 1*9=9 got 8\")")]
-        case::not_enough_data([0xAA].as_ref(), 9, 1, vec![], bits![Msb0, u8;]),
-        #[should_panic(expected="Parse(\"not enough data for Vec: expected 2*8=16 got 8\")")]
-        case::not_enough_data([0xAA].as_ref(), 8, 2, vec![], bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"too much data: container of 8 cannot hold 9\")")]
-        case::too_much_data([0xAA, 0xBB].as_ref(), 9, 1, vec![], bits![Msb0, u8;]),
+        case::not_enough_data([].as_ref(), Some(9), 1, vec![], bits![Msb0, u8;]),
+        #[should_panic(expected="Parse(\"too much data: container of 8 cannot hold 9\")")]
+        case::not_enough_data([0xAA].as_ref(), Some(9), 1, vec![], bits![Msb0, u8;]),
+        #[should_panic(expected="Parse(\"not enough data: expected 8 got 0\")")]
+        case::not_enough_data([0xAA].as_ref(), Some(8), 2, vec![], bits![Msb0, u8;]),
+        #[should_panic(expected="Parse(\"too much data: container of 8 cannot hold 9\")")]
+        case::too_much_data([0xAA, 0xBB].as_ref(), Some(9), 1, vec![], bits![Msb0, u8;]),
     )]
     fn test_vec_read(
         input: &[u8],
-        bit_size: usize,
+        bit_size: Option<usize>,
         count: usize,
         expected: Vec<u8>,
         expected_rest: &BitSlice<Msb0, u8>,
@@ -243,20 +242,20 @@ mod tests {
         assert_eq!(expected_rest, rest);
     }
 
-    #[rstest(input,expected,
-        case::normal(vec![0xAABB, 0xCCDD], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+    #[rstest(input,bit_size,expected,
+        case::normal(vec![0xAABB, 0xCCDD], None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
-    fn test_vec_write(input: Vec<u16>, expected: Vec<u8>) {
-        let res_write = input.write().into_vec();
+    fn test_vec_write(input: Vec<u16>, bit_size: Option<usize>, expected: Vec<u8>) {
+        let res_write = input.write(bit_size).into_vec();
         assert_eq!(expected, res_write);
     }
 
     #[rstest(input,bit_size,count,expected,expected_rest,expected_write,
-        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 8, 4, vec![0xAA, 0xBB, 0xCC, 0xDD], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Some(8), 4, vec![0xAA, 0xBB, 0xCC, 0xDD], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
     fn test_vec_read_write(
         input: &[u8],
-        bit_size: usize,
+        bit_size: Option<usize>,
         count: usize,
         expected: Vec<u8>,
         expected_rest: &BitSlice<Msb0, u8>,

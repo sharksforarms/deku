@@ -14,7 +14,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
         .fields;
 
     let mut field_writes = vec![];
-    let mut field_inputs = vec![];
+    let mut field_overwrites = vec![];
 
     for (i, f) in fields.into_iter().enumerate() {
         let field_endian = f.endian.unwrap_or(input.endian);
@@ -33,7 +33,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
             .map(|v| syn::Ident::new(&v, syn::export::Span::call_site()));
 
         // Support named or indexed fields
-        let (field_ident_orig, field_ident) = f
+        let field_ident = f
             .ident
             .as_ref()
             .map(|v| quote!(#v))
@@ -43,36 +43,16 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
                     quote!(#i)
                 })
             })
-            .and_then(|v| {
-                let field_ident = syn::Ident::new(
-                    &format!("field_{}", quote! { #v }),
-                    syn::export::Span::call_site(),
-                );
-
-                Some((quote! {#v}, quote! { #field_ident }))
-            })
+            .map(|v| Some(quote! { input.#v }))
             .unwrap();
 
         // If `len` attr is provided, overwrite the field with the .len() of the container
-        let field_input_len_overwrite = field_len.as_ref().map(|v| {
-            /*
-            let len_field_ident = syn::Ident::new(
-                &format!("field_{}", quote! { #v }), // TODO: duplicate code
-                syn::export::Span::call_site(),
-            );
-            */
-            quote! {
-                use std::convert::TryInto;
-                input.#v = #field_ident.len().try_into().unwrap();
-            }
-        });
-
-        let field_input = quote! {
-            let mut #field_ident = input.#field_ident_orig;
-
-            #field_input_len_overwrite
-        };
-        field_inputs.push(field_input);
+        if let Some(field_len) = field_len {
+            field_overwrites.push(quote! {
+                // TODO: make write return a Result
+                input.#field_len = #field_ident.len().try_into().unwrap();
+            });
+        }
 
         let endian_flip = field_endian != input.endian;
 
@@ -82,14 +62,14 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
             ));
         }
         let field_bits = match field_bits.or_else(|| field_bytes.map(|v| v * 8usize)) {
-            Some(b) => quote!{Some(#b)},
-            None => quote!{None},
+            Some(b) => quote! {Some(#b)},
+            None => quote! {None},
         };
 
         let field_writer_func = if field_writer.is_some() {
             quote! { #field_writer }
         } else {
-            quote! { field_val.write(#field_bits) }
+            quote! { field_val.write(field_bits) }
         };
 
         let field_write = quote! {
@@ -99,6 +79,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
                 #field_ident
             };
 
+            let field_bits = #field_bits;
             let bits = #field_writer_func;
             acc.extend(bits);
         };
@@ -111,7 +92,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
             fn from(mut input: #ident) -> Self {
                 let mut acc: BitVec<P, u8> = BitVec::new();
 
-                #(#field_inputs)*
+                #(#field_overwrites)*
 
                 #(#field_writes)*
 
@@ -138,6 +119,6 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
         }
     });
 
-    //println!("{}", tokens.to_string());
+    // println!("{}", tokens.to_string());
     Ok(tokens)
 }

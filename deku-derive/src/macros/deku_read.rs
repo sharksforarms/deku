@@ -61,8 +61,8 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
             ));
         }
         let field_bits = match field_bits.or_else(|| field_bytes.map(|v| v * 8usize)) {
-            Some(b) => quote!{Some(#b)},
-            None => quote!{None},
+            Some(b) => quote! {Some(#b)},
+            None => quote! {None},
         };
 
         let endian_flip = field_endian != input.endian;
@@ -70,14 +70,15 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         let field_read_func = if field_reader.is_some() {
             quote! { #field_reader }
         } else if field_len.is_some() {
-            quote! { #field_type::read(rest, #field_bits, #field_len as usize) }
+            quote! { #field_type::read(rest, field_bits, #field_len as usize) }
         } else {
-            quote! { #field_type::read(rest, #field_bits) }
+            quote! { #field_type::read(rest, field_bits) }
         };
 
         // Create field read token for TryFrom trait
         let field_read = quote! {
             let #field_ident = {
+                let field_bits = #field_bits;
 
                 let read_ret = #field_read_func;
                 let (new_rest, value) = read_ret?;
@@ -116,7 +117,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
-        
+
                 let (rest, res) = Self::from_bytes(input)?;
 
                 Ok(res)
@@ -136,7 +137,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
 
         impl BitsReader for #ident {
             fn read(input: &BitSlice<Msb0, u8>, _bit_size: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-                
+
                 let mut rest = input;
                 #(#field_variables)*
                 let value = #initialize_struct;

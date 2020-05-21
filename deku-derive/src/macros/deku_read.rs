@@ -19,7 +19,6 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
 
     let mut field_variables = vec![];
     let mut field_idents = vec![];
-    let mut field_bit_sizes = vec![];
 
     // Iterate each field, creating tokens for implementations
     for (i, f) in fields.into_iter().enumerate() {
@@ -61,12 +60,9 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
                 "both \"bits\" and \"bytes\" specified",
             ));
         }
-
-        let field_bits = field_bits.or_else(|| field_bytes.map(|v| v * 8usize));
-        let field_bits = if field_bits.is_some() {
-            quote! { #field_bits }
-        } else {
-            quote! { #field_type::bit_size() }
+        let field_bits = match field_bits.or_else(|| field_bytes.map(|v| v * 8usize)) {
+            Some(b) => quote! {Some(#b)},
+            None => quote! {None},
         };
 
         let endian_flip = field_endian != input.endian;
@@ -84,9 +80,6 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
             let #field_ident = {
                 let field_bits = #field_bits;
 
-                // TODO: Can this somehow be compile time?
-                assert!(field_bits <= #field_type::bit_size());
-
                 let read_ret = #field_read_func;
                 let (new_rest, value) = read_ret?;
 
@@ -103,13 +96,6 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         };
 
         field_variables.push(field_read);
-
-        // Create bit size token for BitSize trait
-        let field_bit_size = quote! {
-            #field_bits
-        };
-
-        field_bit_sizes.push(field_bit_size);
     }
 
     let initialize_struct = if is_unnamed_struct {
@@ -132,18 +118,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
 
-                // TODO: if there's a dynamic type in the struct, then we're not able to check ahead of time
-                // let input_bits = input.len() * 8;
-                // if input_bits > #ident::bit_size() {
-                //     return Err(DekuError::Parse(format!("too much data: expected {} got {}", #ident::bit_size(), input_bits)));
-                // }
-
                 let (rest, res) = Self::from_bytes(input)?;
-
-                // TODO: This should always be empty due to the check above
-                // if !rest.is_empty() {
-                //     unreachable!();
-                // }
 
                 Ok(res)
             }
@@ -153,11 +128,6 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
             fn from_bytes(input: &[u8]) -> Result<(&[u8], Self), DekuError> {
                 let mut rest = input.bits::<Msb0>();
 
-                // TODO: if there's a dynamic type in the struct, then we're not able to check ahead of time
-                // if rest.len() < #ident::bit_size() {
-                //     return Err(DekuError::Parse(format!("not enough data: expected {} got {}", #ident::bit_size(), rest.len())));
-                // }
-
                 #(#field_variables)*
                 let value = #initialize_struct;
 
@@ -165,21 +135,14 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
             }
         }
 
-        impl BitsSize for #ident {
-            fn bit_size() -> usize {
-                #(#field_bit_sizes)+*
-            }
-        }
-
         impl BitsReader for #ident {
-            fn read(input: &BitSlice<Msb0, u8>, bit_size: usize) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-                let (bits, new_rest) = input.split_at(bit_size);
+            fn read(input: &BitSlice<Msb0, u8>, _bit_size: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
 
-                let mut rest = bits;
+                let mut rest = input;
                 #(#field_variables)*
                 let value = #initialize_struct;
 
-                Ok((new_rest, value))
+                Ok((rest, value))
             }
         }
     });

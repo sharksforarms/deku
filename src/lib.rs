@@ -7,14 +7,10 @@ pub mod error;
 pub mod prelude;
 use crate::error::DekuError;
 
-pub trait BitsSize {
-    fn bit_size() -> usize;
-}
-
-pub trait BitsReader: BitsSize {
+pub trait BitsReader {
     fn read(
         input: &BitSlice<Msb0, u8>,
-        bit_size: usize,
+        bit_size: Option<usize>,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized;
@@ -23,45 +19,43 @@ pub trait BitsReader: BitsSize {
 pub trait BitsReaderItems {
     fn read(
         input: &BitSlice<Msb0, u8>,
-        bit_size: usize,
+        bit_size: Option<usize>,
         count: usize,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized;
 }
 
-pub trait BitsWriter: BitsSize {
-    fn write(self) -> BitVec<Msb0, u8>;
+pub trait BitsWriter {
+    fn write(self, bit_size: Option<usize>) -> BitVec<Msb0, u8>;
     // TODO: swap_endian Should probably be another trait because the reader also uses this
     fn swap_endian(self) -> Self;
 }
 
 macro_rules! ImplDekuTraits {
     ($typ:ty) => {
-        impl BitsSize for $typ {
-            fn bit_size() -> usize {
-                std::mem::size_of::<$typ>() * 8
-            }
-        }
-
         impl BitsReader for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
-                bit_size: usize,
+                bit_size: Option<usize>,
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+                let max_type_bits: usize = std::mem::size_of::<$typ>() * 8;
+
+                let bit_size = match bit_size {
+                    None => max_type_bits,
+                    Some(s) if s > max_type_bits => {
+                        return Err(DekuError::Parse(format!(
+                            "too much data: container of {} cannot hold {}",
+                            max_type_bits, s
+                        )))
+                    }
+                    Some(s) => s,
+                };
                 if input.len() < bit_size {
                     return Err(DekuError::Parse(format!(
                         "not enough data: expected {} got {}",
                         bit_size,
                         input.len()
-                    )));
-                }
-
-                if bit_size > <$typ>::bit_size() {
-                    return Err(DekuError::Parse(format!(
-                        "too much data: container of {} cannot hold {}",
-                        <$typ>::bit_size(),
-                        bit_size
                     )));
                 }
 
@@ -78,14 +72,23 @@ macro_rules! ImplDekuTraits {
         }
 
         impl BitsWriter for $typ {
-            fn write(self) -> BitVec<Msb0, u8> {
+            fn write(self, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
                 #[cfg(target_endian = "little")]
                 let res = self.to_be_bytes();
 
                 #[cfg(target_endian = "big")]
                 let res = self.to_le_bytes();
 
-                res.to_vec().into()
+                let mut res_bits: BitVec<Msb0, u8> = res.to_vec().into();
+
+                // Truncate to fit in bit_size bits
+                if let Some(max_bits) = bit_size {
+                    if res_bits.len() > max_bits {
+                        res_bits = res_bits.split_off(res_bits.len() - max_bits);
+                    }
+                }
+
+                res_bits
             }
 
             fn swap_endian(self) -> $typ {
@@ -95,31 +98,15 @@ macro_rules! ImplDekuTraits {
     };
 }
 
-impl<T: BitsSize> BitsSize for Vec<T> {
-    fn bit_size() -> usize {
-        T::bit_size()
-    }
-}
-
 impl<T: BitsReader> BitsReaderItems for Vec<T> {
     fn read(
         input: &BitSlice<Msb0, u8>,
-        bit_size: usize,
+        bit_size: Option<usize>,
         count: usize,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
     {
-        let expected_bits_total = bit_size * count;
-        if input.len() < bit_size * count {
-            return Err(DekuError::Parse(format!(
-                "not enough data for Vec: expected {}*{}={} got {}",
-                count,
-                bit_size,
-                expected_bits_total,
-                input.len()
-            )));
-        }
 
         let mut res = Vec::with_capacity(count);
         let mut rest = input;
@@ -134,11 +121,11 @@ impl<T: BitsReader> BitsReaderItems for Vec<T> {
 }
 
 impl<T: BitsWriter> BitsWriter for Vec<T> {
-    fn write(self) -> BitVec<Msb0, u8> {
+    fn write(self, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
         let mut acc = BitVec::new();
 
         for v in self {
-            let r = v.write();
+            let r = v.write(bit_size);
             acc.extend(r);
         }
 
@@ -163,12 +150,6 @@ mod tests {
     use super::*;
 
     use rstest::rstest;
-
-    #[test]
-    fn test_bit_size() {
-        assert_eq!(8, u8::bit_size());
-        // assert_eq!(128, u128::bit_size());
-    }
 
     #[rstest(input,bit_size,expected,expected_rest,
         case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), 32, 0xAABBCCDD, bits![Msb0, u8;]),

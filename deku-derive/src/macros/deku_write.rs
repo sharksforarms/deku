@@ -17,10 +17,6 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
     let mut field_inputs = vec![];
 
     for (i, f) in fields.into_iter().enumerate() {
-        let field_type = {
-            let t = &f.ty;
-            quote! { <#t> }
-        };
         let field_endian = f.endian.unwrap_or(input.endian);
         let field_bits = f.bits;
         let field_bytes = f.bytes;
@@ -30,8 +26,6 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
             // TODO: Assert the shape of fn_ident? Only allow a structured function call instead of anything?
             quote! { #fn_ident; }
         });
-
-        println!("Field writer: {:?}", field_writer);
 
         let field_len = &f
             .len
@@ -61,59 +55,44 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
 
         // If `len` attr is provided, overwrite the field with the .len() of the container
         let field_input_len_overwrite = field_len.as_ref().map(|v| {
+            /*
             let len_field_ident = syn::Ident::new(
                 &format!("field_{}", quote! { #v }), // TODO: duplicate code
                 syn::export::Span::call_site(),
             );
-
+            */
             quote! {
-                let #len_field_ident = #field_ident.len();
+                use std::convert::TryInto;
+                input.#v = #field_ident.len().try_into().unwrap();
             }
         });
 
         let field_input = quote! {
-            let #field_ident = input.#field_ident_orig;
+            let mut #field_ident = input.#field_ident_orig;
 
             #field_input_len_overwrite
         };
         field_inputs.push(field_input);
+
+        let endian_flip = field_endian != input.endian;
 
         if field_bits.is_some() && field_bytes.is_some() {
             return Err(darling::Error::duplicate_field(
                 "both \"bits\" and \"bytes\" specified",
             ));
         }
-
-        let endian_flip = field_endian != input.endian;
-
-        let field_bits = field_bits.or_else(|| field_bytes.map(|v| v * 8usize));
-        let field_bits = if field_bits.is_some() {
-            quote! { #field_bits }
-        } else {
-            quote! { #field_type::bit_size() }
-        };
-
-        let mul_len = if let Some(v) = field_len {
-            let len_field_ident = syn::Ident::new(
-                &format!("field_{}", quote! { #v }), // TODO: duplicate code
-                syn::export::Span::call_site(),
-            );
-            quote! { * #len_field_ident as usize }
-        } else {
-            quote! {}
+        let field_bits = match field_bits.or_else(|| field_bytes.map(|v| v * 8usize)) {
+            Some(b) => quote!{Some(#b)},
+            None => quote!{None},
         };
 
         let field_writer_func = if field_writer.is_some() {
             quote! { #field_writer }
         } else {
-            quote! { field_val.write() }
+            quote! { field_val.write(#field_bits) }
         };
 
         let field_write = quote! {
-            // TODO: Can this somehow be compile time?
-            // Assert if we're writing more then what the type supports
-            assert!(#field_bits <= #field_type::bit_size());
-
             let field_val = if (#endian_flip) {
                 #field_ident.swap_endian()
             } else {
@@ -121,8 +100,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
             };
 
             let bits = #field_writer_func;
-            let index = bits.len() - #field_bits #mul_len;
-            acc.extend_from_slice(&bits.as_bitslice()[index..]);
+            acc.extend(bits);
         };
 
         field_writes.push(field_write);
@@ -130,7 +108,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
 
     tokens.extend(quote! {
         impl<P> From<#ident> for BitVec<P, u8> where P: BitOrder {
-            fn from(input: #ident) -> Self {
+            fn from(mut input: #ident) -> Self {
                 let mut acc: BitVec<P, u8> = BitVec::new();
 
                 #(#field_inputs)*
@@ -142,14 +120,14 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
         }
 
         impl From<#ident> for Vec<u8> {
-            fn from(input: #ident) -> Self {
+            fn from(mut input: #ident) -> Self {
                 let mut acc: BitVec<Msb0, u8> = input.into();
                 acc.into_vec()
             }
         }
 
         impl BitsWriter for #ident {
-            fn write(self) -> BitVec<Msb0, u8> {
+            fn write(self, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
                 self.into()
             }
 
@@ -160,6 +138,6 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
         }
     });
 
-    // println!("{}", tokens.to_string());
+    //println!("{}", tokens.to_string());
     Ok(tokens)
 }

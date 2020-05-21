@@ -29,6 +29,8 @@ mod tests {
             #[deku(bytes = "2")] pub u16,
             #[deku(endian = "big")] pub u16,
             pub NestedDeku,
+            pub u8,
+            #[deku(len = "6")] pub Vec<u8>,
         );
 
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -43,6 +45,9 @@ mod tests {
             #[deku(endian = "big")]
             pub field_e: u16,
             pub field_f: NestedDeku,
+            pub vec_len: u8,
+            #[deku(len = "vec_len")]
+            pub vec_data: Vec<u8>,
         }
 
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -65,6 +70,9 @@ mod tests {
             0b1001_0110,
             0xCC,
             0xDD,
+            0x02,
+            0xBE,
+            0xEF,
         ]
         .to_vec();
 
@@ -81,7 +89,9 @@ mod tests {
                     nest_a: 0b00_100101,
                     nest_b: 0b10,
                     inner: samples::DoubleNestedDeku { data: 0xCCDD }
-                }
+                },
+                0x02,
+                vec![0xBE, 0xEF],
             ),
             ret_read
         );
@@ -103,6 +113,9 @@ mod tests {
             0b1001_0110,
             0xCC,
             0xDD,
+            0x02,
+            0xBE,
+            0xEF,
         ]
         .to_vec();
 
@@ -119,26 +132,9 @@ mod tests {
                     nest_a: 0b00_100101,
                     nest_b: 0b10,
                     inner: samples::DoubleNestedDeku { data: 0xCCDD }
-                }
-            },
-            ret_read
-        );
-
-        // Write
-        let ret_write: Vec<u8> = ret_read.into();
-        assert_eq!(test_data, ret_write);
-    }
-
-    #[test]
-    fn test_vec_count() {
-        let test_data: Vec<u8> = [0x02, 0xAA, 0xBB].to_vec();
-
-        // Read
-        let ret_read = samples::VecCountDeku::try_from(test_data.as_ref()).unwrap();
-        assert_eq!(
-            samples::VecCountDeku {
-                count: 0x02,
-                vec_data: vec![0xAA, 0xBB]
+                },
+                vec_len: 0x02,
+                vec_data: vec![0xBE, 0xEF]
             },
             ret_read
         );
@@ -168,13 +164,5 @@ mod tests {
         // Write
         let ret_write: Vec<u8> = ret_read.into();
         assert_eq!([0x03, 0xAA, 0xBB, 0xFF].to_vec(), ret_write);
-    }
-
-    #[should_panic(expected = "too much data: expected 80 got 800")]
-    #[test]
-    #[ignore] // TODO
-    fn test_from_slice_too_much_data() {
-        let test_data = [0xFFu8; 100];
-        samples::NamedDeku::try_from(test_data.as_ref()).unwrap();
     }
 }

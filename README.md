@@ -18,6 +18,8 @@ deku = "0.1"
 
 ## Example
 
+See `examples` folder for more!
+
 ```rust
 use deku::prelude::*;
 use std::convert::TryFrom;
@@ -48,10 +50,25 @@ struct DekuTest {
     #[deku(bits = "2")]
     field_e: u8,
     field_f: FieldF,
+    num_items: u8,
+    #[deku(len = "num_items")]
+    items: Vec<u16>,
 }
 
 fn main() {
-    let test_data: &[u8] = [0xAB, 0b1010010_1, 0xAB, 0xCD, 0b1100_0110].as_ref();
+    let test_data: &[u8] = [
+        0xAB,
+        0b1010010_1,
+        0xAB,
+        0xCD,
+        0b1100_0110,
+        0x02,
+        0xBE,
+        0xEF,
+        0xC0,
+        0xFE,
+    ]
+    .as_ref();
 
     let test_deku = DekuTest::try_from(test_data).unwrap();
 
@@ -62,7 +79,9 @@ fn main() {
             field_c: 0b0000000_1,
             field_d: 0xCDAB,
             field_e: 0b0000_0011,
-            field_f: FieldF { data: 0b00_000110 }
+            field_f: FieldF { data: 0b00_000110 },
+            num_items: 2,
+            items: vec![0xBEEF, 0xC0FE],
         },
         test_deku
     );

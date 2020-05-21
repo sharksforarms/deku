@@ -113,8 +113,7 @@ impl<T: BitsReader> BitsReaderItems for Vec<T> {
         let expected_bits_total = bit_size * count;
         if input.len() < bit_size * count {
             return Err(DekuError::Parse(format!(
-                "not enough data for Vec<{}>: expected {}*{}={} got {}",
-                stringify!(T),
+                "not enough data for Vec: expected {}*{}={} got {}",
                 count,
                 bit_size,
                 expected_bits_total,
@@ -240,11 +239,11 @@ mod tests {
 
         case::bits_6([0b0110_1001, 0b0110_1001].as_ref(), 6, 2, vec![0b00_011010, 0b00_010110], bits![Msb0, u8; 1,0,0,1]),
 
-        #[should_panic(expected="Parse(\"not enough data for Vec<u8>: expected 1*9=9 got 0\")")]
+        #[should_panic(expected="Parse(\"not enough data for Vec: expected 1*9=9 got 0\")")]
         case::not_enough_data([].as_ref(), 9, 1, vec![], bits![Msb0, u8;]),
-        #[should_panic(expected="Parse(\"not enough data for Vec<u8>: expected 1*9=9 got 8\")")]
+        #[should_panic(expected="Parse(\"not enough data for Vec: expected 1*9=9 got 8\")")]
         case::not_enough_data([0xAA].as_ref(), 9, 1, vec![], bits![Msb0, u8;]),
-        #[should_panic(expected="Parse(\"not enough data for Vec<u8>: expected 2*8=16 got 8\")")]
+        #[should_panic(expected="Parse(\"not enough data for Vec: expected 2*8=16 got 8\")")]
         case::not_enough_data([0xAA].as_ref(), 8, 2, vec![], bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"too much data: container of 8 cannot hold 9\")")]
         case::too_much_data([0xAA, 0xBB].as_ref(), 9, 1, vec![], bits![Msb0, u8;]),

@@ -24,6 +24,14 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
         let field_endian = f.endian.unwrap_or(input.endian);
         let field_bits = f.bits;
         let field_bytes = f.bytes;
+        let field_writer = f.writer.as_ref().map(|fn_str| {
+            let fn_ident: TokenStream = fn_str.parse().unwrap();
+
+            // TODO: Assert the shape of fn_ident? Only allow a structured function call instead of anything?
+            quote! { #fn_ident; }
+        });
+
+        println!("Field writer: {:?}", field_writer);
 
         let field_len = &f
             .len
@@ -95,6 +103,12 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
             quote! {}
         };
 
+        let field_writer_func = if field_writer.is_some() {
+            quote! { #field_writer }
+        } else {
+            quote! { field_val.write() }
+        };
+
         let field_write = quote! {
             // TODO: Can this somehow be compile time?
             // Assert if we're writing more then what the type supports
@@ -106,7 +120,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
                 #field_ident
             };
 
-            let bits = field_val.write();
+            let bits = #field_writer_func;
             let index = bits.len() - #field_bits #mul_len;
             acc.extend_from_slice(&bits.as_bitslice()[index..]);
         };

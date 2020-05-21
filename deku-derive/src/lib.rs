@@ -69,6 +69,9 @@ struct DekuFieldReceiver {
 
     #[darling(default)]
     reader: Option<String>,
+
+    #[darling(default)]
+    writer: Option<String>,
 }
 
 #[proc_macro_derive(DekuRead, attributes(deku))]

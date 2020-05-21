@@ -31,7 +31,7 @@ pub trait BitsReaderItems {
 }
 
 pub trait BitsWriter: BitsSize {
-    fn write(self) -> Vec<u8>;
+    fn write(self) -> BitVec<Msb0, u8>;
     // TODO: swap_endian Should probably be another trait because the reader also uses this
     fn swap_endian(self) -> Self;
 }
@@ -78,14 +78,14 @@ macro_rules! ImplDekuTraits {
         }
 
         impl BitsWriter for $typ {
-            fn write(self) -> Vec<u8> {
+            fn write(self) -> BitVec<Msb0, u8> {
                 #[cfg(target_endian = "little")]
                 let res = self.to_be_bytes();
 
                 #[cfg(target_endian = "big")]
                 let res = self.to_le_bytes();
 
-                res.to_vec()
+                res.to_vec().into()
             }
 
             fn swap_endian(self) -> $typ {
@@ -134,8 +134,8 @@ impl<T: BitsReader> BitsReaderItems for Vec<T> {
 }
 
 impl<T: BitsWriter> BitsWriter for Vec<T> {
-    fn write(self) -> Vec<u8> {
-        let mut acc = vec![];
+    fn write(self) -> BitVec<Msb0, u8> {
+        let mut acc = BitVec::new();
 
         for v in self {
             let r = v.write();
@@ -200,7 +200,7 @@ mod tests {
         case::normal(0xAABBCCDD, vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
     fn test_bit_write(input: u32, expected: Vec<u8>) {
-        let res_write = input.write();
+        let res_write = input.write().into_vec();
         assert_eq!(expected, res_write);
     }
 
@@ -220,7 +220,7 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write = res_read.write();
+        let res_write = res_read.write().into_vec();
         assert_eq!(expected_write, res_write);
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
@@ -266,7 +266,7 @@ mod tests {
         case::normal(vec![0xAABB, 0xCCDD], vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
     fn test_vec_write(input: Vec<u16>, expected: Vec<u8>) {
-        let res_write = input.write();
+        let res_write = input.write().into_vec();
         assert_eq!(expected, res_write);
     }
 
@@ -287,7 +287,7 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write = res_read.write();
+        let res_write: Vec<u8> = res_read.into();
         assert_eq!(expected_write, res_write);
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);

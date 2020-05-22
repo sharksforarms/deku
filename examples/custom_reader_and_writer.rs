@@ -3,6 +3,7 @@ use deku::prelude::*;
 fn bit_flipper_read(
     field_a: u8,
     rest: &BitSlice<Msb0, u8>,
+    input_is_le: bool,
     bit_size: Option<usize>,
 ) -> Result<(&BitSlice<Msb0, u8>, u8), DekuError> {
     // Access to previously read fields
@@ -15,7 +16,7 @@ fn bit_flipper_read(
     println!("bit_size: {:?}", bit_size);
 
     // read field_b, calling original func
-    let (rest, value) = u8::read(rest, bit_size)?;
+    let (rest, value) = u8::read(rest, input_is_le, bit_size)?;
 
     // flip the bits on value if field_a is 0x01
     let value = if field_a == 0x01 { !value } else { value };
@@ -23,7 +24,12 @@ fn bit_flipper_read(
     Ok((rest, value))
 }
 
-fn bit_flipper_write(field_a: u8, field_val: u8, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+fn bit_flipper_write(
+    field_a: u8,
+    field_val: u8,
+    output_is_le: bool,
+    bit_size: Option<usize>,
+) -> BitVec<Msb0, u8> {
     // Access to previously written fields
     println!("field_a = 0x{:X}", field_a);
 
@@ -40,7 +46,7 @@ fn bit_flipper_write(field_a: u8, field_val: u8, bit_size: Option<usize>) -> Bit
         field_val
     };
 
-    value.write(bit_size)
+    value.write(output_is_le, bit_size)
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -49,8 +55,8 @@ struct DekuTest {
 
     #[deku(
         bits = "8",
-        reader = "bit_flipper_read(field_a, rest, field_bits)",
-        writer = "bit_flipper_write(input.field_a, field_val, field_bits)"
+        reader = "bit_flipper_read(field_a, rest, input_is_le, field_bits)",
+        writer = "bit_flipper_write(input.field_a, field_val, output_is_le, field_bits)"
     )]
     field_b: u8,
 }

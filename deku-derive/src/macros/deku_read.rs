@@ -77,15 +77,16 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         let field_read_func = if field_reader.is_some() {
             quote! { #field_reader }
         } else if field_len.is_some() {
-            quote! { #field_type::read(rest, #is_le_bytes, field_bits, #field_len as usize) }
+            quote! { #field_type::read(rest, input_is_le, field_bits, #field_len as usize) }
         } else {
-            quote! { #field_type::read(rest, #is_le_bytes, field_bits) }
+            quote! { #field_type::read(rest, input_is_le, field_bits) }
         };
 
         // Create field read token for TryFrom trait
         let field_read = quote! {
             let #field_ident = {
                 let field_bits = #field_bits;
+                let input_is_le = #is_le_bytes;
 
                 let read_ret = #field_read_func;
                 let (new_rest, value) = read_ret?;

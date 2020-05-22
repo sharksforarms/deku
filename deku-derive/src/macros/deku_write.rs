@@ -66,12 +66,12 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
         let field_writer_func = if field_writer.is_some() {
             quote! { #field_writer }
         } else {
-            quote! { field_val.write(#is_le_bytes, field_bits) }
+            quote! { field_val.write(output_is_le, field_bits) }
         };
 
         let field_write = quote! {
             let field_val = #field_ident;
-            let is_le_bytes = #is_le_bytes;
+            let output_is_le = #is_le_bytes;
             let field_bits = #field_bits;
 
             let bits = #field_writer_func;
@@ -85,7 +85,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
         impl<P> From<#ident> for BitVec<P, u8> where P: BitOrder {
             fn from(mut input: #ident) -> Self {
                 use std::convert::TryInto;
-                
+
                 let mut acc: BitVec<P, u8> = BitVec::new();
 
                 #(#field_overwrites)*

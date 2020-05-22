@@ -53,7 +53,7 @@ pub struct Ipv4Header {
 }
 
 fn main() {
-    let test_data = hex!("450000502bc1400040068f37c0a8016bc01efd7d").to_vec();
+    let test_data = hex!("45005000c12b40004006378f6b01a8c07dfd1ec0").to_vec();
 
     let ip_header = Ipv4Header::try_from(test_data.as_ref()).unwrap();
 

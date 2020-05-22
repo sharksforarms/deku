@@ -22,7 +22,7 @@ See `examples` folder for more!
 
 ```rust
 use deku::prelude::*;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct FieldF {

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use deku::prelude::*;
-    use std::convert::{TryFrom, TryInto};
+    use std::convert::TryFrom;
 
     pub mod samples {
         use super::*;
@@ -83,12 +83,12 @@ mod tests {
                 0xFF,
                 0b0000_0010,
                 0b0001_0110,
-                0xAABB,
-                0xDDCC,
+                0xBBAA,
+                0xCCDD,
                 samples::NestedDeku {
                     nest_a: 0b00_100101,
                     nest_b: 0b10,
-                    inner: samples::DoubleNestedDeku { data: 0xCCDD }
+                    inner: samples::DoubleNestedDeku { data: 0xDDCC }
                 },
                 0x02,
                 vec![0xBE, 0xEF],
@@ -126,12 +126,12 @@ mod tests {
                 field_a: 0xFF,
                 field_b: 0b0000_0010,
                 field_c: 0b0001_0110,
-                field_d: 0xAABB,
-                field_e: 0xDDCC,
+                field_d: 0xBBAA,
+                field_e: 0xCCDD,
                 field_f: samples::NestedDeku {
                     nest_a: 0b00_100101,
                     nest_b: 0b10,
-                    inner: samples::DoubleNestedDeku { data: 0xCCDD }
+                    inner: samples::DoubleNestedDeku { data: 0xDDCC }
                 },
                 vec_len: 0x02,
                 vec_data: vec![0xBE, 0xEF]

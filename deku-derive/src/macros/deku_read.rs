@@ -1,4 +1,4 @@
-use crate::DekuReceiver;
+use crate::{DekuReceiver, EndianNess};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -72,14 +72,14 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
             None => quote! {None},
         };
 
-        let endian_flip = field_endian != input.endian;
+        let is_le_bytes = field_endian == EndianNess::Little;
 
         let field_read_func = if field_reader.is_some() {
             quote! { #field_reader }
         } else if field_len.is_some() {
-            quote! { #field_type::read(rest, field_bits, #field_len as usize) }
+            quote! { #field_type::read(rest, #is_le_bytes, field_bits, #field_len as usize) }
         } else {
-            quote! { #field_type::read(rest, field_bits) }
+            quote! { #field_type::read(rest, #is_le_bytes, field_bits) }
         };
 
         // Create field read token for TryFrom trait
@@ -89,12 +89,6 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
 
                 let read_ret = #field_read_func;
                 let (new_rest, value) = read_ret?;
-
-                let value = if (#endian_flip) {
-                    value.swap_endian()
-                } else {
-                    value
-                };
 
                 rest = new_rest;
 
@@ -143,7 +137,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         }
 
         impl BitsReader for #ident {
-            fn read(input: &BitSlice<Msb0, u8>, _bit_size: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+            fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
 
                 let mut rest = input;
                 #(#field_variables)*
@@ -154,6 +148,6 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         }
     });
 
-    // println!("{}", tokens.to_string());
+    println!("{}", tokens.to_string());
     Ok(tokens)
 }

@@ -1,4 +1,4 @@
-use crate::DekuReceiver;
+use crate::{DekuReceiver, EndianNess};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -51,7 +51,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
             });
         }
 
-        let endian_flip = field_endian != input.endian;
+        let is_le_bytes = field_endian == EndianNess::Little;
 
         if field_bits.is_some() && field_bytes.is_some() {
             return Err(darling::Error::duplicate_field(
@@ -66,17 +66,14 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
         let field_writer_func = if field_writer.is_some() {
             quote! { #field_writer }
         } else {
-            quote! { field_val.write(field_bits) }
+            quote! { field_val.write(#is_le_bytes, field_bits) }
         };
 
         let field_write = quote! {
-            let field_val = if (#endian_flip) {
-                #field_ident.swap_endian()
-            } else {
-                #field_ident
-            };
-
+            let field_val = #field_ident;
+            let is_le_bytes = #is_le_bytes;
             let field_bits = #field_bits;
+
             let bits = #field_writer_func;
             acc.extend(bits);
         };
@@ -105,17 +102,12 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
         }
 
         impl BitsWriter for #ident {
-            fn write(self, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+            fn write(self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
                 self.into()
-            }
-
-            fn swap_endian(self) -> Self {
-                // do nothing
-                self
             }
         }
     });
 
-    // println!("{}", tokens.to_string());
+    //println!("{}", tokens.to_string());
     Ok(tokens)
 }

@@ -10,6 +10,7 @@ use crate::error::DekuError;
 pub trait BitsReader {
     fn read(
         input: &BitSlice<Msb0, u8>,
+        input_is_le: bool,
         bit_size: Option<usize>,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
@@ -19,6 +20,7 @@ pub trait BitsReader {
 pub trait BitsReaderItems {
     fn read(
         input: &BitSlice<Msb0, u8>,
+        input_is_le: bool,
         bit_size: Option<usize>,
         count: usize,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
@@ -27,9 +29,7 @@ pub trait BitsReaderItems {
 }
 
 pub trait BitsWriter {
-    fn write(self, bit_size: Option<usize>) -> BitVec<Msb0, u8>;
-    // TODO: swap_endian Should probably be another trait because the reader also uses this
-    fn swap_endian(self) -> Self;
+    fn write(self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8>;
 }
 
 macro_rules! ImplDekuTraits {
@@ -37,6 +37,7 @@ macro_rules! ImplDekuTraits {
         impl BitsReader for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
+                input_is_le: bool,
                 bit_size: Option<usize>,
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 let max_type_bits: usize = std::mem::size_of::<$typ>() * 8;
@@ -61,23 +62,24 @@ macro_rules! ImplDekuTraits {
 
                 let (bits, rest) = input.split_at(bit_size);
 
-                #[cfg(target_endian = "little")]
-                let value: $typ = bits.load_be();
-
-                #[cfg(target_endian = "big")]
-                let value: $typ = bits.load_le();
+                let value = if input_is_le {
+                    bits.load_le()
+                } else {
+                    bits.load_be()
+                };
 
                 Ok((rest, value))
             }
         }
 
         impl BitsWriter for $typ {
-            fn write(self, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
-                #[cfg(target_endian = "little")]
-                let res = self.to_be_bytes();
+            fn write(self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
 
-                #[cfg(target_endian = "big")]
-                let res = self.to_le_bytes();
+                let res = if output_is_le {
+                    self.to_le_bytes()
+                } else {
+                    self.to_be_bytes()
+                };
 
                 let mut res_bits: BitVec<Msb0, u8> = res.to_vec().into();
 
@@ -90,10 +92,6 @@ macro_rules! ImplDekuTraits {
 
                 res_bits
             }
-
-            fn swap_endian(self) -> $typ {
-                self.swap_bytes()
-            }
         }
     };
 }
@@ -101,6 +99,7 @@ macro_rules! ImplDekuTraits {
 impl<T: BitsReader> BitsReaderItems for Vec<T> {
     fn read(
         input: &BitSlice<Msb0, u8>,
+        input_is_le: bool,
         bit_size: Option<usize>,
         count: usize,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
@@ -110,7 +109,7 @@ impl<T: BitsReader> BitsReaderItems for Vec<T> {
         let mut res = Vec::with_capacity(count);
         let mut rest = input;
         for _i in 0..count {
-            let (new_rest, val) = <T>::read(rest, bit_size)?;
+            let (new_rest, val) = <T>::read(rest, input_is_le, bit_size)?;
             res.push(val);
             rest = new_rest;
         }
@@ -120,20 +119,15 @@ impl<T: BitsReader> BitsReaderItems for Vec<T> {
 }
 
 impl<T: BitsWriter> BitsWriter for Vec<T> {
-    fn write(self, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+    fn write(self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
         let mut acc = BitVec::new();
 
         for v in self {
-            let r = v.write(bit_size);
+            let r = v.write(output_is_le, bit_size);
             acc.extend(r);
         }
 
         acc
-    }
-
-    fn swap_endian(self) -> Self {
-        // TODO: should flip endian for each item?
-        self
     }
 }
 

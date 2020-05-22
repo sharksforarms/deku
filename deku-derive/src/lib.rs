@@ -9,7 +9,7 @@ use crate::macros::{deku_read::emit_deku_read, deku_write::emit_deku_write};
 
 #[derive(Debug, Clone, Copy, PartialEq, FromMeta)]
 #[darling(default)]
-enum EndianNess {
+pub (crate) enum EndianNess {
     Little,
     Big,
 }

@@ -114,7 +114,7 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
     };
 
     tokens.extend(quote! {
-        impl TryFrom<&[u8]> for #ident {
+        impl std::convert::TryFrom<&[u8]> for #ident {
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {

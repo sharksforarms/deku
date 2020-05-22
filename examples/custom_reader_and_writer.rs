@@ -1,5 +1,4 @@
 use deku::prelude::*;
-use std::convert::TryFrom;
 
 fn bit_flipper_read(
     field_a: u8,

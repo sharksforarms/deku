@@ -84,6 +84,8 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
     tokens.extend(quote! {
         impl<P> From<#ident> for BitVec<P, u8> where P: BitOrder {
             fn from(mut input: #ident) -> Self {
+                use std::convert::TryInto;
+                
                 let mut acc: BitVec<P, u8> = BitVec::new();
 
                 #(#field_overwrites)*

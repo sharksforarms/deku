@@ -148,6 +148,6 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
         }
     });
 
-    println!("{}", tokens.to_string());
+    // println!("{}", tokens.to_string());
     Ok(tokens)
 }

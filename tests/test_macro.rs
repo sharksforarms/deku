@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use deku::prelude::*;
-    use std::convert::{TryFrom, TryInto};
-
+    use std::convert::TryFrom;
+    
     pub mod samples {
         use super::*;
 

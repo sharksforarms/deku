@@ -51,7 +51,7 @@ struct DekuTest {
     field_e: u8,
     field_f: FieldF,
     num_items: u8,
-    #[deku(len = "num_items")]
+    #[deku(len = "num_items", endian = "big")]
     items: Vec<u16>,
 }
 
@@ -77,7 +77,7 @@ fn main() {
             field_a: 0xAB,
             field_b: 0b0_1010010,
             field_c: 0b0000000_1,
-            field_d: 0xCDAB,
+            field_d: 0xABCD,
             field_e: 0b0000_0011,
             field_f: FieldF { data: 0b00_000110 },
             num_items: 2,

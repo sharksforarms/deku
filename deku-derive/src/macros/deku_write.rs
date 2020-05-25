@@ -20,12 +20,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
         let field_endian = f.endian.unwrap_or(input.endian);
         let field_bits = f.bits;
         let field_bytes = f.bytes;
-        let field_writer = f.writer.as_ref().map(|fn_str| {
-            let fn_ident: TokenStream = fn_str.parse().unwrap();
-
-            // TODO: Assert the shape of fn_ident? Only allow a structured function call instead of anything?
-            quote! { #fn_ident; }
-        });
+        let field_writer = &f.writer;
 
         let field_len = &f.len.as_ref().map(|v| v.parse::<TokenStream>().unwrap());
 
@@ -53,11 +48,6 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
 
         let is_le_bytes = field_endian == EndianNess::Little;
 
-        if field_bits.is_some() && field_bytes.is_some() {
-            return Err(darling::Error::duplicate_field(
-                "both \"bits\" and \"bytes\" specified",
-            ));
-        }
         let field_bits = match field_bits.or_else(|| field_bytes.map(|v| v * 8usize)) {
             Some(b) => quote! {Some(#b)},
             None => quote! {None},

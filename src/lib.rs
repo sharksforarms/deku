@@ -29,7 +29,7 @@ pub trait BitsReaderItems {
 }
 
 pub trait BitsWriter {
-    fn write(self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8>;
+    fn write(&mut self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8>;
 }
 
 macro_rules! ImplDekuTraits {
@@ -82,7 +82,7 @@ macro_rules! ImplDekuTraits {
         }
 
         impl BitsWriter for $typ {
-            fn write(self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+            fn write(&mut self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
                 let res = if output_is_le {
                     self.to_le_bytes()
                 } else {
@@ -127,7 +127,7 @@ impl<T: BitsReader> BitsReaderItems for Vec<T> {
 }
 
 impl<T: BitsWriter> BitsWriter for Vec<T> {
-    fn write(self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+    fn write(&mut self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
         let mut acc = BitVec::new();
 
         for v in self {

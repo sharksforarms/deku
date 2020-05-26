@@ -160,6 +160,7 @@ mod tests {
 
         // Add an item to the vec
         ret_read.vec_data.push(0xFF);
+        ret_read.update();
 
         // Write
         let ret_write: Vec<u8> = ret_read.into();

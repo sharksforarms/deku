@@ -26,8 +26,8 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         .take_struct()
         .expect("expected `struct` type");
 
-    let (field_overwrites, field_writes) =
-        emit_field_writes(input, &fields, Some(quote! { self. }))?;
+    let field_writes = emit_field_writes(input, &fields, Some(quote! { self. }))?;
+    let field_updates = emit_field_updates(&fields, Some(quote! { self. }))?;
 
     tokens.extend(quote! {
         impl<P> From<#ident> for BitVec<P, u8> where P: BitOrder {
@@ -44,18 +44,20 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #ident {
-            fn to_bytes(&mut self) -> Vec<u8> {
+        impl DekuWriteApi for #ident {
+
+            fn update(&mut self) {
+                use std::convert::TryInto;
+                #(#field_updates)*
+            }
+
+            fn to_bytes(&self) -> Vec<u8> {
                 let mut acc: BitVec<Msb0, u8> = self.to_bitvec();
                 acc.into_vec()
             }
 
-            fn to_bitvec<P: BitOrder>(&mut self) -> BitVec<P, u8> {
-                use std::convert::TryInto;
-
+            fn to_bitvec<P: BitOrder>(&self) -> BitVec<P, u8> {
                 let mut acc: BitVec<P, u8> = BitVec::new();
-
-                #(#field_overwrites)*
 
                 #(#field_writes)*
 
@@ -64,7 +66,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         }
 
         impl BitsWriter for #ident {
-            fn write(&mut self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+            fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
                 self.to_bitvec()
             }
         }
@@ -88,7 +90,8 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let id_is_le_bytes = input.endian == EndianNess::Little;
     let id_bit_size = super::option_as_literal_token(input.id_bits);
 
-    let mut variant_matches = vec![];
+    let mut variant_writes = vec![];
+    let mut variant_updates = vec![];
 
     for (_i, variant) in variants.into_iter().enumerate() {
         // check if the first field has an ident, if not, it's a unnamed struct
@@ -112,11 +115,10 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             .collect::<Vec<_>>();
         let variant_match = super::gen_enum_init(variant_is_named, variant_ident, field_idents);
 
-        let variant_write_func = if variant_writer.is_some() {
+        let variant_write = if variant_writer.is_some() {
             quote! { #variant_writer; }
         } else {
-            let (field_overwrites, field_writes) =
-                emit_field_writes(input, &variant.fields.as_ref(), None)?;
+            let field_writes = emit_field_writes(input, &variant.fields.as_ref(), None)?;
 
             quote! {
                 {
@@ -124,15 +126,22 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
                     let bits = variant_id.write(#id_is_le_bytes, #id_bit_size);
                     acc.extend(bits);
 
-                    #(#field_overwrites)*
                     #(#field_writes)*
                 }
             }
         };
 
-        variant_matches.push(quote! {
+        let variant_field_updates = emit_field_updates(&variant.fields.as_ref(), None)?;
+
+        variant_writes.push(quote! {
             #ident :: #variant_match => {
-                #variant_write_func
+                #variant_write
+            }
+        });
+
+        variant_updates.push(quote! {
+            #ident :: #variant_match => {
+                #(#variant_field_updates)*
             }
         });
     }
@@ -152,18 +161,25 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #ident {
-            fn to_bytes(&mut self) -> Vec<u8> {
+        impl DekuWriteApi for #ident {
+            fn update(&mut self) {
+                use std::convert::TryInto;
+
+                match self {
+                    #(#variant_updates),*
+                }
+            }
+
+            fn to_bytes(&self) -> Vec<u8> {
                 let mut acc: BitVec<Msb0, u8> = self.to_bitvec();
                 acc.into_vec()
             }
 
-            fn to_bitvec<P: BitOrder>(&mut self) -> BitVec<P, u8> {
-                use std::convert::TryInto;
+            fn to_bitvec<P: BitOrder>(&self) -> BitVec<P, u8> {
                 let mut acc: BitVec<P, u8> = BitVec::new();
 
                 match self {
-                    #(#variant_matches),*
+                    #(#variant_writes),*
                 }
 
                 acc
@@ -171,7 +187,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         }
 
         impl BitsWriter for #ident {
-            fn write(&mut self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+            fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
                 self.to_bitvec()
             }
         }
@@ -185,37 +201,42 @@ fn emit_field_writes(
     input: &DekuReceiver,
     fields: &Fields<&DekuFieldReceiver>,
     object_prefix: Option<TokenStream>,
-) -> Result<(Vec<TokenStream>, Vec<TokenStream>), darling::Error> {
-    let mut field_overwrites = vec![];
+) -> Result<Vec<TokenStream>, darling::Error> {
     let mut field_writes = vec![];
 
     for (i, f) in fields.iter().enumerate() {
-        let (_field_idents, new_field_overwrites, field_write) =
-            emit_field_write(input, i, f, &object_prefix)?;
-
-        field_overwrites.extend(new_field_overwrites);
+        let field_write = emit_field_write(input, i, f, &object_prefix)?;
         field_writes.push(field_write);
     }
 
-    Ok((field_overwrites, field_writes))
+    Ok(field_writes)
 }
 
-fn emit_field_write(
-    input: &DekuReceiver,
+fn emit_field_updates(
+    fields: &Fields<&DekuFieldReceiver>,
+    object_prefix: Option<TokenStream>,
+) -> Result<Vec<TokenStream>, darling::Error> {
+    let mut field_updates = vec![];
+
+    for (i, f) in fields.iter().enumerate() {
+        let new_field_updates = emit_field_update(i, f, &object_prefix)?;
+        field_updates.extend(new_field_updates);
+    }
+
+    Ok(field_updates)
+}
+
+fn emit_field_update(
     i: usize,
     f: &DekuFieldReceiver,
     object_prefix: &Option<TokenStream>,
-) -> Result<(TokenStream, Vec<TokenStream>, TokenStream), darling::Error> {
+) -> Result<Vec<TokenStream>, darling::Error> {
     assert!(
         f.bytes.is_none(),
         "dev error: `bytes` should be None, use `bits` to get size"
     );
+    let mut field_updates = vec![];
 
-    let mut field_overwrites = vec![];
-
-    let is_le_bytes = f.endian.unwrap_or(input.endian) == EndianNess::Little;
-    let field_bits = super::option_as_literal_token(f.bits);
-    let field_writer = &f.writer;
     let field_len = f.get_len_field(i, false);
     let field_ident = f.get_ident(i, object_prefix.is_none());
 
@@ -227,10 +248,29 @@ fn emit_field_write(
 
     // If `len` attr is provided, overwrite the field with the .len() of the container
     if let Some(field_len) = field_len {
-        field_overwrites.push(quote! {
+        field_updates.push(quote! {
             #deref #object_prefix #field_len = #object_prefix #field_ident.len().try_into().unwrap(); // TODO: unwrap
         });
     }
+
+    Ok(field_updates)
+}
+
+fn emit_field_write(
+    input: &DekuReceiver,
+    i: usize,
+    f: &DekuFieldReceiver,
+    object_prefix: &Option<TokenStream>,
+) -> Result<TokenStream, darling::Error> {
+    assert!(
+        f.bytes.is_none(),
+        "dev error: `bytes` should be None, use `bits` to get size"
+    );
+
+    let is_le_bytes = f.endian.unwrap_or(input.endian) == EndianNess::Little;
+    let field_bits = super::option_as_literal_token(f.bits);
+    let field_writer = &f.writer;
+    let field_ident = f.get_ident(i, object_prefix.is_none());
 
     let field_write_func = if field_writer.is_some() {
         quote! { #field_writer }
@@ -246,5 +286,5 @@ fn emit_field_write(
         acc.extend(bits);
     };
 
-    Ok((field_ident, field_overwrites, field_write))
+    Ok(field_write)
 }

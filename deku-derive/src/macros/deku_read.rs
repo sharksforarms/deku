@@ -125,7 +125,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             quote! {
                 {
                     #(#field_reads)*
-                    #initialize_enum
+                    Self :: #initialize_enum
                 }
             }
         };
@@ -157,7 +157,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
                     #(#variant_matches),*
 
                     _ => {
-                        return Err(DekuError::Parse(format!("Could not find enum variant id = {:?}", variant_id)));
+                        return Err(DekuError::Parse(format!("Could not match enum variant id = {:?}", variant_id)));
                     }
                 };
 
@@ -218,8 +218,8 @@ fn emit_field_read(
     let is_le_bytes = f.endian.unwrap_or(input.endian) == EndianNess::Little;
     let field_bits = super::option_as_literal_token(f.bits);
     let field_reader = &f.reader;
-    let field_len = f.get_len_field(i);
-    let field_ident = f.get_ident(i);
+    let field_len = f.get_len_field(i, true);
+    let field_ident = f.get_ident(i, true);
 
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }

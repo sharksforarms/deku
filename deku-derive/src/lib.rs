@@ -76,9 +76,7 @@ impl DekuReceiver {
             ..self
         }
     }
-}
 
-impl DekuReceiver {
     fn emit_reader(&self) -> Result<TokenStream, darling::Error> {
         emit_deku_read(self)
     }
@@ -95,16 +93,17 @@ fn option_as_tokenstream(input: Option<String>) -> Option<TokenStream> {
     })
 }
 
-fn gen_field_ident<T: ToString>(ident: Option<T>, index: usize) -> syn::Ident {
+fn gen_field_ident<T: ToString>(ident: Option<T>, index: usize, prefix: bool) -> TokenStream {
     let field_name = match ident {
         Some(field_name) => field_name.to_string(),
         None => {
             let index = syn::Index::from(index);
-            format!("field_{}", quote! { #index })
+            let prefix = if prefix { "field_" } else { "" };
+            format!("{}{}", prefix, quote! { #index })
         }
     };
 
-    syn::Ident::new(&field_name, syn::export::Span::call_site())
+    field_name.parse().unwrap()
 }
 
 #[derive(Debug, FromField)]
@@ -155,22 +154,22 @@ impl DekuFieldReceiver {
         self.ident.is_some()
     }
 
-    fn get_ident(&self, i: usize) -> TokenStream {
-        let field_ident = gen_field_ident(self.ident.as_ref(), i);
+    fn get_ident(&self, i: usize, prefix: bool) -> TokenStream {
+        let field_ident = gen_field_ident(self.ident.as_ref(), i, prefix);
         quote! { #field_ident }
     }
 
-    fn get_len_field(&self, i: usize) -> Option<TokenStream> {
+    fn get_len_field(&self, i: usize, prefix: bool) -> Option<TokenStream> {
         self.len
             .as_ref()
             .map(|field_len| {
                 if self.is_named() {
-                    gen_field_ident(Some(field_len), i)
+                    gen_field_ident(Some(field_len), i, prefix)
                 } else {
                     let index = field_len.parse::<usize>().unwrap_or_else(|_| {
                         panic!("could not parse `len` attribute as unnamed: {}", field_len)
                     });
-                    gen_field_ident(None::<String>, index)
+                    gen_field_ident(None::<String>, index, prefix)
                 }
             })
             .map(|field_len| {
@@ -248,11 +247,16 @@ mod tests {
         case::invalid_field_bitsnbytes(r#"struct Test(#[deku(bits=4, bytes=1)] u8);"#),
 
         // Valid Enum
-        case::enum_unnamed(r#"#[deku(id_type=u8)] enum Test { A }"#),
+        case::enum_unnamed(r#"
+        #[deku(id_type="u8")]
+        enum Test {
+            #[deku(id="1")]
+            A
+        }"#),
 
         // Invalid Enum
         #[should_panic(expected = "expected `id_type` on enum")]
-        case::invalid_expected_id_type(r#"enum Test { A }"#),
+        case::invalid_expected_id_type(r#"enum Test { #[deku(id="1")] A }"#),
 
         // TODO: these tests should error/warn eventually?
         // error: trying to store 9 bits in 8 bit type

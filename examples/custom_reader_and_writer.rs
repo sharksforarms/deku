@@ -40,7 +40,7 @@ fn bit_flipper_write(
     println!("bit_size: {:?}", bit_size);
 
     // flip the bits on value if field_a is 0x01
-    let mut value = if field_a == 0x01 { !field_b } else { field_b };
+    let value = if field_a == 0x01 { !field_b } else { field_b };
 
     value.write(output_is_le, bit_size)
 }

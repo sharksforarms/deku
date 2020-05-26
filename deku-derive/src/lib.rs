@@ -245,18 +245,26 @@ mod tests {
         case::invalid_field_duplicate(r#"struct Test(#[deku(bits=4, bits=5)] u8);"#),
         #[should_panic(expected = "conflicting: both \"bits\" and \"bytes\" specified on field")]
         case::invalid_field_bitsnbytes(r#"struct Test(#[deku(bits=4, bytes=1)] u8);"#),
+        #[should_panic(expected = "`id_*` attributes only supported on enum")]
+        case::invalid_struct_id_type(r#"#[deku(id_type="u8")] struct Test(u8);"#),
 
         // Valid Enum
         case::enum_unnamed(r#"
-        #[deku(id_type="u8")]
+        #[deku(id_type = "u8")]
         enum Test {
-            #[deku(id="1")]
-            A
+            #[deku(id = "1")]
+            A,
+            #[deku(id = "2")]
+            B(#[deku(bits = 4)] u8),
+            #[deku(id = "3")]
+            C { field_n: u8 },
         }"#),
 
         // Invalid Enum
         #[should_panic(expected = "expected `id_type` on enum")]
         case::invalid_expected_id_type(r#"enum Test { #[deku(id="1")] A }"#),
+        #[should_panic(expected = "MissingField(\"id\")")]
+        case::invalid_expected_id_type(r#"#[deku(id_type="u8")] enum Test { A }"#),
 
         // TODO: these tests should error/warn eventually?
         // error: trying to store 9 bits in 8 bit type

@@ -237,7 +237,7 @@ fn emit_field_update(
     );
     let mut field_updates = vec![];
 
-    let field_len = f.get_len_field(i, false);
+    let field_len = f.get_len_field(i, object_prefix.is_none());
     let field_ident = f.get_ident(i, object_prefix.is_none());
 
     let deref = if object_prefix.is_none() {

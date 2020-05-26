@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
     use deku::prelude::*;
+    use hex_literal::hex;
+    use rstest::rstest;
     use std::convert::TryFrom;
 
     pub mod samples {
@@ -48,6 +50,23 @@ mod tests {
             pub vec_len: u8,
             #[deku(len = "vec_len")]
             pub vec_data: Vec<u8>,
+        }
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        #[deku(id_type = "u8")]
+        pub enum EnumDeku {
+            #[deku(id = "1")]
+            VarA(u8),
+            #[deku(id = "2")]
+            VarB(#[deku(bits = 4)] u8, #[deku(bits = 4)] u8),
+            #[deku(id = "3")]
+            VarC {
+                field_a: u8,
+                #[deku(len = "field_a")]
+                field_b: Vec<u8>,
+            },
+            #[deku(id = "4")]
+            VarD(u8, #[deku(len = "0")] Vec<u8>),
         }
 
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -142,6 +161,20 @@ mod tests {
         // Write
         let ret_write: Vec<u8> = ret_read.into();
         assert_eq!(test_data, ret_write);
+    }
+
+    #[rstest(input,expected,
+        case(&hex!("01AB"), samples::EnumDeku::VarA(0xAB)),
+        case(&hex!("0269"), samples::EnumDeku::VarB(0b0110, 0b1001)),
+        case(&hex!("0302AABB"), samples::EnumDeku::VarC{field_a: 0x02, field_b: vec![0xAA, 0xBB]}),
+        case(&hex!("0402AABB"), samples::EnumDeku::VarD(0x02, vec![0xAA, 0xBB])),
+    )]
+    fn test_enum(input: &[u8], expected: samples::EnumDeku) {
+        let ret_read = samples::EnumDeku::try_from(input).unwrap();
+        assert_eq!(expected, ret_read);
+
+        let ret_write: Vec<u8> = ret_read.into();
+        assert_eq!(input.to_vec(), ret_write);
     }
 
     #[test]

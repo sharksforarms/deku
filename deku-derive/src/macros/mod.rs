@@ -21,18 +21,18 @@ fn gen_enum_init<V: ToTokens, I: ToTokens>(
     field_idents: Vec<I>,
 ) -> TokenStream {
     if field_idents.is_empty() {
-        return quote! { Self :: #enum_variant };
+        return quote! { #enum_variant };
     }
 
     if is_named {
         quote! {
-            Self :: #enum_variant {
+            #enum_variant {
                 #(#field_idents),*
             }
         }
     } else {
         quote! {
-            Self :: #enum_variant (
+            #enum_variant (
                 #(#field_idents),*
             )
         }

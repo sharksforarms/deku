@@ -44,7 +44,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #ident {
+        impl DekuWriteApi for #ident {
 
             fn update(&mut self) {
                 use std::convert::TryInto;

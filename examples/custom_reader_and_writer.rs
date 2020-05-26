@@ -26,7 +26,7 @@ fn bit_flipper_read(
 
 fn bit_flipper_write(
     field_a: u8,
-    field_val: u8,
+    field_b: u8,
     output_is_le: bool,
     bit_size: Option<usize>,
 ) -> BitVec<Msb0, u8> {
@@ -34,17 +34,13 @@ fn bit_flipper_write(
     println!("field_a = 0x{:X}", field_a);
 
     // value of field_b
-    println!("field_b = 0x{:X}", field_val);
+    println!("field_b = 0x{:X}", field_b);
 
     // Size of the current field
     println!("bit_size: {:?}", bit_size);
 
     // flip the bits on value if field_a is 0x01
-    let value = if field_a == 0x01 {
-        !field_val
-    } else {
-        field_val
-    };
+    let mut value = if field_a == 0x01 { !field_b } else { field_b };
 
     value.write(output_is_le, bit_size)
 }
@@ -56,7 +52,7 @@ struct DekuTest {
     #[deku(
         bits = "8",
         reader = "bit_flipper_read(field_a, rest, input_is_le, field_bits)",
-        writer = "bit_flipper_write(input.field_a, field_val, output_is_le, field_bits)"
+        writer = "bit_flipper_write(self.field_a, self.field_b, output_is_le, field_bits)"
     )]
     field_b: u8,
 }

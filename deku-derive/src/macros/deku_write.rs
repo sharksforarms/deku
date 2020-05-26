@@ -27,11 +27,30 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         .expect("expected `struct` type");
 
     let (field_overwrites, field_writes) =
-        emit_field_writes(input, &fields, Some(quote! { input. }))?;
+        emit_field_writes(input, &fields, Some(quote! { self. }))?;
 
     tokens.extend(quote! {
         impl<P> From<#ident> for BitVec<P, u8> where P: BitOrder {
-            fn from(mut input: #ident) -> Self {
+            fn from(input: #ident) -> Self {
+                let mut input = input;
+                input.to_bitvec()
+            }
+        }
+
+        impl From<#ident> for Vec<u8> {
+            fn from(input: #ident) -> Self {
+                let mut input = input;
+                input.to_bytes()
+            }
+        }
+
+        impl #ident {
+            fn to_bytes(&mut self) -> Vec<u8> {
+                let mut acc: BitVec<Msb0, u8> = self.to_bitvec();
+                acc.into_vec()
+            }
+
+            fn to_bitvec<P: BitOrder>(&mut self) -> BitVec<P, u8> {
                 use std::convert::TryInto;
 
                 let mut acc: BitVec<P, u8> = BitVec::new();
@@ -44,21 +63,14 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl From<#ident> for Vec<u8> {
-            fn from(mut input: #ident) -> Self {
-                let mut acc: BitVec<Msb0, u8> = input.into();
-                acc.into_vec()
-            }
-        }
-
         impl BitsWriter for #ident {
-            fn write(self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
-                self.into()
+            fn write(&mut self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+                self.to_bitvec()
             }
         }
     });
 
-    println!("{}", tokens.to_string());
+    // println!("{}", tokens.to_string());
     Ok(tokens)
 }
 
@@ -108,7 +120,8 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
             quote! {
                 {
-                    let bits = (#variant_id as #id_type).write(#id_is_le_bytes, #id_bit_size);
+                    let mut variant_id: #id_type = #variant_id;
+                    let bits = variant_id.write(#id_is_le_bytes, #id_bit_size);
                     acc.extend(bits);
 
                     #(#field_overwrites)*
@@ -127,11 +140,29 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     tokens.extend(quote! {
         impl<P> From<#ident> for BitVec<P, u8> where P: BitOrder {
             fn from(input: #ident) -> Self {
-                use std::convert::TryInto;
+                let mut input = input;
+                input.to_bitvec()
+            }
+        }
 
+        impl From<#ident> for Vec<u8> {
+            fn from(input: #ident) -> Self {
+                let mut input = input;
+                input.to_bytes()
+            }
+        }
+
+        impl #ident {
+            fn to_bytes(&mut self) -> Vec<u8> {
+                let mut acc: BitVec<Msb0, u8> = self.to_bitvec();
+                acc.into_vec()
+            }
+
+            fn to_bitvec<P: BitOrder>(&mut self) -> BitVec<P, u8> {
+                use std::convert::TryInto;
                 let mut acc: BitVec<P, u8> = BitVec::new();
 
-                match input {
+                match self {
                     #(#variant_matches),*
                 }
 
@@ -139,16 +170,9 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl From<#ident> for Vec<u8> {
-            fn from(input: #ident) -> Self {
-                let mut acc: BitVec<Msb0, u8> = input.into();
-                acc.into_vec()
-            }
-        }
-
         impl BitsWriter for #ident {
-            fn write(self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
-                self.into()
+            fn write(&mut self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+                self.to_bitvec()
             }
         }
     });
@@ -160,14 +184,14 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 fn emit_field_writes(
     input: &DekuReceiver,
     fields: &Fields<&DekuFieldReceiver>,
-    field_accessor: Option<TokenStream>,
+    object_prefix: Option<TokenStream>,
 ) -> Result<(Vec<TokenStream>, Vec<TokenStream>), darling::Error> {
     let mut field_overwrites = vec![];
     let mut field_writes = vec![];
 
     for (i, f) in fields.iter().enumerate() {
         let (_field_idents, new_field_overwrites, field_write) =
-            emit_field_write(input, i, f, &field_accessor)?;
+            emit_field_write(input, i, f, &object_prefix)?;
 
         field_overwrites.extend(new_field_overwrites);
         field_writes.push(field_write);
@@ -180,7 +204,7 @@ fn emit_field_write(
     input: &DekuReceiver,
     i: usize,
     f: &DekuFieldReceiver,
-    field_accessor: &Option<TokenStream>,
+    object_prefix: &Option<TokenStream>,
 ) -> Result<(TokenStream, Vec<TokenStream>, TokenStream), darling::Error> {
     assert!(
         f.bytes.is_none(),
@@ -192,24 +216,11 @@ fn emit_field_write(
     let is_le_bytes = f.endian.unwrap_or(input.endian) == EndianNess::Little;
     let field_bits = super::option_as_literal_token(f.bits);
     let field_writer = &f.writer;
-    let field_len_prefix = f.get_len_field(i, true);
     let field_len = f.get_len_field(i, false);
-    let field_ident = f.get_ident(i, field_accessor.is_none());
+    let field_ident = f.get_ident(i, object_prefix.is_none());
 
-    let mut_ref = if field_accessor.is_some() {
-        Some(quote! { &mut })
-    } else {
-        None
-    };
-
-    let deref = if field_accessor.is_some() {
+    let deref = if object_prefix.is_none() {
         Some(quote! { * })
-    } else {
-        None
-    };
-
-    let is_mut = if field_accessor.is_none() {
-        Some(quote! { mut })
     } else {
         None
     };
@@ -217,21 +228,17 @@ fn emit_field_write(
     // If `len` attr is provided, overwrite the field with the .len() of the container
     if let Some(field_len) = field_len {
         field_overwrites.push(quote! {
-            // first, copy the field to get it's type
-            let #is_mut #field_len_prefix = #mut_ref #field_accessor #field_len;
-            // then modify it. Otherwise, we'd need the type of the `len` field
-            #deref #field_len_prefix = #field_accessor #field_ident.len().try_into().unwrap(); // TODO: unwrap
+            #deref #object_prefix #field_len = #object_prefix #field_ident.len().try_into().unwrap(); // TODO: unwrap
         });
     }
 
     let field_write_func = if field_writer.is_some() {
         quote! { #field_writer }
     } else {
-        quote! { field_val.write(output_is_le, field_bits) }
+        quote! { #object_prefix #field_ident.write(output_is_le, field_bits) }
     };
 
     let field_write = quote! {
-        let field_val = #field_accessor #field_ident;
         let output_is_le = #is_le_bytes;
         let field_bits = #field_bits;
 

@@ -224,6 +224,7 @@ mod tests {
 
     #[rstest(input,
         // Valid struct
+        case::struct_empty(r#"struct Test {}"#),
         case::struct_unnamed(r#"struct Test(u8, u8);"#),
         case::struct_unnamed_attrs(r#"struct Test(#[deku(bits=4)] u8, u8);"#),
         case::struct_all_attrs(r#"
@@ -245,18 +246,35 @@ mod tests {
         case::invalid_field_duplicate(r#"struct Test(#[deku(bits=4, bits=5)] u8);"#),
         #[should_panic(expected = "conflicting: both \"bits\" and \"bytes\" specified on field")]
         case::invalid_field_bitsnbytes(r#"struct Test(#[deku(bits=4, bytes=1)] u8);"#),
+        #[should_panic(expected = "`id_*` attributes only supported on enum")]
+        case::invalid_struct_id_type(r#"#[deku(id_type="u8")] struct Test(u8);"#),
+        #[should_panic(expected = "could not parse `len` attribute as unnamed: asd")]
+        case::invalid_len_field(r#"struct Test(u8, #[deku(len="asd")] Vec<u8>);"#),
 
         // Valid Enum
-        case::enum_unnamed(r#"
-        #[deku(id_type="u8")]
+        case::enum_empty(r#"#[deku(id_type = "u8")] enum Test {}"#),
+        case::enum_all(r#"
+        #[deku(id_type = "u8")]
         enum Test {
-            #[deku(id="1")]
-            A
+            #[deku(id = "1")]
+            A,
+            #[deku(id = "2")]
+            B(#[deku(bits = 4)] u8),
+            #[deku(id = "3")]
+            C { field_n: u8 },
         }"#),
 
         // Invalid Enum
         #[should_panic(expected = "expected `id_type` on enum")]
         case::invalid_expected_id_type(r#"enum Test { #[deku(id="1")] A }"#),
+        #[should_panic(expected = "`id_type` must be specified with `id_bits` or `id_bytes`")]
+        case::invalid_expected_id_type(r#"#[deku(id_bits="5")] enum Test { #[deku(id="1")] A }"#),
+        #[should_panic(expected = "`id_type` must be specified with `id_bits` or `id_bytes`")]
+        case::invalid_expected_id_type(r#"#[deku(id_bytes="5")] enum Test { #[deku(id="1")] A }"#),
+        #[should_panic(expected = "conflicting: both \"id_bits\" and \"id_bytes\" specified on field")]
+        case::invalid_conflict(r#"#[deku(id_type="u8", id_bytes="5", id_bits="5")] enum Test { #[deku(id="1")] A }"#),
+        #[should_panic(expected = "MissingField(\"id\")")]
+        case::invalid_expected_id(r#"#[deku(id_type="u8")] enum Test { A }"#),
 
         // TODO: these tests should error/warn eventually?
         // error: trying to store 9 bits in 8 bit type

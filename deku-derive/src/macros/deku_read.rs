@@ -42,26 +42,32 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
-                let (rest, res) = Self::from_bytes(input)?;
+                let (_rest, res) = Self::from_bytes((input, 0))?;
                 Ok(res)
             }
         }
 
         impl #ident {
-            fn from_bytes(input: &[u8]) -> Result<(&[u8], Self), DekuError> {
-                let mut rest = input.bits::<Msb0>();
+            fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
+                let input_bits = input.0.bits::<Msb0>();
+
+                let mut rest = input.0.bits::<Msb0>();
+                rest = &rest[input.1..];
 
                 #(#field_reads)*
                 let value = #initialize_struct;
 
-                Ok((rest.as_slice(), value))
+                let pad = 8 * ((rest.len() + 7) / 8) - rest.len();
+                let read_idx = input_bits.len() - (rest.len() + pad);
+
+                Ok(((&input_bits[read_idx..].as_slice(), pad), value))
             }
         }
 
         impl BitsReader for #ident {
             fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-
                 let mut rest = input;
+
                 #(#field_reads)*
                 let value = #initialize_struct;
 

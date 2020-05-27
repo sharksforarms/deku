@@ -75,6 +75,31 @@ mod tests {
             #[deku(len = "count")]
             pub vec_data: Vec<u8>,
         }
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        pub struct ReaderWriterDeku {
+            #[deku(
+                reader = "ReaderWriterDeku::read(rest, input_is_le, field_bits)",
+                writer = "ReaderWriterDeku::write(self.field_a, output_is_le, field_bits)"
+            )]
+            pub field_a: u8,
+        }
+
+        impl ReaderWriterDeku {
+            fn read(
+                rest: &BitSlice<Msb0, u8>,
+                input_is_le: bool,
+                bit_size: Option<usize>,
+            ) -> Result<(&BitSlice<Msb0, u8>, u8), DekuError> {
+                let (rest, value) = u8::read(rest, input_is_le, bit_size)?;
+                Ok((rest, value + 1))
+            }
+
+            fn write(field_a: u8, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+                let value = field_a - 1;
+                value.write(output_is_le, bit_size)
+            }
+        }
     }
 
     #[test]
@@ -198,5 +223,21 @@ mod tests {
         // Write
         let ret_write: Vec<u8> = ret_read.into();
         assert_eq!([0x03, 0xAA, 0xBB, 0xFF].to_vec(), ret_write);
+    }
+
+    #[test]
+    fn test_reader_writer() {
+        let test_data: Vec<u8> = [0x01].to_vec();
+
+        let ret_read = samples::ReaderWriterDeku::try_from(test_data.as_ref()).unwrap();
+        assert_eq!(
+            samples::ReaderWriterDeku {
+                field_a: 0x02 // 0x01 + 1 as specified in the reader function
+            },
+            ret_read
+        );
+
+        let ret_write: Vec<u8> = ret_read.into();
+        assert_eq!(test_data, ret_write);
     }
 }

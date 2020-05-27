@@ -60,7 +60,7 @@ struct DekuTest {
 fn main() {
     let test_data: &[u8] = [0x01, 0b1001_0110].as_ref();
 
-    let (_rest, ret_read) = DekuTest::from_bytes(test_data).unwrap();
+    let (_rest, ret_read) = DekuTest::from_bytes((test_data, 0)).unwrap();
 
     assert_eq!(
         ret_read,

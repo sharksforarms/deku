@@ -1,6 +1,39 @@
-//! Deku is a data-to-struct serialization/deserialization library supporting bit level granularity,
-//! Makes use of the [bitvec](https://crates.io/crates/bitvec) crate as the "Reader" and “Writer”
-
+//! Deku serialization/deserialization library supporting bit level granularity.
+//!
+//! This crate allows you define the structure of data, consume from a stream of bytes and writing it back to it's raw form.
+//! This allows the developer to focus on building and maintaining the representation of data and not on serialization/deserialization code.
+//!
+//! This approach is especially usefull when dealing with binary structures or network protocols
+//!
+//! Under the hood, it makes use of the [bitvec](https://crates.io/crates/bitvec) crate as the "Reader" and “Writer”
+//!
+//! Example
+//! ```
+//! use deku::prelude::*;
+//!
+//! #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+//! #[deku(endian = "big")]
+//! struct DekuTest {
+//!     #[deku(bits = "4")]
+//!     field_a: u8,
+//!     #[deku(bits = "4")]
+//!     field_b: u8,
+//!     field_c: u16,
+//! }
+//!
+//! let data: &[u8] = [0b0110_1001, 0xBE, 0xEF].as_ref();
+//! let (_rest, mut val) = DekuTest::from_bytes((data, 0)).unwrap();
+//! assert_eq!(DekuTest {
+//!     field_a: 0b0110,
+//!     field_b: 0b1001,
+//!     field_c: 0xBEEF,
+//! }, val);
+//!
+//! val.field_c = 0xC0FE;
+//!
+//! let data_out = val.to_bytes();
+//! assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
+//! ```
 use bitvec::prelude::*;
 pub use deku_derive::*;
 pub mod error;
@@ -30,12 +63,6 @@ pub trait BitsReaderItems {
 
 pub trait BitsWriter {
     fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8>;
-}
-
-pub trait DekuWriteApi {
-    fn update(&mut self);
-    fn to_bytes(&self) -> Vec<u8>;
-    fn to_bitvec<P: BitOrder>(&self) -> BitVec<P, u8>;
 }
 
 macro_rules! ImplDekuTraits {

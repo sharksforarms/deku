@@ -16,7 +16,7 @@ fn bit_flipper_read(
     println!("bit_size: {:?}", bit_size);
 
     // read field_b, calling original func
-    let (rest, value) = u8::read(rest, input_is_le, bit_size)?;
+    let (rest, value) = u8::read(rest, input_is_le, bit_size, None)?;
 
     // flip the bits on value if field_a is 0x01
     let value = if field_a == 0x01 { !value } else { value };

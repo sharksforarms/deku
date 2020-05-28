@@ -22,7 +22,7 @@ enum DekuTest {
 fn main() {
     let test_data = hex!("03020102").to_vec();
 
-    let mut deku_test = DekuTest::try_from(test_data.as_ref()).unwrap();
+    let deku_test = DekuTest::try_from(test_data.as_ref()).unwrap();
 
     assert_eq!(
         DekuTest::Var3 {

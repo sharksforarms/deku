@@ -1,8 +1,10 @@
 use std::error;
 use std::fmt;
 
+/// Deku errors
 #[derive(Debug, PartialEq)]
 pub enum DekuError {
+    /// Parsing error when reading
     Parse(String),
 }
 

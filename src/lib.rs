@@ -40,7 +40,14 @@ pub mod error;
 pub mod prelude;
 use crate::error::DekuError;
 
+/// "Reader" trait: read bits and construct type
 pub trait BitsReader {
+    /// Read bits and construct type
+    /// * **input** - Input as bits
+    /// * **input_is_le** - `true` if input is to be interpreted as little endian,
+    /// false otherwise (controlled via `endian` deku attribute)
+    /// * **bit_size** - `Some` if `bits` or `bytes` deku attributes provided,
+    /// `None` otherwise
     fn read(
         input: &BitSlice<Msb0, u8>,
         input_is_le: bool,
@@ -50,7 +57,15 @@ pub trait BitsReader {
         Self: Sized;
 }
 
+/// "Reader" trait: read bits and construct multiple of type
 pub trait BitsReaderItems {
+    /// Read bits and construct type
+    /// * **input** - Input as bits
+    /// * **input_is_le** - `true` if input is to be interpreted as little endian,
+    /// false otherwise (controlled via `endian` deku attribute)
+    /// * **bit_size** - `Some` if `bits` or `bytes` deku attributes provided,
+    /// `None` otherwise
+    /// * **count** - `Some` if the `len` or `count` attribute is provided
     fn read(
         input: &BitSlice<Msb0, u8>,
         input_is_le: bool,
@@ -61,7 +76,13 @@ pub trait BitsReaderItems {
         Self: Sized;
 }
 
+/// "Writer" trait: write from type to bits
 pub trait BitsWriter {
+    /// Write type to bits
+    /// * **output_is_le** - `true` if output is to be interpreted as little endian,
+    /// false otherwise (controlled via `endian` deku attribute)
+    /// * **bit_size** - `Some` if `bits` or `bytes` deku attributes provided,
+    /// `None` otherwise
     fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8>;
 }
 

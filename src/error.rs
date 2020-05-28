@@ -8,6 +8,18 @@ pub enum DekuError {
     Parse(String),
 }
 
+impl From<std::num::TryFromIntError> for DekuError {
+    fn from(e: std::num::TryFromIntError) -> DekuError {
+        DekuError::Parse(format!("error parsing int: {}", e.to_string()))
+    }
+}
+
+impl From<std::convert::Infallible> for DekuError {
+    fn from(_e: std::convert::Infallible) -> DekuError {
+        unreachable!();
+    }
+}
+
 impl fmt::Display for DekuError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {

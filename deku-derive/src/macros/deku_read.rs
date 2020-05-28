@@ -65,7 +65,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         }
 
         impl BitsReader for #ident {
-            fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+            fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>, _count: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 let mut rest = input;
 
                 #(#field_reads)*
@@ -97,7 +97,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let variant_id_read = {
         quote! {
             {
-                let (new_rest, variant_id) = #id_type :: read (rest, #id_is_le_bytes, #id_bit_size)?;
+                let (new_rest, variant_id) = #id_type :: read (rest, #id_is_le_bytes, #id_bit_size, None)?;
                 rest = new_rest;
 
                 variant_id
@@ -172,7 +172,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         }
 
         impl BitsReader for #ident {
-            fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+            fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>, _count: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 let mut rest = input;
 
                 let variant_id = #variant_id_read;
@@ -230,9 +230,9 @@ fn emit_field_read(
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
     } else if field_len.is_some() {
-        quote! { #field_type::read(rest, input_is_le, field_bits, #field_len as usize) }
+        quote! { #field_type::read(rest, input_is_le, field_bits, Some(usize::try_from(#field_len)?)) }
     } else {
-        quote! { #field_type::read(rest, input_is_le, field_bits) }
+        quote! { #field_type::read(rest, input_is_le, field_bits, None) }
     };
 
     let field_read = quote! {

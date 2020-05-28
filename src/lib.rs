@@ -48,29 +48,13 @@ pub trait BitsReader {
     /// false otherwise (controlled via `endian` deku attribute)
     /// * **bit_size** - `Some` if `bits` or `bytes` deku attributes provided,
     /// `None` otherwise
+    /// * **count** - Number of elements to read for container, Some if `len` attribute
+    /// is provided, else None
     fn read(
         input: &BitSlice<Msb0, u8>,
         input_is_le: bool,
         bit_size: Option<usize>,
-    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
-    where
-        Self: Sized;
-}
-
-/// "Reader" trait: read bits and construct multiple of type
-pub trait BitsReaderItems {
-    /// Read bits and construct type
-    /// * **input** - Input as bits
-    /// * **input_is_le** - `true` if input is to be interpreted as little endian,
-    /// false otherwise (controlled via `endian` deku attribute)
-    /// * **bit_size** - `Some` if `bits` or `bytes` deku attributes provided,
-    /// `None` otherwise
-    /// * **count** - `Some` if the `len` or `count` attribute is provided
-    fn read(
-        input: &BitSlice<Msb0, u8>,
-        input_is_le: bool,
-        bit_size: Option<usize>,
-        count: usize,
+        count: Option<usize>,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized;
@@ -93,7 +77,10 @@ macro_rules! ImplDekuTraits {
                 input: &BitSlice<Msb0, u8>,
                 input_is_le: bool,
                 bit_size: Option<usize>,
+                count: Option<usize>,
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+                assert!(count.is_none(), "Dev error: `count` should always be None");
+
                 let max_type_bits: usize = std::mem::size_of::<$typ>() * 8;
 
                 let bit_size = match bit_size {
@@ -158,20 +145,22 @@ macro_rules! ImplDekuTraits {
     };
 }
 
-impl<T: BitsReader> BitsReaderItems for Vec<T> {
+impl<T: BitsReader> BitsReader for Vec<T> {
     fn read(
         input: &BitSlice<Msb0, u8>,
         input_is_le: bool,
         bit_size: Option<usize>,
-        count: usize,
+        count: Option<usize>,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
     {
+        let count = count.expect("Dev error: `count` should always be Some");
+
         let mut res = Vec::with_capacity(count);
         let mut rest = input;
         for _i in 0..count {
-            let (new_rest, val) = <T>::read(rest, input_is_le, bit_size)?;
+            let (new_rest, val) = <T>::read(rest, input_is_le, bit_size, None)?;
             res.push(val);
             rest = new_rest;
         }
@@ -212,28 +201,31 @@ mod tests {
     #[cfg(target_endian = "big")]
     static IS_LE: bool = false;
 
-    #[rstest(input,input_is_le,bit_size,expected,expected_rest,
-        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), 0xAABBCCDD, bits![Msb0, u8;]),
-        case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), IS_LE, Some(12), 0b1110_1001_0110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
+    #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,
+        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), None, 0xAABBCCDD, bits![Msb0, u8;]),
+        case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), IS_LE, Some(12), None, 0b1110_1001_0110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
 
         // TODO: Better error message for these
         #[should_panic(expected="Parse(\"not enough data: expected 32 got 0\")")]
-        case::not_enough_data([].as_ref(), IS_LE, Some(32), 0xFF, bits![Msb0, u8;]),
+        case::not_enough_data([].as_ref(), IS_LE, Some(32), None, 0xFF, bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"not enough data: expected 32 got 16\")")]
-        case::not_enough_data([0xAA, 0xBB].as_ref(), IS_LE, Some(32), 0xFF, bits![Msb0, u8;]),
+        case::not_enough_data([0xAA, 0xBB].as_ref(), IS_LE, Some(32), None, 0xFF, bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"too much data: container of 32 cannot hold 64\")")]
-        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), IS_LE, Some(64), 0xFF, bits![Msb0, u8;]),
+        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), IS_LE, Some(64), None, 0xFF, bits![Msb0, u8;]),
+        #[should_panic(expected="Dev error: `count` should always be None")]
+        case::dev_err_count_some([].as_ref(), IS_LE, Some(64), Some(1), 0xFF, bits![Msb0, u8;]),
     )]
     fn test_bit_read(
         input: &[u8],
         input_is_le: bool,
         bit_size: Option<usize>,
+        count: Option<usize>,
         expected: u32,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
 
-        let (rest, res_read) = u32::read(bit_slice, input_is_le, bit_size).unwrap();
+        let (rest, res_read) = u32::read(bit_slice, input_is_le, bit_size, count).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
     }
@@ -259,7 +251,7 @@ mod tests {
     ) {
         let bit_slice = input.bits::<Msb0>();
 
-        let (rest, res_read) = u32::read(bit_slice, is_le, bit_size).unwrap();
+        let (rest, res_read) = u32::read(bit_slice, is_le, bit_size, None).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
@@ -270,26 +262,28 @@ mod tests {
     }
 
     #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,
-        case::count_0([0xAA].as_ref(), IS_LE, Some(8), 0, vec![], bits![Msb0, u8; 1,0,1,0,1,0,1,0]),
-        case::count_1([0xAA, 0xBB].as_ref(), IS_LE, Some(8), 1, vec![0xAA], bits![Msb0, u8; 1,0,1,1,1,0,1,1]),
-        case::count_2([0xAA, 0xBB, 0xCC].as_ref(), IS_LE, Some(8), 2, vec![0xAA, 0xBB], bits![Msb0, u8; 1,1,0,0,1,1,0,0]),
+        case::count_0([0xAA].as_ref(), IS_LE, Some(8), Some(0), vec![], bits![Msb0, u8; 1,0,1,0,1,0,1,0]),
+        case::count_1([0xAA, 0xBB].as_ref(), IS_LE, Some(8), Some(1), vec![0xAA], bits![Msb0, u8; 1,0,1,1,1,0,1,1]),
+        case::count_2([0xAA, 0xBB, 0xCC].as_ref(), IS_LE, Some(8), Some(2), vec![0xAA, 0xBB], bits![Msb0, u8; 1,1,0,0,1,1,0,0]),
 
-        case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), IS_LE, Some(6), 2, vec![0b00_011010, 0b00_011110], bits![Msb0, u8; 1,0,0,1]),
+        case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), IS_LE, Some(6), Some(2), vec![0b00_011010, 0b00_011110], bits![Msb0, u8; 1,0,0,1]),
 
         #[should_panic(expected="Parse(\"too much data: container of 8 cannot hold 9\")")]
-        case::not_enough_data([].as_ref(), IS_LE, Some(9), 1, vec![], bits![Msb0, u8;]),
+        case::not_enough_data([].as_ref(), IS_LE, Some(9), Some(1), vec![], bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"too much data: container of 8 cannot hold 9\")")]
-        case::not_enough_data([0xAA].as_ref(), IS_LE, Some(9), 1, vec![], bits![Msb0, u8;]),
+        case::not_enough_data([0xAA].as_ref(), IS_LE, Some(9), Some(1), vec![], bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"not enough data: expected 8 got 0\")")]
-        case::not_enough_data([0xAA].as_ref(), IS_LE, Some(8), 2, vec![], bits![Msb0, u8;]),
+        case::not_enough_data([0xAA].as_ref(), IS_LE, Some(8), Some(2), vec![], bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"too much data: container of 8 cannot hold 9\")")]
-        case::too_much_data([0xAA, 0xBB].as_ref(), IS_LE, Some(9), 1, vec![], bits![Msb0, u8;]),
+        case::too_much_data([0xAA, 0xBB].as_ref(), IS_LE, Some(9), Some(1), vec![], bits![Msb0, u8;]),
+        #[should_panic(expected="Dev error: `count` should always be Some")]
+        case::dev_err_count_none([].as_ref(), IS_LE, Some(0), None, vec![], bits![Msb0, u8;]),
     )]
     fn test_vec_read(
         input: &[u8],
         input_is_le: bool,
         bit_size: Option<usize>,
-        count: usize,
+        count: Option<usize>,
         expected: Vec<u8>,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
@@ -314,13 +308,13 @@ mod tests {
     }
 
     #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,expected_write,
-        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), IS_LE, Some(8), 4, vec![0xAA, 0xBB, 0xCC, 0xDD], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), IS_LE, Some(8), Some(4), vec![0xAA, 0xBB, 0xCC, 0xDD], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
     fn test_vec_read_write(
         input: &[u8],
         input_is_le: bool,
         bit_size: Option<usize>,
-        count: usize,
+        count: Option<usize>,
         expected: Vec<u8>,
         expected_rest: &BitSlice<Msb0, u8>,
         expected_write: Vec<u8>,

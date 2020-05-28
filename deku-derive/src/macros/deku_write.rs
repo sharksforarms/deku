@@ -44,19 +44,19 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl DekuWriteApi for #ident {
+        impl #ident {
 
-            fn update(&mut self) {
+            pub fn update(&mut self) {
                 use std::convert::TryInto;
                 #(#field_updates)*
             }
 
-            fn to_bytes(&self) -> Vec<u8> {
+            pub fn to_bytes(&self) -> Vec<u8> {
                 let mut acc: BitVec<Msb0, u8> = self.to_bitvec();
                 acc.into_vec()
             }
 
-            fn to_bitvec<P: BitOrder>(&self) -> BitVec<P, u8> {
+            pub fn to_bitvec<P: BitOrder>(&self) -> BitVec<P, u8> {
                 let mut acc: BitVec<P, u8> = BitVec::new();
 
                 #(#field_writes)*
@@ -161,8 +161,8 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl DekuWriteApi for #ident {
-            fn update(&mut self) {
+        impl #ident {
+            pub fn update(&mut self) {
                 use std::convert::TryInto;
 
                 match self {
@@ -170,12 +170,12 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
                 }
             }
 
-            fn to_bytes(&self) -> Vec<u8> {
+            pub fn to_bytes(&self) -> Vec<u8> {
                 let mut acc: BitVec<Msb0, u8> = self.to_bitvec();
                 acc.into_vec()
             }
 
-            fn to_bitvec<P: BitOrder>(&self) -> BitVec<P, u8> {
+            pub fn to_bitvec<P: BitOrder>(&self) -> BitVec<P, u8> {
                 let mut acc: BitVec<P, u8> = BitVec::new();
 
                 match self {

@@ -18,7 +18,10 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
 fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let mut tokens = TokenStream::new();
 
+    let (imp, ty, wher) = input.generics.split_for_impl();
+
     let ident = &input.ident;
+    let ident = quote! { #ident #ty };
 
     let fields = input
         .data
@@ -30,21 +33,21 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }))?;
 
     tokens.extend(quote! {
-        impl<P> From<#ident> for BitVec<P, u8> where P: BitOrder {
+        impl #imp From<#ident> for BitVec<Msb0, u8> #wher {
             fn from(input: #ident) -> Self {
                 let mut input = input;
                 input.to_bitvec()
             }
         }
 
-        impl From<#ident> for Vec<u8> {
+        impl #imp From<#ident> for Vec<u8> #wher {
             fn from(input: #ident) -> Self {
                 let mut input = input;
                 input.to_bytes()
             }
         }
 
-        impl #ident {
+        impl #imp #ident #wher {
 
             pub fn update(&mut self) {
                 use std::convert::TryInto;
@@ -56,8 +59,8 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
                 acc.into_vec()
             }
 
-            pub fn to_bitvec<P: BitOrder>(&self) -> BitVec<P, u8> {
-                let mut acc: BitVec<P, u8> = BitVec::new();
+            pub fn to_bitvec(&self) -> BitVec<Msb0, u8> {
+                let mut acc: BitVec<Msb0, u8> = BitVec::new();
 
                 #(#field_writes)*
 
@@ -65,7 +68,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl BitsWriter for #ident {
+        impl #imp BitsWriter for #ident #wher {
             fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
                 self.to_bitvec()
             }
@@ -79,6 +82,8 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let mut tokens = TokenStream::new();
 
+    let (imp, ty, wher) = input.generics.split_for_impl();
+
     let variants = input
         .data
         .as_ref()
@@ -86,6 +91,8 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         .expect("expected `enum` type");
 
     let ident = &input.ident;
+    let ident = quote! { #ident #ty };
+
     let id_type = input.id_type.as_ref().expect("expected `id_type` on enum");
     let id_is_le_bytes = input.endian == EndianNess::Little;
     let id_bit_size = super::option_as_literal_token(input.id_bits);
@@ -134,34 +141,34 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         let variant_field_updates = emit_field_updates(&variant.fields.as_ref(), None)?;
 
         variant_writes.push(quote! {
-            #ident :: #variant_match => {
+            Self :: #variant_match => {
                 #variant_write
             }
         });
 
         variant_updates.push(quote! {
-            #ident :: #variant_match => {
+            Self :: #variant_match => {
                 #(#variant_field_updates)*
             }
         });
     }
 
     tokens.extend(quote! {
-        impl<P> From<#ident> for BitVec<P, u8> where P: BitOrder {
+        impl #imp From<#ident> for BitVec<Msb0, u8> #wher {
             fn from(input: #ident) -> Self {
                 let mut input = input;
                 input.to_bitvec()
             }
         }
 
-        impl From<#ident> for Vec<u8> {
+        impl #imp From<#ident> for Vec<u8> #wher {
             fn from(input: #ident) -> Self {
                 let mut input = input;
                 input.to_bytes()
             }
         }
 
-        impl #ident {
+        impl #imp #ident #wher {
             pub fn update(&mut self) {
                 use std::convert::TryInto;
 
@@ -175,8 +182,8 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
                 acc.into_vec()
             }
 
-            pub fn to_bitvec<P: BitOrder>(&self) -> BitVec<P, u8> {
-                let mut acc: BitVec<P, u8> = BitVec::new();
+            pub fn to_bitvec(&self) -> BitVec<Msb0, u8> {
+                let mut acc: BitVec<Msb0, u8> = BitVec::new();
 
                 match self {
                     #(#variant_writes),*
@@ -186,7 +193,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl BitsWriter for #ident {
+        impl #imp BitsWriter for #ident #wher {
             fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
                 self.to_bitvec()
             }

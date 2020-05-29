@@ -134,6 +134,10 @@ macro_rules! ImplDekuTraits {
 
                 let res_bits: BitVec<Msb0, u8> = {
                     if let Some(bit_size) = bit_size {
+                        if bit_size > input_bits.len() {
+                            todo!() // TODO: return err
+                        }
+
                         if output_is_le {
                             // Example read 10 bits u32 [0xAB, 0b11_000000]
                             // => [10101011, 00000011, 00000000, 00000000]
@@ -257,6 +261,8 @@ mod tests {
         case::normal_be(0xDDCCBBAA, !IS_LE, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
         case::bit_size_le_smaller(0x03AB, IS_LE, Some(10), vec![0xAB, 0b11_000000]),
         case::bit_size_be_smaller(0x03AB, !IS_LE, Some(10), vec![0b11, 0xAB]),
+        #[should_panic(expected = "not yet implemented")] // TODO:
+        case::bit_size_le_bigger(0x03AB, IS_LE, Some(100), vec![0xAB, 0b11_000000]),
     )]
     fn test_bit_write(input: u32, output_is_le: bool, bit_size: Option<usize>, expected: Vec<u8>) {
         let res_write = input.write(output_is_le, bit_size).into_vec();

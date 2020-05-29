@@ -124,20 +124,42 @@ macro_rules! ImplDekuTraits {
 
         impl BitsWriter for $typ {
             fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
-                let res = if output_is_le {
+                let input = if output_is_le {
                     self.to_le_bytes()
                 } else {
                     self.to_be_bytes()
                 };
 
-                let mut res_bits: BitVec<Msb0, u8> = res.to_vec().into();
+                let input_bits: BitVec<Msb0, u8> = input.to_vec().into();
 
-                // Truncate to fit in bit_size bits
-                if let Some(max_bits) = bit_size {
-                    if res_bits.len() > max_bits {
-                        res_bits = res_bits.split_off(res_bits.len() - max_bits);
+                let res_bits: BitVec<Msb0, u8> = {
+                    if let Some(bit_size) = bit_size {
+                        if output_is_le {
+                            // Example read 10 bits u32 [0xAB, 0b11_000000]
+                            // => [10101011, 00000011, 00000000, 00000000]
+                            let mut res_bits = BitVec::<Msb0, u8>::new();
+                            let mut remaining_bits = bit_size;
+                            for chunk in input_bits.chunks(8) {
+                                if chunk.len() > remaining_bits {
+                                    res_bits
+                                        .extend_from_slice(&chunk[chunk.len() - remaining_bits..]);
+                                    break;
+                                } else {
+                                    res_bits.extend_from_slice(chunk)
+                                }
+                                remaining_bits -= chunk.len();
+                            }
+
+                            res_bits
+                        } else {
+                            // Example read 10 bits u32 [0xAB, 0b11_000000]
+                            // => [00000000, 00000000, 00000010, 10101111]
+                            input_bits[input_bits.len() - bit_size..].into()
+                        }
+                    } else {
+                        input_bits
                     }
-                }
+                };
 
                 res_bits
             }
@@ -231,7 +253,10 @@ mod tests {
     }
 
     #[rstest(input,output_is_le,bit_size,expected,
-        case::normal(0xDDCCBBAA, IS_LE, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal_le(0xDDCCBBAA, IS_LE, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal_be(0xDDCCBBAA, !IS_LE, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
+        case::bit_size_le_smaller(0x03AB, IS_LE, Some(10), vec![0xAB, 0b11_000000]),
+        case::bit_size_be_smaller(0x03AB, !IS_LE, Some(10), vec![0b11, 0xAB]),
     )]
     fn test_bit_write(input: u32, output_is_le: bool, bit_size: Option<usize>, expected: Vec<u8>) {
         let res_write = input.write(output_is_le, bit_size).into_vec();

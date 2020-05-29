@@ -7,6 +7,8 @@
 //!
 //! Under the hood, it makes use of the [bitvec](https://crates.io/crates/bitvec) crate as the "Reader" and “Writer”
 //!
+//! For documentation on `#deku[()]` attributes see [attributes list](attributes/index.html)
+//!
 //! Example
 //! ```
 //! use deku::prelude::*;
@@ -36,6 +38,7 @@
 //! ```
 use bitvec::prelude::*;
 pub use deku_derive::*;
+pub mod attributes;
 pub mod error;
 pub mod prelude;
 use crate::error::DekuError;

@@ -5,13 +5,13 @@
 [![Actions Status](https://github.com/sharksforarms/deku/workflows/CI/badge.svg)](https://github.com/sharksforarms/deku/actions)
 [![codecov](https://codecov.io/gh/sharksforarms/deku/branch/master/graph/badge.svg)](https://codecov.io/gh/sharksforarms/deku)
 
-Declaritive binary reading and writing
+Declarative binary reading and writing
 
-This crate provides bit-level, symetric, serialization/deserialization implementations for structs and enums
+This crate provides bit-level, symmetric, serialization/deserialization implementations for structs and enums
 
 ## Why use Deku
 
-**Productivity**: Focus and declare your types that represent the data, Deku will generate symetric reader/writer functions for your type! Avoid the requirement of writing redundant, error-prone parsing and writing code for binary structs or network headers
+**Productivity**: Focus and declare your types that represent the data, Deku will generate symmetric reader/writer functions for your type! Avoid the requirement of writing redundant, error-prone parsing and writing code for binary structs or network headers
 
 ## Usage
 
@@ -42,7 +42,7 @@ struct FieldF {
 //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-// #[deku(endian = "little")] // By default it uses the system endianess, but can be overwritten
+// #[deku(endian = "little")] // By default it uses the system endianness, but can be overwritten
 struct DekuTest {
     field_a: u8,
     #[deku(bits = "7")]

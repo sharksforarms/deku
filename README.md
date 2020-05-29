@@ -17,7 +17,7 @@ This crate provides bit-level, symmetric, serialization/deserialization implemen
 
 ```toml
 [dependencies]
-deku = "0.1"
+deku = "0.2"
 ```
 
 ## Example

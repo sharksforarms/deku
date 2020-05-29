@@ -155,14 +155,17 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
-                let (rest, res) = Self::from_bytes(input)?;
+                let (_rest, res) = Self::from_bytes((input, 0))?;
                 Ok(res)
             }
         }
 
         impl #imp #ident #wher {
-            fn from_bytes(input: &[u8]) -> Result<(&[u8], Self), DekuError> {
-                let mut rest = input.bits::<Msb0>();
+            fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
+                let input_bits = input.0.bits::<Msb0>();
+
+                let mut rest = input.0.bits::<Msb0>();
+                rest = &rest[input.1..];
 
                 let variant_id = #variant_id_read;
 
@@ -174,7 +177,10 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
                     }
                 };
 
-                Ok((rest.as_slice(), value))
+                let pad = 8 * ((rest.len() + 7) / 8) - rest.len();
+                let read_idx = input_bits.len() - (rest.len() + pad);
+
+                Ok(((&input_bits[read_idx..].as_slice(), pad), value))
             }
         }
 

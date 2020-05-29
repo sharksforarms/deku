@@ -1,9 +1,9 @@
-//! Deku serialization/deserialization library supporting bit level granularity.
+//! Deku: Declarative binary reading and writing
 //!
-//! This crate allows you define the structure of data, consume from a stream of bytes and writing it back to it's raw form.
+//! This crate provides bit-level, symmetric, serialization/deserialization implementations for your structs and enums
 //! This allows the developer to focus on building and maintaining the representation of data and not on serialization/deserialization code.
 //!
-//! This approach is especially usefull when dealing with binary structures or network protocols
+//! This approach is especially useful when dealing with binary structures or network protocols
 //!
 //! Under the hood, it makes use of the [bitvec](https://crates.io/crates/bitvec) crate as the "Reader" and “Writer”
 //!
@@ -104,7 +104,7 @@ macro_rules! ImplDekuTraits {
                 let (bit_slice, rest) = input.split_at(bit_size);
 
                 // Create a new BitVec from the slice
-                // We need to do this because it could be split accross byte boundaries
+                // We need to do this because it could be split across byte boundaries
                 // i.e. BitSlice<Msb0, u8> [00, 1100].load_le() == 48
                 // vs BitSlice<Msb0, u8> [001100].load_le() == 12
                 let mut bits: BitVec<Msb0, u8> = BitVec::new();

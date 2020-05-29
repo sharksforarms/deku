@@ -15,7 +15,7 @@ struct FieldF {
 //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-// #[deku(endian = "little")] // By default it uses the system endianess, but can be overwritten
+// #[deku(endian = "little")] // By default it uses the system endianness, but can be overwritten
 struct DekuTest {
     field_a: u8,
     #[deku(bits = "7")]

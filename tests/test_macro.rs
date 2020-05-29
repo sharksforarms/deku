@@ -100,6 +100,24 @@ mod tests {
                 value.write(output_is_le, bit_size)
             }
         }
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        pub struct GenericStructDeku<T: deku::BitsWriter + deku::BitsReader>
+        where
+            T: deku::BitsWriter + deku::BitsReader,
+        {
+            pub field_a: T,
+        }
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        #[deku(id_type = "u8")]
+        pub enum GenericEnumDeku<T: deku::BitsReader + deku::BitsWriter>
+        where
+            T: deku::BitsWriter + deku::BitsReader,
+        {
+            #[deku(id = "1")]
+            VariantT(T),
+        }
     }
 
     #[test]
@@ -236,6 +254,28 @@ mod tests {
             },
             ret_read
         );
+
+        let ret_write: Vec<u8> = ret_read.into();
+        assert_eq!(test_data, ret_write);
+    }
+
+    #[test]
+    fn test_generic_struct_deku() {
+        let test_data: Vec<u8> = [0x01].to_vec();
+
+        let ret_read = samples::GenericStructDeku::<u8>::try_from(test_data.as_ref()).unwrap();
+        assert_eq!(samples::GenericStructDeku::<u8> { field_a: 0x01 }, ret_read);
+
+        let ret_write: Vec<u8> = ret_read.into();
+        assert_eq!(test_data, ret_write);
+    }
+
+    #[test]
+    fn test_generic_enum_deku() {
+        let test_data: Vec<u8> = [0x01, 0x02].to_vec();
+
+        let ret_read = samples::GenericEnumDeku::<u8>::try_from(test_data.as_ref()).unwrap();
+        assert_eq!(samples::GenericEnumDeku::<u8>::VariantT(0x02), ret_read);
 
         let ret_write: Vec<u8> = ret_read.into();
         assert_eq!(test_data, ret_write);

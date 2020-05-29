@@ -18,7 +18,10 @@ pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darlin
 fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let mut tokens = TokenStream::new();
 
+    let (imp, ty, wher) = input.generics.split_for_impl();
+
     let ident = &input.ident;
+    let ident = quote! { #ident #ty };
 
     let fields = &input
         .data
@@ -38,7 +41,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let initialize_struct = super::gen_struct_init(is_named_struct, field_idents);
 
     tokens.extend(quote! {
-        impl std::convert::TryFrom<&[u8]> for #ident {
+        impl #imp std::convert::TryFrom<&[u8]> for #ident #wher {
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
@@ -47,7 +50,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #ident {
+        impl #imp #ident #wher {
             fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
                 let input_bits = input.0.bits::<Msb0>();
 
@@ -64,7 +67,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl BitsReader for #ident {
+        impl #imp BitsReader for #ident #wher {
             fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>, _count: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 let mut rest = input;
 
@@ -83,6 +86,8 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let mut tokens = TokenStream::new();
 
+    let (imp, ty, wher) = input.generics.split_for_impl();
+
     let variants = input
         .data
         .as_ref()
@@ -90,6 +95,8 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         .expect("expected `enum` type");
 
     let ident = &input.ident;
+    let ident = quote! { #ident #ty };
+
     let id_type = input.id_type.as_ref().expect("expected `id_type` on enum");
     let id_is_le_bytes = input.endian == EndianNess::Little;
     let id_bit_size = super::option_as_literal_token(input.id_bits);
@@ -144,7 +151,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     }
 
     tokens.extend(quote! {
-        impl std::convert::TryFrom<&[u8]> for #ident {
+        impl #imp std::convert::TryFrom<&[u8]> for #ident #wher {
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
@@ -153,7 +160,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #ident {
+        impl #imp #ident #wher {
             fn from_bytes(input: &[u8]) -> Result<(&[u8], Self), DekuError> {
                 let mut rest = input.bits::<Msb0>();
 
@@ -171,7 +178,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl BitsReader for #ident {
+        impl #imp BitsReader for #ident #wher {
             fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>, _count: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 let mut rest = input;
 

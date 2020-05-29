@@ -10,7 +10,7 @@ fn wrap_turbofish<T: ToTokens>(input: T) -> TokenStream {
     quote! { <#input> }
 }
 
-/// Generate a litteral token stream for an Option<T>
+/// Generate a literal token stream for an Option<T>
 fn option_as_literal_token<T: ToTokens>(input: Option<T>) -> TokenStream {
     match input {
         Some(b) => quote! {Some(#b)},

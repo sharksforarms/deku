@@ -127,7 +127,7 @@ struct DekuFieldReceiver {
     ident: Option<syn::Ident>,
     ty: syn::Type,
 
-    /// Endianess for the field
+    /// Endianness for the field
     #[darling(default)]
     endian: Option<EndianNess>,
 

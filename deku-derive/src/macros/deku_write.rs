@@ -54,7 +54,6 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
             pub fn to_bytes(&self) -> Vec<u8> {
                 let mut acc: BitVec<Msb0, u8> = self.to_bitvec();
-                println!("acc: {}", acc);
                 acc.into_vec()
             }
 

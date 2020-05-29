@@ -35,14 +35,12 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     tokens.extend(quote! {
         impl #imp From<#ident> for BitVec<Msb0, u8> #wher {
             fn from(input: #ident) -> Self {
-                let mut input = input;
                 input.to_bitvec()
             }
         }
 
         impl #imp From<#ident> for Vec<u8> #wher {
             fn from(input: #ident) -> Self {
-                let mut input = input;
                 input.to_bytes()
             }
         }
@@ -56,6 +54,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
             pub fn to_bytes(&self) -> Vec<u8> {
                 let mut acc: BitVec<Msb0, u8> = self.to_bitvec();
+                println!("acc: {}", acc);
                 acc.into_vec()
             }
 
@@ -156,14 +155,12 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     tokens.extend(quote! {
         impl #imp From<#ident> for BitVec<Msb0, u8> #wher {
             fn from(input: #ident) -> Self {
-                let mut input = input;
                 input.to_bitvec()
             }
         }
 
         impl #imp From<#ident> for Vec<u8> #wher {
             fn from(input: #ident) -> Self {
-                let mut input = input;
                 input.to_bytes()
             }
         }

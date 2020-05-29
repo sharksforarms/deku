@@ -141,15 +141,23 @@ macro_rules! ImplDekuTraits {
                         if output_is_le {
                             // Example read 10 bits u32 [0xAB, 0b11_000000]
                             // => [10101011, 00000011, 00000000, 00000000]
-                            let mut res_bits = BitVec::<Msb0, u8>::new();
+                            let mut res_bits = BitVec::<Msb0, u8>::with_capacity(bit_size);
                             let mut remaining_bits = bit_size;
                             for chunk in input_bits.chunks(8) {
                                 if chunk.len() > remaining_bits {
-                                    res_bits
-                                        .extend_from_slice(&chunk[chunk.len() - remaining_bits..]);
+                                    let bits = &chunk[chunk.len() - remaining_bits..];
+                                    for b in bits {
+                                        res_bits.push(*b);
+                                    }
+                                    // https://github.com/myrrlyn/bitvec/issues/62
+                                    // res_bits.extend_from_slice(chunk[chunk.len() - remaining_bits..]);
                                     break;
                                 } else {
-                                    res_bits.extend_from_slice(chunk)
+                                    for b in chunk {
+                                        res_bits.push(*b);
+                                    }
+                                    // https://github.com/myrrlyn/bitvec/issues/62
+                                    // res_bits.extend_from_slice(chunk)
                                 }
                                 remaining_bits -= chunk.len();
                             }

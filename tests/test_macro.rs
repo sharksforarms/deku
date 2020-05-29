@@ -111,7 +111,10 @@ mod tests {
 
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
         #[deku(id_type = "u8")]
-        pub enum GenericEnumDeku<T: deku::BitsReader + deku::BitsWriter> {
+        pub enum GenericEnumDeku<T: deku::BitsReader + deku::BitsWriter>
+        where
+            T: deku::BitsWriter + deku::BitsReader,
+        {
             #[deku(id = "1")]
             VariantT(T),
         }

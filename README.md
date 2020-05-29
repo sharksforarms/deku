@@ -5,9 +5,13 @@
 [![Actions Status](https://github.com/sharksforarms/deku/workflows/CI/badge.svg)](https://github.com/sharksforarms/deku/actions)
 [![codecov](https://codecov.io/gh/sharksforarms/deku/branch/master/graph/badge.svg)](https://codecov.io/gh/sharksforarms/deku)
 
-Deku provides bit level serialization/deserialization proc-macros for structs
+Declaritive binary reading and writing
 
-Under the hood, it uses [bitvec](https://crates.io/crates/bitvec) as the "Reader" and “Writer”
+This crate provides bit-level, symetric, serialization/deserialization implementations for structs and enums
+
+## Why use Deku
+
+**Productivity**: Focus and declare your types that represent the data, Deku will generate symetric reader/writer functions for your type! Avoid the requirement of writing redundant, error-prone parsing and writing code for binary structs or network headers
 
 ## Usage
 
@@ -18,7 +22,7 @@ deku = "0.1"
 
 ## Example
 
-See `examples` folder for more!
+See [examples](https://github.com/sharksforarms/deku/tree/master/examples) for more!
 
 ```rust
 use deku::prelude::*;

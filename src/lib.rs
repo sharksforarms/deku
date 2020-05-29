@@ -1,6 +1,6 @@
-//! Deku serialization/deserialization library supporting bit level granularity.
+//! Deku: Declaritive binary reading and writing
 //!
-//! This crate allows you define the structure of data, consume from a stream of bytes and writing it back to it's raw form.
+//! This crate provides bit-level, symetric, serialization/deserialization implementations for your structs and enums
 //! This allows the developer to focus on building and maintaining the representation of data and not on serialization/deserialization code.
 //!
 //! This approach is especially usefull when dealing with binary structures or network protocols

@@ -18,7 +18,7 @@ impl Default for EndianNess {
         let ret = EndianNess::Little;
 
         #[cfg(target_endian = "big")]
-        let ret = EndianNess::Big;
+        let rets = EndianNess::Big;
 
         ret
     }

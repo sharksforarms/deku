@@ -1,41 +1,161 @@
-//! Deku: Declarative binary reading and writing
-//!
-//! This crate provides bit-level, symmetric, serialization/deserialization implementations for your structs and enums
-//! This allows the developer to focus on building and maintaining the representation of data and not on serialization/deserialization code.
-//!
-//! This approach is especially useful when dealing with binary structures or network protocols
-//!
-//! Under the hood, it makes use of the [bitvec](https://crates.io/crates/bitvec) crate as the "Reader" and “Writer”
-//!
-//! For documentation on `#deku[()]` attributes see [attributes list](attributes/index.html)
-//!
-//! Example
-//! ```
-//! use deku::prelude::*;
-//!
-//! #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-//! #[deku(endian = "big")]
-//! struct DekuTest {
-//!     #[deku(bits = "4")]
-//!     field_a: u8,
-//!     #[deku(bits = "4")]
-//!     field_b: u8,
-//!     field_c: u16,
-//! }
-//!
-//! let data: &[u8] = [0b0110_1001, 0xBE, 0xEF].as_ref();
-//! let (_rest, mut val) = DekuTest::from_bytes((data, 0)).unwrap();
-//! assert_eq!(DekuTest {
-//!     field_a: 0b0110,
-//!     field_b: 0b1001,
-//!     field_c: 0xBEEF,
-//! }, val);
-//!
-//! val.field_c = 0xC0FE;
-//!
-//! let data_out = val.to_bytes();
-//! assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
-//! ```
+/*!
+# Deku: Declarative binary reading and writing
+
+Deriving a struct or enum with `DekuRead` and `DekuWrite` provides bit-level, symmetric, serialization/deserialization implementations.
+
+This allows the developer to focus on building and maintaining how the data is represented and manipulated and not on redundant, error-prone, parsing/writing code.
+
+This approach is especially useful when dealing with binary structures such as TLVs or network protocols.
+
+Under the hood, it makes use of the [bitvec](https://crates.io/crates/bitvec) crate as the "Reader" and “Writer”
+
+For documentation and examples on available `#deku[()]` attributes and features, see [attributes list](attributes/index.html)
+
+For more examples, see the [examples folder](https://github.com/sharksforarms/deku/tree/master/examples)!
+
+# Simple Example
+
+Let's read big-endian data into a struct, with fields containing different sizes, modify a value, and write it back
+
+```rust
+use deku::prelude::*;
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "big")]
+struct DekuTest {
+    #[deku(bits = "4")]
+    field_a: u8,
+    #[deku(bits = "4")]
+    field_b: u8,
+    field_c: u16,
+}
+
+let data: Vec<u8> = vec![0b0110_1001, 0xBE, 0xEF];
+let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+assert_eq!(DekuTest {
+    field_a: 0b0110,
+    field_b: 0b1001,
+    field_c: 0xBEEF,
+}, val);
+
+val.field_c = 0xC0FE;
+
+let data_out = val.to_bytes();
+assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
+```
+
+# Composing
+
+Deku structs/enums can be composed as long as they implement BitsReader / BitsWriter! (Which DekuRead/DekuWrite implement)
+
+```rust
+use deku::prelude::*;
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    header: DekuHeader,
+    data: DekuData,
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuHeader(u8);
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuData(u16);
+
+let data: Vec<u8> = vec![0xAA, 0xEF, 0xBE];
+let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+assert_eq!(DekuTest {
+    header: DekuHeader(0xAA),
+    data: DekuData(0xBEEF),
+}, val);
+
+let data_out = val.to_bytes();
+assert_eq!(data, data_out);
+```
+
+# Vec
+
+Vec<T> can be used in combination with the [len](attributes/index.html#len) attribute (T must implement BitsReader/BitsWriter)
+
+If the length of Vec changes, the length is written as the `.len()` of the Vec as the type of the field specified in `len`
+
+`.update()` can be used to "update" the original field!
+
+```rust
+use deku::prelude::*;
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    count: u8,
+    #[deku(len = "count")]
+    data: Vec<u8>,
+}
+
+let data: Vec<u8> = vec![0x02, 0xBE, 0xEF, 0xFF, 0xFF];
+let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+assert_eq!(DekuTest {
+    count: 0x02,
+    data: vec![0xBE, 0xEF]
+}, val);
+
+let data_out = val.to_bytes();
+assert_eq!(vec![0x02, 0xBE, 0xEF], data_out);
+
+// Pushing an element to data
+val.data.push(0xAA);
+
+assert_eq!(DekuTest {
+    count: 0x02, // Note: this value has not changed
+    data: vec![0xBE, 0xEF, 0xAA]
+}, val);
+
+let data_out = val.to_bytes();
+// Even though count is `0x02`, `0x03` is written
+assert_eq!(vec![0x03, 0xBE, 0xEF, 0xAA], data_out);
+
+// Use `update` to update `count`
+val.update();
+
+assert_eq!(DekuTest {
+    count: 0x03,
+    data: vec![0xBE, 0xEF, 0xAA]
+}, val);
+
+```
+
+# Enums
+
+As enums can have multiple variants, each variant must have a way to match on the incoming data.
+
+First the "type" is read using the `id_type`, then is matched against the variants given `id`. What happens after is the same as structs!
+
+This is implemented with the [id](/attributes/index.html#id) and [id_type](attributes/index.html#id_type) attributes.
+
+Example:
+
+```rust
+use deku::prelude::*;
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(id_type = "u8")]
+enum DekuTest {
+    #[deku(id = "0x01")]
+    VariantA,
+    #[deku(id = "0x02")]
+    VariantB(u16),
+}
+
+let data: Vec<u8> = vec![0x01, 0x02, 0xEF, 0xBE];
+
+let (rest, val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+assert_eq!(DekuTest::VariantA , val);
+
+let (rest, val) = DekuTest::from_bytes(rest).unwrap();
+assert_eq!(DekuTest::VariantB(0xBEEF) , val);
+```
+
+*/
 use bitvec::prelude::*;
 pub use deku_derive::*;
 pub mod attributes;

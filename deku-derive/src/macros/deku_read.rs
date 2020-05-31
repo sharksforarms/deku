@@ -52,6 +52,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
         impl #imp #ident #wher {
             fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
+                use std::convert::TryFrom;
                 let input_bits = input.0.bits::<Msb0>();
 
                 let mut rest = input.0.bits::<Msb0>();
@@ -69,6 +70,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
         impl #imp BitsReader for #ident #wher {
             fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>, _count: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+                use std::convert::TryFrom;
                 let mut rest = input;
 
                 #(#field_reads)*

@@ -78,9 +78,8 @@ assert_eq!(data, data_out);
 
 Vec<T> can be used in combination with the [len](attributes/index.html#len) attribute (T must implement BitsReader/BitsWriter)
 
-If the length of Vec changes, the length is written as the `.len()` of the Vec as the type of the field specified in `len`
-
-`.update()` can be used to "update" the original field!
+If the length of Vec changes, the original field specified in `len` will not get updated.
+Calling `.update()` can be used to "update" the original field!
 
 ```rust
 use deku::prelude::*;
@@ -111,8 +110,8 @@ assert_eq!(DekuTest {
 }, val);
 
 let data_out = val.to_bytes();
-// Even though count is `0x02`, `0x03` is written
-assert_eq!(vec![0x03, 0xBE, 0xEF, 0xAA], data_out);
+// Note: `count` is still 0x02 while 3 bytes got written
+assert_eq!(vec![0x02, 0xBE, 0xEF, 0xAA], data_out);
 
 // Use `update` to update `count`
 val.update();

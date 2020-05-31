@@ -79,7 +79,7 @@ assert_eq!(data, data_out);
 Vec<T> can be used in combination with the [len](attributes/index.html#len) attribute (T must implement BitsReader/BitsWriter)
 
 If the length of Vec changes, the original field specified in `len` will not get updated.
-Calling `.update()` can be used to "update" the original field!
+Calling `.update()` can be used to "update" the field!
 
 ```rust
 use deku::prelude::*;

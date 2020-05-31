@@ -23,3 +23,8 @@ bitvec = "0.17"
 [dev-dependencies]
 hex-literal = "0.2"
 rstest = "0.6"
+criterion = "0.3"
+
+[[bench]]
+name = "deku"
+harness = false

@@ -1,14 +1,15 @@
 on: [pull_request]
-name: benchmark pull requests
+
+name: CI Pull Request
+
 jobs:
-  runBenchmark:
-    name: run benchmark
+  benchmark:
+    name: Benchmark
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
         with:
           fetch-depth: 0
-      - name: run benchmark
-        uses: matchai/criterion-compare-action@master
+      - uses: matchai/criterion-compare-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

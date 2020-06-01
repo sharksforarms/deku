@@ -6,7 +6,7 @@ version = "0.2.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/sharksforarms/deku"
 keywords = ["deku", "bits", "serialization", "deserialization", "struct"]
-categories = ["parsing"]
+categories = ["encoding", "parsing", "no-std"]
 description = "bit level serialization/deserialization proc-macro for structs"
 readme = "README.md"
 

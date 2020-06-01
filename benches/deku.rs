@@ -65,7 +65,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         v
     };
     let deku_write_vec_input = DekuVec {
-        count: 100,
+        count: 200,
         data: vec![0xFF; 100],
     };
     c.bench_function("deku_read_vec", |b| {

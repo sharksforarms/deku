@@ -33,7 +33,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }))?;
 
     tokens.extend(quote! {
-        impl #imp std::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
+        impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
             type Error = DekuError;
 
             fn try_from(input: #ident) -> Result<Self, Self::Error> {
@@ -41,7 +41,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #imp std::convert::TryFrom<#ident> for Vec<u8> #wher {
+        impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
             type Error = DekuError;
 
             fn try_from(input: #ident) -> Result<Self, Self::Error> {
@@ -52,7 +52,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         impl #imp #ident #wher {
 
             pub fn update(&mut self) -> Result<(), DekuError> {
-                use std::convert::TryInto;
+                use core::convert::TryInto;
                 #(#field_updates)*
 
                 Ok(())
@@ -158,7 +158,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     }
 
     tokens.extend(quote! {
-        impl #imp std::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
+        impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
             type Error = DekuError;
 
             fn try_from(input: #ident) -> Result<Self, Self::Error> {
@@ -166,7 +166,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #imp std::convert::TryFrom<#ident> for Vec<u8> #wher {
+        impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
             type Error = DekuError;
 
             fn try_from(input: #ident) -> Result<Self, Self::Error> {
@@ -176,7 +176,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
         impl #imp #ident #wher {
             pub fn update(&mut self) -> Result<(), DekuError> {
-                use std::convert::TryInto;
+                use core::convert::TryInto;
 
                 match self {
                     #(#variant_updates),*

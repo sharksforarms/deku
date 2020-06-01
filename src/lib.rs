@@ -13,6 +13,10 @@ For documentation and examples on available `#deku[()]` attributes and features,
 
 For more examples, see the [examples folder](https://github.com/sharksforarms/deku/tree/master/examples)!
 
+## no_std
+
+For use in `no_std` environments, `alloc` is the single feature which is required on deku.
+
 # Simple Example
 
 Let's read big-endian data into a struct, with fields containing different sizes, modify a value, and write it back

@@ -10,6 +10,6 @@ jobs:
       - uses: actions/checkout@master
         with:
           fetch-depth: 0
-      - uses: boa-dev/criterion-compare-action@master
+      - uses: matchai/criterion-compare-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

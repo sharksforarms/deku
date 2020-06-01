@@ -52,8 +52,7 @@ struct DekuTest {
 }
 
 #[no_mangle]
-pub extern "C" fn main() -> ! {
-    loop {
+pub extern "C" fn main() -> () {
         let test_data: Vec<u8> = vec![0b10101_101, 0x02, 0xBE, 0xEF];
 
         // Test reading
@@ -71,5 +70,4 @@ pub extern "C" fn main() -> ! {
         // Test writing
         let val = val.to_bytes().unwrap();
         assert_eq!(test_data, val);
-    }
 }

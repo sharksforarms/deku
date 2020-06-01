@@ -10,6 +10,9 @@ categories = ["parsing"]
 description = "bit level serialization/deserialization proc-macro for structs"
 readme = "README.md"
 
+[lib]
+bench = false
+
 [workspace]
 members = [
     "deku-derive"

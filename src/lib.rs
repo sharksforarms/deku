@@ -358,7 +358,7 @@ mod tests {
     static IS_LE: bool = false;
 
     #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,
-        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), None, 0xAABBCCDD, bits![Msb0, u8;]),
+        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), None, 0xAABB_CCDD, bits![Msb0, u8;]),
         case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), IS_LE, Some(12), None, 0b1110_1001_0110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
 
         // TODO: Better error message for these
@@ -387,8 +387,8 @@ mod tests {
     }
 
     #[rstest(input,output_is_le,bit_size,expected,
-        case::normal_le(0xDDCCBBAA, IS_LE, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
-        case::normal_be(0xDDCCBBAA, !IS_LE, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
+        case::normal_le(0xDDCC_BBAA, IS_LE, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal_be(0xDDCC_BBAA, !IS_LE, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
         case::bit_size_le_smaller(0x03AB, IS_LE, Some(10), vec![0xAB, 0b11_000000]),
         case::bit_size_be_smaller(0x03AB, !IS_LE, Some(10), vec![0b11, 0xAB]),
         #[should_panic(expected = "not yet implemented")] // TODO:
@@ -468,25 +468,26 @@ mod tests {
         assert_eq!(expected, res_write);
     }
 
-    #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,expected_write,
-        case::normal([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), IS_LE, Some(8), Some(4), vec![0xAA, 0xBB, 0xCC, 0xDD], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+    #[rstest(input,is_le,bit_size,count,expected,expected_rest,expected_write,
+        case::normal_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), IS_LE, Some(16), Some(2), vec![0xBBAA, 0xDDCC], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), !IS_LE, Some(16), Some(2), vec![0xAABB, 0xCCDD], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
     fn test_vec_read_write(
         input: &[u8],
-        input_is_le: bool,
+        is_le: bool,
         bit_size: Option<usize>,
         count: Option<usize>,
-        expected: Vec<u8>,
+        expected: Vec<u16>,
         expected_rest: &BitSlice<Msb0, u8>,
         expected_write: Vec<u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
 
-        let (rest, res_read) = Vec::<u8>::read(bit_slice, input_is_le, bit_size, count).unwrap();
+        let (rest, res_read) = Vec::<u16>::read(bit_slice, is_le, bit_size, count).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write: Vec<u8> = res_read.into();
+        let res_write: Vec<u8> = res_read.write(is_le, bit_size).into_vec();
         assert_eq!(expected_write, res_write);
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);

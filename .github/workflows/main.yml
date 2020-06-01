@@ -77,6 +77,17 @@ jobs:
           command: clippy
           args: -- -D warnings
 
+  ensure_no_std:
+    name: Ensure no_std
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - run: cd ensure_no_std && cargo run --release
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest

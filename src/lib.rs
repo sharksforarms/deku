@@ -155,6 +155,14 @@ assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 ```
 
 */
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+#[cfg(feature = "alloc")]
+use alloc::{format, vec::Vec};
+
 use bitvec::prelude::*;
 pub use deku_derive::*;
 pub mod attributes;
@@ -207,7 +215,7 @@ macro_rules! ImplDekuTraits {
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 assert!(count.is_none(), "Dev error: `count` should always be None");
 
-                let max_type_bits: usize = std::mem::size_of::<$typ>() * 8;
+                let max_type_bits: usize = core::mem::size_of::<$typ>() * 8;
 
                 let bit_size = match bit_size {
                     None => max_type_bits,

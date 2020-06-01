@@ -18,10 +18,14 @@ members = [
     "deku-derive"
 ]
 
+[features]
+default = ["std", "bitvec/std"]
+std = ["alloc"]
+alloc = ["bitvec/alloc"]
+
 [dependencies]
 deku_derive = { version = "^0.2.0", path = "deku-derive" }
-bitvec = "0.17"
-
+bitvec = { version = "0.17", default-features = false }
 
 [dev-dependencies]
 hex-literal = "0.2"

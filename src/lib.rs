@@ -40,7 +40,7 @@ assert_eq!(DekuTest {
 
 val.field_c = 0xC0FE;
 
-let data_out = val.to_bytes();
+let data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 ```
 
@@ -70,7 +70,7 @@ assert_eq!(DekuTest {
     data: DekuData(0xBEEF),
 }, val);
 
-let data_out = val.to_bytes();
+let data_out = val.to_bytes().unwrap();
 assert_eq!(data, data_out);
 ```
 
@@ -98,7 +98,7 @@ assert_eq!(DekuTest {
     data: vec![0xBE, 0xEF]
 }, val);
 
-let data_out = val.to_bytes();
+let data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0x02, 0xBE, 0xEF], data_out);
 
 // Pushing an element to data
@@ -109,12 +109,12 @@ assert_eq!(DekuTest {
     data: vec![0xBE, 0xEF, 0xAA]
 }, val);
 
-let data_out = val.to_bytes();
+let data_out = val.to_bytes().unwrap();
 // Note: `count` is still 0x02 while 3 bytes got written
 assert_eq!(vec![0x02, 0xBE, 0xEF, 0xAA], data_out);
 
 // Use `update` to update `count`
-val.update();
+val.update().unwrap();
 
 assert_eq!(DekuTest {
     count: 0x03,
@@ -189,7 +189,11 @@ pub trait BitsWriter {
     /// false otherwise (controlled via `endian` deku attribute)
     /// * **bit_size** - `Some` if `bits` or `bytes` deku attributes provided,
     /// `None` otherwise
-    fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8>;
+    fn write(
+        &self,
+        output_is_le: bool,
+        bit_size: Option<usize>,
+    ) -> Result<BitVec<Msb0, u8>, DekuError>;
 }
 
 macro_rules! ImplDekuTraits {
@@ -245,7 +249,11 @@ macro_rules! ImplDekuTraits {
         }
 
         impl BitsWriter for $typ {
-            fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+            fn write(
+                &self,
+                output_is_le: bool,
+                bit_size: Option<usize>,
+            ) -> Result<BitVec<Msb0, u8>, DekuError> {
                 let input = if output_is_le {
                     self.to_le_bytes()
                 } else {
@@ -257,7 +265,11 @@ macro_rules! ImplDekuTraits {
                 let res_bits: BitVec<Msb0, u8> = {
                     if let Some(bit_size) = bit_size {
                         if bit_size > input_bits.len() {
-                            todo!() // TODO: return err
+                            return Err(DekuError::InvalidParam(format!(
+                                "bit size {} is larger then input {}",
+                                bit_size,
+                                input_bits.len()
+                            )));
                         }
 
                         if output_is_le {
@@ -295,7 +307,7 @@ macro_rules! ImplDekuTraits {
                     }
                 };
 
-                res_bits
+                Ok(res_bits)
             }
         }
     };
@@ -326,15 +338,19 @@ impl<T: BitsReader> BitsReader for Vec<T> {
 }
 
 impl<T: BitsWriter> BitsWriter for Vec<T> {
-    fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+    fn write(
+        &self,
+        output_is_le: bool,
+        bit_size: Option<usize>,
+    ) -> Result<BitVec<Msb0, u8>, DekuError> {
         let mut acc = BitVec::new();
 
         for v in self {
-            let r = v.write(output_is_le, bit_size);
+            let r = v.write(output_is_le, bit_size)?;
             acc.extend(r);
         }
 
-        acc
+        Ok(acc)
     }
 }
 
@@ -361,7 +377,6 @@ mod tests {
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), None, 0xAABB_CCDD, bits![Msb0, u8;]),
         case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), IS_LE, Some(12), None, 0b1110_1001_0110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
 
-        // TODO: Better error message for these
         #[should_panic(expected="Parse(\"not enough data: expected 32 got 0\")")]
         case::not_enough_data([].as_ref(), IS_LE, Some(32), None, 0xFF, bits![Msb0, u8;]),
         #[should_panic(expected="Parse(\"not enough data: expected 32 got 16\")")]
@@ -391,16 +406,16 @@ mod tests {
         case::normal_be(0xDDCC_BBAA, !IS_LE, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
         case::bit_size_le_smaller(0x03AB, IS_LE, Some(10), vec![0xAB, 0b11_000000]),
         case::bit_size_be_smaller(0x03AB, !IS_LE, Some(10), vec![0b11, 0xAB]),
-        #[should_panic(expected = "not yet implemented")] // TODO:
+        #[should_panic(expected = "InvalidParam(\"bit size 100 is larger then input 32\")")]
         case::bit_size_le_bigger(0x03AB, IS_LE, Some(100), vec![0xAB, 0b11_000000]),
     )]
     fn test_bit_write(input: u32, output_is_le: bool, bit_size: Option<usize>, expected: Vec<u8>) {
-        let res_write = input.write(output_is_le, bit_size).into_vec();
+        let res_write = input.write(output_is_le, bit_size).unwrap().into_vec();
         assert_eq!(expected, res_write);
     }
 
     #[rstest(input,is_le,bit_size,expected,expected_rest,expected_write,
-        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), 0xAABBCCDD, bits![Msb0, u8;], vec![0xDD, 0xCC, 0xBB, 0xAA]),
+        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), 0xAABB_CCDD, bits![Msb0, u8;], vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
     fn test_bit_read_write(
         input: &[u8],
@@ -416,7 +431,7 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write = res_read.write(is_le, bit_size).into_vec();
+        let res_write = res_read.write(is_le, bit_size).unwrap().into_vec();
         assert_eq!(expected_write, res_write);
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
@@ -464,7 +479,7 @@ mod tests {
         bit_size: Option<usize>,
         expected: Vec<u8>,
     ) {
-        let res_write = input.write(output_is_le, bit_size).into_vec();
+        let res_write = input.write(output_is_le, bit_size).unwrap().into_vec();
         assert_eq!(expected, res_write);
     }
 
@@ -487,7 +502,7 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write: Vec<u8> = res_read.write(is_le, bit_size).into_vec();
+        let res_write: Vec<u8> = res_read.write(is_le, bit_size).unwrap().into_vec();
         assert_eq!(expected_write, res_write);
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);

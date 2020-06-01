@@ -1,4 +1,5 @@
 use deku::prelude::*;
+use std::convert::TryInto;
 
 fn bit_flipper_read(
     field_a: u8,
@@ -29,7 +30,7 @@ fn bit_flipper_write(
     field_b: u8,
     output_is_le: bool,
     bit_size: Option<usize>,
-) -> BitVec<Msb0, u8> {
+) -> Result<BitVec<Msb0, u8>, DekuError> {
     // Access to previously written fields
     println!("field_a = 0x{:X}", field_a);
 
@@ -70,6 +71,6 @@ fn main() {
         }
     );
 
-    let ret_write: Vec<u8> = ret_read.into();
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(test_data.to_vec(), ret_write);
 }

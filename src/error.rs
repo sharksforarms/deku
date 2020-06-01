@@ -6,6 +6,8 @@ use std::fmt;
 pub enum DekuError {
     /// Parsing error when reading
     Parse(String),
+    /// Invalid parameter
+    InvalidParam(String),
 }
 
 impl From<std::num::TryFromIntError> for DekuError {
@@ -24,6 +26,7 @@ impl fmt::Display for DekuError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             DekuError::Parse(ref err) => write!(f, "Parse error: {}", err),
+            DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {}", err),
         }
     }
 }

@@ -27,7 +27,7 @@ Precedence: field > top-level > system endianness (default)
 Example:
 ```rust
 # use deku::prelude::*;
-# use std::convert::TryFrom;
+# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "little")] // top-level, defaults to system endianness
 struct DekuTest {
@@ -48,7 +48,7 @@ assert_eq!(
     value
 );
 
-let value: Vec<u8> = value.into();
+let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
@@ -61,7 +61,7 @@ Set the bit-size of the field
 Example:
 ```rust
 # use deku::prelude::*;
-# use std::convert::TryFrom;
+# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(bits = 2)]
@@ -84,7 +84,7 @@ assert_eq!(
     value
 );
 
-let value: Vec<u8> = value.into();
+let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
@@ -97,7 +97,7 @@ Set the byte-size of the field
 Example:
 ```rust
 # use deku::prelude::*;
-# use std::convert::TryFrom;
+# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(bytes = 2)]
@@ -117,7 +117,7 @@ assert_eq!(
     value
 );
 
-let value: Vec<u8> = value.into();
+let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
@@ -128,7 +128,7 @@ Specify the field representing the length of the container, i.e. a Vec
 Example:
 ```rust
 # use deku::prelude::*;
-# use std::convert::TryFrom;
+# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     count: u8,
@@ -148,7 +148,7 @@ assert_eq!(
     value
 );
 
-let value: Vec<u8> = value.into();
+let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
@@ -156,7 +156,7 @@ assert_eq!(data, value);
 
 ```rust
 # use deku::prelude::*;
-# use std::convert::TryFrom;
+# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 # struct DekuTest {
 #     count: u8,
@@ -174,14 +174,14 @@ assert_eq!(
 );
 
 value.items.push(0xFF); // new item!
-value.update();
+value.update().unwrap();
 
 assert_eq!(
     DekuTest { count: 0x03, items: vec![0xAB, 0xCD, 0xFF] },
     value
 );
 
-let value: Vec<u8> = value.into();
+let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x03, 0xAB, 0xCD, 0xFF], value);
 ```
 
@@ -192,7 +192,7 @@ Specify custom reader or writer tokens for reading a field or variant
 Example:
 ```rust
 # use deku::prelude::*;
-# use std::convert::TryFrom;
+# use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(
@@ -214,7 +214,7 @@ impl DekuTest {
     }
 
     // Parse from String to u8 and write
-    fn write(field_a: &str, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+    fn write(field_a: &str, output_is_le: bool, bit_size: Option<usize>) -> Result<BitVec<Msb0, u8>, DekuError> {
         let value = field_a.parse::<u8>().unwrap();
         value.write(output_is_le, bit_size)
     }
@@ -230,7 +230,7 @@ assert_eq!(
 );
 
 
-let value: Vec<u8> = value.into();
+let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
@@ -241,7 +241,7 @@ Specify the identifier of the enum variant, must be paired with [id_type](#id_ty
 Example:
 ```rust
 # use deku::prelude::*;
-# use std::convert::TryFrom;
+# use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u8")]
 enum DekuTest {
@@ -260,7 +260,7 @@ assert_eq!(
     value
 );
 
-let variant_bytes: Vec<u8> = value.into();
+let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x01, 0xFF], variant_bytes);
 
 let (rest, value) = DekuTest::from_bytes(rest).unwrap();
@@ -272,7 +272,7 @@ assert_eq!(
     value
 );
 
-let variant_bytes: Vec<u8> = value.into();
+let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x02, 0xAB, 0xEF, 0xBE], variant_bytes);
 ```
 
@@ -289,7 +289,7 @@ Set the bit size of the enum variant `id`
 Example:
 ```rust
 # use deku::prelude::*;
-# use std::convert::TryFrom;
+# use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u8", id_bits = "4")]
 enum DekuTest {
@@ -306,7 +306,7 @@ assert_eq!(
     value
 );
 
-let value: Vec<u8> = value.into();
+let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
@@ -319,7 +319,7 @@ Set the byte size of the enum variant `id`
 Example:
 ```rust
 # use deku::prelude::*;
-# use std::convert::TryFrom;
+# use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u32", id_bytes = "2")]
 enum DekuTest {
@@ -336,7 +336,7 @@ assert_eq!(
     value
 );
 
-let value: Vec<u8> = value.into();
+let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 */

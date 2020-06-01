@@ -25,7 +25,7 @@ fn deku_read_byte(input: &[u8]) {
 }
 
 fn deku_write_byte(input: &DekuByte) {
-    let _v = input.to_bytes();
+    let _v = input.to_bytes().unwrap();
 }
 
 fn deku_read_enum(input: &[u8]) {
@@ -33,7 +33,7 @@ fn deku_read_enum(input: &[u8]) {
 }
 
 fn deku_write_enum(input: &DekuEnum) {
-    let _v = input.to_bytes();
+    let _v = input.to_bytes().unwrap();
 }
 
 fn deku_read_vec(input: &[u8]) {
@@ -41,7 +41,7 @@ fn deku_read_vec(input: &[u8]) {
 }
 
 fn deku_write_vec(input: &DekuVec) {
-    let _v = input.to_bytes();
+    let _v = input.to_bytes().unwrap();
 }
 
 fn criterion_benchmark(c: &mut Criterion) {

@@ -1,0 +1,23 @@
+[package]
+name = "ensure_no_std"
+version = "0.1.0"
+authors = ["sharks <sharks@sharks>"]
+edition = "2018"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+
+[workspace]
+
+
+[features]
+default = ["alloc"]
+alloc = []
+
+[dependencies]
+wee_alloc = "0.4"
+deku = { path = "../", default-features = false, features = ["alloc"] }

@@ -41,7 +41,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let initialize_struct = super::gen_struct_init(is_named_struct, field_idents);
 
     tokens.extend(quote! {
-        impl #imp std::convert::TryFrom<&[u8]> for #ident #wher {
+        impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
@@ -52,7 +52,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
         impl #imp #ident #wher {
             fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
-                use std::convert::TryFrom;
+                use core::convert::TryFrom;
                 let input_bits = input.0.bits::<Msb0>();
 
                 let mut rest = input.0.bits::<Msb0>();
@@ -70,7 +70,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
         impl #imp BitsReader for #ident #wher {
             fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>, _count: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-                use std::convert::TryFrom;
+                use core::convert::TryFrom;
                 let mut rest = input;
 
                 #(#field_reads)*
@@ -153,7 +153,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     }
 
     tokens.extend(quote! {
-        impl #imp std::convert::TryFrom<&[u8]> for #ident #wher {
+        impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {

@@ -13,6 +13,10 @@ For documentation and examples on available `#deku[()]` attributes and features,
 
 For more examples, see the [examples folder](https://github.com/sharksforarms/deku/tree/master/examples)!
 
+## no_std
+
+For use in `no_std` environments, `alloc` is the single feature which is required on deku.
+
 # Simple Example
 
 Let's read big-endian data into a struct, with fields containing different sizes, modify a value, and write it back
@@ -155,6 +159,14 @@ assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 ```
 
 */
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+#[cfg(feature = "alloc")]
+use alloc::{format, vec::Vec};
+
 use bitvec::prelude::*;
 pub use deku_derive::*;
 pub mod attributes;
@@ -207,7 +219,7 @@ macro_rules! ImplDekuTraits {
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 assert!(count.is_none(), "Dev error: `count` should always be None");
 
-                let max_type_bits: usize = std::mem::size_of::<$typ>() * 8;
+                let max_type_bits: usize = core::mem::size_of::<$typ>() * 8;
 
                 let bit_size = match bit_size {
                     None => max_type_bits,

@@ -1,5 +1,5 @@
-use std::error;
-use std::fmt;
+#![cfg(feature = "alloc")]
+use alloc::{format, string::String, string::ToString};
 
 /// Deku errors
 #[derive(Debug, PartialEq)]
@@ -10,20 +10,20 @@ pub enum DekuError {
     InvalidParam(String),
 }
 
-impl From<std::num::TryFromIntError> for DekuError {
-    fn from(e: std::num::TryFromIntError) -> DekuError {
+impl From<core::num::TryFromIntError> for DekuError {
+    fn from(e: core::num::TryFromIntError) -> DekuError {
         DekuError::Parse(format!("error parsing int: {}", e.to_string()))
     }
 }
 
-impl From<std::convert::Infallible> for DekuError {
-    fn from(_e: std::convert::Infallible) -> DekuError {
+impl From<core::convert::Infallible> for DekuError {
+    fn from(_e: core::convert::Infallible) -> DekuError {
         unreachable!();
     }
 }
 
-impl fmt::Display for DekuError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl core::fmt::Display for DekuError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match *self {
             DekuError::Parse(ref err) => write!(f, "Parse error: {}", err),
             DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {}", err),
@@ -31,8 +31,9 @@ impl fmt::Display for DekuError {
     }
 }
 
-impl error::Error for DekuError {
-    fn cause(&self) -> Option<&dyn error::Error> {
+#[cfg(feature = "std")]
+impl std::error::Error for DekuError {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         Some(self)
     }
 }

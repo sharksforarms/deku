@@ -24,7 +24,7 @@ std = ["alloc"]
 alloc = ["bitvec/alloc"]
 
 [dependencies]
-deku_derive = { version = "^0.2.0", path = "deku-derive" }
+deku_derive = { version = "^0.3.0", path = "deku-derive" }
 bitvec = { version = "0.17", default-features = false }
 
 [dev-dependencies]

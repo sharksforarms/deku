@@ -248,6 +248,23 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(
+        expected = "Parse(\"error parsing int: out of range integral type conversion attempted\")"
+    )]
+    fn test_dynamic_vec_count_error() {
+        let mut val = samples::VecCountDeku {
+            count: 0x02,
+            vec_data: vec![0xAA, 0xBB],
+        };
+
+        // `count` is a u8, add u8::MAX ++ items and try to update
+        for _ in 0..std::u8::MAX {
+            val.vec_data.push(0xFF);
+        }
+        val.update().unwrap();
+    }
+
+    #[test]
     fn test_reader_writer() {
         let test_data: Vec<u8> = [0x01].to_vec();
 

@@ -32,7 +32,7 @@ fn main() {
         deku_test
     );
 
-    let ret_out: Vec<u8> = deku_test.to_bytes();
+    let ret_out: Vec<u8> = deku_test.to_bytes().unwrap();
 
     assert_eq!(test_data, ret_out);
 }

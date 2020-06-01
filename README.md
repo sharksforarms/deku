@@ -49,6 +49,6 @@ assert_eq!(DekuTest {
 
 val.field_c = 0xC0FE;
 
-let data_out = val.to_bytes();
+let data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 ```

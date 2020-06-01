@@ -1,5 +1,5 @@
 use deku::prelude::*;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct FieldF {
@@ -63,6 +63,6 @@ fn main() {
         test_deku
     );
 
-    let test_deku: Vec<u8> = test_deku.into();
+    let test_deku: Vec<u8> = test_deku.try_into().unwrap();
     assert_eq!(test_data.to_vec(), test_deku);
 }

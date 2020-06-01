@@ -3,7 +3,7 @@ mod tests {
     use deku::prelude::*;
     use hex_literal::hex;
     use rstest::rstest;
-    use std::convert::TryFrom;
+    use std::convert::{TryFrom, TryInto};
 
     pub mod samples {
         use super::*;
@@ -95,7 +95,11 @@ mod tests {
                 Ok((rest, value + 1))
             }
 
-            fn write(field_a: u8, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+            fn write(
+                field_a: u8,
+                output_is_le: bool,
+                bit_size: Option<usize>,
+            ) -> Result<BitVec<Msb0, u8>, DekuError> {
                 let value = field_a - 1;
                 value.write(output_is_le, bit_size)
             }
@@ -159,7 +163,7 @@ mod tests {
         );
 
         // Write
-        let ret_write: Vec<u8> = ret_read.into();
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(test_data, ret_write);
     }
 
@@ -202,7 +206,7 @@ mod tests {
         );
 
         // Write
-        let ret_write: Vec<u8> = ret_read.into();
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(test_data, ret_write);
     }
 
@@ -216,7 +220,7 @@ mod tests {
         let ret_read = samples::EnumDeku::try_from(input).unwrap();
         assert_eq!(expected, ret_read);
 
-        let ret_write: Vec<u8> = ret_read.into();
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(input.to_vec(), ret_write);
     }
 
@@ -236,10 +240,10 @@ mod tests {
 
         // Add an item to the vec
         ret_read.vec_data.push(0xFF);
-        ret_read.update();
+        ret_read.update().unwrap();
 
         // Write
-        let ret_write: Vec<u8> = ret_read.into();
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!([0x03, 0xAA, 0xBB, 0xFF].to_vec(), ret_write);
     }
 
@@ -255,7 +259,7 @@ mod tests {
             ret_read
         );
 
-        let ret_write: Vec<u8> = ret_read.into();
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(test_data, ret_write);
     }
 
@@ -266,7 +270,7 @@ mod tests {
         let ret_read = samples::GenericStructDeku::<u8>::try_from(test_data.as_ref()).unwrap();
         assert_eq!(samples::GenericStructDeku::<u8> { field_a: 0x01 }, ret_read);
 
-        let ret_write: Vec<u8> = ret_read.into();
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(test_data, ret_write);
     }
 
@@ -277,7 +281,7 @@ mod tests {
         let ret_read = samples::GenericEnumDeku::<u8>::try_from(test_data.as_ref()).unwrap();
         assert_eq!(samples::GenericEnumDeku::<u8>::VariantT(0x02), ret_read);
 
-        let ret_write: Vec<u8> = ret_read.into();
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(test_data, ret_write);
     }
 }

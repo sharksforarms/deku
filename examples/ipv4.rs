@@ -1,6 +1,6 @@
 use deku::prelude::*;
 use hex_literal::hex;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 /// Ipv4 Header
 /// ```text
@@ -76,7 +76,7 @@ fn main() {
         ip_header
     );
 
-    let ip_header_data: Vec<u8> = ip_header.into();
+    let ip_header_data: Vec<u8> = ip_header.try_into().unwrap();
 
     assert_eq!(test_data, ip_header_data);
 }

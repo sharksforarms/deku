@@ -33,41 +33,47 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }))?;
 
     tokens.extend(quote! {
-        impl #imp From<#ident> for BitVec<Msb0, u8> #wher {
-            fn from(input: #ident) -> Self {
+        impl #imp std::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
+            type Error = DekuError;
+
+            fn try_from(input: #ident) -> Result<Self, Self::Error> {
                 input.to_bitvec()
             }
         }
 
-        impl #imp From<#ident> for Vec<u8> #wher {
-            fn from(input: #ident) -> Self {
+        impl #imp std::convert::TryFrom<#ident> for Vec<u8> #wher {
+            type Error = DekuError;
+
+            fn try_from(input: #ident) -> Result<Self, Self::Error> {
                 input.to_bytes()
             }
         }
 
         impl #imp #ident #wher {
 
-            pub fn update(&mut self) {
+            pub fn update(&mut self) -> Result<(), DekuError> {
                 use std::convert::TryInto;
                 #(#field_updates)*
+
+                Ok(())
             }
 
-            pub fn to_bytes(&self) -> Vec<u8> {
-                let mut acc: BitVec<Msb0, u8> = self.to_bitvec();
-                acc.into_vec()
+            pub fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
+                let mut acc: BitVec<Msb0, u8> = self.to_bitvec()?;
+                Ok(acc.into_vec())
             }
 
-            pub fn to_bitvec(&self) -> BitVec<Msb0, u8> {
+            pub fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
                 let mut acc: BitVec<Msb0, u8> = BitVec::new();
 
                 #(#field_writes)*
 
-                acc
+                Ok(acc)
             }
         }
 
         impl #imp BitsWriter for #ident #wher {
-            fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+            fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> Result<BitVec<Msb0, u8>, DekuError> {
                 self.to_bitvec()
             }
         }
@@ -121,14 +127,14 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         let variant_match = super::gen_enum_init(variant_is_named, variant_ident, field_idents);
 
         let variant_write = if variant_writer.is_some() {
-            quote! { #variant_writer; }
+            quote! { #variant_writer ?; }
         } else {
             let field_writes = emit_field_writes(input, &variant.fields.as_ref(), None)?;
 
             quote! {
                 {
                     let mut variant_id: #id_type = #variant_id;
-                    let bits = variant_id.write(#id_is_le_bytes, #id_bit_size);
+                    let bits = variant_id.write(#id_is_le_bytes, #id_bit_size)?;
                     acc.extend(bits);
 
                     #(#field_writes)*
@@ -152,45 +158,51 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     }
 
     tokens.extend(quote! {
-        impl #imp From<#ident> for BitVec<Msb0, u8> #wher {
-            fn from(input: #ident) -> Self {
+        impl #imp std::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
+            type Error = DekuError;
+
+            fn try_from(input: #ident) -> Result<Self, Self::Error> {
                 input.to_bitvec()
             }
         }
 
-        impl #imp From<#ident> for Vec<u8> #wher {
-            fn from(input: #ident) -> Self {
+        impl #imp std::convert::TryFrom<#ident> for Vec<u8> #wher {
+            type Error = DekuError;
+
+            fn try_from(input: #ident) -> Result<Self, Self::Error> {
                 input.to_bytes()
             }
         }
 
         impl #imp #ident #wher {
-            pub fn update(&mut self) {
+            pub fn update(&mut self) -> Result<(), DekuError> {
                 use std::convert::TryInto;
 
                 match self {
                     #(#variant_updates),*
                 }
+
+                Ok(())
             }
 
-            pub fn to_bytes(&self) -> Vec<u8> {
-                let mut acc: BitVec<Msb0, u8> = self.to_bitvec();
-                acc.into_vec()
+            pub fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
+                let mut acc: BitVec<Msb0, u8> = self.to_bitvec()?;
+                Ok(acc.into_vec())
             }
 
-            pub fn to_bitvec(&self) -> BitVec<Msb0, u8> {
+            pub fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
                 let mut acc: BitVec<Msb0, u8> = BitVec::new();
 
                 match self {
                     #(#variant_writes),*
                 }
 
-                acc
+                Ok(acc)
             }
         }
 
         impl #imp BitsWriter for #ident #wher {
-            fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> BitVec<Msb0, u8> {
+            fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> Result<BitVec<Msb0, u8>, DekuError> {
                 self.to_bitvec()
             }
         }
@@ -252,7 +264,7 @@ fn emit_field_update(
     // If `len` attr is provided, overwrite the field with the .len() of the container
     if let Some(field_len) = field_len {
         field_updates.push(quote! {
-            #deref #object_prefix #field_len = #object_prefix #field_ident.len().try_into().unwrap(); // TODO: unwrap
+            #deref #object_prefix #field_len = #object_prefix #field_ident.len().try_into()?;
         });
     }
 
@@ -285,7 +297,7 @@ fn emit_field_write(
         let output_is_le = #is_le_bytes;
         let field_bits = #field_bits;
 
-        let bits = #field_write_func;
+        let bits = #field_write_func ?;
         acc.extend(bits);
     };
 

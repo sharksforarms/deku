@@ -88,6 +88,20 @@ jobs:
           override: true
       - run: cd ensure_no_std && cargo run --release
 
+  ensure_wasm:
+    name: Ensure wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - uses: jetli/wasm-pack-action@v0.3.0
+        with:
+          version: 'latest'
+      - run: cd ensure_wasm && wasm-pack build --target web && wasm-pack test --node
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest

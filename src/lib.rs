@@ -241,19 +241,43 @@ macro_rules! ImplDekuTraits {
 
                 let (bit_slice, rest) = input.split_at(bit_size);
 
-                // Create a new BitVec from the slice
-                // We need to do this because it could be split across byte boundaries
-                // i.e. BitSlice<Msb0, u8> [00, 1100].load_le() == 48
-                // vs BitSlice<Msb0, u8> [001100].load_le() == 12
-                let mut bits: BitVec<Msb0, u8> = BitVec::new();
-                for b in bit_slice {
-                    bits.push(*b);
-                }
+                // Create a new BitVec from the slice and pad un-aligned chunks
+                // i.e. [10010110, 1110] -> [10010110, 00001110]
+                let bits: BitVec<Msb0, u8> = {
+                    let mut bits = BitVec::with_capacity(bit_slice.len());
+                    for chunk in bit_slice.chunks(8) {
+                        if chunk.len() != 8 {
+                            let pad = 8 * ((chunk.len() + 7) / 8) - chunk.len();
+                            for _ in 0..pad {
+                                bits.push(false);
+                            }
+                        }
 
+                        for b in chunk {
+                            bits.push(*b);
+                        }
+                    }
+
+                    bits
+                };
+
+                // Cast underlying pointer to $typ, size checks above make this safe
+                // TODO: unsafe, maybe there's a better way?
+                let value = unsafe { &*(bits.as_ptr() as *const $typ) };
+
+                // Swap endian as needed
                 let value = if input_is_le {
-                    bits.load_le()
+                    if cfg!(target_endian = "big") {
+                        value.swap_bytes()
+                    } else {
+                        *value
+                    }
                 } else {
-                    bits.load_be()
+                    if cfg!(target_endian = "little") {
+                        value.swap_bytes()
+                    } else {
+                        *value
+                    }
                 };
 
                 Ok((rest, value))
@@ -370,8 +394,18 @@ ImplDekuTraits!(u8);
 ImplDekuTraits!(u16);
 ImplDekuTraits!(u32);
 ImplDekuTraits!(u64);
-// ImplDekuTraits!(u128);
+ImplDekuTraits!(u128);
 ImplDekuTraits!(usize);
+ImplDekuTraits!(i8);
+ImplDekuTraits!(i16);
+ImplDekuTraits!(i32);
+ImplDekuTraits!(i64);
+ImplDekuTraits!(i128);
+ImplDekuTraits!(isize);
+
+// no method named `swap_bytes` found for:
+// ImplDekuTraits!(f32);
+// ImplDekuTraits!(f64);
 
 #[cfg(test)]
 mod tests {
@@ -384,6 +418,78 @@ mod tests {
 
     #[cfg(target_endian = "big")]
     static IS_LE: bool = false;
+
+    macro_rules! TestPrimitive {
+        ($test_name:ident, $typ:ty, $input:expr, $expected:expr) => {
+            #[test]
+            fn $test_name() {
+                let input = $input;
+                let bit_slice = input.bits::<Msb0>();
+                let (_rest, res_read) = <$typ>::read(bit_slice, IS_LE, None, None).unwrap();
+                assert_eq!($expected, res_read);
+
+                let res_write = res_read.write(IS_LE, None).unwrap().into_vec();
+                assert_eq!(input, res_write);
+            }
+        };
+    }
+
+    TestPrimitive!(test_u8, u8, vec![0xAAu8], 0xAAu8);
+    TestPrimitive!(test_u16, u16, vec![0xABu8, 0xCD], 0xCDAB);
+    TestPrimitive!(test_u32, u32, vec![0xABu8, 0xCD, 0xEF, 0xBE], 0xBEEFCDAB);
+    TestPrimitive!(
+        test_u64,
+        u64,
+        vec![0xABu8, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD, 0xFE, 0xC0],
+        0xC0FECDABBEEFCDAB
+    );
+    TestPrimitive!(
+        test_u128,
+        u128,
+        vec![
+            0xABu8, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD, 0xFE, 0xC0, 0xAB, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD,
+            0xFE, 0xC0
+        ],
+        0xC0FECDABBEEFCDABC0FECDABBEEFCDAB
+    );
+    TestPrimitive!(
+        test_usize,
+        usize,
+        vec![0xABu8, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD, 0xFE, 0xC0],
+        if core::mem::size_of::<usize>() == 8 {
+            0xC0FECDABBEEFCDAB
+        } else {
+            0xBEEFCDAB
+        }
+    );
+    TestPrimitive!(test_i8, i8, vec![0xFBu8], -5);
+    TestPrimitive!(test_i16, i16, vec![0xFDu8, 0xFE], -259);
+    TestPrimitive!(test_i32, i32, vec![0x02u8, 0x3F, 0x01, 0xEF], -0x10FEC0FE);
+    TestPrimitive!(
+        test_i64,
+        i64,
+        vec![0x02u8, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF],
+        -0x10FEC0FE10FEC0FE
+    );
+    TestPrimitive!(
+        test_i128,
+        i128,
+        vec![
+            0x02u8, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF, 0x01, 0x3F,
+            0x01, 0xEF
+        ],
+        -0x10FEC0FE10FEC0FE10FEC0FE10FEC0FE
+    );
+    TestPrimitive!(
+        test_isize,
+        isize,
+        vec![0x02u8, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF],
+        if core::mem::size_of::<isize>() == 8 {
+            -0x10FEC0FE10FEC0FE
+        } else {
+            -0x10FEC0FE
+        }
+    );
 
     #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), None, 0xAABB_CCDD, bits![Msb0, u8;]),
@@ -445,8 +551,6 @@ mod tests {
 
         let res_write = res_read.write(is_le, bit_size).unwrap().into_vec();
         assert_eq!(expected_write, res_write);
-
-        assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
     }
 
     #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,

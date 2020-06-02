@@ -13,8 +13,6 @@ This crate provides bit-level, symmetric, serialization/deserialization implemen
 
 **Productivity**: Focus and declare your types that represent the data, Deku will generate symmetric reader/writer functions for your type! Avoid the requirement of writing redundant, error-prone parsing and writing code for binary structs or network headers
 
-**no_std**: Compatible with `#![no_std]`
-
 ## Usage
 
 ```toml

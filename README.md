@@ -15,6 +15,8 @@ This crate provides bit-level, symmetric, serialization/deserialization implemen
 
 **no_std**: Compatible with `#![no_std]`
 
+**wasm**: Web Assembly ready
+
 ## Usage
 
 ```toml

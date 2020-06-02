@@ -250,10 +250,37 @@ macro_rules! ImplDekuTraits {
                     bits.push(*b);
                 }
 
+                let mut new_bits: BitVec<Msb0, u8> = BitVec::new();
+
+                for chunk in bits.chunks_mut(8) {
+                    if chunk.len() != 8 {
+                        let pad = 8 * ((chunk.len() + 7) / 8) - chunk.len();
+                        for _ in 0..pad {
+                            new_bits.push(false);
+                        }
+                    }
+
+                    for b in chunk {
+                        new_bits.push(*b);
+                    }
+                }
+
+                // Cast underlying pointer to $typ, size checks above make this safe
+                // TODO: unsafe, maybe there's a better way?
+                let value = unsafe { &*(new_bits.as_ptr() as *const $typ) };
+
                 let value = if input_is_le {
-                    bits.load_le()
+                    if cfg!(target_endian = "big") {
+                        value.swap_bytes()
+                    } else {
+                        *value
+                    }
                 } else {
-                    bits.load_be()
+                    if cfg!(target_endian = "little") {
+                        value.swap_bytes()
+                    } else {
+                        *value
+                    }
                 };
 
                 Ok((rest, value))
@@ -370,7 +397,7 @@ ImplDekuTraits!(u8);
 ImplDekuTraits!(u16);
 ImplDekuTraits!(u32);
 ImplDekuTraits!(u64);
-// ImplDekuTraits!(u128);
+ImplDekuTraits!(u128);
 ImplDekuTraits!(usize);
 
 #[cfg(test)]

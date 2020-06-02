@@ -22,21 +22,24 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 use deku::prelude::*;
 
+#[wasm_bindgen]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-struct DekuTest {
+pub struct DekuTest {
     #[deku(bits = "5")]
-    field_a: u8,
+    pub field_a: u8,
     #[deku(bits = "3")]
-    field_b: u8,
-    count: u8,
-    #[deku(len = "count")]
-    data: Vec<u8>,
+    pub field_b: u8,
+    pub field_c: u8,
 }
 
 #[wasm_bindgen]
-pub fn deku_read(input: &str) -> String {
-    let data = hex::decode(input).unwrap();
-    let (_rest, val) = DekuTest::from_bytes((&data, 0)).unwrap();
+pub fn deku_read(input: &[u8]) -> DekuTest {
+    let (_rest, val) = DekuTest::from_bytes((input, 0)).unwrap();
 
-    return format!("{:?}", val);
+    val
+}
+
+#[wasm_bindgen]
+pub fn deku_write(input: &DekuTest) -> Vec<u8> {
+    input.to_bytes().unwrap()
 }

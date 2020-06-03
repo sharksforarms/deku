@@ -168,6 +168,7 @@ extern crate alloc;
 use alloc::{format, vec::Vec};
 
 use bitvec::prelude::*;
+use core::convert::TryInto;
 pub use deku_derive::*;
 pub mod attributes;
 pub mod error;
@@ -258,26 +259,26 @@ macro_rules! ImplDekuTraits {
                         }
                     }
 
+                    // Pad up-to size of type
+                    for _ in 0..(max_type_bits - bits.len()) {
+                        if input_is_le {
+                            bits.push(false);
+                        } else {
+                            bits.insert(0, false);
+                        }
+                    }
+
                     bits
                 };
 
-                // Cast underlying pointer to $typ, size checks above make this safe
-                // TODO: unsafe, maybe there's a better way?
-                let value = unsafe { &*(bits.as_ptr() as *const $typ) };
+                let bytes = bits.into_vec();
+                let bytes: &[u8] = bytes.as_ref();
 
-                // Swap endian as needed
+                // Read value
                 let value = if input_is_le {
-                    if cfg!(target_endian = "big") {
-                        value.swap_bytes()
-                    } else {
-                        *value
-                    }
+                    <$typ>::from_le_bytes(bytes.try_into()?)
                 } else {
-                    if cfg!(target_endian = "little") {
-                        value.swap_bytes()
-                    } else {
-                        *value
-                    }
+                    <$typ>::from_be_bytes(bytes.try_into()?)
                 };
 
                 Ok((rest, value))

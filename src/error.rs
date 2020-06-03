@@ -16,6 +16,12 @@ impl From<core::num::TryFromIntError> for DekuError {
     }
 }
 
+impl From<core::array::TryFromSliceError> for DekuError {
+    fn from(e: core::array::TryFromSliceError) -> DekuError {
+        DekuError::Parse(format!("error parsing from slice: {}", e.to_string()))
+    }
+}
+
 impl From<core::convert::Infallible> for DekuError {
     fn from(_e: core::convert::Infallible) -> DekuError {
         unreachable!();

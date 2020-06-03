@@ -9,6 +9,7 @@ A documentation-only module for #[deku] attributes
 | [bits](#bits) | field | Set the bit-size of the field
 | [bytes](#bytes) | field | Set the byte-size of the field
 | [len](#len) | field | Set the field representing the element count of a container
+| [map](#map) | field | Apply a function over the result of reading
 | [reader](#readerwriter) | variant, field | Custom reader code
 | [writer](#readerwriter) | variant, field | Custom writer code
 | [id](#id) | variant | variant id value, paired with `id_type`
@@ -183,6 +184,41 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x03, 0xAB, 0xCD, 0xFF], value);
+```
+
+# map
+
+Specify a function or lambda to apply to the result of the read
+
+Example:
+
+Read a `u8` and apply a function to convert it to a `String`.
+
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead)]
+pub struct DekuTest {
+    #[deku(map = "|(rest, field): (_, u8)| -> Result<_, DekuError> { Ok((rest, field.to_string())) }")]
+    pub field_a: String,
+    #[deku(map = "DekuTest::map_field_b")]
+    pub field_b: String,
+}
+
+impl DekuTest {
+    fn map_field_b(input: (&BitSlice<Msb0, u8>, u8)) -> Result<(&BitSlice<Msb0, u8>, String), DekuError> {
+        Ok((input.0, input.1.to_string()))
+    }
+}
+
+let data: Vec<u8> = vec![0x01, 0x02];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest { field_a: "1".to_string(), field_b: "2".to_string() },
+    value
+);
 ```
 
 # reader/writer

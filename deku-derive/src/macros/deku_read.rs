@@ -245,7 +245,7 @@ fn emit_field_read(
         .map(|v| {
             quote! { (#v) }
         })
-        .or(Some(quote! { Result::<_, DekuError>::Ok }));
+        .or_else(|| Some(quote! { Result::<_, DekuError>::Ok }));
     let field_len = f.get_len_field(i, true);
     let field_ident = f.get_ident(i, true);
 

@@ -403,10 +403,8 @@ ImplDekuTraits!(i32);
 ImplDekuTraits!(i64);
 ImplDekuTraits!(i128);
 ImplDekuTraits!(isize);
-
-// no method named `swap_bytes` found for:
-// ImplDekuTraits!(f32);
-// ImplDekuTraits!(f64);
+ImplDekuTraits!(f32);
+ImplDekuTraits!(f64);
 
 #[cfg(test)]
 mod tests {
@@ -491,6 +489,8 @@ mod tests {
             -0x10FEC0FE
         }
     );
+    TestPrimitive!(test_f32, f32, vec![0xA6u8, 0x9B, 0xC4, 0xBB], -0.006);
+    TestPrimitive!(test_f64, f64, vec![0xFAu8, 0x7E, 0x6A, 0xBC, 0x74, 0x93, 0x78, 0xBF], -0.006);
 
     #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), None, 0xAABB_CCDD, bits![Msb0, u8;]),

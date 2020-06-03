@@ -4,12 +4,6 @@ use quote::{quote, ToTokens};
 pub(crate) mod deku_read;
 pub(crate) mod deku_write;
 
-/// Wrap type in `<>` to allow turbofish style usage
-/// example: <Vec<u8>> == Vec::<u8>
-fn wrap_turbofish<T: ToTokens>(input: T) -> TokenStream {
-    quote! { <#input> }
-}
-
 /// Generate a literal token stream for an Option<T>
 fn option_as_literal_token<T: ToTokens>(input: Option<T>) -> TokenStream {
     match input {

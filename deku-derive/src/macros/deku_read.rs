@@ -235,19 +235,26 @@ fn emit_field_read(
         "dev error: `bytes` should be None, use `bits` to get size"
     );
 
-    let field_type = super::wrap_turbofish(&f.ty);
+    let field_type = &f.ty;
     let is_le_bytes = f.endian.unwrap_or(input.endian) == EndianNess::Little;
     let field_bits = super::option_as_literal_token(f.bits);
     let field_reader = &f.reader;
+    let field_map = f
+        .map
+        .as_ref()
+        .map(|v| {
+            quote! { (#v) }
+        })
+        .or(Some(quote! { Result::<_, DekuError>::Ok }));
     let field_len = f.get_len_field(i, true);
     let field_ident = f.get_ident(i, true);
 
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
     } else if field_len.is_some() {
-        quote! { #field_type::read(rest, input_is_le, field_bits, Some(usize::try_from(#field_len)?)) }
+        quote! { BitsReader::read(rest, input_is_le, field_bits, Some(usize::try_from(#field_len)?)) }
     } else {
-        quote! { #field_type::read(rest, input_is_le, field_bits, None) }
+        quote! { BitsReader::read(rest, input_is_le, field_bits, None) }
     };
 
     let field_read = quote! {
@@ -255,8 +262,7 @@ fn emit_field_read(
             let field_bits = #field_bits;
             let input_is_le = #is_le_bytes;
 
-            let read_ret = #field_read_func;
-            let (new_rest, value) = read_ret?;
+            let (new_rest, value): (_, #field_type) = #field_map(#field_read_func ?)?;
 
             rest = new_rest;
 

@@ -143,6 +143,10 @@ struct DekuFieldReceiver {
     #[darling(default)]
     len: Option<String>,
 
+    /// apply a function to the field after it's read
+    #[darling(default, map = "option_as_tokenstream")]
+    map: Option<TokenStream>,
+
     /// custom field reader code
     #[darling(default, map = "option_as_tokenstream")]
     reader: Option<TokenStream>,

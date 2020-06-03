@@ -76,6 +76,24 @@ mod tests {
             pub vec_data: Vec<u8>,
         }
 
+        #[derive(PartialEq, Debug, DekuRead)]
+        pub struct MapDeku {
+            #[deku(
+                map = "|(rest, field): (_, u8)| -> Result<_, DekuError> { Ok((rest, field.to_string())) }"
+            )]
+            pub field_a: String,
+            #[deku(map = "MapDeku::map_field_b")]
+            pub field_b: String,
+        }
+
+        impl MapDeku {
+            fn map_field_b(
+                input: (&BitSlice<Msb0, u8>, u8),
+            ) -> Result<(&BitSlice<Msb0, u8>, String), DekuError> {
+                Ok((input.0, input.1.to_string()))
+            }
+        }
+
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
         pub struct ReaderWriterDeku {
             #[deku(
@@ -262,6 +280,20 @@ mod tests {
             val.vec_data.push(0xFF);
         }
         val.update().unwrap();
+    }
+
+    #[test]
+    fn test_map() {
+        let test_data: Vec<u8> = [0x01, 0x02].to_vec();
+
+        let ret_read = samples::MapDeku::try_from(test_data.as_ref()).unwrap();
+        assert_eq!(
+            samples::MapDeku {
+                field_a: "1".to_string(),
+                field_b: "2".to_string(),
+            },
+            ret_read
+        );
     }
 
     #[test]

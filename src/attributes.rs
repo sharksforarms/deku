@@ -8,7 +8,7 @@ A documentation-only module for #[deku] attributes
 | [endian](#endian) | top-level, field | Set the endianness
 | [bits](#bits) | field | Set the bit-size of the field
 | [bytes](#bytes) | field | Set the byte-size of the field
-| [len](#len) | field | Set the field representing the element count of a container
+| [count](#count) | field | Set the field representing the element count of a container
 | [map](#map) | field | Apply a function over the result of reading
 | [reader](#readerwriter) | variant, field | Custom reader code
 | [writer](#readerwriter) | variant, field | Custom writer code
@@ -122,7 +122,7 @@ let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
-# len
+# count
 
 Specify the field representing the length of the container, i.e. a Vec
 
@@ -133,7 +133,7 @@ Example:
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     count: u8,
-    #[deku(len = "count")]
+    #[deku(count = "count")]
     items: Vec<u8>,
 }
 
@@ -153,7 +153,7 @@ let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
-**Note**: calling `.update()` on a struct derived with `DekuWrite` will update the `len` field!
+**Note**: calling `.update()` on a struct derived with `DekuWrite` will update the `count` field!
 
 ```rust
 # use deku::prelude::*;
@@ -161,7 +161,7 @@ assert_eq!(data, value);
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 # struct DekuTest {
 #     count: u8,
-#     #[deku(len = "count")]
+#     #[deku(count = "count")]
 #     items: Vec<u8>,
 # }
 #

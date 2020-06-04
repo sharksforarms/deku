@@ -16,7 +16,7 @@ enum DekuEnum {
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuVec {
     count: u8,
-    #[deku(len = "count")]
+    #[deku(count = "count")]
     data: Vec<u8>,
 }
 

@@ -14,7 +14,7 @@ enum DekuTest {
     #[deku(id = "3")]
     Var3 {
         field_a: u8,
-        #[deku(len = "field_a")]
+        #[deku(count = "field_a")]
         field_b: Vec<u8>,
     },
 }

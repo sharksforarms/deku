@@ -262,7 +262,8 @@ fn emit_field_read(
             let field_bits = #field_bits;
             let input_is_le = #is_le_bytes;
 
-            let (new_rest, value): (_, #field_type) = #field_map(#field_read_func ?)?;
+            let (new_rest, value) = #field_read_func?;
+            let value: #field_type = #field_map(value)?;
 
             rest = new_rest;
 

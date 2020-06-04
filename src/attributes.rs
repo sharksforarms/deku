@@ -199,15 +199,15 @@ Read a `u8` and apply a function to convert it to a `String`.
 # use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead)]
 pub struct DekuTest {
-    #[deku(map = "|(rest, field): (_, u8)| -> Result<_, DekuError> { Ok((rest, field.to_string())) }")]
+    #[deku(map = "|field: u8| -> Result<_, DekuError> { Ok(field.to_string()) }")]
     pub field_a: String,
     #[deku(map = "DekuTest::map_field_b")]
     pub field_b: String,
 }
 
 impl DekuTest {
-    fn map_field_b(input: (&BitSlice<Msb0, u8>, u8)) -> Result<(&BitSlice<Msb0, u8>, String), DekuError> {
-        Ok((input.0, input.1.to_string()))
+    fn map_field_b(field_b: u8) -> Result<String, DekuError> {
+        Ok(field_b.to_string())
     }
 }
 

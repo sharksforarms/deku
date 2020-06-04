@@ -43,7 +43,7 @@ struct DekuTest {
     #[deku(bits = "3")]
     field_b: u8,
     count: u8,
-    #[deku(len = "count")]
+    #[deku(count = "count")]
     data: Vec<u8>,
 }
 

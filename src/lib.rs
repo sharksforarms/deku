@@ -80,9 +80,9 @@ assert_eq!(data, data_out);
 
 # Vec
 
-Vec<T> can be used in combination with the [len](attributes/index.html#len) attribute (T must implement BitsReader/BitsWriter)
+Vec<T> can be used in combination with the [count](attributes/index.html#count) attribute (T must implement BitsReader/BitsWriter)
 
-If the length of Vec changes, the original field specified in `len` will not get updated.
+If the length of Vec changes, the original field specified in `count` will not get updated.
 Calling `.update()` can be used to "update" the field!
 
 ```rust
@@ -91,7 +91,7 @@ use deku::prelude::*;
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     count: u8,
-    #[deku(len = "count")]
+    #[deku(count = "count")]
     data: Vec<u8>,
 }
 
@@ -183,7 +183,7 @@ pub trait BitsReader {
     /// false otherwise (controlled via `endian` deku attribute)
     /// * **bit_size** - `Some` if `bits` or `bytes` deku attributes provided,
     /// `None` otherwise
-    /// * **count** - Number of elements to read for container, Some if `len` attribute
+    /// * **count** - Number of elements to read for container, Some if `count` attribute
     /// is provided, else None
     fn read(
         input: &BitSlice<Msb0, u8>,

@@ -246,13 +246,13 @@ fn emit_field_read(
             quote! { (#v) }
         })
         .or_else(|| Some(quote! { Result::<_, DekuError>::Ok }));
-    let field_len = f.get_len_field(i, true);
+    let field_count = f.get_count_field(i, true);
     let field_ident = f.get_ident(i, true);
 
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
-    } else if field_len.is_some() {
-        quote! { BitsReader::read(rest, input_is_le, field_bits, Some(usize::try_from(#field_len)?)) }
+    } else if field_count.is_some() {
+        quote! { BitsReader::read(rest, input_is_le, field_bits, Some(usize::try_from(#field_count)?)) }
     } else {
         quote! { BitsReader::read(rest, input_is_le, field_bits, None) }
     };

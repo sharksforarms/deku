@@ -8,6 +8,8 @@ pub enum DekuError {
     Parse(String),
     /// Invalid parameter
     InvalidParam(String),
+    /// Byte slice casting error
+    ByteSliceCast(String),
 }
 
 impl From<core::num::TryFromIntError> for DekuError {
@@ -28,11 +30,18 @@ impl From<core::convert::Infallible> for DekuError {
     }
 }
 
+impl From<byte_slice_cast::Error> for DekuError {
+    fn from(e: byte_slice_cast::Error) -> Self {
+        DekuError::ByteSliceCast(format!("error casting byte slice: {}", e.to_string()))
+    }
+}
+
 impl core::fmt::Display for DekuError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match *self {
             DekuError::Parse(ref err) => write!(f, "Parse error: {}", err),
             DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {}", err),
+            DekuError::ByteSliceCast(ref err) => write!(f, "Byte slice casting error:: {}", err),
         }
     }
 }

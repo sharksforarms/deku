@@ -6,8 +6,6 @@
 use super::{BitsReader, BitsWriter};
 use crate::error::DekuError;
 use bitvec::prelude::*;
-use byte_slice_cast::*;
-use core::convert::TryInto;
 pub use deku_derive::*;
 
 macro_rules! ImplDekuSliceTraits {
@@ -15,8 +13,8 @@ macro_rules! ImplDekuSliceTraits {
         impl BitsReader for [$typ; $count] {
             fn read(
                 input: &BitSlice<Msb0, u8>,
-                _input_is_le: bool,
-                _bit_size: Option<usize>,
+                input_is_le: bool,
+                bit_size: Option<usize>,
                 count: Option<usize>,
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
             where
@@ -24,9 +22,15 @@ macro_rules! ImplDekuSliceTraits {
             {
                 assert!(count.is_none(), "Dev error: `count` should always be None");
 
-                let (slice, rest): (&BitSlice<Msb0, u8>, &BitSlice<Msb0, u8>) =
-                    input.split_at($count * 8);
-                Ok((rest, slice.as_slice_of::<$typ>()?.try_into()?))
+                let mut slice: [$typ; $count] = Default::default();
+                let mut rest = input;
+                for i in 0..$count {
+                    let (new_rest, value) = <$typ>::read(rest, input_is_le, bit_size, count)?;
+                    slice[i] = value;
+                    rest = new_rest;
+                }
+
+                Ok((rest, slice))
             }
         }
 
@@ -514,3 +518,49 @@ ImplDekuSliceTraits!(f64, 29);
 ImplDekuSliceTraits!(f64, 30);
 ImplDekuSliceTraits!(f64, 31);
 ImplDekuSliceTraits!(f64, 32);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use rstest::rstest;
+
+    #[cfg(target_endian = "little")]
+    static IS_LE: bool = true;
+
+    #[cfg(target_endian = "big")]
+    static IS_LE: bool = false;
+
+    #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,
+        case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, None, None, [0xCCDD, 0xAABB], bits![Msb0, u8;]),
+        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), !IS_LE, None, None, [0xDDCC, 0xBBAA], bits![Msb0, u8;]),
+    )]
+    fn test_bit_read(
+        input: &[u8],
+        input_is_le: bool,
+        bit_size: Option<usize>,
+        count: Option<usize>,
+        expected: [u16; 2],
+        expected_rest: &BitSlice<Msb0, u8>,
+    ) {
+        let bit_slice = input.bits::<Msb0>();
+
+        let (rest, res_read) = <[u16; 2]>::read(bit_slice, input_is_le, bit_size, count).unwrap();
+        assert_eq!(expected, res_read);
+        assert_eq!(expected_rest, rest);
+    }
+
+    #[rstest(input,output_is_le,bit_size,expected,
+        case::normal_le([0xDDCC, 0xBBAA], IS_LE, None, vec![0xCC, 0xDD, 0xAA, 0xBB]),
+        case::normal_be([0xDDCC, 0xBBAA], !IS_LE, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
+    )]
+    fn test_bit_write(
+        input: [u16; 2],
+        output_is_le: bool,
+        bit_size: Option<usize>,
+        expected: Vec<u8>,
+    ) {
+        let res_write = input.write(output_is_le, bit_size).unwrap().into_vec();
+        assert_eq!(expected, res_write);
+    }
+}

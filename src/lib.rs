@@ -173,6 +173,7 @@ pub use deku_derive::*;
 pub mod attributes;
 pub mod error;
 pub mod prelude;
+mod slice_impls;
 use crate::error::DekuError;
 
 /// "Reader" trait: read bits and construct type

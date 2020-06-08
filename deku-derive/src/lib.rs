@@ -154,6 +154,14 @@ struct DekuFieldReceiver {
     /// custom field writer code
     #[darling(default, map = "option_as_tokenstream")]
     writer: Option<TokenStream>,
+
+    // skip field reading/writing
+    #[darling(default)]
+    skip: bool,
+
+    // default value code when used with skip
+    #[darling(default, map = "option_as_tokenstream")]
+    default: Option<TokenStream>,
 }
 
 impl DekuFieldReceiver {
@@ -168,10 +176,23 @@ impl DekuFieldReceiver {
         let bits = self.bits.or_else(|| self.bytes.map(|v| v * 8));
         let bytes = None;
 
+        // Validate `skip` is provided with `default`
+        if self.default.is_some() && !self.skip {
+            panic!("`default` attribute must be used with `skip`");
+        }
+
+        // Default `default` if skip is provided without `default`
+        let default = if self.skip && self.default.is_none() {
+            Some(quote! { Default::default() })
+        } else {
+            self.default
+        };
+
         // Return updated receiver
         Self {
             bits,
             bytes,
+            default,
             ..self
         }
     }
@@ -269,6 +290,8 @@ mod tests {
             field_c: u32,
             #[deku(endian = big)]
             field_d: u32,
+            #[deku(skip, default = "5")]
+            field_e: u32,
         }"#),
 
         // Invalid Struct
@@ -282,6 +305,8 @@ mod tests {
         case::invalid_struct_id_type(r#"#[deku(id_type="u8")] struct Test(u8);"#),
         #[should_panic(expected = "could not parse `count` attribute as unnamed: asd")]
         case::invalid_count_field(r#"struct Test(u8, #[deku(count ="asd")] Vec<u8>);"#),
+        #[should_panic(expected = "`default` attribute must be used with `skip`")]
+        case::invalid_default(r#"struct Test(u8, #[deku(default ="asd")] Vec<u8>);"#),
 
         // Valid Enum
         case::enum_empty(r#"#[deku(id_type = "u8")] enum Test {}"#),

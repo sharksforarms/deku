@@ -190,7 +190,8 @@ assert_eq!(vec![0x03, 0xAB, 0xCD, 0xFF], value);
 
 # skip
 
-Skip the reading/writing of a field
+Skip the reading/writing of a field.
+All other attributes except `default` will be ignored
 
 Defaults value to [default](#default)
 

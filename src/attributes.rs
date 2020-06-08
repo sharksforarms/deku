@@ -9,6 +9,8 @@ A documentation-only module for #[deku] attributes
 | [bits](#bits) | field | Set the bit-size of the field
 | [bytes](#bytes) | field | Set the byte-size of the field
 | [count](#count) | field | Set the field representing the element count of a container
+| [skip](#skip) | field | Skip the reading/writing of a field
+| [default](#default) | field | Custom defaulting code when `skip` is true
 | [map](#map) | field | Apply a function over the result of reading
 | [reader](#readerwriter) | variant, field | Custom reader code
 | [writer](#readerwriter) | variant, field | Custom writer code
@@ -184,6 +186,65 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x03, 0xAB, 0xCD, 0xFF], value);
+```
+
+# skip
+
+Skip the reading/writing of a field
+
+Defaults value to [default](#default)
+
+Example:
+
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+pub struct DekuTest {
+    pub field_a: u8,
+    #[deku(skip)]
+    pub field_b: Option<u8>,
+    pub field_c: u8,
+}
+
+let data: Vec<u8> = vec![0x01, 0x02];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest { field_a: 0x01, field_b: None, field_c: 0x02 },
+    value
+);
+```
+
+
+# default
+
+Default code tokens used with [skip](#skip)
+
+Defaults to `Default::default()`
+
+Example:
+
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+pub struct DekuTest {
+    pub field_a: u8,
+    #[deku(skip, default = "Some(field_a)")]
+    pub field_b: Option<u8>,
+    pub field_c: u8,
+}
+
+let data: Vec<u8> = vec![0x01, 0x02];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest { field_a: 0x01, field_b: Some(0x01), field_c: 0x02 },
+    value
+);
 ```
 
 # map

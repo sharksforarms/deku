@@ -282,6 +282,11 @@ fn emit_field_write(
         "dev error: `bytes` should be None, use `bits` to get size"
     );
 
+    // skip writing this field
+    if f.skip {
+        return Ok(quote! {});
+    }
+
     let is_le_bytes = f.endian.unwrap_or(input.endian) == EndianNess::Little;
     let field_bits = super::option_as_literal_token(f.bits);
     let field_writer = &f.writer;

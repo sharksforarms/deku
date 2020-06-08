@@ -271,5 +271,16 @@ fn emit_field_read(
         };
     };
 
+    if f.skip {
+        let default_tok = f.default.as_ref().expect("expected `default` attribute");
+
+        let default_read = quote! {
+            let #field_ident = {
+                #default_tok
+            };
+        };
+        return Ok((field_ident, default_read));
+    }
+
     Ok((field_ident, field_read))
 }

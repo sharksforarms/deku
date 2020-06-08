@@ -136,6 +136,22 @@ mod tests {
             #[deku(id = "1")]
             VariantT(T),
         }
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        pub struct SkipDeku {
+            pub field_a: u8,
+            #[deku(skip)]
+            pub field_b: Option<u8>,
+            pub field_c: u8,
+        }
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        pub struct DefaultDeku {
+            pub field_a: u8,
+            #[deku(skip, default = "5")]
+            pub field_b: u8,
+            pub field_c: u8,
+        }
     }
 
     #[test]
@@ -325,6 +341,42 @@ mod tests {
 
         let ret_read = samples::GenericEnumDeku::<u8>::try_from(test_data.as_ref()).unwrap();
         assert_eq!(samples::GenericEnumDeku::<u8>::VariantT(0x02), ret_read);
+
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+        assert_eq!(test_data, ret_write);
+    }
+
+    #[test]
+    fn test_skip_deku() {
+        let test_data: Vec<u8> = [0x01, 0x02].to_vec();
+
+        let ret_read = samples::SkipDeku::try_from(test_data.as_ref()).unwrap();
+        assert_eq!(
+            samples::SkipDeku {
+                field_a: 0x01,
+                field_b: None,
+                field_c: 0x02,
+            },
+            ret_read
+        );
+
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+        assert_eq!(test_data, ret_write);
+    }
+
+    #[test]
+    fn test_default_deku() {
+        let test_data: Vec<u8> = [0x01, 0x02].to_vec();
+
+        let ret_read = samples::DefaultDeku::try_from(test_data.as_ref()).unwrap();
+        assert_eq!(
+            samples::DefaultDeku {
+                field_a: 0x01,
+                field_b: 0x05,
+                field_c: 0x02,
+            },
+            ret_read
+        );
 
         let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(test_data, ret_write);

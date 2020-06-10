@@ -167,6 +167,9 @@ extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::{format, vec::Vec};
 
+#[cfg(feature = "std")]
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
 use bitvec::prelude::*;
 use core::convert::TryInto;
 pub use deku_derive::*;
@@ -407,6 +410,76 @@ ImplDekuTraits!(isize);
 ImplDekuTraits!(f32);
 ImplDekuTraits!(f64);
 
+#[cfg(feature = "std")]
+impl BitsReader for Ipv4Addr {
+    fn read(
+        input: &BitSlice<Msb0, u8>,
+        input_is_le: bool,
+        bit_size: Option<usize>,
+        count: Option<usize>,
+    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    where
+        Self: Sized,
+    {
+        let (rest, ip) = u32::read(input, input_is_le, bit_size, count)?;
+        Ok((rest, ip.into()))
+    }
+}
+
+#[cfg(feature = "std")]
+impl BitsWriter for Ipv4Addr {
+    fn write(
+        &self,
+        output_is_le: bool,
+        bit_size: Option<usize>,
+    ) -> Result<BitVec<Msb0, u8>, DekuError> {
+        let ip: u32 = (*self).into();
+        ip.write(output_is_le, bit_size)
+    }
+}
+
+#[cfg(feature = "std")]
+impl BitsReader for Ipv6Addr {
+    fn read(
+        input: &BitSlice<Msb0, u8>,
+        input_is_le: bool,
+        bit_size: Option<usize>,
+        count: Option<usize>,
+    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    where
+        Self: Sized,
+    {
+        let (rest, ip) = u128::read(input, input_is_le, bit_size, count)?;
+        Ok((rest, ip.into()))
+    }
+}
+
+#[cfg(feature = "std")]
+impl BitsWriter for Ipv6Addr {
+    fn write(
+        &self,
+        output_is_le: bool,
+        bit_size: Option<usize>,
+    ) -> Result<BitVec<Msb0, u8>, DekuError> {
+        let ip: u128 = (*self).into();
+        ip.write(output_is_le, bit_size)
+    }
+}
+
+#[cfg(feature = "std")]
+impl BitsWriter for IpAddr {
+    fn write(
+        &self,
+        output_is_le: bool,
+        bit_size: Option<usize>,
+    ) -> Result<BitVec<Msb0, u8>, DekuError> {
+        match self {
+            IpAddr::V4(ipv4) => ipv4.write(output_is_le, bit_size),
+            IpAddr::V6(ipv6) => ipv6.write(output_is_le, bit_size),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -629,5 +702,70 @@ mod tests {
         assert_eq!(expected_write, res_write);
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
+    }
+
+    #[rstest(input,is_le,bit_size,count,expected,expected_rest,
+        case::normal_le([237,160,254,145].as_ref(), IS_LE, None, None, Ipv4Addr::new(145,254,160,237), bits![Msb0, u8;]),
+        case::normal_be([145,254,160,237].as_ref(), !IS_LE, None, None, Ipv4Addr::new(145,254,160,237), bits![Msb0, u8;]),
+    )]
+    fn test_ipv4(
+        input: &[u8],
+        is_le: bool,
+        bit_size: Option<usize>,
+        count: Option<usize>,
+        expected: Ipv4Addr,
+        expected_rest: &BitSlice<Msb0, u8>,
+    ) {
+        let bit_slice = input.bits::<Msb0>();
+
+        let (rest, res_read) = Ipv4Addr::read(bit_slice, is_le, bit_size, count).unwrap();
+        assert_eq!(expected, res_read);
+        assert_eq!(expected_rest, rest);
+
+        let res_write: Vec<u8> = res_read.write(is_le, bit_size).unwrap().into_vec();
+        assert_eq!(input.to_vec(), res_write);
+    }
+
+    #[rstest(input,is_le,bit_size,count,expected,expected_rest,
+        case::normal_le([0xFF, 0x02, 0x0A, 0xC0, 0xFF, 0xFF,
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].as_ref(),
+                        IS_LE, None, None, Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff), bits![Msb0, u8;]),
+        case::normal_be([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        0xFF, 0xFF, 0xC0, 0x0A, 0x02, 0xFF].as_ref(),
+                        !IS_LE, None, None, Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff), bits![Msb0, u8;]),
+    )]
+    fn test_ipv6(
+        input: &[u8],
+        is_le: bool,
+        bit_size: Option<usize>,
+        count: Option<usize>,
+        expected: Ipv6Addr,
+        expected_rest: &BitSlice<Msb0, u8>,
+    ) {
+        let bit_slice = input.bits::<Msb0>();
+
+        let (rest, res_read) = Ipv6Addr::read(bit_slice, is_le, bit_size, count).unwrap();
+        assert_eq!(expected, res_read);
+        assert_eq!(expected_rest, rest);
+
+        let res_write: Vec<u8> = res_read.write(is_le, bit_size).unwrap().into_vec();
+        assert_eq!(input.to_vec(), res_write);
+    }
+
+    #[test]
+    fn test_ip_addr_write() {
+        let ip_addr = IpAddr::V4(Ipv4Addr::new(145, 254, 160, 237));
+        let ret_write = ip_addr.write(true, None).unwrap().into_vec();
+        assert_eq!(vec![237, 160, 254, 145], ret_write);
+
+        let ip_addr = IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff));
+        let ret_write = ip_addr.write(true, None).unwrap().into_vec();
+        assert_eq!(
+            vec![
+                0xFF, 0x02, 0x0A, 0xC0, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00
+            ],
+            ret_write
+        );
     }
 }

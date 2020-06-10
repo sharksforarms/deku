@@ -300,7 +300,7 @@ fn emit_field_write(
 
     let field_write = quote! {
         let output_is_le = #is_le_bytes;
-        let field_bits = #field_bits;
+        let field_bits: Option<usize> = #field_bits;
 
         let bits = #field_write_func ?;
         acc.extend(bits);

@@ -33,7 +33,7 @@ pub extern "C" fn oom(_: ::core::alloc::Layout) -> ! {
 #[no_mangle]
 pub extern "C" fn eh_personality() {}
 
-use alloc::{vec, vec::Vec};
+use alloc::{format, vec, vec::Vec};
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]

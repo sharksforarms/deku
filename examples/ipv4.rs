@@ -1,13 +1,14 @@
 use deku::prelude::*;
 use hex_literal::hex;
 use std::convert::{TryFrom, TryInto};
+use std::net::Ipv4Addr;
 
 /// Ipv4 Header
 /// ```text
 ///     0                   1                   2                   3
 ///     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-///    |Version|  IHL  |    DSCP   | ECN |        Total Length         |
+///    |Version|  IHL  |    DSCP   |ECN|         Total Length          |
 ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ///    |         Identification        |Flags|      Fragment Offset    |
 ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -21,6 +22,7 @@ use std::convert::{TryFrom, TryInto};
 ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "big")]
 pub struct Ipv4Header {
     #[deku(bits = "4")]
     pub version: u8, // Version
@@ -30,30 +32,23 @@ pub struct Ipv4Header {
     pub dscp: u8, // Differentiated Services Code Point
     #[deku(bits = "2")]
     pub ecn: u8, // Explicit Congestion Notification
-    #[deku(bytes = "2")]
-    pub length: u16, // Total Length
-    #[deku(bytes = "2")]
+    pub length: u16,         // Total Length
     pub identification: u16, // Identification
     #[deku(bits = "3")]
     pub flags: u8, // Flags
     #[deku(bits = "13")]
     pub offset: u16, // Fragment Offset
-    #[deku(bytes = "1")]
-    pub ttl: u8, // Time To Live
-    #[deku(bytes = "1")]
-    pub protocol: u8, // Protocol
-    #[deku(bytes = "2")]
-    pub checksum: u16, // Header checksum
-    #[deku(bytes = "4")]
-    pub src: u32, // Source IP Address
-    #[deku(bytes = "4")]
-    pub dst: u32, // Destination IP Address
-                  // options
-                  // padding
+    pub ttl: u8,             // Time To Live
+    pub protocol: u8,        // Protocol
+    pub checksum: u16,       // Header checksum
+    pub src: Ipv4Addr,       // Source IP Address
+    pub dst: Ipv4Addr,       // Destination IP Address
+                             // options
+                             // padding
 }
 
 fn main() {
-    let test_data = hex!("45005000c12b40004006378f6b01a8c07dfd1ec0").to_vec();
+    let test_data = hex!("4500004b0f490000801163a591fea0ed91fd02cb").to_vec();
 
     let ip_header = Ipv4Header::try_from(test_data.as_ref()).unwrap();
 
@@ -63,15 +58,15 @@ fn main() {
             ihl: 5,
             ecn: 0,
             dscp: 0,
-            length: 80,
-            identification: 0x2bc1,
-            flags: 2,
+            length: 75,
+            identification: 0x0f49,
+            flags: 0,
             offset: 0,
-            ttl: 64,
-            protocol: 6,
-            checksum: 0x8f37,
-            src: 3232235883,
-            dst: 3223256445,
+            ttl: 128,
+            protocol: 17,
+            checksum: 0x63a5,
+            src: Ipv4Addr::new(145, 254, 160, 237),
+            dst: Ipv4Addr::new(145, 253, 2, 203),
         },
         ip_header
     );

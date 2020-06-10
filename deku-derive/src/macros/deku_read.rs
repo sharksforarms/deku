@@ -259,7 +259,7 @@ fn emit_field_read(
 
     let field_read = quote! {
         let #field_ident = {
-            let field_bits = #field_bits;
+            let field_bits: Option<usize> = #field_bits;
             let input_is_le = #is_le_bytes;
 
             let (new_rest, value) = #field_read_func?;

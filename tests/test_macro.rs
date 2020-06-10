@@ -155,6 +155,13 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = r#"Parse("Too much data")"#)]
+    fn test_too_much_data() {
+        let test_data = [0u8; 100].as_ref();
+        samples::UnNamedDeku::try_from(test_data).unwrap();
+    }
+
+    #[test]
     fn test_unnamed_struct() {
         let test_data: Vec<u8> = [
             0xFF,

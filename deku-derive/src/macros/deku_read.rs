@@ -45,7 +45,10 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
-                let (_rest, res) = Self::from_bytes((input, 0))?;
+                let (rest, res) = Self::from_bytes((input, 0))?;
+                if !rest.0.is_empty() {
+                    return Err(DekuError::Parse(format!("Too much data")));
+                }
                 Ok(res)
             }
         }
@@ -157,7 +160,10 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             type Error = DekuError;
 
             fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
-                let (_rest, res) = Self::from_bytes((input, 0))?;
+                let (rest, res) = Self::from_bytes((input, 0))?;
+                if !rest.0.is_empty() {
+                    return Err(DekuError::Parse(format!("Too much data")));
+                }
                 Ok(res)
             }
         }

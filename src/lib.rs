@@ -250,16 +250,26 @@ macro_rules! ImplDekuTraits {
                 // i.e. [10010110, 1110] -> [10010110, 00001110]
                 let bits: BitVec<Msb0, u8> = {
                     let mut bits = BitVec::with_capacity(bit_slice.len());
-                    for chunk in bit_slice.chunks(8) {
-                        if chunk.len() != 8 {
-                            let pad = 8 * ((chunk.len() + 7) / 8) - chunk.len();
-                            for _ in 0..pad {
-                                bits.push(false);
-                            }
-                        }
 
-                        for b in chunk {
-                            bits.push(*b);
+                    // Copy bits to new BitVec
+                    for b in bit_slice {
+                        bits.push(*b);
+                    }
+
+                    // Force align
+                    //i.e. [1110, 10010110] -> [11101001, 0110]
+                    bits.force_align();
+
+                    // Some padding to next byte
+                    let pad = 8 * ((bits.len() + 7) / 8) - bits.len();
+                    if input_is_le {
+                        let ins_index = bits.len() - (8 - pad);
+                        for _ in 0..pad {
+                            bits.insert(ins_index, false);
+                        }
+                    } else {
+                        for _ in 0..pad {
+                            bits.insert(0, false);
                         }
                     }
 
@@ -573,7 +583,9 @@ mod tests {
 
     #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), None, 0xAABB_CCDD, bits![Msb0, u8;]),
-        case::normal_offset([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), IS_LE, Some(12), None, 0b1110_1001_0110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
+        case::normal_bits_12_le([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), IS_LE, Some(12), None, 0b1110_1001_0110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
+        case::normal_bits_12_be([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), !IS_LE, Some(12), None, 0b1001_0110_1110, bits![Msb0, u8; 0,0,0,0, 1,1,0,0,1,1,0,0, 1,1,0,1,1,1,0,1]),
+        case::normal_bit_6([0b1001_0110].as_ref(), IS_LE, Some(6), None, 0b1001_01, bits![Msb0, u8; 1,0,]),
 
         #[should_panic(expected="Parse(\"not enough data: expected 32 got 0\")")]
         case::not_enough_data([].as_ref(), IS_LE, Some(32), None, 0xFF, bits![Msb0, u8;]),

@@ -139,13 +139,17 @@ struct DekuFieldReceiver {
     #[darling(default)]
     bytes: Option<usize>,
 
-    /// reference to another field providing the length of the container
-    #[darling(default)]
-    count: Option<String>,
+    /// tokens providing the length of the container
+    #[darling(default, map = "option_as_tokenstream")]
+    count: Option<TokenStream>,
 
     /// apply a function to the field after it's read
     #[darling(default, map = "option_as_tokenstream")]
     map: Option<TokenStream>,
+
+    /// map field when updating struct
+    #[darling(default, map = "option_as_tokenstream")]
+    update: Option<TokenStream>,
 
     /// custom field reader code
     #[darling(default, map = "option_as_tokenstream")]
@@ -197,36 +201,12 @@ impl DekuFieldReceiver {
         }
     }
 
-    /// Field is named if it has an ident
-    fn is_named(&self) -> bool {
-        self.ident.is_some()
-    }
-
     /// Get ident of the field
     /// `index` is provided in the case of un-named structs
     /// `prefix` is true in the case of variable declarations, false if original field is desired
     fn get_ident(&self, index: usize, prefix: bool) -> TokenStream {
         let field_ident = gen_field_ident(self.ident.as_ref(), index, prefix);
         quote! { #field_ident }
-    }
-
-    /// Get the ident of the length field provided via the `count` attribute
-    /// `index` is provided in the case of un-named structs
-    /// `prefix` is true in the case of variable declarations, false if original field is desired
-    fn get_count_field(&self, index: usize, prefix: bool) -> Option<TokenStream> {
-        self.count.as_ref().map(|field_count| {
-            if self.is_named() {
-                gen_field_ident(Some(field_count), index, prefix)
-            } else {
-                let index = field_count.parse::<usize>().unwrap_or_else(|_| {
-                    panic!(
-                        "could not parse `count` attribute as unnamed: {}",
-                        field_count
-                    )
-                });
-                gen_field_ident(None::<String>, index, prefix)
-            }
-        })
     }
 }
 
@@ -303,8 +283,6 @@ mod tests {
         case::invalid_field_bitsnbytes(r#"struct Test(#[deku(bits=4, bytes=1)] u8);"#),
         #[should_panic(expected = "`id_*` attributes only supported on enum")]
         case::invalid_struct_id_type(r#"#[deku(id_type="u8")] struct Test(u8);"#),
-        #[should_panic(expected = "could not parse `count` attribute as unnamed: asd")]
-        case::invalid_count_field(r#"struct Test(u8, #[deku(count ="asd")] Vec<u8>);"#),
         #[should_panic(expected = "`default` attribute must be used with `skip`")]
         case::invalid_default(r#"struct Test(u8, #[deku(default ="asd")] Vec<u8>);"#),
 

@@ -9,6 +9,7 @@ A documentation-only module for #[deku] attributes
 | [bits](#bits) | field | Set the bit-size of the field
 | [bytes](#bytes) | field | Set the byte-size of the field
 | [count](#count) | field | Set the field representing the element count of a container
+| [update](#update) | field | Apply code over the field when `.update()` is called
 | [skip](#skip) | field | Skip the reading/writing of a field
 | [default](#default) | field | Custom defaulting code when `skip` is true
 | [map](#map) | field | Apply a function over the result of reading
@@ -134,6 +135,7 @@ Example:
 # use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
+    #[deku(update = "self.items.len()")]
     count: u8,
     #[deku(count = "count")]
     items: Vec<u8>,
@@ -155,18 +157,24 @@ let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
-**Note**: calling `.update()` on a struct derived with `DekuWrite` will update the `count` field!
+**Note**: See [update](#update) for more information on the attribute!
 
+# update
+
+Specify custom code to run on the field when `.update()` is called on the struct/enum
+
+Example:
 ```rust
-# use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
-# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-# struct DekuTest {
-#     count: u8,
-#     #[deku(count = "count")]
-#     items: Vec<u8>,
-# }
-#
+use deku::prelude::*;
+use std::convert::{TryInto, TryFrom};
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(update = "self.items.len()")]
+    count: u8,
+    #[deku(count = "count")]
+    items: Vec<u8>,
+}
+
 let data: Vec<u8> = vec![0x02, 0xAB, 0xCD];
 
 let mut value = DekuTest::try_from(data.as_ref()).unwrap();
@@ -217,7 +225,6 @@ assert_eq!(
     value
 );
 ```
-
 
 # default
 

@@ -254,7 +254,7 @@ fn emit_field_read(
             quote! { (#v) }
         })
         .or_else(|| Some(quote! { Result::<_, DekuError>::Ok }));
-    let field_count = f.get_count_field(i, true);
+    let field_count = &f.count;
     let field_ident = f.get_ident(i, true);
 
     let field_read_func = if field_reader.is_some() {

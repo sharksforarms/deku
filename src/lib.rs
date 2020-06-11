@@ -50,7 +50,7 @@ assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 
 # Composing
 
-Deku structs/enums can be composed as long as they implement BitsReader / BitsWriter! (Which DekuRead/DekuWrite implement)
+Deku structs/enums can be composed as long as they implement DekuRead / DekuWrite! (Which DekuRead/DekuWrite implement)
 
 ```rust
 use deku::prelude::*;
@@ -80,7 +80,7 @@ assert_eq!(data, data_out);
 
 # Vec
 
-Vec<T> can be used in combination with the [count](attributes/index.html#count) attribute (T must implement BitsReader/BitsWriter)
+Vec<T> can be used in combination with the [count](attributes/index.html#count) attribute (T must implement DekuRead/DekuWrite)
 
 If the length of Vec changes, the original field specified in `count` will not get updated.
 Calling `.update()` can be used to "update" the field!
@@ -181,7 +181,7 @@ mod slice_impls;
 use crate::error::DekuError;
 
 /// "Reader" trait: read bits and construct type
-pub trait BitsReader {
+pub trait DekuRead {
     /// Read bits and construct type
     /// * **input** - Input as bits
     /// * **input_is_le** - `true` if input is to be interpreted as little endian,
@@ -201,7 +201,7 @@ pub trait BitsReader {
 }
 
 /// "Writer" trait: write from type to bits
-pub trait BitsWriter {
+pub trait DekuWrite {
     /// Write type to bits
     /// * **output_is_le** - `true` if output is to be interpreted as little endian,
     /// false otherwise (controlled via `endian` deku attribute)
@@ -214,9 +214,15 @@ pub trait BitsWriter {
     ) -> Result<BitVec<Msb0, u8>, DekuError>;
 }
 
+/// "Updater" trait: apply mutations to a type
+pub trait DekuUpdate {
+    /// Apply updates
+    fn update(&mut self) -> Result<(), DekuError>;
+}
+
 macro_rules! ImplDekuTraits {
     ($typ:ty) => {
-        impl BitsReader for $typ {
+        impl DekuRead for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
                 input_is_le: bool,
@@ -300,7 +306,7 @@ macro_rules! ImplDekuTraits {
             }
         }
 
-        impl BitsWriter for $typ {
+        impl DekuWrite for $typ {
             fn write(
                 &self,
                 output_is_le: bool,
@@ -365,7 +371,7 @@ macro_rules! ImplDekuTraits {
     };
 }
 
-impl<T: BitsReader> BitsReader for Vec<T> {
+impl<T: DekuRead> DekuRead for Vec<T> {
     fn read(
         input: &BitSlice<Msb0, u8>,
         input_is_le: bool,
@@ -389,7 +395,7 @@ impl<T: BitsReader> BitsReader for Vec<T> {
     }
 }
 
-impl<T: BitsWriter> BitsWriter for Vec<T> {
+impl<T: DekuWrite> DekuWrite for Vec<T> {
     fn write(
         &self,
         output_is_le: bool,
@@ -422,7 +428,7 @@ ImplDekuTraits!(f32);
 ImplDekuTraits!(f64);
 
 #[cfg(feature = "std")]
-impl BitsReader for Ipv4Addr {
+impl DekuRead for Ipv4Addr {
     fn read(
         input: &BitSlice<Msb0, u8>,
         input_is_le: bool,
@@ -438,7 +444,7 @@ impl BitsReader for Ipv4Addr {
 }
 
 #[cfg(feature = "std")]
-impl BitsWriter for Ipv4Addr {
+impl DekuWrite for Ipv4Addr {
     fn write(
         &self,
         output_is_le: bool,
@@ -450,7 +456,7 @@ impl BitsWriter for Ipv4Addr {
 }
 
 #[cfg(feature = "std")]
-impl BitsReader for Ipv6Addr {
+impl DekuRead for Ipv6Addr {
     fn read(
         input: &BitSlice<Msb0, u8>,
         input_is_le: bool,
@@ -466,7 +472,7 @@ impl BitsReader for Ipv6Addr {
 }
 
 #[cfg(feature = "std")]
-impl BitsWriter for Ipv6Addr {
+impl DekuWrite for Ipv6Addr {
     fn write(
         &self,
         output_is_le: bool,
@@ -478,7 +484,7 @@ impl BitsWriter for Ipv6Addr {
 }
 
 #[cfg(feature = "std")]
-impl BitsWriter for IpAddr {
+impl DekuWrite for IpAddr {
     fn write(
         &self,
         output_is_le: bool,

@@ -1,16 +1,16 @@
-//! Implementations of BitsReader and BitsWriter for [T; N] where 0 < N <= 32
+//! Implementations of DekuRead and DekuWrite for [T; N] where 0 < N <= 32
 
-// Forked out BitsReader and BitsWriter impls for [T; N] into a separate file
+// Forked out DekuRead and DekuWrite impls for [T; N] into a separate file
 // since the list of impls is long
 
-use super::{BitsReader, BitsWriter};
+use super::{DekuRead, DekuWrite};
 use crate::error::DekuError;
 use bitvec::prelude::*;
 pub use deku_derive::*;
 
 macro_rules! ImplDekuSliceTraits {
     ($typ:ty, $count:expr) => {
-        impl BitsReader for [$typ; $count] {
+        impl DekuRead for [$typ; $count] {
             fn read(
                 input: &BitSlice<Msb0, u8>,
                 input_is_le: bool,
@@ -34,7 +34,7 @@ macro_rules! ImplDekuSliceTraits {
             }
         }
 
-        impl BitsWriter for [$typ; $count] {
+        impl DekuWrite for [$typ; $count] {
             fn write(
                 &self,
                 output_is_le: bool,

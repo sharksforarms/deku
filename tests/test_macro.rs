@@ -125,18 +125,18 @@ mod tests {
         }
 
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        pub struct GenericStructDeku<T: deku::BitsWriter + deku::BitsReader>
+        pub struct GenericStructDeku<T: deku::DekuWrite + deku::DekuRead>
         where
-            T: deku::BitsWriter + deku::BitsReader,
+            T: deku::DekuWrite + deku::DekuRead,
         {
             pub field_a: T,
         }
 
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
         #[deku(id_type = "u8")]
-        pub enum GenericEnumDeku<T: deku::BitsReader + deku::BitsWriter>
+        pub enum GenericEnumDeku<T: deku::DekuRead + deku::DekuWrite>
         where
-            T: deku::BitsWriter + deku::BitsReader,
+            T: deku::DekuWrite + deku::DekuRead,
         {
             #[deku(id = "1")]
             VariantT(T),

@@ -90,6 +90,7 @@ use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
+    #[deku(update = "self.data.len()")]
     count: u8,
     #[deku(count = "count")]
     data: Vec<u8>,

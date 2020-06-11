@@ -252,20 +252,17 @@ fn emit_field_update(
     );
     let mut field_updates = vec![];
 
-    let field_count = f.get_count_field(i, object_prefix.is_none());
     let field_ident = f.get_ident(i, object_prefix.is_none());
-
     let deref = if object_prefix.is_none() {
         Some(quote! { * })
     } else {
         None
     };
 
-    // If `count` attr is provided, overwrite the field with the .len() of the container
-    if let Some(field_count) = field_count {
+    if let Some(field_update) = &f.update {
         field_updates.push(quote! {
-            #deref #object_prefix #field_count = #object_prefix #field_ident.len().try_into()?;
-        });
+            #deref #object_prefix #field_ident = #field_update.try_into()?;
+        })
     }
 
     Ok(field_updates)

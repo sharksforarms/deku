@@ -31,8 +31,7 @@ mod tests {
             #[deku(bytes = "2")] pub u16,
             #[deku(endian = "big")] pub u16,
             pub NestedDeku,
-            #[deku(update = "self.7.len()")]
-            pub u8,
+            #[deku(update = "self.7.len()")] pub u8,
             #[deku(count = "field_6")] pub Vec<u8>,
         );
 
@@ -68,7 +67,10 @@ mod tests {
                 field_b: Vec<u8>,
             },
             #[deku(id = "4")]
-            VarD(#[deku(update = "field_1.len()")] u8, #[deku(count = "field_0")] Vec<u8>),
+            VarD(
+                #[deku(update = "field_1.len()")] u8,
+                #[deku(count = "field_0")] Vec<u8>,
+            ),
         }
 
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]

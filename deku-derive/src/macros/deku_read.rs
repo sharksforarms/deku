@@ -71,7 +71,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #imp BitsReader for #ident #wher {
+        impl #imp DekuRead for #ident #wher {
             fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>, _count: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 use core::convert::TryFrom;
                 let mut rest = input;
@@ -193,7 +193,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #imp BitsReader for #ident #wher {
+        impl #imp DekuRead for #ident #wher {
             fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>, _count: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 use core::convert::TryFrom;
                 let mut rest = input;
@@ -260,9 +260,9 @@ fn emit_field_read(
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
     } else if field_count.is_some() {
-        quote! { BitsReader::read(rest, input_is_le, field_bits, Some(usize::try_from(#field_count)?)) }
+        quote! { DekuRead::read(rest, input_is_le, field_bits, Some(usize::try_from(#field_count)?)) }
     } else {
-        quote! { BitsReader::read(rest, input_is_le, field_bits, None) }
+        quote! { DekuRead::read(rest, input_is_le, field_bits, None) }
     };
 
     let field_read = quote! {

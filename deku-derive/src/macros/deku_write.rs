@@ -19,6 +19,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let mut tokens = TokenStream::new();
 
     let (imp, ty, wher) = input.generics.split_for_impl();
+    let vis = &input.vis;
 
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
@@ -49,21 +50,22 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #imp #ident #wher {
-
-            pub fn update(&mut self) -> Result<(), DekuError> {
+        impl #imp DekuUpdate for #ident #wher {
+            fn update(&mut self) -> Result<(), DekuError> {
                 use core::convert::TryInto;
                 #(#field_updates)*
 
                 Ok(())
             }
+        }
 
-            pub fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
+        impl #imp #ident #wher {
+            #vis fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
                 let mut acc: BitVec<Msb0, u8> = self.to_bitvec()?;
                 Ok(acc.into_vec())
             }
 
-            pub fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
+            #vis fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
                 let mut acc: BitVec<Msb0, u8> = BitVec::new();
 
                 #(#field_writes)*
@@ -72,7 +74,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #imp BitsWriter for #ident #wher {
+        impl #imp DekuWrite for #ident #wher {
             fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> Result<BitVec<Msb0, u8>, DekuError> {
                 self.to_bitvec()
             }
@@ -87,6 +89,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let mut tokens = TokenStream::new();
 
     let (imp, ty, wher) = input.generics.split_for_impl();
+    let vis = &input.vis;
 
     let variants = input
         .data
@@ -174,8 +177,8 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #imp #ident #wher {
-            pub fn update(&mut self) -> Result<(), DekuError> {
+        impl #imp DekuUpdate for #ident #wher {
+            fn update(&mut self) -> Result<(), DekuError> {
                 use core::convert::TryInto;
 
                 match self {
@@ -184,13 +187,16 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
                 Ok(())
             }
+        }
 
-            pub fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
+        impl #imp #ident #wher {
+
+            #vis fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
                 let mut acc: BitVec<Msb0, u8> = self.to_bitvec()?;
                 Ok(acc.into_vec())
             }
 
-            pub fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
+            #vis fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
                 let mut acc: BitVec<Msb0, u8> = BitVec::new();
 
                 match self {
@@ -201,7 +207,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        impl #imp BitsWriter for #ident #wher {
+        impl #imp DekuWrite for #ident #wher {
             fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> Result<BitVec<Msb0, u8>, DekuError> {
                 self.to_bitvec()
             }

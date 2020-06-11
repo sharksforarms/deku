@@ -32,6 +32,7 @@ impl Default for EndianNess {
     map = "DekuReceiver::init"
 )]
 struct DekuReceiver {
+    vis: syn::Visibility,
     ident: syn::Ident,
     generics: syn::Generics,
     data: ast::Data<DekuVariantReceiver, DekuFieldReceiver>,

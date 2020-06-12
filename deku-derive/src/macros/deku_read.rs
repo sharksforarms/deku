@@ -19,6 +19,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let mut tokens = TokenStream::new();
 
     let (imp, ty, wher) = input.generics.split_for_impl();
+    let vis = &input.vis;
 
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
@@ -54,7 +55,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         }
 
         impl #imp #ident #wher {
-            fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
+            #vis fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
                 use core::convert::TryFrom;
                 let input_bits = input.0.bits::<Msb0>();
 
@@ -92,6 +93,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let mut tokens = TokenStream::new();
 
     let (imp, ty, wher) = input.generics.split_for_impl();
+    let vis = &input.vis;
 
     let variants = input
         .data
@@ -169,7 +171,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         }
 
         impl #imp #ident #wher {
-            fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
+            #vis fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
                 use core::convert::TryFrom;
                 let input_bits = input.0.bits::<Msb0>();
 

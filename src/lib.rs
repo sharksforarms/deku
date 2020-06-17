@@ -253,53 +253,66 @@ macro_rules! ImplDekuTraits {
 
                 let (bit_slice, rest) = input.split_at(bit_size);
 
-                // Create a new BitVec from the slice and pad un-aligned chunks
-                // i.e. [10010110, 1110] -> [10010110, 00001110]
-                let bits: BitVec<Msb0, u8> = {
-                    let mut bits = BitVec::with_capacity(bit_slice.len());
+                let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
 
-                    // Copy bits to new BitVec
-                    for b in bit_slice {
-                        bits.push(*b);
-                    }
+                let value = if pad == 0 && bit_slice.len() == max_type_bits {
+                    // if everything is aligned, just read the value
 
-                    // Force align
-                    //i.e. [1110, 10010110] -> [11101001, 0110]
-                    bits.force_align();
+                    let bytes: &[u8] = bit_slice.as_slice();
 
-                    // Some padding to next byte
-                    let pad = 8 * ((bits.len() + 7) / 8) - bits.len();
+                    // Read value
                     if input_is_le {
-                        let ins_index = bits.len() - (8 - pad);
-                        for _ in 0..pad {
-                            bits.insert(ins_index, false);
-                        }
+                        <$typ>::from_le_bytes(bytes.try_into()?)
                     } else {
-                        for _ in 0..pad {
-                            bits.insert(0, false);
-                        }
+                        <$typ>::from_be_bytes(bytes.try_into()?)
                     }
-
-                    // Pad up-to size of type
-                    for _ in 0..(max_type_bits - bits.len()) {
-                        if input_is_le {
-                            bits.push(false);
-                        } else {
-                            bits.insert(0, false);
-                        }
-                    }
-
-                    bits
-                };
-
-                let bytes = bits.into_vec();
-                let bytes: &[u8] = bytes.as_ref();
-
-                // Read value
-                let value = if input_is_le {
-                    <$typ>::from_le_bytes(bytes.try_into()?)
                 } else {
-                    <$typ>::from_be_bytes(bytes.try_into()?)
+                    // Create a new BitVec from the slice and pad un-aligned chunks
+                    // i.e. [10010110, 1110] -> [10010110, 00001110]
+                    let bits: BitVec<Msb0, u8> = {
+                        let mut bits = BitVec::with_capacity(bit_slice.len() + pad);
+
+                        // Copy bits to new BitVec
+                        for b in bit_slice {
+                            bits.push(*b);
+                        }
+
+                        // Force align
+                        //i.e. [1110, 10010110] -> [11101001, 0110]
+                        bits.force_align();
+
+                        // Some padding to next byte
+                        if input_is_le {
+                            let ins_index = bits.len() - (8 - pad);
+                            for _ in 0..pad {
+                                bits.insert(ins_index, false);
+                            }
+                        } else {
+                            for _ in 0..pad {
+                                bits.insert(0, false);
+                            }
+                        }
+
+                        // Pad up-to size of type
+                        for _ in 0..(max_type_bits - bits.len()) {
+                            if input_is_le {
+                                bits.push(false);
+                            } else {
+                                bits.insert(0, false);
+                            }
+                        }
+
+                        bits
+                    };
+
+                    let bytes: &[u8] = bits.as_slice();
+
+                    // Read value
+                    if input_is_le {
+                        <$typ>::from_le_bytes(bytes.try_into()?)
+                    } else {
+                        <$typ>::from_be_bytes(bytes.try_into()?)
+                    }
                 };
 
                 Ok((rest, value))

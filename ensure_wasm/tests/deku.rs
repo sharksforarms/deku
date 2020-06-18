@@ -5,6 +5,8 @@ use wasm_bindgen_test::*;
 
 use ensure_wasm::*;
 
+use deku::prelude::*;
+
 #[wasm_bindgen_test]
 fn test_read() {
     assert_eq!(

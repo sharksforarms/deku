@@ -200,6 +200,13 @@ pub trait DekuRead {
         Self: Sized;
 }
 
+/// "Reader" trait: implemented on DekuRead struct and enum containers
+pub trait DekuContainerRead: DekuRead {
+    fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError>
+    where
+        Self: Sized;
+}
+
 /// "Writer" trait: write from type to bits
 pub trait DekuWrite {
     /// Write type to bits
@@ -212,6 +219,15 @@ pub trait DekuWrite {
         output_is_le: bool,
         bit_size: Option<usize>,
     ) -> Result<BitVec<Msb0, u8>, DekuError>;
+}
+
+/// "Writer" trait: implemented on DekuWrite struct and enum containers
+pub trait DekuContainerWrite: DekuWrite {
+    /// Write struct/enum to Vec<u8>
+    fn to_bytes(&self) -> Result<Vec<u8>, DekuError>;
+
+    /// Write struct/enum to BitVec
+    fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError>;
 }
 
 /// "Updater" trait: apply mutations to a type

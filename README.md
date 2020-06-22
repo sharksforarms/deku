@@ -11,19 +11,19 @@ This crate provides bit-level, symmetric, serialization/deserialization implemen
 
 ## Why use Deku
 
-**Productivity**: Focus and declare your types that represent the data, Deku will generate symmetric reader/writer functions for your type! Avoid the requirement of writing redundant, error-prone parsing and writing code for binary structs or network headers
+**Productivity**: Deku will generate symmetric reader/writer functions for your type! Avoid the requirement of writing redundant, error-prone parsing and writing code for binary structs or network headers
 
 ## Usage
 
 ```toml
 [dependencies]
-deku = "0.5"
+deku = "0.6"
 ```
 
 no_std:
 ```toml
 [dependencies]
-deku = { version = "0.5", default-features = false, features = ["alloc"] }
+deku = { version = "0.6", default-features = false, features = ["alloc"] }
 ```
 
 ## Example
@@ -58,3 +58,7 @@ val.field_c = 0xC0FE;
 let data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 ```
+
+## Changelog
+
+See [CHANGELOG.md](https://github.com/sharksforarms/deku/blob/master/CHANGELOG.md)

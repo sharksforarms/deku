@@ -74,6 +74,15 @@ mod tests {
         }
 
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        #[deku(id_type = "u8")]
+        pub enum EnumDekuDefault {
+            #[deku(id = "1")]
+            VarA(u8),
+
+            VarDefault(u8, u8),
+        }
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
         pub struct VecCountDeku {
             #[deku(update = "self.vec_data.len()")]
             pub count: u8,
@@ -257,9 +266,27 @@ mod tests {
         case(&hex!("0269"), samples::EnumDeku::VarB(0b0110, 0b1001)),
         case(&hex!("0302AABB"), samples::EnumDeku::VarC{field_a: 0x02, field_b: vec![0xAA, 0xBB]}),
         case(&hex!("0402AABB"), samples::EnumDeku::VarD(0x02, vec![0xAA, 0xBB])),
+
+        #[should_panic(expected = "Parse(\"Could not match enum variant id = 255\")")]
+        case(&hex!("FFAB"), samples::EnumDeku::VarA(0xFF))
     )]
     fn test_enum(input: &[u8], expected: samples::EnumDeku) {
         let ret_read = samples::EnumDeku::try_from(input).unwrap();
+        assert_eq!(expected, ret_read);
+
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+        assert_eq!(input.to_vec(), ret_write);
+    }
+
+    #[rstest(input,expected,
+        case(&hex!("01AB"), samples::EnumDekuDefault::VarA(0xAB)),
+        case(&hex!("FFAB"), samples::EnumDekuDefault::VarDefault(0xFF, 0xAB)),
+
+        #[should_panic(expected = "Parse(\"Too much data\")")]
+        case(&hex!("FFFFFF"), samples::EnumDekuDefault::VarA(0xAB)),
+    )]
+    fn test_enum_default(input: &[u8], expected: samples::EnumDekuDefault) {
+        let ret_read = samples::EnumDekuDefault::try_from(input).unwrap();
         assert_eq!(expected, ret_read);
 
         let ret_write: Vec<u8> = ret_read.try_into().unwrap();

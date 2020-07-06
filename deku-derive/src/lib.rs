@@ -227,7 +227,8 @@ struct DekuVariantReceiver {
     writer: Option<TokenStream>,
 
     /// variant `id` value
-    id: String,
+    #[darling(default)]
+    id: Option<String>,
 }
 
 impl DekuVariantReceiver {
@@ -309,8 +310,6 @@ mod tests {
         case::invalid_expected_id_type(r#"#[deku(id_bytes="5")] enum Test { #[deku(id="1")] A }"#),
         #[should_panic(expected = "conflicting: both \"id_bits\" and \"id_bytes\" specified on field")]
         case::invalid_conflict(r#"#[deku(id_type="u8", id_bytes="5", id_bits="5")] enum Test { #[deku(id="1")] A }"#),
-        #[should_panic(expected = "MissingField(\"id\")")]
-        case::invalid_expected_id(r#"#[deku(id_type="u8")] enum Test { A }"#),
 
         // TODO: these tests should error/warn eventually?
         // error: trying to store 9 bits in 8 bit type

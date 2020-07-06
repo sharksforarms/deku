@@ -106,18 +106,8 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let id_is_le_bytes = input.endian == EndianNess::Little;
     let id_bit_size = super::option_as_literal_token(input.id_bits);
 
-    let variant_id_read = {
-        quote! {
-            {
-                let (new_rest, variant_id) = #id_type :: read (rest, #id_is_le_bytes, #id_bit_size, None)?;
-                rest = new_rest;
-
-                variant_id
-            }
-        }
-    };
-
     let mut variant_matches = vec![];
+    let mut has_default_match = false;
 
     for (_i, variant) in variants.into_iter().enumerate() {
         // check if the first field has an ident, if not, it's a unnamed struct
@@ -128,7 +118,14 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             .and_then(|v| v.ident.as_ref())
             .is_some();
 
-        let variant_id: TokenStream = variant.id.parse().unwrap();
+        let variant_id = if let Some(variant_id) = &variant.id {
+            variant_id.parse().unwrap()
+        } else {
+            // id attribute not provided, treat it as a catch-all default
+            has_default_match = true;
+            quote! { _ }
+        };
+
         let variant_ident = &variant.ident;
         let variant_reader = &variant.reader;
 
@@ -140,8 +137,18 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             let initialize_enum =
                 super::gen_enum_init(variant_is_named, variant_ident, field_idents);
 
+            // if we're consuming an id, set the rest to new_rest before reading the variant
+            let new_rest = if variant.id.is_some() {
+                quote! {
+                    rest = new_rest;
+                }
+            } else {
+                quote! {}
+            };
+
             quote! {
                 {
+                    #new_rest
                     #(#field_reads)*
                     Self :: #initialize_enum
                 }
@@ -154,6 +161,23 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             }
         });
     }
+
+    // if no default match, return error
+    if !has_default_match {
+        variant_matches.push(quote! {
+            _ => {
+                return Err(DekuError::Parse(format!("Could not match enum variant id = {:?}", variant_id)));
+            }
+        });
+    }
+
+    let variant_read = quote! {
+        let (new_rest, variant_id) = #id_type::read(rest, #id_is_le_bytes, #id_bit_size, None)?;
+
+        let value = match variant_id {
+            #(#variant_matches),*
+        };
+    };
 
     tokens.extend(quote! {
         impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
@@ -176,15 +200,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
                 let mut rest = input.0.bits::<Msb0>();
                 rest = &rest[input.1..];
 
-                let variant_id = #variant_id_read;
-
-                let value = match variant_id {
-                    #(#variant_matches),*
-
-                    _ => {
-                        return Err(DekuError::Parse(format!("Could not match enum variant id = {:?}", variant_id)));
-                    }
-                };
+                #variant_read
 
                 let pad = 8 * ((rest.len() + 7) / 8) - rest.len();
                 let read_idx = input_bits.len() - (rest.len() + pad);
@@ -198,15 +214,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
                 use core::convert::TryFrom;
                 let mut rest = input;
 
-                let variant_id = #variant_id_read;
-
-                let value = match variant_id {
-                    #(#variant_matches),*
-
-                    _ => {
-                        return Err(DekuError::Parse(format!("Could not find enum variant id = {:?}", variant_id)));
-                    }
-                };
+                #variant_read
 
                 Ok((rest, value))
             }

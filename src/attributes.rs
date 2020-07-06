@@ -343,6 +343,8 @@ assert_eq!(data, value);
 
 Specify the identifier of the enum variant, must be paired with [id_type](#id_type)
 
+**Note**: If no `id` is specified, the variant is treated as the "catch-all".
+
 Example:
 ```rust
 # use deku::prelude::*;
@@ -354,9 +356,13 @@ enum DekuTest {
     VariantA(u8),
     #[deku(id = "0x02")]
     VariantB(u8, u16),
+
+    VariantCatchAll { // Catch-all variant
+        type_: u8
+    },
 }
 
-let data: Vec<u8> = vec![0x01, 0xFF, 0x02, 0xAB, 0xEF, 0xBE];
+let data: Vec<u8> = vec![0x01, 0xFF, 0x02, 0xAB, 0xEF, 0xBE, 0xFF];
 
 let (rest, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 
@@ -369,8 +375,6 @@ let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x01, 0xFF], variant_bytes);
 
 let (rest, value) = DekuTest::from_bytes(rest).unwrap();
-# assert_eq!(0, rest.0.len());
-# assert_eq!(0, rest.1);
 
 assert_eq!(
     DekuTest::VariantB(0xAB, 0xBEEF),
@@ -379,6 +383,18 @@ assert_eq!(
 
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x02, 0xAB, 0xEF, 0xBE], variant_bytes);
+
+let (rest, value) = DekuTest::from_bytes(rest).unwrap();
+# assert_eq!(0, rest.0.len());
+# assert_eq!(0, rest.1);
+
+assert_eq!(
+    DekuTest::VariantCatchAll { type_: 0xFF },
+    value
+);
+
+let variant_bytes: Vec<u8> = value.try_into().unwrap();
+assert_eq!(vec![0xFF], variant_bytes);
 ```
 
 # id_type

@@ -114,7 +114,6 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             .and_then(|v| v.ident.as_ref())
             .is_some();
 
-        let variant_id: TokenStream = variant.id.parse().unwrap();
         let variant_ident = &variant.ident;
         let variant_writer = &variant.reader;
 
@@ -125,6 +124,19 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             .enumerate()
             .map(|(i, f)| f.get_ident(i, true))
             .collect::<Vec<_>>();
+
+        let variant_id_write = if let Some(variant_id) = &variant.id {
+            let variant_id: TokenStream = variant_id.parse().unwrap();
+
+            quote! {
+                    let mut variant_id: #id_type = #variant_id;
+                    let bits = variant_id.write(#id_is_le_bytes, #id_bit_size)?;
+                    acc.extend(bits);
+            }
+        } else {
+            quote! {}
+        };
+
         let variant_match = super::gen_enum_init(variant_is_named, variant_ident, field_idents);
 
         let variant_write = if variant_writer.is_some() {
@@ -134,10 +146,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
             quote! {
                 {
-                    let mut variant_id: #id_type = #variant_id;
-                    let bits = variant_id.write(#id_is_le_bytes, #id_bit_size)?;
-                    acc.extend(bits);
-
+                    #variant_id_write
                     #(#field_writes)*
                 }
             }

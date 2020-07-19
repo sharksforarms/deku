@@ -239,16 +239,24 @@ impl DekuVariantReceiver {
 
 #[proc_macro_derive(DekuRead, attributes(deku))]
 pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let receiver = DekuReceiver::from_derive_input(&syn::parse(input).unwrap()).unwrap();
-    let tokens = receiver.emit_reader().unwrap();
-    tokens.into()
+    match DekuReceiver::from_derive_input(&syn::parse(input).unwrap()) {
+        Ok(v) => v
+            .emit_reader()
+            .unwrap_or_else(|err| err.write_errors())
+            .into(),
+        Err(e) => e.write_errors().into(),
+    }
 }
 
 #[proc_macro_derive(DekuWrite, attributes(deku))]
 pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let receiver = DekuReceiver::from_derive_input(&syn::parse(input).unwrap()).unwrap();
-    let tokens = receiver.emit_writer().unwrap();
-    tokens.into()
+    match DekuReceiver::from_derive_input(&syn::parse(input).unwrap()) {
+        Ok(v) => v
+            .emit_writer()
+            .unwrap_or_else(|err| err.write_errors())
+            .into(),
+        Err(e) => e.write_errors().into(),
+    }
 }
 
 #[cfg(test)]

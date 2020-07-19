@@ -8,24 +8,23 @@ use crate::error::DekuError;
 use bitvec::prelude::*;
 pub use deku_derive::*;
 
+// TODO: We should add two different implementations like `impl DekuRead<bool, usize>` and
+// `impl DekuRead<bool>` to replace the `Option`?
+
 macro_rules! ImplDekuSliceTraits {
     ($typ:ty, $count:expr) => {
-        impl DekuRead for [$typ; $count] {
+        impl DekuRead<(bool, Option<usize>)> for [$typ; $count] {
             fn read(
                 input: &BitSlice<Msb0, u8>,
-                input_is_le: bool,
-                bit_size: Option<usize>,
-                count: Option<usize>,
+                ctx: (bool, Option<usize>),
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
             where
                 Self: Sized,
             {
-                assert!(count.is_none(), "Dev error: `count` should always be None");
-
                 let mut slice: [$typ; $count] = Default::default();
                 let mut rest = input;
                 for i in 0..$count {
-                    let (new_rest, value) = <$typ>::read(rest, input_is_le, bit_size, count)?;
+                    let (new_rest, value) = <$typ>::read(rest, ctx)?;
                     slice[i] = value;
                     rest = new_rest;
                 }
@@ -34,16 +33,15 @@ macro_rules! ImplDekuSliceTraits {
             }
         }
 
-        impl DekuWrite for [$typ; $count] {
+        impl DekuWrite<(bool, Option<usize>)> for [$typ; $count] {
             fn write(
                 &self,
-                output_is_le: bool,
-                bit_size: Option<usize>,
+                ctx: (bool, Option<usize>),
             ) -> Result<BitVec<Msb0, u8>, DekuError> {
                 let mut acc = BitVec::new();
 
                 for v in self {
-                    let r = v.write(output_is_le, bit_size)?;
+                    let r = v.write(ctx)?;
                     acc.extend(r);
                 }
 
@@ -531,21 +529,20 @@ mod tests {
     #[cfg(target_endian = "big")]
     static IS_LE: bool = false;
 
-    #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,
-        case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, None, None, [0xCCDD, 0xAABB], bits![Msb0, u8;]),
-        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), !IS_LE, None, None, [0xDDCC, 0xBBAA], bits![Msb0, u8;]),
+    #[rstest(input,input_is_le,bit_size,expected,expected_rest,
+        case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, None, [0xCCDD, 0xAABB], bits![Msb0, u8;]),
+        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), !IS_LE, None, [0xDDCC, 0xBBAA], bits![Msb0, u8;]),
     )]
     fn test_bit_read(
         input: &[u8],
         input_is_le: bool,
         bit_size: Option<usize>,
-        count: Option<usize>,
         expected: [u16; 2],
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
 
-        let (rest, res_read) = <[u16; 2]>::read(bit_slice, input_is_le, bit_size, count).unwrap();
+        let (rest, res_read) = <[u16; 2]>::read(bit_slice, (input_is_le, bit_size)).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
     }
@@ -560,7 +557,7 @@ mod tests {
         bit_size: Option<usize>,
         expected: Vec<u8>,
     ) {
-        let res_write = input.write(output_is_le, bit_size).unwrap().into_vec();
+        let res_write = input.write((output_is_le, bit_size)).unwrap().into_vec();
         assert_eq!(expected, res_write);
     }
 }

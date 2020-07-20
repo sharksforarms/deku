@@ -183,7 +183,7 @@ mod slice_impls;
 use crate::error::DekuError;
 
 /// "Reader" trait: read bits and construct type
-pub trait DekuRead<Ctx> {
+pub trait DekuRead<Ctx=()> {
     /// Read bits and construct type
     /// * **input** - Input as bits
     /// * **input_is_le** - `true` if input is to be interpreted as little endian,
@@ -205,7 +205,7 @@ pub trait DekuContainerRead: DekuRead<()> {
 }
 
 /// "Writer" trait: write from type to bits
-pub trait DekuWrite<Ctx> {
+pub trait DekuWrite<Ctx=()> {
     /// Write type to bits
     /// * **output_is_le** - `true` if output is to be interpreted as little endian,
     /// false otherwise (controlled via `endian` deku attribute)

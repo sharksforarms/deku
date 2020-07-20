@@ -34,10 +34,7 @@ macro_rules! ImplDekuSliceTraits {
         }
 
         impl DekuWrite<(bool, Option<usize>)> for [$typ; $count] {
-            fn write(
-                &self,
-                ctx: (bool, Option<usize>),
-            ) -> Result<BitVec<Msb0, u8>, DekuError> {
+            fn write(&self, ctx: (bool, Option<usize>)) -> Result<BitVec<Msb0, u8>, DekuError> {
                 let mut acc = BitVec::new();
 
                 for v in self {

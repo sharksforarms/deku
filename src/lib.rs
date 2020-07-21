@@ -487,10 +487,10 @@ macro_rules! ImplDekuTraits {
     };
 }
 
-impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Ctx, usize)> for Vec<T> {
+impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(usize, Ctx)> for Vec<T> {
     fn read(
         input: &BitSlice<Msb0, u8>,
-        (ctx, count): (Ctx, usize),
+        (count, inner_ctx): (usize, Ctx),
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
@@ -498,7 +498,7 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Ctx, usize)> for Vec<T> {
         let mut res = Vec::with_capacity(count);
         let mut rest = input;
         for _i in 0..count {
-            let (new_rest, val) = <T>::read(rest, ctx)?;
+            let (new_rest, val) = <T>::read(rest, inner_ctx)?;
             res.push(val);
             rest = new_rest;
         }
@@ -792,8 +792,8 @@ mod tests {
         let bit_slice = input.bits::<Msb0>();
 
         let (rest, res_read) = match bit_size {
-            Some(bit_size) => Vec::<u8>::read(bit_slice, ((input_is_le, bit_size), count)).unwrap(),
-            None => Vec::<u8>::read(bit_slice, ((input_is_le), count)).unwrap(),
+            Some(bit_size) => Vec::<u8>::read(bit_slice, (count, (input_is_le, bit_size))).unwrap(),
+            None => Vec::<u8>::read(bit_slice, (count, (input_is_le))).unwrap(),
         };
 
         assert_eq!(expected, res_read);
@@ -826,7 +826,7 @@ mod tests {
         // Unwrap here because all test cases are `Some`.
         let bit_size = bit_size.unwrap();
 
-        let (rest, res_read) = Vec::<u16>::read(bit_slice, ((is_le, bit_size), count)).unwrap();
+        let (rest, res_read) = Vec::<u16>::read(bit_slice, (count, (is_le, bit_size))).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 

@@ -507,6 +507,18 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(usize, Ctx)> for Vec<T> {
     }
 }
 
+impl<T: DekuRead> DekuRead<usize> for Vec<T> {
+    fn read(
+        input: &BitSlice<Msb0, u8>,
+        count: usize,
+    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    where
+        Self: Sized,
+    {
+        Vec::read(input, (count, ()))
+    }
+}
+
 impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Vec<T> {
     fn write(&self, ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError> {
         let mut acc = BitVec::new();

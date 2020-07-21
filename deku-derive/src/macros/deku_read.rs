@@ -72,7 +72,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         }
 
         impl #imp DekuRead for #ident #wher {
-            fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>, _count: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+            fn read(input: &BitSlice<Msb0, u8>, _: ()) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 use core::convert::TryFrom;
                 let mut rest = input;
 
@@ -102,9 +102,16 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
 
+    // TODO: replace `expect` with an error.
     let id_type = input.id_type.as_ref().expect("expected `id_type` on enum");
+
     let id_is_le_bytes = input.endian == EndianNess::Little;
-    let id_bit_size = super::option_as_literal_token(input.id_bits);
+
+    let id_args = if let Some(id_bit_size) = input.id_bits {
+        quote! {(#id_is_le_bytes, #id_bit_size)}
+    } else {
+        quote! {#id_is_le_bytes}
+    };
 
     let mut variant_matches = vec![];
     let mut has_default_match = false;
@@ -172,7 +179,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     }
 
     let variant_read = quote! {
-        let (new_rest, variant_id) = #id_type::read(rest, #id_is_le_bytes, #id_bit_size, None)?;
+        let (new_rest, variant_id) = #id_type::read(rest, #id_args)?;
 
         let value = match variant_id {
             #(#variant_matches),*
@@ -210,7 +217,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         }
 
         impl #imp DekuRead for #ident #wher {
-            fn read(input: &BitSlice<Msb0, u8>, _input_is_le: bool, _bit_size: Option<usize>, _count: Option<usize>) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+            fn read(input: &BitSlice<Msb0, u8>, _: ()) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 use core::convert::TryFrom;
                 let mut rest = input;
 
@@ -242,7 +249,7 @@ fn emit_field_reads(
 }
 
 fn emit_field_read(
-    input: &DekuReceiver,
+    _input: &DekuReceiver,
     i: usize,
     f: &DekuFieldReceiver,
 ) -> Result<(TokenStream, TokenStream), darling::Error> {
@@ -252,8 +259,7 @@ fn emit_field_read(
     );
 
     let field_type = &f.ty;
-    let is_le_bytes = f.endian.unwrap_or(input.endian) == EndianNess::Little;
-    let field_bits = super::option_as_literal_token(f.bits);
+    let field_is_le = f.endian.map(|endian| endian == EndianNess::Little);
     let field_reader = &f.reader;
     let field_map = f
         .map
@@ -262,22 +268,36 @@ fn emit_field_read(
             quote! { (#v) }
         })
         .or_else(|| Some(quote! { Result::<_, DekuError>::Ok }));
-    let field_count = &f.count;
     let field_ident = f.get_ident(i, true);
 
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
-    } else if field_count.is_some() {
-        quote! { DekuRead::read(rest, input_is_le, field_bits, Some(usize::try_from(#field_count)?)) }
     } else {
-        quote! { DekuRead::read(rest, input_is_le, field_bits, None) }
+        let mut read_args = Vec::with_capacity(3);
+
+        if let Some(field_count) = &f.count {
+            read_args.push(quote! {usize::try_from(#field_count)?})
+        }
+        if let Some(field_is_le) = field_is_le {
+            read_args.push(quote! {#field_is_le});
+        }
+        if let Some(field_bits) = f.bits {
+            read_args.push(quote! {#field_bits})
+        }
+
+        // Because `impl DekuRead<(bool, usize)>` but `impl DekuRead<bool>`(not tuple)
+        let read_args = if read_args.len() == 1 {
+            let arg = &read_args[0];
+            quote! {#arg}
+        } else {
+            quote! {#(#read_args),*}
+        };
+
+        quote! {DekuRead::read(rest, (#read_args))}
     };
 
     let field_read = quote! {
         let #field_ident = {
-            let field_bits: Option<usize> = #field_bits;
-            let input_is_le = #is_le_bytes;
-
             let (new_rest, value) = #field_read_func?;
             let value: #field_type = #field_map(value)?;
 

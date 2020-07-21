@@ -4,14 +4,6 @@ use quote::{quote, ToTokens};
 pub(crate) mod deku_read;
 pub(crate) mod deku_write;
 
-/// Generate a literal token stream for an Option<T>
-fn option_as_literal_token<T: ToTokens>(input: Option<T>) -> TokenStream {
-    match input {
-        Some(b) => quote! {Some(#b)},
-        None => quote! {None},
-    }
-}
-
 /// Generate enum initialization TokenStream
 /// Cases:
 /// - No fields: `MyEnum`

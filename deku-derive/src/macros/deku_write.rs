@@ -74,7 +74,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         }
 
         impl #imp DekuWrite for #ident #wher {
-            fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> Result<BitVec<Msb0, u8>, DekuError> {
+            fn write(&self, _: ()) -> Result<BitVec<Msb0, u8>, DekuError> {
                 self.to_bitvec()
             }
         }
@@ -100,7 +100,12 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
     let id_type = input.id_type.as_ref().expect("expected `id_type` on enum");
     let id_is_le_bytes = input.endian == EndianNess::Little;
-    let id_bit_size = super::option_as_literal_token(input.id_bits);
+
+    let id_args = if let Some(id_bit_size) = input.id_bits {
+        quote! {(#id_is_le_bytes, #id_bit_size)}
+    } else {
+        quote! {#id_is_le_bytes}
+    };
 
     let mut variant_writes = vec![];
     let mut variant_updates = vec![];
@@ -130,7 +135,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 
             quote! {
                     let mut variant_id: #id_type = #variant_id;
-                    let bits = variant_id.write(#id_is_le_bytes, #id_bit_size)?;
+                    let bits = variant_id.write(#id_args)?;
                     acc.extend(bits);
             }
         } else {
@@ -215,7 +220,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
         }
 
         impl #imp DekuWrite for #ident #wher {
-            fn write(&self, output_is_le: bool, bit_size: Option<usize>) -> Result<BitVec<Msb0, u8>, DekuError> {
+            fn write(&self, _: ()) -> Result<BitVec<Msb0, u8>, DekuError> {
                 self.to_bitvec()
             }
         }
@@ -282,7 +287,7 @@ fn emit_field_update(
 }
 
 fn emit_field_write(
-    input: &DekuReceiver,
+    _input: &DekuReceiver,
     i: usize,
     f: &DekuFieldReceiver,
     object_prefix: &Option<TokenStream>,
@@ -297,20 +302,34 @@ fn emit_field_write(
         return Ok(quote! {});
     }
 
-    let is_le_bytes = f.endian.unwrap_or(input.endian) == EndianNess::Little;
-    let field_bits = super::option_as_literal_token(f.bits);
+    let field_is_le = f.endian.map(|endian| endian == EndianNess::Little);
     let field_writer = &f.writer;
     let field_ident = f.get_ident(i, object_prefix.is_none());
 
     let field_write_func = if field_writer.is_some() {
         quote! { #field_writer }
     } else {
-        quote! { #object_prefix #field_ident.write(output_is_le, field_bits) }
+        let mut write_args = Vec::with_capacity(2);
+
+        if let Some(field_is_le) = field_is_le {
+            write_args.push(quote! {#field_is_le});
+        }
+        if let Some(field_bits) = f.bits {
+            write_args.push(quote! {#field_bits});
+        }
+
+        // Because `impl DekuWrite<(bool, usize)>` but `impl DekuWrite<bool>`(not a tuple)
+        let write_args = if write_args.len() == 1 {
+            let args = &write_args[0];
+            quote! {#args}
+        } else {
+            quote! {#(#write_args),*}
+        };
+
+        quote! { #object_prefix #field_ident.write((#write_args)) }
     };
 
     let field_write = quote! {
-        let output_is_le = #is_le_bytes;
-        let field_bits: Option<usize> = #field_bits;
 
         let bits = #field_write_func ?;
         acc.extend(bits);

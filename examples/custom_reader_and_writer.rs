@@ -1,3 +1,6 @@
+// NO CUSTOM READER/WRITER WHICH USING `input_is_le` and `bit_size`
+
+/*
 use deku::prelude::*;
 use std::convert::TryInto;
 
@@ -74,3 +77,6 @@ fn main() {
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(test_data.to_vec(), ret_write);
 }
+*/
+
+fn main() {}

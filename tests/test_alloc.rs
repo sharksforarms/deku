@@ -5,15 +5,17 @@ use deku::prelude::*;
 static A: AllocCounterSystem = AllocCounterSystem;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(ctx = "is_le_bytes: bool")]
 struct NestedStruct {
+    #[deku(ctx = "is_le_bytes")]
     pub field_a: u8,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u8")]
+#[deku(id_type = "u8", ctx = "is_le_bytes: bool")]
 enum NestedEnum {
     #[deku(id = "0x01")]
-    VarA(u8),
+    VarA(#[deku(ctx = "is_le_bytes")] u8),
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]

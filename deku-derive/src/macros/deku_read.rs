@@ -109,7 +109,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     // TODO: replace `expect` with an error.
     let id_type = input.id_type.as_ref().expect("expected `id_type` on enum");
 
-    let id_is_le_bytes = input.endian == EndianNess::Little;
+    let id_is_le_bytes = input.endian.unwrap_or_default() == EndianNess::Little;
 
     let id_args = if let Some(id_bit_size) = input.id_bits {
         quote! {(#id_is_le_bytes, #id_bit_size)}
@@ -262,12 +262,15 @@ fn emit_field_reads(
 }
 
 fn emit_field_read(
-    _input: &DekuData,
+    input: &DekuData,
     i: usize,
     f: &FieldData,
 ) -> Result<(TokenStream, TokenStream), syn::Error> {
     let field_type = &f.ty;
-    let field_is_le = f.endian.map(|endian| endian == EndianNess::Little);
+    let field_is_le = f
+        .endian
+        .or(input.endian)
+        .map(|endian| endian == EndianNess::Little);
     let field_reader = &f.reader;
     let field_map = f
         .map

@@ -240,7 +240,7 @@ Example:
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 pub struct DekuTest {
     pub field_a: u8,
-    #[deku(skip, default = "Some(field_a)")]
+    #[deku(skip, default = "Some(*field_a)")]
     pub field_b: Option<u8>,
     pub field_c: u8,
 }
@@ -301,8 +301,8 @@ Example:
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(
-        reader = "DekuTest::read(rest, input_is_le, field_bits)",
-        writer = "DekuTest::write(&self.field_a, output_is_le, field_bits)"
+        reader = "DekuTest::read(rest)",
+        writer = "DekuTest::write(&self.field_a)"
     )]
     field_a: String,
 }
@@ -311,17 +311,15 @@ impl DekuTest {
     // Read and convert to String
     fn read(
         rest: &BitSlice<Msb0, u8>,
-        input_is_le: bool,
-        bit_size: Option<usize>,
     ) -> Result<(&BitSlice<Msb0, u8>, String), DekuError> {
-        let (rest, value) = u8::read(rest, input_is_le, bit_size, None)?;
+        let (rest, value) = u8::read(rest, ())?;
         Ok((rest, value.to_string()))
     }
 
     // Parse from String to u8 and write
-    fn write(field_a: &str, output_is_le: bool, bit_size: Option<usize>) -> Result<BitVec<Msb0, u8>, DekuError> {
+    fn write(field_a: &str) -> Result<BitVec<Msb0, u8>, DekuError> {
         let value = field_a.parse::<u8>().unwrap();
-        value.write(output_is_le, bit_size)
+        value.write(())
     }
 }
 

@@ -36,7 +36,7 @@ struct DekuData {
     generics: syn::Generics,
     data: ast::Data<VariantData, FieldData>,
 
-    endian: EndianNess,
+    endian: Option<EndianNess>,
 
     ctx: Option<syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>>,
 
@@ -308,7 +308,7 @@ struct DekuReceiver {
 
     /// Endian default for the fields
     #[darling(default)]
-    endian: EndianNess,
+    endian: Option<EndianNess>,
 
     /// struct/enum level ctx like "a: u8, b: u8"
     /// The type of it should be `syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>`. `darling`

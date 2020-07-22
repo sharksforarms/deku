@@ -1,21 +1,16 @@
-use crate::{DekuFieldReceiver, DekuReceiver, EndianNess};
+use crate::{EndianNess, DekuData, FieldData};
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-pub(crate) fn emit_deku_read(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
-    assert!(
-        input.id_bytes.is_none(),
-        "dev error: `id_bytes` should be None, use `id_bits` to get size"
-    );
-
+pub(crate) fn emit_deku_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
     match &input.data {
         Data::Enum(_) => emit_enum(input),
         Data::Struct(_) => emit_struct(input),
     }
 }
 
-fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
+fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut tokens = TokenStream::new();
 
     let (imp, ty, wher) = input.generics.split_for_impl();
@@ -88,7 +83,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     Ok(tokens)
 }
 
-fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
+fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut tokens = TokenStream::new();
 
     let (imp, ty, wher) = input.generics.split_for_impl();
@@ -233,9 +228,9 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 }
 
 fn emit_field_reads(
-    input: &DekuReceiver,
-    fields: &Fields<&DekuFieldReceiver>,
-) -> Result<(Vec<TokenStream>, Vec<TokenStream>), darling::Error> {
+    input: &DekuData,
+    fields: &Fields<&FieldData>,
+) -> Result<(Vec<TokenStream>, Vec<TokenStream>), syn::Error> {
     let mut field_reads = vec![];
     let mut field_idents = vec![];
 
@@ -249,14 +244,10 @@ fn emit_field_reads(
 }
 
 fn emit_field_read(
-    _input: &DekuReceiver,
+    _input: &DekuData,
     i: usize,
-    f: &DekuFieldReceiver,
-) -> Result<(TokenStream, TokenStream), darling::Error> {
-    assert!(
-        f.bytes.is_none(),
-        "dev error: `bytes` should be None, use `bits` to get size"
-    );
+    f: &FieldData,
+) -> Result<(TokenStream, TokenStream), syn::Error> {
 
     let field_type = &f.ty;
     let field_is_le = f.endian.map(|endian| endian == EndianNess::Little);

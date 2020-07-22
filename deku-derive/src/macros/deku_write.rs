@@ -1,13 +1,9 @@
-use crate::{DekuFieldReceiver, DekuReceiver, EndianNess};
+use crate::{EndianNess, DekuData, FieldData};
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
-    assert!(
-        input.id_bytes.is_none(),
-        "dev error: `id_bytes` should be None, use `id_bits` to get size"
-    );
+pub(crate) fn emit_deku_write(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     match &input.data {
         Data::Enum(_) => emit_enum(input),
@@ -15,7 +11,7 @@ pub(crate) fn emit_deku_write(input: &DekuReceiver) -> Result<TokenStream, darli
     }
 }
 
-fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
+fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut tokens = TokenStream::new();
 
     let (imp, ty, wher) = input.generics.split_for_impl();
@@ -84,7 +80,7 @@ fn emit_struct(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
     Ok(tokens)
 }
 
-fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
+fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut tokens = TokenStream::new();
 
     let (imp, ty, wher) = input.generics.split_for_impl();
@@ -120,7 +116,7 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
             .is_some();
 
         let variant_ident = &variant.ident;
-        let variant_writer = &variant.reader;
+        let variant_writer = &variant.writer;
 
         let field_idents = variant
             .fields
@@ -231,10 +227,10 @@ fn emit_enum(input: &DekuReceiver) -> Result<TokenStream, darling::Error> {
 }
 
 fn emit_field_writes(
-    input: &DekuReceiver,
-    fields: &Fields<&DekuFieldReceiver>,
+    input: &DekuData,
+    fields: &Fields<&FieldData>,
     object_prefix: Option<TokenStream>,
-) -> Result<Vec<TokenStream>, darling::Error> {
+) -> Result<Vec<TokenStream>, syn::Error> {
     let mut field_writes = vec![];
 
     for (i, f) in fields.iter().enumerate() {
@@ -246,9 +242,9 @@ fn emit_field_writes(
 }
 
 fn emit_field_updates(
-    fields: &Fields<&DekuFieldReceiver>,
+    fields: &Fields<&FieldData>,
     object_prefix: Option<TokenStream>,
-) -> Result<Vec<TokenStream>, darling::Error> {
+) -> Result<Vec<TokenStream>, syn::Error> {
     let mut field_updates = vec![];
 
     for (i, f) in fields.iter().enumerate() {
@@ -261,13 +257,9 @@ fn emit_field_updates(
 
 fn emit_field_update(
     i: usize,
-    f: &DekuFieldReceiver,
+    f: &FieldData,
     object_prefix: &Option<TokenStream>,
-) -> Result<Vec<TokenStream>, darling::Error> {
-    assert!(
-        f.bytes.is_none(),
-        "dev error: `bytes` should be None, use `bits` to get size"
-    );
+) -> Result<Vec<TokenStream>, syn::Error> {
     let mut field_updates = vec![];
 
     let field_ident = f.get_ident(i, object_prefix.is_none());
@@ -287,15 +279,11 @@ fn emit_field_update(
 }
 
 fn emit_field_write(
-    _input: &DekuReceiver,
+    _input: &DekuData,
     i: usize,
-    f: &DekuFieldReceiver,
+    f: &FieldData,
     object_prefix: &Option<TokenStream>,
-) -> Result<TokenStream, darling::Error> {
-    assert!(
-        f.bytes.is_none(),
-        "dev error: `bytes` should be None, use `bits` to get size"
-    );
+) -> Result<TokenStream, syn::Error> {
 
     // skip writing this field
     if f.skip {

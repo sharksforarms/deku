@@ -3,6 +3,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 mod macros;
 use crate::macros::{deku_read::emit_deku_read, deku_write::emit_deku_write};
+use syn::spanned::Spanned;
 
 #[derive(Debug, Clone, Copy, PartialEq, FromMeta)]
 #[darling(default)]
@@ -24,13 +25,268 @@ impl Default for EndianNess {
     }
 }
 
+/// # Note
+/// We use this instead of `DekuReceiver::init` because handle everything in one struct is hard to use,
+/// and can't save a different type i.e. `ctx: syn::LitStr` -> `ctx: syn::punctuated::Punctuated<FnArg, syn::token::Comma>`.
+struct DekuData {
+    vis: syn::Visibility,
+    ident: syn::Ident,
+    generics: syn::Generics,
+    data: ast::Data<VariantData, FieldData>,
+
+    endian: EndianNess,
+
+    ctx: Option<syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>>,
+
+    id_type: Option<syn::Ident>,
+
+    id_bits: Option<usize>,
+}
+
+impl DekuData {
+    /// Map `DekuReceiver` to `DekuData`. It will check if attributes valid. Return a compile error
+    /// if failed.
+    fn from_receiver(receiver: DekuReceiver) -> Result<Self, TokenStream> {
+        // Validate
+        DekuData::validate(&receiver)
+            .map_err(|(span, msg)| syn::Error::new(span, msg).to_compile_error())?;
+
+        let data = match receiver.data {
+            ast::Data::Struct(fields) => ast::Data::Struct(ast::Fields {
+                style: fields.style,
+                fields: fields
+                    .fields
+                    .into_iter()
+                    .map(FieldData::from_receiver)
+                    .collect::<Result<Vec<_>, _>>()?,
+            }),
+            ast::Data::Enum(variants) => ast::Data::Enum(
+                variants
+                    .into_iter()
+                    .map(VariantData::from_receiver)
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+        };
+
+        let ctx = receiver
+            .ctx
+            .map(|s| s.parse_with(syn::punctuated::Punctuated::parse_terminated))
+            .transpose()
+            .map_err(|e| e.to_compile_error())?;
+
+        let id_bits = receiver.id_bytes.map(|b| b * 8).or(receiver.id_bits);
+
+        Ok(Self {
+            vis: receiver.vis,
+            ident: receiver.ident,
+            generics: receiver.generics,
+            data,
+            endian: receiver.endian,
+            ctx,
+            id_type: receiver.id_type,
+            id_bits,
+        })
+    }
+
+    fn validate(receiver: &DekuReceiver) -> Result<(), (proc_macro2::Span, &str)> {
+        match receiver.data {
+            ast::Data::Struct(_) => {
+                // Validate id_* attributes are being used on an enum
+                if receiver.id_type.is_some() {
+                    Err((receiver.id_type.span(), "`id_type` only supported on enum"))
+                } else if receiver.id_bytes.is_some() {
+                    Err((
+                        receiver.id_bytes.span(),
+                        "`id_bytes` only supported on enum",
+                    ))
+                } else if receiver.id_bits.is_some() {
+                    Err((receiver.id_bits.span(), "`id_bits` only supported on enum"))
+                } else {
+                    Ok(())
+                }
+            }
+            ast::Data::Enum(_) => {
+                // Validate either `id_bits` or `id_bytes` is specified
+                if (receiver.id_bits.is_some() || receiver.id_bytes.is_some())
+                    && receiver.id_type.is_none()
+                {
+                    return Err((
+                        receiver.ident.span(),
+                        "`id_type` must be specified with `id_bits` or `id_bytes`",
+                    ));
+                }
+
+                // Validate either `id_bits` or `id_bytes` is specified
+                if receiver.id_bits.is_some() && receiver.id_bytes.is_some() {
+                    return Err((
+                        receiver.id_bits.span(),
+                        "conflicting: both \"id_bits\" and \"id_bytes\" specified on field",
+                    ));
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    /// Emit a reader. If any error happened, the result will be a compile error.
+    fn emit_reader(&self) -> TokenStream {
+        match self.emit_reader_checked() {
+            Ok(tks) => tks,
+            Err(e) => e.to_compile_error()
+        }
+    }
+
+    /// Emit a writer. If any error happened, the result will be a compile error.
+    fn emit_writer(&self) -> TokenStream {
+        match self.emit_writer_checked() {
+            Ok(tks) => tks,
+            Err(e) => e.to_compile_error()
+        }
+    }
+
+    /// Same as `emit_reader`, but won't auto convert error to compile error.
+    fn emit_reader_checked(&self) -> Result<TokenStream, syn::Error> {
+        emit_deku_read(self)
+    }
+
+    /// Same as `emit_writer`, but won't auto convert error to compile error.
+    fn emit_writer_checked(&self) -> Result<TokenStream, syn::Error> {
+        emit_deku_write(self)
+    }
+}
+
+struct FieldData {
+    ident: Option<syn::Ident>,
+    ty: syn::Type,
+
+    /// Endianness for the field
+    endian: Option<EndianNess>,
+
+    /// field bit size
+    bits: Option<usize>,
+
+    /// tokens providing the length of the container
+    count: Option<TokenStream>,
+
+    /// apply a function to the field after it's read
+    map: Option<TokenStream>,
+
+    /// map field when updating struct
+    update: Option<TokenStream>,
+
+    /// custom field reader code
+    reader: Option<TokenStream>,
+
+    /// custom field writer code
+    writer: Option<TokenStream>,
+
+    // skip field reading/writing
+    skip: bool,
+
+    // default value code when used with skip
+    default: Option<TokenStream>,
+}
+
+impl FieldData {
+    fn from_receiver(receiver: DekuFieldReceiver) -> Result<Self, TokenStream> {
+        FieldData::validate(&receiver)
+            .map_err(|(span, msg)| syn::Error::new(span, msg).to_compile_error())?;
+
+        let bits = receiver.bytes.map(|b| b * 8).or(receiver.bits);
+
+        // Default `default` if skip is provided without `default`
+        let default = if receiver.skip && receiver.default.is_none() {
+            Some(quote! { Default::default() })
+        } else {
+            receiver.default
+        };
+
+        Ok(Self {
+            ident: receiver.ident,
+            ty: receiver.ty,
+            endian: receiver.endian,
+            bits,
+            count: receiver.count,
+            map: receiver.map,
+            update: receiver.update,
+            reader: receiver.reader,
+            writer: receiver.writer,
+            skip: receiver.skip,
+            default,
+        })
+    }
+
+    fn validate(receiver: &DekuFieldReceiver) -> Result<(), (proc_macro2::Span, &str)> {
+        // Validate either `bits` or `bytes` is specified
+        if receiver.bits.is_some() && receiver.bytes.is_some() {
+            // FIXME: Ideally we need to use `Span::join` to encompass `bits` and `bytes` together.
+            return Err((
+                receiver.bits.span(),
+                "conflicting: both \"bits\" and \"bytes\" specified on field",
+            ));
+        }
+
+        // Validate `skip` is provided with `default`
+        if receiver.default.is_some() && !receiver.skip {
+            return Err((
+                receiver.default.span(),
+                "`default` attribute must be used with `skip`",
+            ));
+        }
+
+        Ok(())
+    }
+
+
+    /// Get ident of the field
+    /// `index` is provided in the case of un-named structs
+    /// `prefix` is true in the case of variable declarations, false if original field is desired
+    fn get_ident(&self, index: usize, prefix: bool) -> TokenStream {
+        let field_ident = gen_field_ident(self.ident.as_ref(), index, prefix);
+        quote! { #field_ident }
+    }
+}
+
+struct VariantData {
+    ident: syn::Ident,
+    fields: ast::Fields<FieldData>,
+
+    /// custom variant reader code
+    reader: Option<TokenStream>,
+
+    /// custom variant reader code
+    writer: Option<TokenStream>,
+
+    /// variant `id` value
+    id: Option<String>,
+}
+
+impl VariantData {
+    fn from_receiver(receiver: DekuVariantReceiver) -> Result<Self, TokenStream> {
+        let fields = ast::Fields {
+            style: receiver.fields.style,
+            fields: receiver
+                .fields
+                .fields
+                .into_iter()
+                .map(FieldData::from_receiver)
+                .collect::<Result<Vec<_>, _>>()?,
+        };
+
+        Ok(Self {
+            ident: receiver.ident,
+            fields,
+            reader: receiver.reader,
+            writer: receiver.writer,
+            id: receiver.id,
+        })
+    }
+}
+
 /// Receiver for the top-level struct or enum
 #[derive(Debug, FromDeriveInput)]
-#[darling(
-    attributes(deku),
-    supports(struct_any, enum_any),
-    map = "DekuReceiver::init"
-)]
+#[darling(attributes(deku), supports(struct_any, enum_any))]
 struct DekuReceiver {
     vis: syn::Visibility,
     ident: syn::Ident,
@@ -40,6 +296,12 @@ struct DekuReceiver {
     /// Endian default for the fields
     #[darling(default)]
     endian: EndianNess,
+
+    /// struct/enum level ctx like "a: u8, b: u8"
+    /// The type of it should be `syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>`. `darling`
+    /// can't parse it from `Meta`, so we will parse it latter.
+    #[darling(default)]
+    ctx: Option<syn::LitStr>,
 
     /// enum only: type of the enum `id`
     #[darling(default)]
@@ -52,47 +314,6 @@ struct DekuReceiver {
     // enum only: byte size of the enum `id`
     #[darling(default)]
     id_bytes: Option<usize>,
-}
-
-impl DekuReceiver {
-    /// Initialize and validate the DekuReceiver
-    fn init(self) -> Self {
-        // Validate id_* attributes are being used on an enum
-        if (self.id_type.is_some() || self.id_bits.is_some() || self.id_bytes.is_some())
-            && !self.data.is_enum()
-        {
-            panic!("`id_*` attributes only supported on enum")
-        }
-
-        // Validate that `id_type` is set with a size
-        if (self.id_bits.is_some() || self.id_bytes.is_some()) && self.id_type.is_none() {
-            panic!("`id_type` must be specified with `id_bits` or `id_bytes`");
-        }
-
-        // Validate either `id_bits` or `id_bytes` is specified
-        if self.id_bits.is_some() && self.id_bytes.is_some() {
-            panic!("conflicting: both \"id_bits\" and \"id_bytes\" specified on field");
-        }
-
-        // Calculate bit size from both attributes
-        let id_bits = self.id_bits.or_else(|| self.id_bytes.map(|v| v * 8));
-        let id_bytes = None;
-
-        // Return updated receiver
-        Self {
-            id_bits,
-            id_bytes,
-            ..self
-        }
-    }
-
-    fn emit_reader(&self) -> Result<TokenStream, darling::Error> {
-        emit_deku_read(self)
-    }
-
-    fn emit_writer(&self) -> Result<TokenStream, darling::Error> {
-        emit_deku_write(self)
-    }
 }
 
 /// Parse a TokenStream from an Option<String>
@@ -123,7 +344,7 @@ fn gen_field_ident<T: ToString>(ident: Option<T>, index: usize, prefix: bool) ->
 
 /// Receiver for the field-level attributes inside a struct/enum variant
 #[derive(Debug, FromField)]
-#[darling(attributes(deku), map = "DekuFieldReceiver::init")]
+#[darling(attributes(deku))]
 struct DekuFieldReceiver {
     ident: Option<syn::Ident>,
     ty: syn::Type,
@@ -169,51 +390,9 @@ struct DekuFieldReceiver {
     default: Option<TokenStream>,
 }
 
-impl DekuFieldReceiver {
-    /// Initialize and validate the DekuFieldReceiver
-    fn init(self) -> Self {
-        // Validate either `bits` or `bytes` is specified
-        if self.bits.is_some() && self.bytes.is_some() {
-            panic!("conflicting: both \"bits\" and \"bytes\" specified on field");
-        }
-
-        // Calculate bit size from both attributes
-        let bits = self.bits.or_else(|| self.bytes.map(|v| v * 8));
-        let bytes = None;
-
-        // Validate `skip` is provided with `default`
-        if self.default.is_some() && !self.skip {
-            panic!("`default` attribute must be used with `skip`");
-        }
-
-        // Default `default` if skip is provided without `default`
-        let default = if self.skip && self.default.is_none() {
-            Some(quote! { Default::default() })
-        } else {
-            self.default
-        };
-
-        // Return updated receiver
-        Self {
-            bits,
-            bytes,
-            default,
-            ..self
-        }
-    }
-
-    /// Get ident of the field
-    /// `index` is provided in the case of un-named structs
-    /// `prefix` is true in the case of variable declarations, false if original field is desired
-    fn get_ident(&self, index: usize, prefix: bool) -> TokenStream {
-        let field_ident = gen_field_ident(self.ident.as_ref(), index, prefix);
-        quote! { #field_ident }
-    }
-}
-
 /// Receiver for the variant-level attributes inside a enum
 #[derive(Debug, FromVariant)]
-#[darling(attributes(deku), map = "DekuVariantReceiver::init")]
+#[darling(attributes(deku))]
 struct DekuVariantReceiver {
     ident: syn::Ident,
     fields: ast::Fields<DekuFieldReceiver>,
@@ -231,24 +410,44 @@ struct DekuVariantReceiver {
     id: Option<String>,
 }
 
-impl DekuVariantReceiver {
-    fn init(self) -> Self {
-        self
-    }
-}
-
 #[proc_macro_derive(DekuRead, attributes(deku))]
 pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let receiver = DekuReceiver::from_derive_input(&syn::parse(input).unwrap()).unwrap();
-    let tokens = receiver.emit_reader().unwrap();
-    tokens.into()
+    let input = match syn::parse(input) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error().into()
+    };
+
+    let receiver = match DekuReceiver::from_derive_input(&input) {
+        Ok(receiver) => receiver,
+        Err(err) => return err.write_errors().into()
+    };
+
+    let data = match DekuData::from_receiver(receiver) {
+        Ok(data) => data,
+        Err(err) => return err.into(),
+    };
+
+    data.emit_reader().into()
 }
 
 #[proc_macro_derive(DekuWrite, attributes(deku))]
 pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let receiver = DekuReceiver::from_derive_input(&syn::parse(input).unwrap()).unwrap();
-    let tokens = receiver.emit_writer().unwrap();
-    tokens.into()
+    let input = match syn::parse(input) {
+        Ok(input) => input,
+        Err(err) => return err.to_compile_error().into()
+    };
+
+    let receiver = match DekuReceiver::from_derive_input(&input) {
+        Ok(receiver) => receiver,
+        Err(err) => return err.write_errors().into()
+    };
+
+    let data = match DekuData::from_receiver(receiver) {
+        Ok(data) => data,
+        Err(err) => return err.into(),
+    };
+
+    data.emit_writer().into()
 }
 
 #[cfg(test)]
@@ -321,8 +520,9 @@ mod tests {
         let parsed = parse_str(input).unwrap();
 
         let receiver = DekuReceiver::from_derive_input(&parsed).unwrap();
-        let res_reader = receiver.emit_reader();
-        let res_writer = receiver.emit_writer();
+        let data = DekuData::from_receiver(receiver).unwrap();
+        let res_reader = data.emit_reader_checked();
+        let res_writer = data.emit_writer_checked();
 
         res_reader.unwrap();
         res_writer.unwrap();

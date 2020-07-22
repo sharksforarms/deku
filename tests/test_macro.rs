@@ -104,42 +104,6 @@ mod tests {
             }
         }
 
-        // TODO:
-        // Since we changed the signature of `DekuRead` and `DekuWrite`, there is no magic variant
-        // `input_is_le` and `field_bits` anymore, so I commented those codes. But I feel like there
-        // still are some things not right.
-        /*
-        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        pub struct ReaderWriterDeku {
-            #[deku(
-                reader = "ReaderWriterDeku::read(rest, input_is_le, field_bits)",
-                writer = "ReaderWriterDeku::write(self.field_a, output_is_le, field_bits)"
-            )]
-            pub field_a: u8,
-        }
-
-
-        impl ReaderWriterDeku {
-            fn read(
-                rest: &BitSlice<Msb0, u8>,
-                input_is_le: bool,
-                bit_size: Option<usize>,
-            ) -> Result<(&BitSlice<Msb0, u8>, u8), DekuError> {
-                let (rest, value) = u8::read(rest, input_is_le, bit_size, None)?;
-                Ok((rest, value + 1))
-            }
-
-            fn write(
-                field_a: u8,
-                output_is_le: bool,
-                bit_size: Option<usize>,
-            ) -> Result<BitVec<Msb0, u8>, DekuError> {
-                let value = field_a - 1;
-                value.write(output_is_le, bit_size)
-            }
-        }
-         */
-
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
         pub struct GenericStructDeku<T: deku::DekuWrite + deku::DekuRead>
         where
@@ -172,6 +136,53 @@ mod tests {
             #[deku(skip, default = "5")]
             pub field_b: u8,
             pub field_c: u8,
+        }
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        #[deku(ctx = "_a: u8, _b: u8")]
+        pub struct TopLevelCtxStruct {}
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        #[deku(ctx = "a: u8, b: u8")]
+        pub struct SubTypeNeedCtx {
+            #[deku(
+                reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c) as usize))})(rest)",
+                writer = "(|c|{u8::write(&(c-a-b), ())})(self.i as u8)"
+            )]
+            pub(crate) i: usize,
+        }
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        pub struct FieldLevelCtxStruct {
+            pub a: u8,
+            pub b: u8,
+            #[deku(ctx = "a + 1, *b")]
+            pub c: SubTypeNeedCtx,
+        }
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        #[deku(id_type = "u8", ctx = "a: u8, b: u8")]
+        pub enum TopLevelCtxEnum {
+            #[deku(id = "1")]
+            VariantA(
+                #[deku(
+                    reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})(rest)",
+                    writer = "(|c|{u8::write(&(c-a-b), ())})(field_0)"
+                )]
+                u8,
+            ),
+        }
+
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        #[deku(id_type = "u8")]
+        pub enum VariantLevelCtxEnum {
+            #[deku(id = "1")]
+            VariantA {
+                a: u8,
+                b: u8,
+                #[deku(ctx = "*a, *b")]
+                c: SubTypeNeedCtx,
+            },
         }
     }
 
@@ -354,25 +365,6 @@ mod tests {
         );
     }
 
-    // `ReaderWriterDeku` is gone. See ReaderWriterDeku(line 107)
-    /*
-    #[test]
-    fn test_reader_writer() {
-        let test_data: Vec<u8> = [0x01].to_vec();
-
-        let ret_read = samples::ReaderWriterDeku::try_from(test_data.as_ref()).unwrap();
-        assert_eq!(
-            samples::ReaderWriterDeku {
-                field_a: 0x02 // 0x01 + 1 as specified in the reader function
-            },
-            ret_read
-        );
-
-        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-        assert_eq!(test_data, ret_write);
-    }
-     */
-
     #[test]
     fn test_generic_struct_deku() {
         let test_data: Vec<u8> = [0x01].to_vec();
@@ -429,5 +421,36 @@ mod tests {
 
         let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(test_data, ret_write);
+    }
+
+    #[test]
+    fn test_ctx_struct() {
+        let test_data = [0x01_u8, 0x02, 0x03];
+
+        let ret_read = samples::FieldLevelCtxStruct::try_from(&test_data[..]).unwrap();
+        assert_eq!(
+            ret_read,
+            samples::FieldLevelCtxStruct {
+                a: 0x01,
+                b: 0x02,
+                c: samples::SubTypeNeedCtx {
+                    i: 0x01 + 1 + 0x02 + 0x03
+                } // (a + 1) + b + c
+            }
+        );
+
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+        assert_eq!(ret_write, test_data)
+    }
+
+    #[test]
+    fn test_top_level_ctx_enum() {
+        let test_data = [0x01_u8, 0x03];
+        let (rest, ret_read) = samples::TopLevelCtxEnum::read(test_data.bits(), (1, 2)).unwrap();
+        assert!(rest.is_empty());
+        assert_eq!(ret_read, samples::TopLevelCtxEnum::VariantA(0x06));
+
+        let ret_write = ret_read.write((1, 2)).unwrap();
+        assert_eq!(ret_write.into_vec(), &test_data[..]);
     }
 }

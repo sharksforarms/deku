@@ -1,4 +1,5 @@
-use crate::{EndianNess, DekuData, FieldData};
+use crate::macros::{gen_ctx_types_and_arg, gen_hidden_field_ident, gen_hidden_field_idents};
+use crate::{DekuData, EndianNess, FieldData};
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -33,9 +34,13 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let (field_idents, field_reads) = emit_field_reads(input, &fields)?;
 
-    let initialize_struct = super::gen_struct_init(is_named_struct, field_idents);
+    let hidden_fields = gen_hidden_field_idents(is_named_struct, field_idents);
 
-    tokens.extend(quote! {
+    let initialize_struct = super::gen_struct_init(is_named_struct, hidden_fields);
+
+    // Only implement `DekuContainerRead` for types don't need any context.
+    if input.ctx.is_none() {
+        tokens.extend(quote! {
         impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
             type Error = DekuError;
 
@@ -64,10 +69,14 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
                 Ok(((&input_bits[read_idx..].as_slice(), pad), value))
             }
-        }
+        }})
+    }
 
-        impl #imp DekuRead for #ident #wher {
-            fn read(input: &BitSlice<Msb0, u8>, _: ()) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+    let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
+
+    tokens.extend(quote! {
+        impl #imp DekuRead<#ctx_types> for #ident #wher {
+            fn read<'a>(input: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                 use core::convert::TryFrom;
                 let mut rest = input;
 
@@ -136,8 +145,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         } else {
             let (field_idents, field_reads) = emit_field_reads(input, &variant.fields.as_ref())?;
 
+            let hidden_fields = gen_hidden_field_idents(variant_is_named, field_idents);
             let initialize_enum =
-                super::gen_enum_init(variant_is_named, variant_ident, field_idents);
+                super::gen_enum_init(variant_is_named, variant_ident, hidden_fields);
 
             // if we're consuming an id, set the rest to new_rest before reading the variant
             let new_rest = if variant.id.is_some() {
@@ -181,7 +191,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         };
     };
 
-    tokens.extend(quote! {
+    // Only implement `DekuContainerRead` for types don't need any context.
+    if input.ctx.is_none() {
+        tokens.extend(quote! {
+
         impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
             type Error = DekuError;
 
@@ -210,9 +223,14 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 Ok(((&input_bits[read_idx..].as_slice(), pad), value))
             }
         }
+        })
+    }
 
-        impl #imp DekuRead for #ident #wher {
-            fn read(input: &BitSlice<Msb0, u8>, _: ()) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+    let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
+
+    tokens.extend(quote! {
+        impl #imp DekuRead<#ctx_types> for #ident #wher {
+            fn read<'a>(input: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                 use core::convert::TryFrom;
                 let mut rest = input;
 
@@ -248,7 +266,6 @@ fn emit_field_read(
     i: usize,
     f: &FieldData,
 ) -> Result<(TokenStream, TokenStream), syn::Error> {
-
     let field_type = &f.ty;
     let field_is_le = f.endian.map(|endian| endian == EndianNess::Little);
     let field_reader = &f.reader;
@@ -260,20 +277,20 @@ fn emit_field_read(
         })
         .or_else(|| Some(quote! { Result::<_, DekuError>::Ok }));
     let field_ident = f.get_ident(i, true);
+    let hidden_field_ident = gen_hidden_field_ident(field_ident.clone());
 
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
     } else {
         let mut read_args = Vec::with_capacity(3);
-
-        if let Some(field_count) = &f.count {
-            read_args.push(quote! {usize::try_from(#field_count)?})
-        }
         if let Some(field_is_le) = field_is_le {
             read_args.push(quote! {#field_is_le});
         }
         if let Some(field_bits) = f.bits {
             read_args.push(quote! {#field_bits})
+        }
+        if let Some(ctx) = &f.ctx {
+            read_args.push(quote! {#ctx});
         }
 
         // Because `impl DekuRead<(bool, usize)>` but `impl DekuRead<bool>`(not tuple)
@@ -284,11 +301,28 @@ fn emit_field_read(
             quote! {#(#read_args),*}
         };
 
-        quote! {DekuRead::read(rest, (#read_args))}
+        // Count is special, we need to generate `(count, (other, ..))` for it.
+        if let Some(field_count) = &f.count {
+            // The count has same problem, when it isn't a copy type, the field will be moved.
+            // e.g. struct FooBar {
+            //   a: Baz // a type implement `TryInto<usize>` but not `Copy`.
+            //   #[deku(count = "a") <-- Oops, use of moved value: `a`
+            //   b: Vec<_>
+            // }
+            quote! {DekuRead::read(rest, (usize::try_from(*#field_count)?, (#read_args)))}
+        } else {
+            quote! {DekuRead::read(rest, (#read_args))}
+        }
     };
 
+    // We must pass a ref to context so that it won't be moved when use.
+    // e.g.
+    // let a = read(rest);
+    // let b = read(rest, a); <-- Oops! a have been moved, then we can't use it for constructing.
+    // let c = read(rest, &mut b); <-- `b` will be changed.
+    // So I add a `__`(double underscore) for it. Hopes none writes `let d = read(rest, __b);`
     let field_read = quote! {
-        let #field_ident = {
+        let #hidden_field_ident = {
             let (new_rest, value) = #field_read_func?;
             let value: #field_type = #field_map(value)?;
 
@@ -296,15 +330,17 @@ fn emit_field_read(
 
             value
         };
+        let #field_ident = &#hidden_field_ident;
     };
 
     if f.skip {
         let default_tok = f.default.as_ref().expect("expected `default` attribute");
 
         let default_read = quote! {
-            let #field_ident = {
+            let #hidden_field_ident = {
                 #default_tok
             };
+            let #field_ident = &#hidden_field_ident;
         };
         return Ok((field_ident, default_read));
     }

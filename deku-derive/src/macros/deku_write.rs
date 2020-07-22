@@ -1,10 +1,10 @@
-use crate::{EndianNess, DekuData, FieldData};
+use crate::macros::{gen_ctx_types_and_arg, gen_struct_destruction};
+use crate::{DekuData, EndianNess, FieldData};
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
 
 pub(crate) fn emit_deku_write(input: &DekuData) -> Result<TokenStream, syn::Error> {
-
     match &input.data {
         Data::Enum(_) => emit_enum(input),
         Data::Struct(_) => emit_struct(input),
@@ -19,32 +19,77 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
 
+    // TODO: Replace `expect` with `Err`
     let fields = input
         .data
         .as_ref()
         .take_struct()
         .expect("expected `struct` type");
 
-    let field_writes = emit_field_writes(input, &fields, Some(quote! { self. }))?;
+    let field_writes = emit_field_writes(input, &fields, None)?;
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }))?;
 
+    /*
+    NOTE:
+    Because the requirement by `ctx`, we need to deconstruct first.
+    e.g.: match *self { Self{ ref field_0, ref field_1 } => { /* do something */} }
+     */
+    // We checked in `emit_deku_write`.
+    let r#struct = input.data.as_ref().take_struct().unwrap();
+    let named = r#struct.style.is_struct();
+
+    let field_idents = r#struct
+        .iter()
+        .enumerate()
+        .map(|(i, f)| f.get_ident(i, true))
+        .collect::<Vec<_>>();
+
+    let destruction = gen_struct_destruction(named, &input.ident, &field_idents);
+
+
+    // A type is container only if it's not required any context
+    if input.ctx.is_none() {
+        tokens.extend(quote! {
+            impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
+                type Error = DekuError;
+
+                fn try_from(input: #ident) -> Result<Self, Self::Error> {
+                    input.to_bitvec()
+                }
+            }
+
+            impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
+                type Error = DekuError;
+
+                fn try_from(input: #ident) -> Result<Self, Self::Error> {
+                    input.to_bytes()
+                }
+            }
+
+            impl #imp DekuContainerWrite for #ident #wher {
+                fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
+                    let mut acc: BitVec<Msb0, u8> = self.to_bitvec()?;
+                    Ok(acc.into_vec())
+                }
+
+                fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
+                    match *self {
+                        #destruction => {
+                            let mut acc: BitVec<Msb0, u8> = BitVec::new();
+                            #(#field_writes)*
+
+                            Ok(acc)
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
+
+
     tokens.extend(quote! {
-        impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
-            type Error = DekuError;
-
-            fn try_from(input: #ident) -> Result<Self, Self::Error> {
-                input.to_bitvec()
-            }
-        }
-
-        impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
-            type Error = DekuError;
-
-            fn try_from(input: #ident) -> Result<Self, Self::Error> {
-                input.to_bytes()
-            }
-        }
-
         impl #imp DekuUpdate for #ident #wher {
             fn update(&mut self) -> Result<(), DekuError> {
                 use core::convert::TryInto;
@@ -54,24 +99,16 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         }
 
-        impl #imp DekuContainerWrite for #ident #wher {
-            fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
-                let mut acc: BitVec<Msb0, u8> = self.to_bitvec()?;
-                Ok(acc.into_vec())
-            }
+        impl #imp DekuWrite<#ctx_types> for #ident #wher {
+            fn write(&self, #ctx_arg) -> Result<BitVec<Msb0, u8>, DekuError> {
+                match *self {
+                    #destruction => {
+                        let mut acc: BitVec<Msb0, u8> = BitVec::new();
+                        #(#field_writes)*
 
-            fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
-                let mut acc: BitVec<Msb0, u8> = BitVec::new();
-
-                #(#field_writes)*
-
-                Ok(acc)
-            }
-        }
-
-        impl #imp DekuWrite for #ident #wher {
-            fn write(&self, _: ()) -> Result<BitVec<Msb0, u8>, DekuError> {
-                self.to_bitvec()
+                        Ok(acc)
+                    }
+                }
             }
         }
     });
@@ -168,22 +205,48 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
     }
 
+    // A type is container only if it's not required any context
+    if input.ctx.is_none() {
+        tokens.extend(quote!{
+            impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
+                type Error = DekuError;
+
+                fn try_from(input: #ident) -> Result<Self, Self::Error> {
+                    input.to_bitvec()
+                }
+            }
+
+            impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
+                type Error = DekuError;
+
+                fn try_from(input: #ident) -> Result<Self, Self::Error> {
+                    input.to_bytes()
+                }
+            }
+
+            impl #imp DekuContainerWrite for #ident #wher {
+
+                fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
+                    let mut acc: BitVec<Msb0, u8> = self.to_bitvec()?;
+                    Ok(acc.into_vec())
+                }
+
+                fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
+                    let mut acc: BitVec<Msb0, u8> = BitVec::new();
+
+                    match self {
+                        #(#variant_writes),*
+                    }
+
+                    Ok(acc)
+                }
+            }
+        })
+    }
+
+    let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
+
     tokens.extend(quote! {
-        impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
-            type Error = DekuError;
-
-            fn try_from(input: #ident) -> Result<Self, Self::Error> {
-                input.to_bitvec()
-            }
-        }
-
-        impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
-            type Error = DekuError;
-
-            fn try_from(input: #ident) -> Result<Self, Self::Error> {
-                input.to_bytes()
-            }
-        }
 
         impl #imp DekuUpdate for #ident #wher {
             fn update(&mut self) -> Result<(), DekuError> {
@@ -197,14 +260,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         }
 
-        impl #imp DekuContainerWrite for #ident #wher {
-
-            fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
-                let mut acc: BitVec<Msb0, u8> = self.to_bitvec()?;
-                Ok(acc.into_vec())
-            }
-
-            fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
+        impl #imp DekuWrite<#ctx_types> for #ident #wher {
+            fn write(&self, #ctx_arg) -> Result<BitVec<Msb0, u8>, DekuError> {
                 let mut acc: BitVec<Msb0, u8> = BitVec::new();
 
                 match self {
@@ -212,12 +269,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 }
 
                 Ok(acc)
-            }
-        }
-
-        impl #imp DekuWrite for #ident #wher {
-            fn write(&self, _: ()) -> Result<BitVec<Msb0, u8>, DekuError> {
-                self.to_bitvec()
             }
         }
     });
@@ -284,7 +335,6 @@ fn emit_field_write(
     f: &FieldData,
     object_prefix: &Option<TokenStream>,
 ) -> Result<TokenStream, syn::Error> {
-
     // skip writing this field
     if f.skip {
         return Ok(quote! {});
@@ -304,6 +354,9 @@ fn emit_field_write(
         }
         if let Some(field_bits) = f.bits {
             write_args.push(quote! {#field_bits});
+        }
+        if let Some(ctx) = &f.ctx {
+            write_args.push(quote! {#ctx});
         }
 
         // Because `impl DekuWrite<(bool, usize)>` but `impl DekuWrite<bool>`(not a tuple)

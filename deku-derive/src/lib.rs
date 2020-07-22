@@ -3,6 +3,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 mod macros;
 use crate::macros::{deku_read::emit_deku_read, deku_write::emit_deku_write};
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 
 #[derive(Debug, Clone, Copy, PartialEq, FromMeta)]
@@ -28,6 +29,7 @@ impl Default for EndianNess {
 /// # Note
 /// We use this instead of `DekuReceiver::init` because handle everything in one struct is hard to use,
 /// and can't save a different type i.e. `ctx: syn::LitStr` -> `ctx: syn::punctuated::Punctuated<FnArg, syn::token::Comma>`.
+#[derive(Debug)]
 struct DekuData {
     vis: syn::Visibility,
     ident: syn::Ident,
@@ -42,6 +44,7 @@ struct DekuData {
 
     id_bits: Option<usize>,
 }
+
 
 impl DekuData {
     /// Map `DekuReceiver` to `DekuData`. It will check if attributes valid. Return a compile error
@@ -133,7 +136,7 @@ impl DekuData {
     fn emit_reader(&self) -> TokenStream {
         match self.emit_reader_checked() {
             Ok(tks) => tks,
-            Err(e) => e.to_compile_error()
+            Err(e) => e.to_compile_error(),
         }
     }
 
@@ -141,7 +144,7 @@ impl DekuData {
     fn emit_writer(&self) -> TokenStream {
         match self.emit_writer_checked() {
             Ok(tks) => tks,
-            Err(e) => e.to_compile_error()
+            Err(e) => e.to_compile_error(),
         }
     }
 
@@ -156,6 +159,7 @@ impl DekuData {
     }
 }
 
+#[derive(Debug)]
 struct FieldData {
     ident: Option<syn::Ident>,
     ty: syn::Type,
@@ -171,6 +175,9 @@ struct FieldData {
 
     /// apply a function to the field after it's read
     map: Option<TokenStream>,
+
+    /// context passed to the type
+    ctx: Option<Punctuated<syn::Expr, syn::token::Comma>>,
 
     /// map field when updating struct
     update: Option<TokenStream>,
@@ -202,6 +209,12 @@ impl FieldData {
             receiver.default
         };
 
+        let ctx = receiver
+            .ctx
+            .map(|s| s.parse_with(Punctuated::parse_terminated))
+            .transpose()
+            .map_err(|e| e.to_compile_error())?;
+
         Ok(Self {
             ident: receiver.ident,
             ty: receiver.ty,
@@ -209,6 +222,7 @@ impl FieldData {
             bits,
             count: receiver.count,
             map: receiver.map,
+            ctx,
             update: receiver.update,
             reader: receiver.reader,
             writer: receiver.writer,
@@ -238,7 +252,6 @@ impl FieldData {
         Ok(())
     }
 
-
     /// Get ident of the field
     /// `index` is provided in the case of un-named structs
     /// `prefix` is true in the case of variable declarations, false if original field is desired
@@ -248,6 +261,7 @@ impl FieldData {
     }
 }
 
+#[derive(Debug)]
 struct VariantData {
     ident: syn::Ident,
     fields: ast::Fields<FieldData>,
@@ -369,6 +383,10 @@ struct DekuFieldReceiver {
     #[darling(default, map = "option_as_tokenstream")]
     map: Option<TokenStream>,
 
+    /// context like `"a, c + 1"`. We will parse it to `Punctuated<Expr, Comma>` latter.
+    #[darling(default)]
+    ctx: Option<syn::LitStr>,
+
     /// map field when updating struct
     #[darling(default, map = "option_as_tokenstream")]
     update: Option<TokenStream>,
@@ -414,12 +432,12 @@ struct DekuVariantReceiver {
 pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = match syn::parse(input) {
         Ok(input) => input,
-        Err(err) => return err.to_compile_error().into()
+        Err(err) => return err.to_compile_error().into(),
     };
 
     let receiver = match DekuReceiver::from_derive_input(&input) {
         Ok(receiver) => receiver,
-        Err(err) => return err.write_errors().into()
+        Err(err) => return err.write_errors().into(),
     };
 
     let data = match DekuData::from_receiver(receiver) {
@@ -434,12 +452,12 @@ pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = match syn::parse(input) {
         Ok(input) => input,
-        Err(err) => return err.to_compile_error().into()
+        Err(err) => return err.to_compile_error().into(),
     };
 
     let receiver = match DekuReceiver::from_derive_input(&input) {
         Ok(receiver) => receiver,
-        Err(err) => return err.write_errors().into()
+        Err(err) => return err.write_errors().into(),
     };
 
     let data = match DekuData::from_receiver(receiver) {

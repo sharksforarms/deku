@@ -46,7 +46,6 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let destruction = gen_struct_destruction(named, &input.ident, &field_idents);
 
-
     // A type is container only if it's not required any context
     if input.ctx.is_none() {
         tokens.extend(quote! {
@@ -87,7 +86,6 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
-
 
     tokens.extend(quote! {
         impl #imp DekuUpdate for #ident #wher {
@@ -207,7 +205,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // A type is container only if it's not required any context
     if input.ctx.is_none() {
-        tokens.extend(quote!{
+        tokens.extend(quote! {
             impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
                 type Error = DekuError;
 

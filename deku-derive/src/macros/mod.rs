@@ -84,7 +84,6 @@ fn gen_struct_destruction<I: ToTokens, F: ToTokens>(
 }
 
 fn gen_hidden_field_ident(ident: TokenStream) -> TokenStream {
-
     // We can't concat to token, so I use string.
     // See https://github.com/rust-lang/rust/issues/29599
     let span = ident.span();
@@ -105,10 +104,7 @@ fn gen_hidden_field_idents(named: bool, idents: Vec<TokenStream>) -> Vec<TokenSt
             .map(|(i, h)| quote! {#i: #h})
             .collect()
     } else {
-        idents
-            .into_iter()
-            .map(gen_hidden_field_ident)
-            .collect()
+        idents.into_iter().map(gen_hidden_field_ident).collect()
     }
 }
 

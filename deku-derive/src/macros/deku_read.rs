@@ -305,11 +305,11 @@ fn emit_field_read(
         if let Some(field_count) = &f.count {
             // The count has same problem, when it isn't a copy type, the field will be moved.
             // e.g. struct FooBar {
-            //   a: Baz // a type implement `TryInto<usize>` but not `Copy`.
+            //   a: Baz // a type implement `Into<usize>` but not `Copy`.
             //   #[deku(count = "a") <-- Oops, use of moved value: `a`
             //   b: Vec<_>
             // }
-            quote! {DekuRead::read(rest, (usize::try_from(*#field_count)?, (#read_args)))}
+            quote! {DekuRead::read(rest, (usize::try_from(#field_count << 0usize)?, (#read_args)))}
         } else {
             quote! {DekuRead::read(rest, (#read_args))}
         }

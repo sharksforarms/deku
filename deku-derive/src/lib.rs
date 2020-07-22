@@ -45,7 +45,6 @@ struct DekuData {
     id_bits: Option<usize>,
 }
 
-
 impl DekuData {
     /// Map `DekuReceiver` to `DekuData`. It will check if attributes valid. Return a compile error
     /// if failed.

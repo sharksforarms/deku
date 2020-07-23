@@ -1,21 +1,22 @@
 use alloc_counter::AllocCounterSystem;
 use deku::prelude::*;
+use deku::ctx::Endian;
 
 #[global_allocator]
 static A: AllocCounterSystem = AllocCounterSystem;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(ctx = "is_le_bytes: bool")]
+#[deku(ctx = "endian: Endian")]
 struct NestedStruct {
-    #[deku(ctx = "is_le_bytes")]
+    #[deku(ctx = "endian")]
     pub field_a: u8,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u8", ctx = "is_le_bytes: bool")]
+#[deku(id_type = "u8", ctx = "endian: Endian")]
 enum NestedEnum {
     #[deku(id = "0x01")]
-    VarA(#[deku(ctx = "is_le_bytes")] u8),
+    VarA(#[deku(ctx = "endian")] u8),
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]

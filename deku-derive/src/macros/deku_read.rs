@@ -1,5 +1,5 @@
-use crate::macros::{gen_ctx_types_and_arg, gen_internal_field_ident, gen_internal_field_idents};
-use crate::{DekuData, EndianNess, FieldData};
+use crate::macros::{gen_ctx_types_and_arg, gen_id_args, gen_internal_field_ident, gen_internal_field_idents, gen_field_args};
+use crate::{DekuData, FieldData};
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -109,13 +109,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     // We have checked `id_type` in `DekuData::validate`, so `unwrap` is safe.
     let id_type = input.id_type.as_ref().unwrap();
 
-    let id_is_le_bytes = input.endian.unwrap_or_default() == EndianNess::Little;
-
-    let id_args = if let Some(id_bit_size) = input.id_bits {
-        quote! {(#id_is_le_bytes, #id_bit_size)}
-    } else {
-        quote! {#id_is_le_bytes}
-    };
+    let id_args = gen_id_args(input.endian.as_ref(), input.id_bits);
 
     let mut variant_matches = vec![];
     let mut has_default_match = false;
@@ -184,7 +178,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     }
 
     let variant_read = quote! {
-        let (new_rest, variant_id) = #id_type::read(rest, #id_args)?;
+        let (new_rest, variant_id) = #id_type::read(rest, (#id_args))?;
 
         let value = match variant_id {
             #(#variant_matches),*
@@ -267,11 +261,11 @@ fn emit_field_read(
     f: &FieldData,
 ) -> Result<(TokenStream, TokenStream), syn::Error> {
     let field_type = &f.ty;
-    let field_is_le = f
-        .endian
-        .or(input.endian)
-        .map(|endian| endian == EndianNess::Little);
+
+    let field_endian = f.endian.as_ref().or_else(|| input.endian.as_ref());
+
     let field_reader = &f.reader;
+
     let field_map = f
         .map
         .as_ref()
@@ -279,30 +273,15 @@ fn emit_field_read(
             quote! { (#v) }
         })
         .or_else(|| Some(quote! { Result::<_, DekuError>::Ok }));
+
     let field_ident = f.get_ident(i, true);
+
     let internal_field_ident = gen_internal_field_ident(field_ident.clone());
 
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
     } else {
-        let mut read_args = Vec::with_capacity(3);
-        if let Some(field_is_le) = field_is_le {
-            read_args.push(quote! {#field_is_le});
-        }
-        if let Some(field_bits) = f.bits {
-            read_args.push(quote! {#field_bits})
-        }
-        if let Some(ctx) = &f.ctx {
-            read_args.push(quote! {#ctx});
-        }
-
-        // Because `impl DekuRead<(bool, usize)>` but `impl DekuRead<bool>`(not tuple)
-        let read_args = if read_args.len() == 1 {
-            let arg = &read_args[0];
-            quote! {#arg}
-        } else {
-            quote! {#(#read_args),*}
-        };
+        let read_args = gen_field_args(field_endian, f.bits, f.ctx.as_ref())?;
 
         // Count is special, we need to generate `(count, (other, ..))` for it.
         if let Some(field_count) = &f.count {
@@ -315,7 +294,7 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    DekuRead::read(rest, (usize::try_from(*((#field_count).borrow()))?, (#read_args)))
+                    DekuRead::read(rest, (deku::ctx::Count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
                 }
             }
         } else {

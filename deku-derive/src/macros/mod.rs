@@ -151,3 +151,55 @@ fn gen_ctx_types_and_arg(
         Ok((quote! {()}, quote! {_: ()}))
     }
 }
+
+fn gen_id_args(endian: Option<&syn::LitStr>, bits: Option<usize>) -> TokenStream {
+    let endian = endian.map(|s| {
+        quote! {<deku::ctx::Endian as core::str::FromStr>::from_str(#s)}
+    });
+
+    let bits = bits.map(|n| quote! {deku::ctx::BitSize(#n)});
+
+    let mut id_args = Vec::with_capacity(2);
+    if let Some(id_endian) = endian {
+        id_args.push(id_endian);
+    }
+    if let Some(id_bits) = bits {
+        id_args.push(id_bits);
+    }
+    if id_args.len() == 1 {
+        let arg = &id_args[0];
+        quote! {#arg}
+    } else {
+        quote! {#(#id_args),*}
+    }
+}
+
+fn gen_field_args(
+    endian: Option<&syn::LitStr>,
+    bits: Option<usize>,
+    ctx: Option<&Punctuated<syn::Expr, syn::token::Comma>>,
+) -> syn::Result<TokenStream> {
+    let mut args = Vec::with_capacity(3);
+
+    if let Some(field_endian) = endian {
+        args.push(match field_endian.value().as_str() {
+            "little" => quote! {deku::ctx::Endian::Little},
+            "big" => quote! {deku::ctx::Endian::Big},
+            _ => return Err(syn::Error::new(field_endian.span(), "Unknown endian")),
+        });
+    }
+    if let Some(field_bits) = bits {
+        args.push(quote! {deku::ctx::BitSize(#field_bits)})
+    }
+    if let Some(ctx) = ctx {
+        args.push(quote! {#ctx});
+    }
+
+    // Because `impl DekuRead<(T1, T2)>` but `impl DekuRead<T1>`(not tuple)
+    if args.len() == 1 {
+        let arg = &args[0];
+        Ok(quote! {#arg})
+    } else {
+        Ok(quote! {#(#args),*})
+    }
+}

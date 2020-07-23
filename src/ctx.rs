@@ -2,7 +2,7 @@
 //! See [ctx attribute](attributes/index.html#ctx) for more information.
 
 use core::ops::{Deref, DerefMut};
-use std::str::FromStr;
+use core::str::FromStr;
 
 /// An endian.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -23,10 +23,10 @@ impl Endian {
     /// [`Endian::default`]: #method.default
     pub const fn new() -> Self {
         #[cfg(target_endian = "little")]
-            let endian = Endian::Little;
+        let endian = Endian::Little;
 
         #[cfg(target_endian = "big")]
-            let endian = Endian::Big;
+        let endian = Endian::Big;
 
         endian
     }

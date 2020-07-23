@@ -1,5 +1,5 @@
-use crate::macros::{gen_ctx_types_and_arg, gen_struct_destruction};
-use crate::{DekuData, EndianNess, FieldData};
+use crate::macros::{gen_ctx_types_and_arg, gen_id_args, gen_struct_destruction, gen_field_args};
+use crate::{DekuData, FieldData};
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -130,13 +130,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let ident = quote! { #ident #ty };
 
     let id_type = input.id_type.as_ref().expect("expected `id_type` on enum");
-    let id_is_le_bytes = input.endian.unwrap_or_default() == EndianNess::Little;
 
-    let id_args = if let Some(id_bit_size) = input.id_bits {
-        quote! {(#id_is_le_bytes, #id_bit_size)}
-    } else {
-        quote! {#id_is_le_bytes}
-    };
+    let id_args = gen_id_args(input.endian.as_ref(), input.id_bits);
 
     let mut variant_writes = vec![];
     let mut variant_updates = vec![];
@@ -166,7 +161,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
             quote! {
                     let mut variant_id: #id_type = #variant_id;
-                    let bits = variant_id.write(#id_args)?;
+                    let bits = variant_id.write((#id_args))?;
                     acc.extend(bits);
             }
         } else {
@@ -338,35 +333,15 @@ fn emit_field_write(
         return Ok(quote! {});
     }
 
-    let field_is_le = f
-        .endian
-        .or(input.endian)
-        .map(|endian| endian == EndianNess::Little);
+    let field_endian = f.endian.as_ref().or_else(|| input.endian.as_ref());
+
     let field_writer = &f.writer;
     let field_ident = f.get_ident(i, object_prefix.is_none());
 
     let field_write_func = if field_writer.is_some() {
         quote! { #field_writer }
     } else {
-        let mut write_args = Vec::with_capacity(3);
-
-        if let Some(field_is_le) = field_is_le {
-            write_args.push(quote! {#field_is_le});
-        }
-        if let Some(field_bits) = f.bits {
-            write_args.push(quote! {#field_bits});
-        }
-        if let Some(ctx) = &f.ctx {
-            write_args.push(quote! {#ctx});
-        }
-
-        // Because `impl DekuWrite<(bool, usize)>` but `impl DekuWrite<bool>`(not a tuple)
-        let write_args = if write_args.len() == 1 {
-            let args = &write_args[0];
-            quote! {#args}
-        } else {
-            quote! {#(#write_args),*}
-        };
+        let write_args = gen_field_args(field_endian, f.bits, f.ctx.as_ref())?;
 
         quote! { #object_prefix #field_ident.write((#write_args)) }
     };

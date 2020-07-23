@@ -1,6 +1,6 @@
 use alloc_counter::AllocCounterSystem;
-use deku::prelude::*;
 use deku::ctx::Endian;
+use deku::prelude::*;
 
 #[global_allocator]
 static A: AllocCounterSystem = AllocCounterSystem;

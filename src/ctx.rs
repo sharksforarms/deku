@@ -40,7 +40,7 @@ impl Endian {
     }
 
     /// Is it a big endian.
-    pub fn is_ge(&self) -> bool {
+    pub fn is_be(&self) -> bool {
         match self {
             Endian::Big => true,
             _ => false,
@@ -117,7 +117,7 @@ impl BitSize {
     /// # use std::mem::size_of;
     /// # use deku::ctx::BitSize;
     ///
-    /// assert_eq!(BitSize::with_byte_size(1), 8);
+    /// assert_eq!(BitSize::with_byte_size(1), BitSize(8));
     /// ```
     ///
     /// # Panic
@@ -131,7 +131,7 @@ impl BitSize {
     /// ```rust
     /// # use deku::ctx::BitSize;
     ///
-    /// assert_eq!(BitSize::of::<i32>(), 4 * 8);
+    /// assert_eq!(BitSize::of::<i32>(), BitSize(4 * 8));
     /// ```
     /// # Panics
     /// Panic if the bit size of given type is greater than `usize::MAX`

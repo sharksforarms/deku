@@ -1,4 +1,4 @@
-use crate::macros::{gen_ctx_types_and_arg, gen_id_args, gen_struct_destruction, gen_field_args};
+use crate::macros::{gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_struct_destruction};
 use crate::{DekuData, FieldData};
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;

@@ -108,14 +108,9 @@ impl DekuData {
                 }
             }
             ast::Data::Enum(_) => {
-                // Validate either `id_bits` or `id_bytes` is specified
-                if (receiver.id_bits.is_some() || receiver.id_bytes.is_some())
-                    && receiver.id_type.is_none()
-                {
-                    return Err((
-                        receiver.ident.span(),
-                        "`id_type` must be specified with `id_bits` or `id_bytes`",
-                    ));
+                // Validate `id_type` is specified.
+                if receiver.id_type.is_none() {
+                    return Err((receiver.ident.span(), "`id_type` must be specified on enum"))
                 }
 
                 // Validate either `id_bits` or `id_bytes` is specified

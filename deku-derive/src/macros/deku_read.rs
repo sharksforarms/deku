@@ -106,8 +106,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
 
-    // TODO: replace `expect` with an error.
-    let id_type = input.id_type.as_ref().expect("expected `id_type` on enum");
+    // We have checked `id_type` in `DekuData::validate`, so `unwrap` is safe.
+    let id_type = input.id_type.as_ref().unwrap();
 
     let id_is_le_bytes = input.endian.unwrap_or_default() == EndianNess::Little;
 

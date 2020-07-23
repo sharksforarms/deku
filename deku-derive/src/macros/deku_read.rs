@@ -1,4 +1,4 @@
-use crate::macros::{gen_ctx_types_and_arg, gen_hidden_field_ident, gen_hidden_field_idents};
+use crate::macros::{gen_ctx_types_and_arg, gen_internal_field_ident, gen_internal_field_idents};
 use crate::{DekuData, EndianNess, FieldData};
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
@@ -34,7 +34,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let (field_idents, field_reads) = emit_field_reads(input, &fields)?;
 
-    let hidden_fields = gen_hidden_field_idents(is_named_struct, field_idents);
+    let hidden_fields = gen_internal_field_idents(is_named_struct, field_idents);
 
     let initialize_struct = super::gen_struct_init(is_named_struct, hidden_fields);
 
@@ -145,7 +145,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         } else {
             let (field_idents, field_reads) = emit_field_reads(input, &variant.fields.as_ref())?;
 
-            let hidden_fields = gen_hidden_field_idents(variant_is_named, field_idents);
+            let hidden_fields = gen_internal_field_idents(variant_is_named, field_idents);
             let initialize_enum =
                 super::gen_enum_init(variant_is_named, variant_ident, hidden_fields);
 
@@ -280,7 +280,7 @@ fn emit_field_read(
         })
         .or_else(|| Some(quote! { Result::<_, DekuError>::Ok }));
     let field_ident = f.get_ident(i, true);
-    let hidden_field_ident = gen_hidden_field_ident(field_ident.clone());
+    let internal_field_ident = gen_internal_field_ident(field_ident.clone());
 
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
@@ -330,7 +330,7 @@ fn emit_field_read(
     // let c = read(rest, &mut b); <-- `b` will be changed.
     // So I add a `__`(double underscore) for it. Hopes none writes `let d = read(rest, __b);`
     let field_read = quote! {
-        let #hidden_field_ident = {
+        let #internal_field_ident = {
             let (new_rest, value) = #field_read_func?;
             let value: #field_type = #field_map(value)?;
 
@@ -338,17 +338,17 @@ fn emit_field_read(
 
             value
         };
-        let #field_ident = &#hidden_field_ident;
+        let #field_ident = &#internal_field_ident;
     };
 
     if f.skip {
         let default_tok = f.default.as_ref().expect("expected `default` attribute");
 
         let default_read = quote! {
-            let #hidden_field_ident = {
+            let #internal_field_ident = {
                 #default_tok
             };
-            let #field_ident = &#hidden_field_ident;
+            let #field_ident = &#internal_field_ident;
         };
         return Ok((field_ident, default_read));
     }

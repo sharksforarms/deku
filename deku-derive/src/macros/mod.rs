@@ -83,28 +83,28 @@ fn gen_struct_destruction<I: ToTokens, F: ToTokens>(
     }
 }
 
-fn gen_hidden_field_ident(ident: TokenStream) -> TokenStream {
+fn gen_internal_field_ident(ident: TokenStream) -> TokenStream {
     // We can't concat to token, so I use string.
     // See https://github.com/rust-lang/rust/issues/29599
     let span = ident.span();
     let s = ident.to_string();
-    let mut name = "__".to_owned();
+    let mut name = "__deku_".to_owned();
     name.push_str(&s);
 
     syn::Ident::new(&name, span).to_token_stream()
 }
 
 /// -> `{ a: __a }` or `(__a)`
-fn gen_hidden_field_idents(named: bool, idents: Vec<TokenStream>) -> Vec<TokenStream> {
+fn gen_internal_field_idents(named: bool, idents: Vec<TokenStream>) -> Vec<TokenStream> {
     // -> `{ a: __a }` or `(__a)`
     if named {
         idents
             .into_iter()
-            .map(|i| (i.clone(), gen_hidden_field_ident(i)))
+            .map(|i| (i.clone(), gen_internal_field_ident(i)))
             .map(|(i, h)| quote! {#i: #h})
             .collect()
     } else {
-        idents.into_iter().map(gen_hidden_field_ident).collect()
+        idents.into_iter().map(gen_internal_field_ident).collect()
     }
 }
 

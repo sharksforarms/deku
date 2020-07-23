@@ -544,8 +544,13 @@ mod tests {
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
+        let endian = if input_is_le {
+            crate::ctx::Endian::Little
+        } else {
+            crate::ctx::Endian::Big
+        };
 
-        let (rest, res_read) = <[u16; 2]>::read(bit_slice, input_is_le).unwrap();
+        let (rest, res_read) = <[u16; 2]>::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
     }
@@ -555,7 +560,12 @@ mod tests {
         case::normal_be([0xDDCC, 0xBBAA], !IS_LE, vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
     fn test_bit_write(input: [u16; 2], output_is_le: bool, expected: Vec<u8>) {
-        let res_write = input.write(output_is_le).unwrap().into_vec();
+        let endian = if output_is_le {
+            crate::ctx::Endian::Little
+        } else {
+            crate::ctx::Endian::Big
+        };
+        let res_write = input.write(endian).unwrap().into_vec();
         assert_eq!(expected, res_write);
     }
 }

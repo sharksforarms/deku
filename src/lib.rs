@@ -171,11 +171,13 @@ use alloc::{format, vec::Vec};
 #[cfg(feature = "std")]
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use crate::ctx::{BitSize, Count, Endian};
 use bitvec::prelude::*;
 use core::convert::TryInto;
 pub use deku_derive::*;
 
 pub mod attributes;
+pub mod ctx;
 pub mod error;
 pub mod prelude;
 mod slice_impls;
@@ -252,12 +254,15 @@ the primary types' implementation.
 
 macro_rules! ImplDekuTraits {
     ($typ:ty) => {
-        impl DekuRead<(bool, usize)> for $typ {
+        impl DekuRead<(Endian, BitSize)> for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
-                (input_is_le, bit_size): (bool, usize),
+                (endian, bit_size): (Endian, BitSize),
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-                let max_type_bits: usize = core::mem::size_of::<$typ>() * 8;
+                let max_type_bits: usize = BitSize::of::<$typ>().into();
+                let bit_size: usize = bit_size.into();
+
+                let input_is_le = endian.is_le();
 
                 if bit_size > max_type_bits {
                     return Err(DekuError::Parse(format!(
@@ -342,31 +347,27 @@ macro_rules! ImplDekuTraits {
             }
         }
 
-        // Only have `endian`, set `bit_size` to `size_of::<Type>() * 8`
-        impl DekuRead<bool> for $typ {
+        // Only have `endian`, set `bit_size` to `BitSize::of::<Type>()`
+        impl DekuRead<Endian> for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
-                input_is_le: bool,
+                endian: Endian,
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-                let max_type_bits: usize = core::mem::size_of::<$typ>() * 8;
+                let max_type_bits = BitSize::of::<$typ>();
 
-                <$typ>::read(input, (input_is_le, max_type_bits))
+                <$typ>::read(input, (endian, max_type_bits))
             }
         }
 
-        // Only have `bit_size`, set `endian` to `Native`.
-        impl DekuRead<usize> for $typ {
+        // Only have `bit_size`, set `endian` to `Endian::default`.
+        impl DekuRead<BitSize> for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
-                bit_size: usize,
+                bit_size: BitSize,
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-                #[cfg(target_endian = "little")]
-                let input_is_le: bool = true;
+                let endian = Endian::default();
 
-                #[cfg(target_endian = "big")]
-                let input_is_le: bool = false;
-
-                <$typ>::read(input, (input_is_le, bit_size))
+                <$typ>::read(input, (endian, bit_size))
             }
         }
 
@@ -375,29 +376,23 @@ macro_rules! ImplDekuTraits {
                 input: &BitSlice<Msb0, u8>,
                 _: (),
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-                // We could add a static value to remove those.
-                #[cfg(target_endian = "little")]
-                let input_is_le: bool = true;
-
-                #[cfg(target_endian = "big")]
-                let input_is_le: bool = false;
-
-                let max_type_bits: usize = core::mem::size_of::<$typ>() * 8;
-
-                <$typ>::read(input, (input_is_le, max_type_bits))
+                <$typ>::read(input, Endian::default())
             }
         }
 
-        impl DekuWrite<(bool, usize)> for $typ {
+        impl DekuWrite<(Endian, BitSize)> for $typ {
             fn write(
                 &self,
-                (output_is_le, bit_size): (bool, usize),
+                (endian, bit_size): (Endian, BitSize),
             ) -> Result<BitVec<Msb0, u8>, DekuError> {
+                let output_is_le = endian.is_le();
                 let input = if output_is_le {
                     self.to_le_bytes()
                 } else {
                     self.to_be_bytes()
                 };
+
+                let bit_size: usize = bit_size.into();
 
                 let input_bits: BitVec<Msb0, u8> = input.to_vec().into();
 
@@ -447,9 +442,9 @@ macro_rules! ImplDekuTraits {
         }
 
         // Only have `endian`, return all input
-        impl DekuWrite<bool> for $typ {
-            fn write(&self, output_is_le: bool) -> Result<BitVec<Msb0, u8>, DekuError> {
-                let input = if output_is_le {
+        impl DekuWrite<Endian> for $typ {
+            fn write(&self, endian: Endian) -> Result<BitVec<Msb0, u8>, DekuError> {
+                let input = if endian.is_le() {
                     self.to_le_bytes()
                 } else {
                     self.to_be_bytes()
@@ -459,42 +454,31 @@ macro_rules! ImplDekuTraits {
             }
         }
 
-        // Only have `bit_size`, set `endian` to `Native`.
-        impl DekuWrite<usize> for $typ {
-            fn write(&self, bit_size: usize) -> Result<BitVec<Msb0, u8>, DekuError> {
-                #[cfg(target_endian = "little")]
-                let output_is_le: bool = true;
-
-                #[cfg(target_endian = "big")]
-                let output_is_le: bool = false;
-
-                <$typ>::write(self, (output_is_le, bit_size))
+        // Only have `bit_size`, set `endian` to `Endian::default`.
+        impl DekuWrite<BitSize> for $typ {
+            fn write(&self, bit_size: BitSize) -> Result<BitVec<Msb0, u8>, DekuError> {
+                <$typ>::write(self, (Endian::default(), bit_size))
             }
         }
 
         impl DekuWrite for $typ {
             fn write(&self, _: ()) -> Result<BitVec<Msb0, u8>, DekuError> {
-                // We could add a static value to remove those.
-                #[cfg(target_endian = "little")]
-                let output_is_le: bool = true;
-
-                #[cfg(target_endian = "big")]
-                let output_is_le: bool = false;
-
-                <$typ>::write(self, output_is_le)
+                <$typ>::write(self, Endian::default())
             }
         }
     };
 }
 
-impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(usize, Ctx)> for Vec<T> {
+impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Count, Ctx)> for Vec<T> {
     fn read(
         input: &BitSlice<Msb0, u8>,
-        (count, inner_ctx): (usize, Ctx),
+        (count, inner_ctx): (Count, Ctx),
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
     {
+        let count: usize = count.into();
+
         let mut res = Vec::with_capacity(count);
         let mut rest = input;
         for _i in 0..count {
@@ -507,10 +491,10 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(usize, Ctx)> for Vec<T> {
     }
 }
 
-impl<T: DekuRead> DekuRead<usize> for Vec<T> {
+impl<T: DekuRead> DekuRead<Count> for Vec<T> {
     fn read(
         input: &BitSlice<Msb0, u8>,
-        count: usize,
+        count: Count,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
@@ -626,16 +610,18 @@ mod tests {
     #[cfg(target_endian = "big")]
     static IS_LE: bool = false;
 
+    static ENDIAN: Endian = Endian::new();
+
     macro_rules! TestPrimitive {
         ($test_name:ident, $typ:ty, $input:expr, $expected:expr) => {
             #[test]
             fn $test_name() {
                 let input = $input;
                 let bit_slice = input.bits::<Msb0>();
-                let (_rest, res_read) = <$typ>::read(bit_slice, IS_LE).unwrap();
+                let (_rest, res_read) = <$typ>::read(bit_slice, ENDIAN).unwrap();
                 assert_eq!($expected, res_read);
 
-                let res_write = res_read.write(IS_LE).unwrap().into_vec();
+                let res_write = res_read.write(ENDIAN).unwrap().into_vec();
                 assert_eq!(input, res_write);
             }
         };
@@ -725,10 +711,15 @@ mod tests {
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
+        let endian = if input_is_le {
+            Endian::Little
+        } else {
+            Endian::Big
+        };
 
         let (rest, res_read) = match bit_size {
-            Some(bit_size) => u32::read(bit_slice, (input_is_le, bit_size)).unwrap(),
-            None => u32::read(bit_slice, input_is_le).unwrap(),
+            Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
+            None => u32::read(bit_slice, endian).unwrap(),
         };
 
         assert_eq!(expected, res_read);
@@ -744,9 +735,15 @@ mod tests {
         case::bit_size_le_bigger(0x03AB, IS_LE, Some(100), vec![0xAB, 0b11_000000]),
     )]
     fn test_bit_write(input: u32, output_is_le: bool, bit_size: Option<usize>, expected: Vec<u8>) {
+        let endian = if output_is_le {
+            Endian::Little
+        } else {
+            Endian::Big
+        };
+
         let res_write = match bit_size {
-            Some(bit_size) => input.write((output_is_le, bit_size)).unwrap().into_vec(),
-            None => input.write(output_is_le).unwrap().into_vec(),
+            Some(bit_size) => input.write((endian, BitSize(bit_size))).unwrap().into_vec(),
+            None => input.write(endian).unwrap().into_vec(),
         };
         assert_eq!(expected, res_write);
     }
@@ -763,17 +760,21 @@ mod tests {
         expected_write: Vec<u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
+        let endian = if is_le { Endian::Little } else { Endian::Big };
 
         let (rest, res_read) = match bit_size {
-            Some(bit_size) => u32::read(bit_slice, (is_le, bit_size)).unwrap(),
-            None => u32::read(bit_slice, is_le).unwrap(),
+            Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
+            None => u32::read(bit_slice, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
         let res_write = match bit_size {
-            Some(bit_size) => res_read.write((is_le, bit_size)).unwrap().into_vec(),
-            None => res_read.write(is_le).unwrap().into_vec(),
+            Some(bit_size) => res_read
+                .write((endian, BitSize(bit_size)))
+                .unwrap()
+                .into_vec(),
+            None => res_read.write(endian).unwrap().into_vec(),
         };
 
         assert_eq!(expected_write, res_write);
@@ -802,10 +803,17 @@ mod tests {
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
+        let endian = if input_is_le {
+            Endian::Little
+        } else {
+            Endian::Big
+        };
 
         let (rest, res_read) = match bit_size {
-            Some(bit_size) => Vec::<u8>::read(bit_slice, (count, (input_is_le, bit_size))).unwrap(),
-            None => Vec::<u8>::read(bit_slice, (count, (input_is_le))).unwrap(),
+            Some(bit_size) => {
+                Vec::<u8>::read(bit_slice, (Count(count), (endian, BitSize(bit_size)))).unwrap()
+            }
+            None => Vec::<u8>::read(bit_slice, (Count(count), (endian))).unwrap(),
         };
 
         assert_eq!(expected, res_read);
@@ -816,7 +824,13 @@ mod tests {
         case::normal(vec![0xAABB, 0xCCDD], IS_LE, vec![0xBB, 0xAA, 0xDD, 0xCC]),
     )]
     fn test_vec_write(input: Vec<u16>, output_is_le: bool, expected: Vec<u8>) {
-        let res_write = input.write(output_is_le).unwrap().into_vec();
+        let endian = if output_is_le {
+            Endian::Little
+        } else {
+            Endian::Big
+        };
+
+        let res_write = input.write(endian).unwrap().into_vec();
         assert_eq!(expected, res_write);
     }
 
@@ -834,15 +848,20 @@ mod tests {
         expected_write: Vec<u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
+        let endian = if is_le { Endian::Little } else { Endian::Big };
 
         // Unwrap here because all test cases are `Some`.
         let bit_size = bit_size.unwrap();
 
-        let (rest, res_read) = Vec::<u16>::read(bit_slice, (count, (is_le, bit_size))).unwrap();
+        let (rest, res_read) =
+            Vec::<u16>::read(bit_slice, (Count(count), (endian, BitSize(bit_size)))).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write: Vec<u8> = res_read.write((is_le, bit_size)).unwrap().into_vec();
+        let res_write: Vec<u8> = res_read
+            .write((endian, BitSize(bit_size)))
+            .unwrap()
+            .into_vec();
         assert_eq!(expected_write, res_write);
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
@@ -859,12 +878,13 @@ mod tests {
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
+        let endian = if is_le { Endian::Little } else { Endian::Big };
 
-        let (rest, res_read) = Ipv4Addr::read(bit_slice, is_le).unwrap();
+        let (rest, res_read) = Ipv4Addr::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write: Vec<u8> = res_read.write(is_le).unwrap().into_vec();
+        let res_write: Vec<u8> = res_read.write(endian).unwrap().into_vec();
         assert_eq!(input.to_vec(), res_write);
     }
 
@@ -879,23 +899,24 @@ mod tests {
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
+        let endian = if is_le { Endian::Little } else { Endian::Big };
 
-        let (rest, res_read) = Ipv6Addr::read(bit_slice, is_le).unwrap();
+        let (rest, res_read) = Ipv6Addr::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write: Vec<u8> = res_read.write(is_le).unwrap().into_vec();
+        let res_write: Vec<u8> = res_read.write(endian).unwrap().into_vec();
         assert_eq!(input.to_vec(), res_write);
     }
 
     #[test]
     fn test_ip_addr_write() {
         let ip_addr = IpAddr::V4(Ipv4Addr::new(145, 254, 160, 237));
-        let ret_write = ip_addr.write(true).unwrap().into_vec();
+        let ret_write = ip_addr.write(Endian::Little).unwrap().into_vec();
         assert_eq!(vec![237, 160, 254, 145], ret_write);
 
         let ip_addr = IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff));
-        let ret_write = ip_addr.write(true).unwrap().into_vec();
+        let ret_write = ip_addr.write(Endian::Little).unwrap().into_vec();
         assert_eq!(
             vec![
                 0xFF, 0x02, 0x0A, 0xC0, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

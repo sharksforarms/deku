@@ -348,7 +348,7 @@ fn emit_field_write(
     let field_write_func = if field_writer.is_some() {
         quote! { #field_writer }
     } else {
-        let mut write_args = Vec::with_capacity(2);
+        let mut write_args = Vec::with_capacity(3);
 
         if let Some(field_is_le) = field_is_le {
             write_args.push(quote! {#field_is_le});

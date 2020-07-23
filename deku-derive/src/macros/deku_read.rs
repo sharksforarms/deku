@@ -312,7 +312,12 @@ fn emit_field_read(
             //   #[deku(count = "a") <-- Oops, use of moved value: `a`
             //   b: Vec<_>
             // }
-            quote! {DekuRead::read(rest, (usize::try_from(#field_count << 0usize)?, (#read_args)))}
+            quote! {
+                {
+                    use core::borrow::Borrow;
+                    DekuRead::read(rest, (usize::try_from(*((#field_count).borrow()))?, (#read_args)))
+                }
+            }
         } else {
             quote! {DekuRead::read(rest, (#read_args))}
         }

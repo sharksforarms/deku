@@ -61,8 +61,9 @@ fn gen_struct_init<I: ToTokens>(is_named: bool, field_idents: Vec<I>) -> TokenSt
 }
 
 /// Generate struct destruction
-/// Named: `#ident { ref fields }`
-/// Unnamed: `#ident ( ref fields )`
+///
+/// - Named: `#ident { ref fields }`
+/// - Unnamed: `#ident ( ref fields )`
 fn gen_struct_destruction<I: ToTokens, F: ToTokens>(
     named: bool,
     ident: I,
@@ -83,6 +84,8 @@ fn gen_struct_destruction<I: ToTokens, F: ToTokens>(
     }
 }
 
+/// Convert a field ident to internal ident:
+/// `a` -> `__deku_a`
 fn gen_internal_field_ident(ident: TokenStream) -> TokenStream {
     // We can't concat to token, so I use string.
     // See https://github.com/rust-lang/rust/issues/29599
@@ -94,7 +97,10 @@ fn gen_internal_field_ident(ident: TokenStream) -> TokenStream {
     syn::Ident::new(&name, span).to_token_stream()
 }
 
-/// -> `{ a: __a }` or `(__a)`
+/// Map all field indents to internal idents
+///
+/// - Named: `{ a: __deku_a }`
+/// - Unnamed: `( __deku_a )`
 fn gen_internal_field_idents(named: bool, idents: Vec<TokenStream>) -> Vec<TokenStream> {
     // -> `{ a: __a }` or `(__a)`
     if named {
@@ -123,6 +129,11 @@ fn split_ctx_to_pats_and_types(
         .collect::<Result<Vec<_>, _>>()
 }
 
+/// Generate ctx types and argument
+///
+/// - Empty: arg: `(): ()`, type: `()`
+/// - One: arg: `a: usize`, type: `usize`
+/// - Other: arg: `(a, b, ...): (u8, u8, ...)`, type: `(u8, u8, ...)`
 fn gen_ctx_types_and_arg(
     ctx: Option<&Punctuated<syn::FnArg, syn::token::Comma>>,
 ) -> syn::Result<(TokenStream, TokenStream)> {
@@ -152,54 +163,54 @@ fn gen_ctx_types_and_arg(
     }
 }
 
-fn gen_id_args(endian: Option<&syn::LitStr>, bits: Option<usize>) -> TokenStream {
-    let endian = endian.map(|s| {
-        quote! {<deku::ctx::Endian as core::str::FromStr>::from_str(#s)}
-    });
-
+/// Generate argument for `id`:
+/// `#deku(endian = "big", id_bits = "1")` -> `Endian::Big, BitSize(1)`
+fn gen_id_args(endian: Option<&syn::LitStr>, bits: Option<usize>) -> syn::Result<TokenStream> {
+    let endian = endian.map(gen_endian_from_str).transpose()?;
     let bits = bits.map(|n| quote! {deku::ctx::BitSize(#n)});
 
-    let mut id_args = Vec::with_capacity(2);
-    if let Some(id_endian) = endian {
-        id_args.push(id_endian);
-    }
-    if let Some(id_bits) = bits {
-        id_args.push(id_bits);
-    }
-    if id_args.len() == 1 {
-        let arg = &id_args[0];
-        quote! {#arg}
-    } else {
-        quote! {#(#id_args),*}
+    // FIXME: Should be `into_iter` here, see https://github.com/rust-lang/rust/issues/66145.
+    let id_args = [endian.as_ref(), bits.as_ref()]
+        .iter()
+        .filter_map(|i| *i)
+        .collect::<Vec<_>>();
+
+    match &id_args[..] {
+        [arg] => Ok(quote! {#arg}),
+        args => Ok(quote! {#(#args),*}),
     }
 }
 
+/// Generate argument for fields:
+///
+/// `#deku(endian = "big", id_bits = "1", ctx = "a")` -> `Endian::Big, BitSize(1), a`
 fn gen_field_args(
     endian: Option<&syn::LitStr>,
     bits: Option<usize>,
     ctx: Option<&Punctuated<syn::Expr, syn::token::Comma>>,
 ) -> syn::Result<TokenStream> {
-    let mut args = Vec::with_capacity(3);
+    let endian = endian.map(gen_endian_from_str).transpose()?;
+    let bits = bits.map(|n| quote! {deku::ctx::BitSize(#n)});
+    let ctx = ctx.map(|c| quote! {#c});
 
-    if let Some(field_endian) = endian {
-        args.push(match field_endian.value().as_str() {
-            "little" => quote! {deku::ctx::Endian::Little},
-            "big" => quote! {deku::ctx::Endian::Big},
-            _ => return Err(syn::Error::new(field_endian.span(), "Unknown endian")),
-        });
-    }
-    if let Some(field_bits) = bits {
-        args.push(quote! {deku::ctx::BitSize(#field_bits)})
-    }
-    if let Some(ctx) = ctx {
-        args.push(quote! {#ctx});
-    }
+    // FIXME: Should be `into_iter` here, see https://github.com/rust-lang/rust/issues/66145.
+    let field_args = [endian.as_ref(), bits.as_ref(), ctx.as_ref()]
+        .iter()
+        .filter_map(|i| *i)
+        .collect::<Vec<_>>();
 
     // Because `impl DekuRead<(T1, T2)>` but `impl DekuRead<T1>`(not tuple)
-    if args.len() == 1 {
-        let arg = &args[0];
-        Ok(quote! {#arg})
-    } else {
-        Ok(quote! {#(#args),*})
+    match &field_args[..] {
+        [arg] => Ok(quote! {#arg}),
+        args => Ok(quote! {#(#args),*}),
+    }
+}
+
+/// Generate endian tokens from string: `big` -> `Endian::Big`.
+fn gen_endian_from_str(s: &syn::LitStr) -> syn::Result<TokenStream> {
+    match s.value().as_str() {
+        "little" => Ok(quote! {deku::ctx::Endian::Little}),
+        "big" => Ok(quote! {deku::ctx::Endian::Big}),
+        _ => Err(syn::Error::new(s.span(), "Unknown endian name")),
     }
 }

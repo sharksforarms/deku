@@ -22,11 +22,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
 
-    let fields = &input
-        .data
-        .as_ref()
-        .take_struct()
-        .expect("expected `struct` type");
+    // checked in `emit_deku_read`
+    let fields = &input.data.as_ref().take_struct().unwrap();
 
     // check if the first field has an ident, if not, it's a unnamed struct
     let is_named_struct = fields
@@ -37,9 +34,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let (field_idents, field_reads) = emit_field_reads(input, &fields)?;
 
-    let hidden_fields = gen_internal_field_idents(is_named_struct, field_idents);
+    let internal_fields = gen_internal_field_idents(is_named_struct, field_idents);
 
-    let initialize_struct = super::gen_struct_init(is_named_struct, hidden_fields);
+    let initialize_struct = super::gen_struct_init(is_named_struct, internal_fields);
 
     // Only implement `DekuContainerRead` for types don't need any context.
     if input.ctx.is_none() {
@@ -100,23 +97,24 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let (imp, ty, wher) = input.generics.split_for_impl();
 
-    let variants = input
-        .data
-        .as_ref()
-        .take_enum()
-        .expect("expected `enum` type");
+    // checked in `emit_deku_read`
+    let variants = input.data.as_ref().take_enum().unwrap();
 
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
 
-    // We have checked `id_type` in `DekuData::validate`, so `unwrap` is safe.
+    // checked in `DekuData::validate`
     let id_type = input.id_type.as_ref().unwrap();
 
-    let id_args = gen_id_args(input.endian.as_ref(), input.id_bits);
+    let id_args = gen_id_args(input.endian.as_ref(), input.id_bits)?;
 
     let mut variant_matches = vec![];
     let mut has_default_match = false;
 
+    /*
+    FIXME: The loop body is too big. The usage of enumerate looks strange. And `mut Vec` can be
+        replaced with `map`.
+     */
     for (_i, variant) in variants.into_iter().enumerate() {
         // check if the first field has an ident, if not, it's a unnamed struct
         let variant_is_named = variant
@@ -142,9 +140,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         } else {
             let (field_idents, field_reads) = emit_field_reads(input, &variant.fields.as_ref())?;
 
-            let hidden_fields = gen_internal_field_idents(variant_is_named, field_idents);
+            let internal_fields = gen_internal_field_idents(variant_is_named, field_idents);
             let initialize_enum =
-                super::gen_enum_init(variant_is_named, variant_ident, hidden_fields);
+                super::gen_enum_init(variant_is_named, variant_ident, internal_fields);
 
             // if we're consuming an id, set the rest to new_rest before reading the variant
             let new_rest = if variant.id.is_some() {
@@ -310,7 +308,6 @@ fn emit_field_read(
     // let a = read(rest);
     // let b = read(rest, a); <-- Oops! a have been moved, then we can't use it for constructing.
     // let c = read(rest, &mut b); <-- `b` will be changed.
-    // So I add a `__`(double underscore) for it. Hopes none writes `let d = read(rest, __b);`
     let field_read = quote! {
         let #internal_field_ident = {
             let (new_rest, value) = #field_read_func?;
@@ -324,6 +321,7 @@ fn emit_field_read(
     };
 
     if f.skip {
+        // TODO: Replace `expect` with `syn::Error` or check it in `FieldData::validate`.
         let default_tok = f.default.as_ref().expect("expected `default` attribute");
 
         let default_read = quote! {

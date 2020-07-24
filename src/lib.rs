@@ -231,27 +231,6 @@ pub trait DekuUpdate {
     fn update(&mut self) -> Result<(), DekuError>;
 }
 
-/*
-Note: Why we need specializations?
-Because it's impossible to write a derive macro without it:
-```rust
-struct A {
-    #[deku(bits = 12)]
-    a: u8,
-    #[deku(endian = "big")]
-    b: u8
-    c: CustomType
-}
-```
-Currently all types that did't have an endian attribute will imply using the `Native` endian. But we
-can't do those things to `CustomType` - it does not need an endian.
-So how about we always add a fixed param to the trait impl? It's the same thing as adding a fixed argument
-in function's definition.
-
-So I moved the responsibility of considering endian(and default bit size etc.) from derive macro to
-the primary types' implementation.
- */
-
 macro_rules! ImplDekuTraits {
     ($typ:ty) => {
         impl DekuRead<(Endian, BitSize)> for $typ {
@@ -531,9 +510,6 @@ ImplDekuTraits!(isize);
 ImplDekuTraits!(f32);
 ImplDekuTraits!(f64);
 
-/*
-FIXME: Currently those implementation will expose it's implementation detail.
-*/
 #[cfg(feature = "std")]
 impl<Ctx> DekuRead<Ctx> for Ipv4Addr
 where

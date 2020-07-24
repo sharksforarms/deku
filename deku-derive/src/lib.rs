@@ -6,9 +6,6 @@ use crate::macros::{deku_read::emit_deku_read, deku_write::emit_deku_write};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 
-/// # Note
-/// We use this instead of `DekuReceiver::init` because handle everything in one struct is hard to use,
-/// and can't save a different type i.e. `ctx: syn::LitStr` -> `ctx: syn::punctuated::Punctuated<FnArg, syn::token::Comma>`.
 #[derive(Debug)]
 struct DekuData {
     vis: syn::Visibility,
@@ -16,7 +13,7 @@ struct DekuData {
     generics: syn::Generics,
     data: ast::Data<VariantData, FieldData>,
 
-    /// Endianness for all fields, `little` or `big`
+    /// Endianness for all fields
     endian: Option<syn::LitStr>,
 
     ctx: Option<syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>>,
@@ -139,7 +136,7 @@ struct FieldData {
     ident: Option<syn::Ident>,
     ty: syn::Type,
 
-    /// Endianness for the field, `little` or `big`
+    /// Endianness for the field
     endian: Option<syn::LitStr>,
 
     /// field bit size

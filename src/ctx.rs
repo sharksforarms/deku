@@ -22,29 +22,21 @@ impl Endian {
     ///
     /// [`Endian::default`]: #method.default
     pub const fn new() -> Self {
-        #[cfg(target_endian = "little")]
-        let endian = Endian::Little;
-
-        #[cfg(target_endian = "big")]
-        let endian = Endian::Big;
-
-        endian
+        if cfg!(target_endian = "little") {
+            Endian::Little
+        } else {
+            Endian::Big
+        }
     }
 
     /// Is it a little endian.
     pub fn is_le(&self) -> bool {
-        match self {
-            Endian::Little => true,
-            _ => false,
-        }
+        self == &Endian::Little
     }
 
     /// Is it a big endian.
     pub fn is_be(&self) -> bool {
-        match self {
-            Endian::Big => true,
-            _ => false,
-        }
+        self == &Endian::Big
     }
 }
 
@@ -123,7 +115,7 @@ impl BitSize {
     /// # Panic
     /// Panic if `byte_size * 8` is greater than `usize::MAX`.
     pub fn with_byte_size(byte_size: usize) -> Self {
-        Self(byte_size * 8)
+        Self(byte_size.checked_mul(8).expect("bit size overflow"))
     }
 
     /// Returns the bit size of a type.

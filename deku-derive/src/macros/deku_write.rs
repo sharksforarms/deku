@@ -19,34 +19,28 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
 
-    // TODO: Replace `expect` with `Err`
-    let fields = input
-        .data
-        .as_ref()
-        .take_struct()
-        .expect("expected `struct` type");
+    // We checked in `emit_deku_write`.
+    let fields = input.data.as_ref().take_struct().unwrap();
 
     let field_writes = emit_field_writes(input, &fields, None)?;
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }))?;
 
     /*
     NOTE:
-    Because the requirement by `ctx`, we need to deconstruct first.
+    Because the requirement of former fields accessing, we need to deconstruct first.
     e.g.: match *self { Self{ ref field_0, ref field_1 } => { /* do something */} }
      */
-    // We checked in `emit_deku_write`.
-    let r#struct = input.data.as_ref().take_struct().unwrap();
-    let named = r#struct.style.is_struct();
+    let named = fields.style.is_struct();
 
-    let field_idents = r#struct
+    let field_idents = fields
         .iter()
         .enumerate()
         .map(|(i, f)| f.get_ident(i, true))
         .collect::<Vec<_>>();
 
-    let destruction = gen_struct_destruction(named, &input.ident, &field_idents);
+    let destructured = gen_struct_destruction(named, &input.ident, &field_idents);
 
-    // A type is container only if it's not required any context
+    // Only implement `DekuContainerWrite` for types don't need any context.
     if input.ctx.is_none() {
         tokens.extend(quote! {
             impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
@@ -73,7 +67,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
                 fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
                     match *self {
-                        #destruction => {
+                        #destructured => {
                             let mut acc: BitVec<Msb0, u8> = BitVec::new();
                             #(#field_writes)*
 
@@ -100,7 +94,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         impl #imp DekuWrite<#ctx_types> for #ident #wher {
             fn write(&self, #ctx_arg) -> Result<BitVec<Msb0, u8>, DekuError> {
                 match *self {
-                    #destruction => {
+                    #destructured => {
                         let mut acc: BitVec<Msb0, u8> = BitVec::new();
                         #(#field_writes)*
 
@@ -120,22 +114,24 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let (imp, ty, wher) = input.generics.split_for_impl();
 
-    let variants = input
-        .data
-        .as_ref()
-        .take_enum()
-        .expect("expected `enum` type");
+    // checked in emit_deku_write
+    let variants = input.data.as_ref().take_enum().unwrap();
 
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
 
-    let id_type = input.id_type.as_ref().expect("expected `id_type` on enum");
+    // checked in `DekuData::validate`
+    let id_type = input.id_type.as_ref().unwrap();
 
-    let id_args = gen_id_args(input.endian.as_ref(), input.id_bits);
+    let id_args = gen_id_args(input.endian.as_ref(), input.id_bits)?;
 
     let mut variant_writes = vec![];
     let mut variant_updates = vec![];
 
+    /*
+    FIXME: The loop body is too big. The usage of `enumerate` looks strange. And two `mut Vec` can be
+        replaced with `map` and `split`.
+     */
     for (_i, variant) in variants.into_iter().enumerate() {
         // check if the first field has an ident, if not, it's a unnamed struct
         let variant_is_named = variant
@@ -198,7 +194,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
     }
 
-    // A type is container only if it's not required any context
+    // Only implement `DekuContainerWrite` for types don't need any context.
     if input.ctx.is_none() {
         tokens.extend(quote! {
             impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {

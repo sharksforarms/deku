@@ -1,0 +1,5 @@
+error: `id_type` must be specified on enum
+ --> $DIR/enum_without_id_type.rs:4:6
+  |
+4 | enum Test {}
+  |      ^^^^

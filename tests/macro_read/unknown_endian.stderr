@@ -1,0 +1,23 @@
+error: Unknown endian name
+ --> $DIR/unknown_endian.rs:4:17
+  |
+4 | #[deku(endian = "1")]
+  |                 ^^^
+
+error: Unknown endian name
+  --> $DIR/unknown_endian.rs:11:21
+   |
+11 |     #[deku(endian = "2")]
+   |                     ^^^
+
+error: Unknown endian name
+  --> $DIR/unknown_endian.rs:16:33
+   |
+16 | #[deku(id_type = "u8", endian = "3")]
+   |                                 ^^^
+
+error: Unknown endian name
+  --> $DIR/unknown_endian.rs:23:23
+   |
+23 |     A(#[deku(endian = "4")] u8),
+   |                       ^^^

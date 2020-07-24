@@ -1,0 +1,31 @@
+error: conflicting: both "id_bits" and "id_bytes" specified on field
+ --> $DIR/bits_bytes_conflict.rs:3:10
+  |
+3 | #[derive(DekuRead)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: conflicting: both "bits" and "bytes" specified on field
+ --> $DIR/bits_bytes_conflict.rs:7:10
+  |
+7 | #[derive(DekuRead)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: conflicting: both "bits" and "bytes" specified on field
+  --> $DIR/bits_bytes_conflict.rs:17:10
+   |
+17 | #[derive(DekuRead)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: conflicting: both "bits" and "bytes" specified on field
+  --> $DIR/bits_bytes_conflict.rs:23:10
+   |
+23 | #[derive(DekuRead)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)

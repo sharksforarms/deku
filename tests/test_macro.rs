@@ -453,4 +453,10 @@ mod tests {
         let ret_write = ret_read.write((1, 2)).unwrap();
         assert_eq!(ret_write.into_vec(), &test_data[..]);
     }
+
+    #[test]
+    fn test_compile() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/macro_read/*.rs");
+    }
 }

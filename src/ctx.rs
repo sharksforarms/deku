@@ -22,11 +22,13 @@ impl Endian {
     ///
     /// [`Endian::default`]: #method.default
     pub const fn new() -> Self {
-        if cfg!(target_endian = "little") {
-            Endian::Little
-        } else {
-            Endian::Big
-        }
+        #[cfg(target_endian = "little")]
+        let endian = Endian::Little;
+
+        #[cfg(target_endian = "big")]
+        let endian = Endian::Big;
+
+        endian
     }
 
     /// Is it a little endian.

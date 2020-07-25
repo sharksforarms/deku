@@ -69,6 +69,11 @@ impl DekuData {
     }
 
     fn validate(receiver: &DekuReceiver) -> Result<(), (proc_macro2::Span, &str)> {
+        /*
+        FIXME: All `span` call have the same issue with `receiver.bits.span()` except `receiver.ident`
+            see `FieldData::validate`.
+         */
+
         match receiver.data {
             ast::Data::Struct(_) => {
                 // Validate id_* attributes are being used on an enum
@@ -206,6 +211,17 @@ impl FieldData {
     fn validate(receiver: &DekuFieldReceiver) -> Result<(), (proc_macro2::Span, &str)> {
         // Validate either `bits` or `bytes` is specified
         if receiver.bits.is_some() && receiver.bytes.is_some() {
+            /*
+            FIXME: `receiver.bits.span()` will return `call_site`, that's unexpected. It makes
+               compiler given `#[derive(DekuRead)]`
+                                         ^^^^^^^^
+               instead of `#[deku(bits = "", bytes = "")]`
+                                  ^^^^^^^^^^^^^^^^^^^^^
+               A possible reason might be that the `span` was discorded by `darling`(because inner
+               type don't have a `span`).
+               Maybe we should parse it manually.
+            */
+
             // FIXME: Ideally we need to use `Span::join` to encompass `bits` and `bytes` together.
             return Err((
                 receiver.bits.span(),
@@ -215,6 +231,7 @@ impl FieldData {
 
         // Validate `skip` is provided with `default`
         if receiver.default.is_some() && !receiver.skip {
+            // FIXME: Same issue with `receiver.bits.span()` see above.
             return Err((
                 receiver.default.span(),
                 "`default` attribute must be used with `skip`",

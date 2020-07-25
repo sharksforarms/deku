@@ -19,6 +19,8 @@ A documentation-only module for #[deku] attributes
 | [id_type](#id_type) | top-level (enum only) | Set the type of the variant `id`
 | [id_bits](#id_bits) | top-level (enum only) | Set the bit-size of the variant `id`
 | [id_bytes](#id_bytes) | top-level (enum only) | Set the byte-size of the variant `id`
+| [ctx](#top_level_ctx) | top-level | The context a struct/enum needed for context-sensitive parsing.
+| [ctx](#field_level_ctx) | field | Set to pass a context required by this field.
 
 # endian
 
@@ -458,4 +460,90 @@ assert_eq!(
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
+
+# top_level_ctx
+
+The context a struct/enum needed for context-sensitive parsing.
+
+**Value**: The value of a ctx attribute must be a literal string which can be parsed to function
+argument list:
+```ignore
+#[deku(ctx = "a: Type, b: Type")] // <-- good
+struct A{}
+#[deku(ctx = "self")] // <-- bad
+struct B{}
+```
+
+Example:
+```
+# use deku::prelude::*;
+# use bitvec::slice::AsBits;
+#[derive(DekuRead, DekuWrite)]
+#[deku(ctx = "_a: u8")]
+struct Test {}
+
+let data: Vec<u8> = vec![0xEF, 0xBE, 0xFF];
+
+let (_, value) = Test::read(data.bits(), 10).unwrap();
+// let _ = Test::read(data.bits(), ""); <-- compile error.
+let _ = value.write(10);
+// let _ = Test::write(true); <-- compile error.
+```
+
+# field_level_ctx
+
+Set to pass a context required by this field.
+
+**Value**: This attribute accept a literal string which can be parsed to expression list:
+```ignore
+struct Test {
+    p: u8,
+    #[deku(ctx = r#"p, 12, "str", true"#)] // <-- good
+    a: u8,
+    #[deku(ctx = ",")] // <-- bad
+    b: u8,
+}
+```
+
+**Visibility**: List of what you can access:
+1. All former fields which have been parsed(you can only access const reference, no move, no mut).
+2. Every context defined through `top-level-ctx` attribute.
+
+Example
+```
+# use deku::prelude::*;
+#[derive(DekuRead, DekuWrite)]
+#[deku(ctx = "a: u8")]
+struct Subtype {
+    #[deku(map = "|b: u8| -> Result<_, DekuError> { Ok(b + a) }")]
+    b: u8
+}
+
+#[derive(DekuRead, DekuWrite)]
+struct Test {
+    a: u8,
+    #[deku(ctx = "*a")] // `a` is a reference
+    sub: Subtype
+}
+
+let data: Vec<u8> = vec![0x01, 0x02];
+
+let (rest, value) = Test::from_bytes((&data[..], 0)).unwrap();
+assert_eq!(value.a, 0x01);
+assert_eq!(value.sub.b, 0x01 + 0x02)
+```
+
+In addition, currently `endian`, `bytes` and `bits` are a sugar of `ctx`, codes below are equivalent:
+```ignore
+struct Type1 {
+    #[deku(endian = "big", bits = "1")]
+    field: u8,
+}
+
+struct Type2 {
+    #[deku(ctx = "Endian::Big, BitSize(1)")]
+    field: u8,
+}
+```
+
 */

@@ -1,5 +1,5 @@
 //! This module provided types for context representation could be used in context-sensitive parsing.
-//! See [ctx attribute](attributes/index.html#ctx) for more information.
+//! See [ctx attribute](../attributes/index.html#ctx) for more information.
 
 use core::ops::{Deref, DerefMut};
 use core::str::FromStr;

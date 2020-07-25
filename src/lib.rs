@@ -188,19 +188,17 @@ use crate::error::DekuError;
 pub trait DekuRead<Ctx = ()> {
     /// Read bits and construct type
     /// * **input** - Input as bits
-    /// * **input_is_le** - `true` if input is to be interpreted as little endian,
-    /// false otherwise (controlled via `endian` deku attribute)
-    /// * **bit_size** - `Some` if `bits` or `bytes` deku attributes provided,
-    /// `None` otherwise
-    /// * **count** - Number of elements to read for container, Some if `count` attribute
-    /// is provided, else None
+    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means not context
+    /// needed.
     fn read(input: &BitSlice<Msb0, u8>, ctx: Ctx) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized;
 }
 
-/// "Reader" trait: implemented on DekuRead struct and enum containers
+/// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which
+/// doesn't need any context information.
 pub trait DekuContainerRead: DekuRead<()> {
+    // TODO: Explain that's the second arg `usize` means.
     fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError>
     where
         Self: Sized;
@@ -209,14 +207,13 @@ pub trait DekuContainerRead: DekuRead<()> {
 /// "Writer" trait: write from type to bits
 pub trait DekuWrite<Ctx = ()> {
     /// Write type to bits
-    /// * **output_is_le** - `true` if output is to be interpreted as little endian,
-    /// false otherwise (controlled via `endian` deku attribute)
-    /// * **bit_size** - `Some` if `bits` or `bytes` deku attributes provided,
-    /// `None` otherwise
+    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means not context
+    /// needed.
     fn write(&self, ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError>;
 }
 
-/// "Writer" trait: implemented on DekuWrite struct and enum containers
+/// "Writer" trait: implemented on DekuWrite struct and enum containers. A `container` is a type which
+/// doesn't need any context information.
 pub trait DekuContainerWrite: DekuWrite<()> {
     /// Write struct/enum to Vec<u8>
     fn to_bytes(&self) -> Result<Vec<u8>, DekuError>;
@@ -449,6 +446,19 @@ macro_rules! ImplDekuTraits {
 }
 
 impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Count, Ctx)> for Vec<T> {
+    /// Read the specified number of `T`s from input.
+    /// * `count` - the number of `T`s you want to read.
+    /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s in constructing.
+    /// # Examples
+    /// ```rust
+    /// # use deku::ctx::*;
+    /// # use deku::DekuRead;
+    /// # use bitvec::slice::AsBits;
+    /// let input = vec![1u8, 2, 3, 4];
+    /// let (rest, v) = Vec::<u32>::read(input.bits(), (1.into(), Endian::Little)).unwrap();
+    /// assert!(rest.is_empty());
+    /// assert_eq!(v, vec![0x04030201])
+    /// ```
     fn read(
         input: &BitSlice<Msb0, u8>,
         (count, inner_ctx): (Count, Ctx),
@@ -471,6 +481,7 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Count, Ctx)> for Vec<T> {
 }
 
 impl<T: DekuRead> DekuRead<Count> for Vec<T> {
+    /// Read the specified number of `T`s from input for types don't require context.
     fn read(
         input: &BitSlice<Msb0, u8>,
         count: Count,
@@ -483,11 +494,21 @@ impl<T: DekuRead> DekuRead<Count> for Vec<T> {
 }
 
 impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Vec<T> {
-    fn write(&self, ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError> {
+    /// Write all `T`s in a `Vec` to bits.
+    /// * **inner_ctx** - The context required by `T`.
+    /// # Examples
+    /// ```rust
+    /// # use deku::{ctx::Endian, DekuWrite};
+    /// # use bitvec::bitvec;
+    /// let data = vec![1u8];
+    /// let output = data.write(Endian::Big).unwrap();
+    /// assert_eq!(output, bitvec![0, 0, 0, 0, 0, 0, 0, 1])
+    /// ```
+    fn write(&self, inner_ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError> {
         let mut acc = BitVec::new();
 
         for v in self {
-            let r = v.write(ctx)?;
+            let r = v.write(inner_ctx)?;
             acc.extend(r);
         }
 

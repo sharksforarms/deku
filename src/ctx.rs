@@ -32,13 +32,13 @@ impl Endian {
     }
 
     /// Is it little endian
-    pub fn is_le(&self) -> bool {
-        self == &Endian::Little
+    pub fn is_le(self) -> bool {
+        self == Endian::Little
     }
 
     /// Is it big endian
-    pub fn is_be(&self) -> bool {
-        self == &Endian::Big
+    pub fn is_be(self) -> bool {
+        self == Endian::Big
     }
 }
 

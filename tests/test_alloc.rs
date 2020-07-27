@@ -6,17 +6,16 @@ use deku::prelude::*;
 static A: AllocCounterSystem = AllocCounterSystem;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(ctx = "endian: Endian")]
+#[deku(ctx = "_endian: Endian")]
 struct NestedStruct {
-    #[deku(ctx = "endian")]
     pub field_a: u8,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u8", ctx = "endian: Endian")]
+#[deku(id_type = "u8", ctx = "_endian: Endian")]
 enum NestedEnum {
     #[deku(id = "0x01")]
-    VarA(#[deku(ctx = "endian")] u8),
+    VarA(u8),
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]

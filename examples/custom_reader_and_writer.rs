@@ -1,5 +1,5 @@
-use deku::prelude::*;
 use deku::ctx::BitSize;
+use deku::prelude::*;
 use std::convert::TryInto;
 
 fn bit_flipper_read(

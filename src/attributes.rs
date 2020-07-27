@@ -19,8 +19,8 @@ A documentation-only module for #[deku] attributes
 | [id_type](#id_type) | top-level (enum only) | Set the type of the variant `id`
 | [id_bits](#id_bits) | top-level (enum only) | Set the bit-size of the variant `id`
 | [id_bytes](#id_bytes) | top-level (enum only) | Set the byte-size of the variant `id`
-| [ctx](#top_level_ctx) | top-level | The context a struct/enum needed for context-sensitive parsing.
-| [ctx](#field_level_ctx) | field | Set to pass a context required by this field.
+| [ctx](#top_level_ctx) | top-level | Context argument list for context sensitive parsing
+| [ctx](#field_level_ctx) | field | Context arguments to pass to field
 
 # endian
 
@@ -463,19 +463,20 @@ assert_eq!(data, value);
 
 # top_level_ctx
 
-The context a struct/enum needed for context-sensitive parsing.
+Argument list of external context required for parsing/writing.
 
 **Value**: The value of a ctx attribute must be a literal string which can be parsed to function
 argument list:
+
 ```ignore
-#[deku(ctx = "a: Type, b: Type")] // <-- good
+#[deku(ctx = "a: u8, b: String")] // <-- valid
 struct A{}
-#[deku(ctx = "self")] // <-- bad
+#[deku(ctx = "10, true")] // <-- invalid
 struct B{}
 ```
 
 Example:
-```
+```rust
 # use deku::prelude::*;
 # use bitvec::slice::AsBits;
 #[derive(DekuRead, DekuWrite)]
@@ -492,25 +493,25 @@ let _ = value.write(10);
 
 # field_level_ctx
 
-Set to pass a context required by this field.
+Pass context arguments to a type which accepts them.
 
-**Value**: This attribute accept a literal string which can be parsed to expression list:
+**Value**: This attribute accepts a literal string which can be parsed to expression list:
 ```ignore
 struct Test {
     p: u8,
-    #[deku(ctx = r#"p, 12, "str", true"#)] // <-- good
+    #[deku(ctx = r#"p, 12, "str", true"#)] // <-- valid
     a: u8,
-    #[deku(ctx = ",")] // <-- bad
+    #[deku(ctx = ",")] // <-- invalid
     b: u8,
 }
 ```
 
 **Visibility**: List of what you can access:
-1. All former fields which have been parsed(you can only access const reference, no move, no mut).
+1. All former fields which have been parsed (you can only access const reference, no move, no mut).
 2. Every context defined through `top-level-ctx` attribute.
 
 Example
-```
+```rust
 # use deku::prelude::*;
 #[derive(DekuRead, DekuWrite)]
 #[deku(ctx = "a: u8")]
@@ -533,7 +534,7 @@ assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
 
-In addition, currently `endian`, `bytes` and `bits` are a sugar of `ctx`, codes below are equivalent:
+In addition, currently, `endian`, `bytes` and `bits` are a sugar of `ctx`, examples below are equivalent:
 ```ignore
 struct Type1 {
     #[deku(endian = "big", bits = "1")]

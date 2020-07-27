@@ -159,6 +159,36 @@ let (rest, val) = DekuTest::from_bytes(rest).unwrap();
 assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 ```
 
+# Context
+
+Child parsers can get access to the parent's parsed values using the `ctx` attribute
+
+Example:
+
+```rust
+use deku::prelude::*;
+
+#[derive(DekuRead, DekuWrite)]
+#[deku(ctx = "a: u8")]
+struct Subtype {
+    #[deku(map = "|b: u8| -> Result<_, DekuError> { Ok(b + a) }")]
+    b: u8
+}
+
+#[derive(DekuRead, DekuWrite)]
+struct Root {
+    a: u8,
+    #[deku(ctx = "*a")] // `a` is a reference
+    sub: Subtype
+}
+
+let data: Vec<u8> = vec![0x01, 0x02];
+
+let (rest, value) = Root::from_bytes((&data[..], 0)).unwrap();
+assert_eq!(value.a, 0x01);
+assert_eq!(value.sub.b, 0x01 + 0x02)
+```
+
 */
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -188,7 +218,7 @@ use crate::error::DekuError;
 pub trait DekuRead<Ctx = ()> {
     /// Read bits and construct type
     /// * **input** - Input as bits
-    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means not context
+    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.
     fn read(input: &BitSlice<Msb0, u8>, ctx: Ctx) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
@@ -198,7 +228,10 @@ pub trait DekuRead<Ctx = ()> {
 /// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which
 /// doesn't need any context information.
 pub trait DekuContainerRead: DekuRead<()> {
-    // TODO: Explain that's the second arg `usize` means.
+    /// Read bytes and construct type
+    /// * **input** - Input as a tuple of (bytes, bit_offset)
+    ///
+    /// Returns a tuple of the remaining data as (bytes, bit_offset) and a constructed value
     fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError>
     where
         Self: Sized;
@@ -207,7 +240,7 @@ pub trait DekuContainerRead: DekuRead<()> {
 /// "Writer" trait: write from type to bits
 pub trait DekuWrite<Ctx = ()> {
     /// Write type to bits
-    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means not context
+    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.
     fn write(&self, ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError>;
 }
@@ -448,7 +481,7 @@ macro_rules! ImplDekuTraits {
 impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Count, Ctx)> for Vec<T> {
     /// Read the specified number of `T`s from input.
     /// * `count` - the number of `T`s you want to read.
-    /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s in constructing.
+    /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s when constructing.
     /// # Examples
     /// ```rust
     /// # use deku::ctx::*;
@@ -481,7 +514,7 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Count, Ctx)> for Vec<T> {
 }
 
 impl<T: DekuRead> DekuRead<Count> for Vec<T> {
-    /// Read the specified number of `T`s from input for types don't require context.
+    /// Read the specified number of `T`s from input for types which don't require context.
     fn read(
         input: &BitSlice<Msb0, u8>,
         count: Count,
@@ -601,12 +634,6 @@ mod tests {
 
     use rstest::rstest;
 
-    #[cfg(target_endian = "little")]
-    static IS_LE: bool = true;
-
-    #[cfg(target_endian = "big")]
-    static IS_LE: bool = false;
-
     static ENDIAN: Endian = Endian::new();
 
     macro_rules! TestPrimitive {
@@ -688,31 +715,26 @@ mod tests {
         -0.006
     );
 
-    #[rstest(input, input_is_le, bit_size, expected, expected_rest,
-        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), 0xAABB_CCDD, bits![Msb0, u8;]),
-        case::normal_bits_12_le([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), IS_LE, Some(12), 0b1110_1001_0110, bits![Msb0, u8; 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1]),
-        case::normal_bits_12_be([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), !IS_LE, Some(12), 0b1001_0110_1110, bits![Msb0, u8; 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1]),
-        case::normal_bit_6([0b1001_0110].as_ref(), IS_LE, Some(6), 0b1001_01, bits![Msb0, u8; 1, 0,]),
+    #[rstest(input, endian, bit_size, expected, expected_rest,
+        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, bits![Msb0, u8;]),
+        case::normal_bits_12_le([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Little, Some(12), 0b1110_1001_0110, bits![Msb0, u8; 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1]),
+        case::normal_bits_12_be([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Big, Some(12), 0b1001_0110_1110, bits![Msb0, u8; 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1]),
+        case::normal_bit_6([0b1001_0110].as_ref(), Endian::Little, Some(6), 0b1001_01, bits![Msb0, u8; 1, 0,]),
         #[should_panic(expected = "Parse(\"not enough data: expected 32 got 0\")")]
-        case::not_enough_data([].as_ref(), IS_LE, Some(32), 0xFF, bits![Msb0, u8;]),
+        case::not_enough_data([].as_ref(), Endian::Little, Some(32), 0xFF, bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"not enough data: expected 32 got 16\")")]
-        case::not_enough_data([0xAA, 0xBB].as_ref(), IS_LE, Some(32), 0xFF, bits![Msb0, u8;]),
+        case::not_enough_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(32), 0xFF, bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"too much data: container of 32 cannot hold 64\")")]
-        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), IS_LE, Some(64), 0xFF, bits![Msb0, u8;]),
+        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(64), 0xFF, bits![Msb0, u8;]),
     )]
     fn test_bit_read(
         input: &[u8],
-        input_is_le: bool,
+        endian: Endian,
         bit_size: Option<usize>,
         expected: u32,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
-        let endian = if input_is_le {
-            Endian::Little
-        } else {
-            Endian::Big
-        };
 
         let (rest, res_read) = match bit_size {
             Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
@@ -723,21 +745,15 @@ mod tests {
         assert_eq!(expected_rest, rest);
     }
 
-    #[rstest(input, output_is_le, bit_size, expected,
-        case::normal_le(0xDDCC_BBAA, IS_LE, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
-        case::normal_be(0xDDCC_BBAA, !IS_LE, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
-        case::bit_size_le_smaller(0x03AB, IS_LE, Some(10), vec![0xAB, 0b11_000000]),
-        case::bit_size_be_smaller(0x03AB, !IS_LE, Some(10), vec![0b11, 0xAB]),
+    #[rstest(input, endian, bit_size, expected,
+        case::normal_le(0xDDCC_BBAA, Endian::Little, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
+        case::bit_size_le_smaller(0x03AB, Endian::Little, Some(10), vec![0xAB, 0b11_000000]),
+        case::bit_size_be_smaller(0x03AB, Endian::Big, Some(10), vec![0b11, 0xAB]),
         #[should_panic(expected = "InvalidParam(\"bit size 100 is larger then input 32\")")]
-        case::bit_size_le_bigger(0x03AB, IS_LE, Some(100), vec![0xAB, 0b11_000000]),
+        case::bit_size_le_bigger(0x03AB, Endian::Little, Some(100), vec![0xAB, 0b11_000000]),
     )]
-    fn test_bit_write(input: u32, output_is_le: bool, bit_size: Option<usize>, expected: Vec<u8>) {
-        let endian = if output_is_le {
-            Endian::Little
-        } else {
-            Endian::Big
-        };
-
+    fn test_bit_write(input: u32, endian: Endian, bit_size: Option<usize>, expected: Vec<u8>) {
         let res_write = match bit_size {
             Some(bit_size) => input.write((endian, BitSize(bit_size))).unwrap().into_vec(),
             None => input.write(endian).unwrap().into_vec(),
@@ -745,19 +761,18 @@ mod tests {
         assert_eq!(expected, res_write);
     }
 
-    #[rstest(input, is_le, bit_size, expected, expected_rest, expected_write,
-        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, Some(32), 0xAABB_CCDD, bits![Msb0, u8;], vec![0xDD, 0xCC, 0xBB, 0xAA]),
+    #[rstest(input, endian, bit_size, expected, expected_rest, expected_write,
+        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, bits![Msb0, u8;], vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
     fn test_bit_read_write(
         input: &[u8],
-        is_le: bool,
+        endian: Endian,
         bit_size: Option<usize>,
         expected: u32,
         expected_rest: &BitSlice<Msb0, u8>,
         expected_write: Vec<u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
-        let endian = if is_le { Endian::Little } else { Endian::Big };
 
         let (rest, res_read) = match bit_size {
             Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
@@ -777,34 +792,29 @@ mod tests {
         assert_eq!(expected_write, res_write);
     }
 
-    #[rstest(input,input_is_le,bit_size,count,expected,expected_rest,
-        case::count_0([0xAA].as_ref(), IS_LE, Some(8), 0, vec![], bits![Msb0, u8; 1, 0, 1, 0, 1, 0, 1, 0]),
-        case::count_1([0xAA, 0xBB].as_ref(), IS_LE, Some(8), 1, vec![0xAA], bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
-        case::count_2([0xAA, 0xBB, 0xCC].as_ref(), IS_LE, Some(8), 2, vec![0xAA, 0xBB], bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0]),
-        case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), IS_LE, Some(6), 2, vec![0b00_011010, 0b00_011110], bits![Msb0, u8; 1, 0, 0, 1]),
+    #[rstest(input,endian,bit_size,count,expected,expected_rest,
+        case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0, vec![], bits![Msb0, u8; 1, 0, 1, 0, 1, 0, 1, 0]),
+        case::count_1([0xAA, 0xBB].as_ref(), Endian::Little, Some(8), 1, vec![0xAA], bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
+        case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Endian::Little, Some(8), 2, vec![0xAA, 0xBB], bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0]),
+        case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), Endian::Little, Some(6), 2, vec![0b00_011010, 0b00_011110], bits![Msb0, u8; 1, 0, 0, 1]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 cannot hold 9\")")]
-        case::not_enough_data([].as_ref(), IS_LE, Some(9), 1, vec![], bits![Msb0, u8;]),
+        case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 cannot hold 9\")")]
-        case::not_enough_data([0xAA].as_ref(), IS_LE, Some(9), 1, vec![], bits![Msb0, u8;]),
+        case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"not enough data: expected 8 got 0\")")]
-        case::not_enough_data([0xAA].as_ref(), IS_LE, Some(8), 2, vec![], bits![Msb0, u8;]),
+        case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(8), 2, vec![], bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 cannot hold 9\")")]
-        case::too_much_data([0xAA, 0xBB].as_ref(), IS_LE, Some(9), 1, vec![], bits![Msb0, u8;]),
+        case::too_much_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
     )]
     fn test_vec_read(
         input: &[u8],
-        input_is_le: bool,
+        endian: Endian,
         bit_size: Option<usize>,
         count: usize,
         expected: Vec<u8>,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
-        let endian = if input_is_le {
-            Endian::Little
-        } else {
-            Endian::Big
-        };
 
         let (rest, res_read) = match bit_size {
             Some(bit_size) => {
@@ -817,27 +827,21 @@ mod tests {
         assert_eq!(expected_rest, rest);
     }
 
-    #[rstest(input, output_is_le, expected,
-        case::normal(vec![0xAABB, 0xCCDD], IS_LE, vec![0xBB, 0xAA, 0xDD, 0xCC]),
+    #[rstest(input, endian, expected,
+        case::normal(vec![0xAABB, 0xCCDD], Endian::Little, vec![0xBB, 0xAA, 0xDD, 0xCC]),
     )]
-    fn test_vec_write(input: Vec<u16>, output_is_le: bool, expected: Vec<u8>) {
-        let endian = if output_is_le {
-            Endian::Little
-        } else {
-            Endian::Big
-        };
-
+    fn test_vec_write(input: Vec<u16>, endian: Endian, expected: Vec<u8>) {
         let res_write = input.write(endian).unwrap().into_vec();
         assert_eq!(expected, res_write);
     }
 
-    #[rstest(input, is_le, bit_size, count, expected, expected_rest, expected_write,
-        case::normal_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), IS_LE, Some(16), 2, vec![0xBBAA, 0xDDCC], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
-        case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), !IS_LE, Some(16), 2, vec![0xAABB, 0xCCDD], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+    #[rstest(input, endian, bit_size, count, expected, expected_rest, expected_write,
+        case::normal_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), 2, vec![0xBBAA, 0xDDCC], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), 2, vec![0xAABB, 0xCCDD], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
     )]
     fn test_vec_read_write(
         input: &[u8],
-        is_le: bool,
+        endian: Endian,
         bit_size: Option<usize>,
         count: usize,
         expected: Vec<u16>,
@@ -845,7 +849,6 @@ mod tests {
         expected_write: Vec<u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
-        let endian = if is_le { Endian::Little } else { Endian::Big };
 
         // Unwrap here because all test cases are `Some`.
         let bit_size = bit_size.unwrap();
@@ -864,18 +867,17 @@ mod tests {
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
     }
 
-    #[rstest(input, is_le, expected, expected_rest,
-        case::normal_le([237, 160, 254, 145].as_ref(), IS_LE, Ipv4Addr::new(145, 254, 160, 237), bits![Msb0, u8;]),
-        case::normal_be([145, 254, 160, 237].as_ref(), !IS_LE, Ipv4Addr::new(145, 254, 160, 237), bits![Msb0, u8;]),
+    #[rstest(input, endian, expected, expected_rest,
+        case::normal_le([237, 160, 254, 145].as_ref(), Endian::Little, Ipv4Addr::new(145, 254, 160, 237), bits![Msb0, u8;]),
+        case::normal_be([145, 254, 160, 237].as_ref(), Endian::Big, Ipv4Addr::new(145, 254, 160, 237), bits![Msb0, u8;]),
     )]
     fn test_ipv4(
         input: &[u8],
-        is_le: bool,
+        endian: Endian,
         expected: Ipv4Addr,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
-        let endian = if is_le { Endian::Little } else { Endian::Big };
 
         let (rest, res_read) = Ipv4Addr::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
@@ -885,18 +887,17 @@ mod tests {
         assert_eq!(input.to_vec(), res_write);
     }
 
-    #[rstest(input, is_le, expected, expected_rest,
-        case::normal_le([0xFF, 0x02, 0x0A, 0xC0, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].as_ref(), IS_LE, Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff), bits![Msb0, u8;]),
-        case::normal_be([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xC0, 0x0A, 0x02, 0xFF].as_ref(), !IS_LE, Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff), bits![Msb0, u8;]),
+    #[rstest(input, endian, expected, expected_rest,
+        case::normal_le([0xFF, 0x02, 0x0A, 0xC0, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00].as_ref(), Endian::Little, Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff), bits![Msb0, u8;]),
+        case::normal_be([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xC0, 0x0A, 0x02, 0xFF].as_ref(), Endian::Big, Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff), bits![Msb0, u8;]),
     )]
     fn test_ipv6(
         input: &[u8],
-        is_le: bool,
+        endian: Endian,
         expected: Ipv6Addr,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
-        let endian = if is_le { Endian::Little } else { Endian::Big };
 
         let (rest, res_read) = Ipv6Addr::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);

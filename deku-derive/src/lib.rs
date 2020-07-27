@@ -6,6 +6,7 @@ use crate::macros::{deku_read::emit_deku_read, deku_write::emit_deku_write};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 
+/// A post-processed version of `DekuReceiver`
 #[derive(Debug)]
 struct DekuData {
     vis: syn::Visibility,
@@ -16,16 +17,20 @@ struct DekuData {
     /// Endianness for all fields
     endian: Option<syn::LitStr>,
 
+    /// top-level context, argument list
     ctx: Option<syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>>,
 
+    /// enum only: type of the enum `id`
     id_type: Option<syn::Ident>,
 
+    /// enum only: bit size of the enum `id`
+    /// `id_bytes` is converted to `id_bits` if provided
     id_bits: Option<usize>,
 }
 
 impl DekuData {
-    /// Map `DekuReceiver` to `DekuData`. It will check if attributes valid. Return a compile error
-    /// if failed.
+    /// Map a `DekuReceiver` to `DekuData`
+    /// It will check if attributes are valid, returns a compiler error if not
     fn from_receiver(receiver: DekuReceiver) -> Result<Self, TokenStream> {
         // Validate
         DekuData::validate(&receiver)
@@ -70,9 +75,8 @@ impl DekuData {
 
     fn validate(receiver: &DekuReceiver) -> Result<(), (proc_macro2::Span, &str)> {
         /*
-        FIXME: All `span` call have the same issue with `receiver.bits.span()` except `receiver.ident`
-            see `FieldData::validate`.
-         */
+        FIXME: Issue with `span`, see `FieldData::validate`.
+        */
 
         match receiver.data {
             ast::Data::Struct(_) => {
@@ -91,7 +95,7 @@ impl DekuData {
                 }
             }
             ast::Data::Enum(_) => {
-                // Validate `id_type` is specified.
+                // Validate `id_type` is specified
                 if receiver.id_type.is_none() {
                     return Err((receiver.ident.span(), "`id_type` must be specified on enum"));
                 }
@@ -109,7 +113,7 @@ impl DekuData {
         }
     }
 
-    /// Emit a reader. If any error happened, the result will be a compile error.
+    /// Emit a reader. On error, a compiler error is emitted
     fn emit_reader(&self) -> TokenStream {
         match self.emit_reader_checked() {
             Ok(tks) => tks,
@@ -117,7 +121,7 @@ impl DekuData {
         }
     }
 
-    /// Emit a writer. If any error happened, the result will be a compile error.
+    /// Emit a writer. On error, a compiler error is emitted
     fn emit_writer(&self) -> TokenStream {
         match self.emit_writer_checked() {
             Ok(tks) => tks,
@@ -125,23 +129,24 @@ impl DekuData {
         }
     }
 
-    /// Same as `emit_reader`, but won't auto convert error to compile error.
+    /// Same as `emit_reader`, but won't auto convert error to compile error
     fn emit_reader_checked(&self) -> Result<TokenStream, syn::Error> {
         emit_deku_read(self)
     }
 
-    /// Same as `emit_writer`, but won't auto convert error to compile error.
+    /// Same as `emit_writer`, but won't auto convert error to compile error
     fn emit_writer_checked(&self) -> Result<TokenStream, syn::Error> {
         emit_deku_write(self)
     }
 }
 
+/// A post-processed version of `FieldReceiver`
 #[derive(Debug)]
 struct FieldData {
     ident: Option<syn::Ident>,
     ty: syn::Type,
 
-    /// Endianness for the field
+    /// endianness for the field
     endian: Option<syn::LitStr>,
 
     /// field bit size
@@ -153,7 +158,7 @@ struct FieldData {
     /// apply a function to the field after it's read
     map: Option<TokenStream>,
 
-    /// context passed to the type
+    /// context passed to the field
     ctx: Option<Punctuated<syn::Expr, syn::token::Comma>>,
 
     /// map field when updating struct
@@ -165,10 +170,10 @@ struct FieldData {
     /// custom field writer code
     writer: Option<TokenStream>,
 
-    // skip field reading/writing
+    /// skip field reading/writing
     skip: bool,
 
-    // default value code when used with skip
+    /// default value code when used with skip
     default: Option<TokenStream>,
 }
 
@@ -179,7 +184,7 @@ impl FieldData {
 
         let bits = receiver.bytes.map(|b| b * 8).or(receiver.bits);
 
-        // Default `default` if skip is provided without `default`
+        // Default the `default` attr if skip is provided without `default`
         let default = if receiver.skip && receiver.default.is_none() {
             Some(quote! { Default::default() })
         } else {
@@ -212,12 +217,12 @@ impl FieldData {
         // Validate either `bits` or `bytes` is specified
         if receiver.bits.is_some() && receiver.bytes.is_some() {
             /*
-            FIXME: `receiver.bits.span()` will return `call_site`, that's unexpected. It makes
-               compiler given `#[derive(DekuRead)]`
+            FIXME: `receiver.bits.span()` will return `call_site`, that's unexpected. The compiler
+               error gives:    `#[derive(DekuRead)]`
                                          ^^^^^^^^
                instead of `#[deku(bits = "", bytes = "")]`
                                   ^^^^^^^^^^^^^^^^^^^^^
-               A possible reason might be that the `span` was discorded by `darling`(because inner
+               A possible reason might be that the `span` was discarded by `darling`(because inner
                type don't have a `span`).
                Maybe we should parse it manually.
             */
@@ -250,6 +255,7 @@ impl FieldData {
     }
 }
 
+/// A post-processed version of `VariantReceiver`
 #[derive(Debug)]
 struct VariantData {
     ident: syn::Ident,
@@ -300,9 +306,10 @@ struct DekuReceiver {
     #[darling(default)]
     endian: Option<syn::LitStr>,
 
-    /// struct/enum level ctx like "a: u8, b: u8"
-    /// The type of it should be `syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>`. `darling`
-    /// can't parse it from `Meta`, so we will parse it latter.
+    /// top-level context, argument list
+    // TODO: The type of it should be
+    //       `syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>`
+    //       https://github.com/TedDriggs/darling/pull/98
     #[darling(default)]
     ctx: Option<syn::LitStr>,
 
@@ -310,11 +317,11 @@ struct DekuReceiver {
     #[darling(default)]
     id_type: Option<syn::Ident>,
 
-    // enum only: bit size of the enum `id`
+    /// enum only: bit size of the enum `id`
     #[darling(default)]
     id_bits: Option<usize>,
 
-    // enum only: byte size of the enum `id`
+    /// enum only: byte size of the enum `id`
     #[darling(default)]
     id_bytes: Option<usize>,
 }
@@ -372,7 +379,10 @@ struct DekuFieldReceiver {
     #[darling(default, map = "option_as_tokenstream")]
     map: Option<TokenStream>,
 
-    /// context like `"a, c + 1"`. We will parse it to `Punctuated<Expr, Comma>` latter.
+    /// context passed to the field.
+    /// A comma separated argument list.
+    // TODO: The type of it should be `Punctuated<Expr, Comma>`
+    //       https://github.com/TedDriggs/darling/pull/98
     #[darling(default)]
     ctx: Option<syn::LitStr>,
 
@@ -388,11 +398,11 @@ struct DekuFieldReceiver {
     #[darling(default, map = "option_as_tokenstream")]
     writer: Option<TokenStream>,
 
-    // skip field reading/writing
+    /// skip field reading/writing
     #[darling(default)]
     skip: bool,
 
-    // default value code when used with skip
+    /// default value code when used with skip
     #[darling(default, map = "option_as_tokenstream")]
     default: Option<TokenStream>,
 }

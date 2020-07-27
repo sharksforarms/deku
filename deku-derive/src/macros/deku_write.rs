@@ -19,17 +19,12 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
 
-    // We checked in `emit_deku_write`.
+    // Checked in `emit_deku_write`.
     let fields = input.data.as_ref().take_struct().unwrap();
 
     let field_writes = emit_field_writes(input, &fields, None)?;
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }))?;
 
-    /*
-    NOTE:
-    Because the requirement of former fields accessing, we need to deconstruct first.
-    e.g.: match *self { Self{ ref field_0, ref field_1 } => { /* do something */} }
-     */
     let named = fields.style.is_struct();
 
     let field_idents = fields
@@ -40,7 +35,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let destructured = gen_struct_destruction(named, &input.ident, &field_idents);
 
-    // Only implement `DekuContainerWrite` for types don't need any context.
+    // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() {
         tokens.extend(quote! {
             impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
@@ -129,10 +124,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut variant_updates = vec![];
 
     /*
-    FIXME: The loop body is too big. The usage of `enumerate` looks strange. And two `mut Vec` can be
-        replaced with `map` and `split`.
-     */
-    for (_i, variant) in variants.into_iter().enumerate() {
+        FIXME: The loop body is too big.
+    */
+    for variant in variants {
         // check if the first field has an ident, if not, it's a unnamed struct
         let variant_is_named = variant
             .fields
@@ -194,7 +188,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
     }
 
-    // Only implement `DekuContainerWrite` for types don't need any context.
+    // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() {
         tokens.extend(quote! {
             impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
@@ -214,7 +208,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
 
             impl #imp DekuContainerWrite for #ident #wher {
-
                 fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
                     let mut acc: BitVec<Msb0, u8> = self.to_bitvec()?;
                     Ok(acc.into_vec())
@@ -236,7 +229,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
 
     tokens.extend(quote! {
-
         impl #imp DekuUpdate for #ident #wher {
             fn update(&mut self) -> Result<(), DekuError> {
                 use core::convert::TryInto;

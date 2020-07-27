@@ -87,8 +87,7 @@ fn gen_struct_destruction<I: ToTokens, F: ToTokens>(
 /// Convert a field ident to internal ident:
 /// `a` -> `__deku_a`
 fn gen_internal_field_ident(ident: TokenStream) -> TokenStream {
-    // We can't concat to token, so I use string.
-    // See https://github.com/rust-lang/rust/issues/29599
+    // Concat token: https://github.com/rust-lang/rust/issues/29599
     let span = ident.span();
     let s = ident.to_string();
     let mut name = "__deku_".to_owned();
@@ -102,7 +101,6 @@ fn gen_internal_field_ident(ident: TokenStream) -> TokenStream {
 /// - Named: `{ a: __deku_a }`
 /// - Unnamed: `( __deku_a )`
 fn gen_internal_field_idents(named: bool, idents: Vec<TokenStream>) -> Vec<TokenStream> {
-    // -> `{ a: __a }` or `(__a)`
     if named {
         idents
             .into_iter()
@@ -141,18 +139,16 @@ fn gen_ctx_types_and_arg(
         let pats_types = split_ctx_to_pats_and_types(ctx)?;
 
         if pats_types.len() == 1 {
-            // remove paren for single item
+            // remove parens for single item
             let (pat, ty) = pats_types[0];
             Ok((quote! {#ty}, quote! {#pat:#ty}))
         } else {
             let pats = pats_types.iter().map(|(pat, _)| pat);
             let types = pats_types.iter().map(|(_, ty)| ty);
 
-            // avoid move
-            let types2 = types.clone();
-
             // "a: u8, b: usize" -> (u8, usize)
-            let ctx_types = quote! {(#(#types2),*)};
+            let types_cpy = types.clone();
+            let ctx_types = quote! {(#(#types_cpy),*)};
             // "a: u8, b: usize" -> (a, b): (u8, usize)
             let ctx_arg = quote! {(#(#pats),*): (#(#types),*)};
 
@@ -211,6 +207,6 @@ fn gen_endian_from_str(s: &syn::LitStr) -> syn::Result<TokenStream> {
     match s.value().as_str() {
         "little" => Ok(quote! {deku::ctx::Endian::Little}),
         "big" => Ok(quote! {deku::ctx::Endian::Big}),
-        _ => Err(syn::Error::new(s.span(), "Unknown endian name")),
+        _ => Err(syn::Error::new(s.span(), "Unknown endian")),
     }
 }

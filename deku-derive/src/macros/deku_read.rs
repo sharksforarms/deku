@@ -38,7 +38,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let initialize_struct = super::gen_struct_init(is_named_struct, internal_fields);
 
-    // Only implement `DekuContainerRead` for types don't need any context.
+    // Implement `DekuContainerRead` for types that don't need a context
     if input.ctx.is_none() {
         tokens.extend(quote! {
         impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
@@ -112,10 +112,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut has_default_match = false;
 
     /*
-    FIXME: The loop body is too big. The usage of enumerate looks strange. And `mut Vec` can be
-        replaced with `map`.
-     */
-    for (_i, variant) in variants.into_iter().enumerate() {
+    FIXME: The loop body is too big
+    */
+    for variant in variants {
         // check if the first field has an ident, if not, it's a unnamed struct
         let variant_is_named = variant
             .fields
@@ -186,7 +185,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         };
     };
 
-    // Only implement `DekuContainerRead` for types don't need any context.
+    // Implement `DekuContainerRead` for types that don't need a context
     if input.ctx.is_none() {
         tokens.extend(quote! {
 
@@ -303,11 +302,6 @@ fn emit_field_read(
         }
     };
 
-    // We must pass a ref to context so that it won't be moved when use.
-    // e.g.
-    // let a = read(rest);
-    // let b = read(rest, a); <-- Oops! a have been moved, then we can't use it for constructing.
-    // let c = read(rest, &mut b); <-- `b` will be changed.
     let field_read = quote! {
         let #internal_field_ident = {
             let (new_rest, value) = #field_read_func?;
@@ -321,8 +315,8 @@ fn emit_field_read(
     };
 
     if f.skip {
-        // TODO: Replace `expect` with `syn::Error` or check it in `FieldData::validate`.
-        let default_tok = f.default.as_ref().expect("expected `default` attribute");
+        // checked in `FieldData::from_receiver`, will be Some if `skip` is true
+        let default_tok = f.default.as_ref().unwrap();
 
         let default_read = quote! {
             let #internal_field_ident = {

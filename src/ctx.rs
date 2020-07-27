@@ -1,24 +1,24 @@
-//! This module provided types for context representation could be used in context-sensitive parsing.
+//! This module provides types for context representation could be used in context-sensitive parsing.
 //! See [ctx attribute](../attributes/index.html#ctx) for more information.
 
 use core::ops::{Deref, DerefMut};
 use core::str::FromStr;
 
-/// An endian.
+/// An endian
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Endian {
     Little,
     Big,
 }
 
-/// An error returned when parsing a `Endian` using [`from_str`] fails
+/// Error returned when parsing a `Endian` using [`from_str`]
 ///
 /// [`from_str`]: enum.Endian.html#method.from_str
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseEndianError {}
 
 impl Endian {
-    /// As same as [`Endian::default`], but const.
+    /// [`Endian::default`], but const.
     ///
     /// [`Endian::default`]: #method.default
     pub const fn new() -> Self {
@@ -31,12 +31,12 @@ impl Endian {
         endian
     }
 
-    /// Is it a little endian.
+    /// Is it little endian
     pub fn is_le(&self) -> bool {
         self == &Endian::Little
     }
 
-    /// Is it a big endian.
+    /// Is it big endian
     pub fn is_be(&self) -> bool {
         self == &Endian::Big
     }
@@ -70,7 +70,7 @@ impl FromStr for Endian {
     }
 }
 
-/// The count of a container's elements.
+/// The count of a container's elements
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Count(pub usize);
 
@@ -100,12 +100,12 @@ impl DerefMut for Count {
     }
 }
 
-/// The number of a data's bits.
+/// The number bits in a field
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct BitSize(pub usize);
 
 impl BitSize {
-    /// Convert the size in bytes to the bit size.
+    /// Convert the size in bytes to a bit size.
     /// # Examples
     /// ```rust
     /// # use std::mem::size_of;
@@ -133,7 +133,7 @@ impl BitSize {
         Self::with_byte_size(core::mem::size_of::<T>())
     }
 
-    /// Returns the bit size of the pointed-to value.
+    /// Returns the bit size of the pointed-to value
     pub fn of_val<T: ?Sized>(val: &T) -> Self {
         Self::with_byte_size(core::mem::size_of_val(val))
     }

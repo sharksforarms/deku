@@ -8,10 +8,6 @@ use crate::error::DekuError;
 use bitvec::prelude::*;
 pub use deku_derive::*;
 
-/*
-Note: They are all generic because those type are not really required a context. They forward context
-to inner types.
- */
 macro_rules! ImplDekuSliceTraits {
     ($typ:ty, $count:expr) => {
         impl<Ctx: Copy> DekuRead<Ctx> for [$typ; $count]
@@ -525,46 +521,31 @@ ImplDekuSliceTraits!(f64, 32);
 mod tests {
     use super::*;
 
+    use crate::ctx::Endian;
     use rstest::rstest;
 
-    #[cfg(target_endian = "little")]
-    static IS_LE: bool = true;
-
-    #[cfg(target_endian = "big")]
-    static IS_LE: bool = false;
-
-    #[rstest(input,input_is_le,expected,expected_rest,
-        case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), IS_LE, [0xCCDD, 0xAABB], bits![Msb0, u8;]),
-        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), !IS_LE, [0xDDCC, 0xBBAA], bits![Msb0, u8;]),
+    #[rstest(input,endian,expected,expected_rest,
+        case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, [0xCCDD, 0xAABB], bits![Msb0, u8;]),
+        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, [0xDDCC, 0xBBAA], bits![Msb0, u8;]),
     )]
     fn test_bit_read(
         input: &[u8],
-        input_is_le: bool,
+        endian: Endian,
         expected: [u16; 2],
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
         let bit_slice = input.bits::<Msb0>();
-        let endian = if input_is_le {
-            crate::ctx::Endian::Little
-        } else {
-            crate::ctx::Endian::Big
-        };
 
         let (rest, res_read) = <[u16; 2]>::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
     }
 
-    #[rstest(input,output_is_le,expected,
-        case::normal_le([0xDDCC, 0xBBAA], IS_LE, vec![0xCC, 0xDD, 0xAA, 0xBB]),
-        case::normal_be([0xDDCC, 0xBBAA], !IS_LE, vec![0xDD, 0xCC, 0xBB, 0xAA]),
+    #[rstest(input,endian,expected,
+        case::normal_le([0xDDCC, 0xBBAA], Endian::Little, vec![0xCC, 0xDD, 0xAA, 0xBB]),
+        case::normal_be([0xDDCC, 0xBBAA], Endian::Big, vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
-    fn test_bit_write(input: [u16; 2], output_is_le: bool, expected: Vec<u8>) {
-        let endian = if output_is_le {
-            crate::ctx::Endian::Little
-        } else {
-            crate::ctx::Endian::Big
-        };
+    fn test_bit_write(input: [u16; 2], endian: Endian, expected: Vec<u8>) {
         let res_write = input.write(endian).unwrap().into_vec();
         assert_eq!(expected, res_write);
     }

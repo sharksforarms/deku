@@ -147,7 +147,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .collect::<Vec<_>>();
 
         let variant_id_write = if let Some(variant_id) = &variant.id {
-            let variant_id: TokenStream = variant_id.parse().unwrap();
+            let variant_id: TokenStream = variant_id.clone();
 
             quote! {
                     let mut variant_id: #id_type = #variant_id;

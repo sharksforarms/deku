@@ -17,6 +17,7 @@ A documentation-only module for #[deku] attributes
 | [reader](#readerwriter) | variant, field | Custom reader code
 | [writer](#readerwriter) | variant, field | Custom writer code
 | [id](#id) | variant | variant id value, paired with `id_type`
+| [id_pat](#id_pat) | variant | variant id match pattern, paired with `id_type`
 | [id_type](#id_type) | top-level (enum only) | Set the type of the variant `id`
 | [id_bits](#id_bits) | top-level (enum only) | Set the bit-size of the variant `id`
 | [id_bytes](#id_bytes) | top-level (enum only) | Set the byte-size of the variant `id`
@@ -434,6 +435,40 @@ assert_eq!(
 
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0xFF], variant_bytes);
+```
+
+# id_pat
+
+Specify the identifier in the form of a match pattern for the enum variant.
+
+The enum variant must have space to store the identifier for proper writing.
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(id_type = "u8")]
+enum DekuTest {
+    #[deku(id = "0x01")]
+    VariantA(u8),
+    #[deku(id_pat = "0x02..=0x06")]
+    VariantB {
+        id: u8
+    },
+}
+
+let data: Vec<u8> = vec![0x02];
+
+let (rest, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+
+assert_eq!(
+    DekuTest::VariantB { id: 0x02 },
+    value
+);
+
+let variant_bytes: Vec<u8> = value.try_into().unwrap();
+assert_eq!(data, variant_bytes);
 ```
 
 # id_type

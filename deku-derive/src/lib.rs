@@ -325,7 +325,7 @@ struct DekuReceiver {
     id_bytes: Option<usize>,
 }
 
-/// Parse a TokenStream from an Option<String>
+/// Parse a TokenStream from an Option<LitStr>
 fn option_as_tokenstream(input: Option<syn::LitStr>) -> Option<TokenStream> {
     input.map(|v| {
         v.parse::<TokenStream>()

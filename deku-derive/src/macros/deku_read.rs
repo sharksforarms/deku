@@ -102,6 +102,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
+    let ident_as_string = ident.to_string();
 
     // checked in `DekuData::validate`
     let id_type = input.id_type.as_ref().unwrap();
@@ -172,7 +173,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if !has_default_match {
         variant_matches.push(quote! {
             _ => {
-                return Err(DekuError::Parse(format!("Could not match enum variant id = {:?}", variant_id)));
+                return Err(DekuError::Parse(format!("Could not match enum variant id = {:?} on enum `{}`", variant_id, #ident_as_string)));
             }
         });
     }

@@ -326,7 +326,7 @@ struct DekuReceiver {
 }
 
 /// Parse a TokenStream from an Option<String>
-fn option_as_tokenstream(input: Option<String>) -> Option<TokenStream> {
+fn option_as_tokenstream(input: Option<syn::LitStr>) -> Option<TokenStream> {
     input.map(|v| {
         v.parse::<TokenStream>()
             .expect("could not parse token stream")

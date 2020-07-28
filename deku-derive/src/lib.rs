@@ -173,8 +173,11 @@ struct FieldData {
     /// skip field reading/writing
     skip: bool,
 
-    /// default value code when used with skip
-    default: Option<TokenStream>,
+    /// default value code when used with skip or cond
+    default: TokenStream,
+
+    /// condition to parse field
+    cond: Option<TokenStream>,
 }
 
 impl FieldData {
@@ -184,12 +187,7 @@ impl FieldData {
 
         let bits = receiver.bytes.map(|b| b * 8).or(receiver.bits);
 
-        // Default the `default` attr if skip is provided without `default`
-        let default = if receiver.skip && receiver.default.is_none() {
-            Some(quote! { Default::default() })
-        } else {
-            receiver.default
-        };
+        let default = receiver.default.unwrap_or(quote! { Default::default() });
 
         let ctx = receiver
             .ctx
@@ -210,6 +208,7 @@ impl FieldData {
             writer: receiver.writer,
             skip: receiver.skip,
             default,
+            cond: receiver.cond,
         })
     }
 
@@ -234,12 +233,12 @@ impl FieldData {
             ));
         }
 
-        // Validate `skip` is provided with `default`
-        if receiver.default.is_some() && !receiver.skip {
+        // Validate usage of `default` attribute
+        if receiver.default.is_some() && (!receiver.skip && receiver.cond.is_none()) {
             // FIXME: Same issue with `receiver.bits.span()` see above.
             return Err((
                 receiver.default.span(),
-                "`default` attribute must be used with `skip`",
+                "`default` attribute cannot be used here",
             ));
         }
 
@@ -405,6 +404,10 @@ struct DekuFieldReceiver {
     /// default value code when used with skip
     #[darling(default, map = "option_as_tokenstream")]
     default: Option<TokenStream>,
+
+    /// condition to parse field
+    #[darling(default, map = "option_as_tokenstream")]
+    cond: Option<TokenStream>,
 }
 
 /// Receiver for the variant-level attributes inside a enum

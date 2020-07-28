@@ -137,6 +137,20 @@ pub mod samples {
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    pub struct SkipCondDeku {
+        pub field_a: u8,
+        #[deku(skip, cond = "*field_a == 0x01", default = "5")]
+        pub field_b: u8,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    pub struct CondDeku {
+        pub field_a: u8,
+        #[deku(cond = "*field_a == 0x01")]
+        pub field_b: Option<u8>,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(ctx = "_a: u8, _b: u8")]
     pub struct TopLevelCtxStruct {}
 
@@ -413,6 +427,40 @@ fn test_default_deku() {
             field_a: 0x01,
             field_b: 0x05,
             field_c: 0x02,
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(test_data, ret_write);
+}
+
+#[test]
+fn test_skip_cond_deku() {
+    let test_data: Vec<u8> = [0x01].to_vec();
+
+    let ret_read = samples::SkipCondDeku::try_from(test_data.as_ref()).unwrap();
+    assert_eq!(
+        samples::SkipCondDeku {
+            field_a: 0x01,
+            field_b: 0x05, // default
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(vec![0x01], ret_write);
+}
+
+#[test]
+fn test_cond_deku() {
+    let test_data: Vec<u8> = [0x01, 0x02].to_vec();
+
+    let ret_read = samples::CondDeku::try_from(test_data.as_ref()).unwrap();
+    assert_eq!(
+        samples::CondDeku {
+            field_a: 0x01,
+            field_b: Some(0x02),
         },
         ret_read
     );

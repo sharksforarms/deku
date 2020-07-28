@@ -302,30 +302,58 @@ fn emit_field_read(
         }
     };
 
+    let field_read_normal = quote! {
+        let (new_rest, value) = #field_read_func?;
+        let value: #field_type = #field_map(value)?;
+
+        rest = new_rest;
+
+        value
+    };
+    let field_default = &f.default;
+
+    let field_read_tokens = match (f.skip, &f.cond) {
+        (true, Some(field_cond)) => {
+            // #[deku(skip, cond = "...")] ==> `skip` if `cond`
+            quote! {
+                if (#field_cond) {
+                    println!("defaulitng");
+                    #field_default
+                } else {
+                    println!("reading");
+                    #field_read_normal
+                }
+            }
+        }
+        (true, None) => {
+            // #[deku(skip)] ==> `skip`
+            quote! {
+                #field_default
+            }
+        }
+        (false, Some(field_cond)) => {
+            // #[deku(cond = "...")] ==> read if `cond`
+            quote! {
+                if (#field_cond) {
+                    #field_read_normal
+                } else {
+                    #field_default
+                }
+            }
+        }
+        (false, None) => {
+            quote! {
+                #field_read_normal
+            }
+        }
+    };
+
     let field_read = quote! {
         let #internal_field_ident = {
-            let (new_rest, value) = #field_read_func?;
-            let value: #field_type = #field_map(value)?;
-
-            rest = new_rest;
-
-            value
+            #field_read_tokens
         };
         let #field_ident = &#internal_field_ident;
     };
-
-    if f.skip {
-        // checked in `FieldData::from_receiver`, will be Some if `skip` is true
-        let default_tok = f.default.as_ref().unwrap();
-
-        let default_read = quote! {
-            let #internal_field_ident = {
-                #default_tok
-            };
-            let #field_ident = &#internal_field_ident;
-        };
-        return Ok((field_ident, default_read));
-    }
 
     Ok((field_ident, field_read))
 }

@@ -316,11 +316,6 @@ fn emit_field_write(
     f: &FieldData,
     object_prefix: &Option<TokenStream>,
 ) -> Result<TokenStream, syn::Error> {
-    // skip writing this field
-    if f.skip {
-        return Ok(quote! {});
-    }
-
     let field_endian = f.endian.as_ref().or_else(|| input.endian.as_ref());
 
     let field_writer = &f.writer;
@@ -334,10 +329,37 @@ fn emit_field_write(
         quote! { #object_prefix #field_ident.write((#write_args)) }
     };
 
-    let field_write = quote! {
-
+    let field_write_normal = quote! {
         let bits = #field_write_func ?;
         acc.extend(bits);
+    };
+
+    let field_write_tokens = match (f.skip, &f.cond) {
+        (true, Some(field_cond)) => {
+            // #[deku(skip, cond = "...")] ==> `skip` if `cond`
+            quote! {
+                if (#field_cond) {
+                   // skipping, no write
+                } else {
+                    #field_write_normal
+                }
+            }
+        }
+        (true, None) => {
+            // #[deku(skip)] ==> `skip`
+            quote! {
+                // skipping, no write
+            }
+        }
+        (false, _) => {
+            quote! {
+                #field_write_normal
+            }
+        }
+    };
+
+    let field_write = quote! {
+        #field_write_tokens
     };
 
     Ok(field_write)

@@ -125,7 +125,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .is_some();
 
         let variant_id = if let Some(variant_id) = &variant.id {
-            variant_id.parse().unwrap()
+            variant_id.clone()
+        } else if let Some(variant_id_pat) = &variant.id_pat {
+            variant_id_pat.clone()
         } else {
             // id attribute not provided, treat it as a catch-all default
             has_default_match = true;

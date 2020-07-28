@@ -267,11 +267,17 @@ struct VariantData {
     writer: Option<TokenStream>,
 
     /// variant `id` value
-    id: Option<String>,
+    id: Option<TokenStream>,
+
+    /// variant `id_pat` value
+    id_pat: Option<TokenStream>,
 }
 
 impl VariantData {
     fn from_receiver(receiver: DekuVariantReceiver) -> Result<Self, TokenStream> {
+        VariantData::validate(&receiver)
+            .map_err(|(span, msg)| syn::Error::new(span, msg).to_compile_error())?;
+
         let fields = ast::Fields {
             style: receiver.fields.style,
             fields: receiver
@@ -288,7 +294,22 @@ impl VariantData {
             reader: receiver.reader,
             writer: receiver.writer,
             id: receiver.id,
+            id_pat: receiver.id_pat,
         })
+    }
+
+    fn validate(receiver: &DekuVariantReceiver) -> Result<(), (proc_macro2::Span, &str)> {
+        if receiver.id.is_some() && receiver.id_pat.is_some() {
+            /*
+            FIXME: Issue with `span`, see `FieldData::validate`.
+            */
+            return Err((
+                receiver.id.span(),
+                "conflicting: both \"id\" and \"id_pat\" specified on variant",
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -426,8 +447,12 @@ struct DekuVariantReceiver {
     writer: Option<TokenStream>,
 
     /// variant `id` value
-    #[darling(default)]
-    id: Option<String>,
+    #[darling(default, map = "option_as_tokenstream")]
+    id: Option<TokenStream>,
+
+    /// variant `id_pat` value
+    #[darling(default, map = "option_as_tokenstream")]
+    id_pat: Option<TokenStream>,
 }
 
 #[proc_macro_derive(DekuRead, attributes(deku))]

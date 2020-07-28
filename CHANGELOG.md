@@ -1,6 +1,15 @@
 # Changelog
 
-## [Unreleased]
+## [0.7.0 - Unreleased]
+
+- Added `cond` attribute, which allows for conditional parsing or skipping of a field
+
+Community:
+
+- Added `ctx` attribute which adds the ability to pass context to child parsers from the parent ([@constfold](https://github.com/constfold))
+- Internal refactoring of `endian`, `bits` and `count` attributes, they are now sugar around the `ctx` ([@constfold](https://github.com/constfold))
+- Refactored `test_macros.rs` ([@wcampbell0x2a](https://github.com/wcampbell0x2a))
+
 
 ## [0.6.1] - 2020-07-06
 

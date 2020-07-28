@@ -11,6 +11,7 @@ A documentation-only module for #[deku] attributes
 | [count](#count) | field | Set the field representing the element count of a container
 | [update](#update) | field | Apply code over the field when `.update()` is called
 | [skip](#skip) | field | Skip the reading/writing of a field
+| [cond](#cond) | field | Conditional expression for the field
 | [default](#default) | field | Custom defaulting code when `skip` is true
 | [map](#map) | field | Apply a function over the result of reading
 | [reader](#readerwriter) | variant, field | Custom reader code
@@ -201,9 +202,10 @@ assert_eq!(vec![0x03, 0xAB, 0xCD, 0xFF], value);
 # skip
 
 Skip the reading/writing of a field.
-All other attributes except `default` will be ignored
 
 Defaults value to [default](#default)
+
+**Note**: Can be paired with [cond](#cond) to have conditional skipping
 
 Example:
 
@@ -228,9 +230,46 @@ assert_eq!(
 );
 ```
 
+# cond
+
+Specify a condition to parse or skip a field
+
+**Note**: Can be paired with [default](#default)
+
+Example:
+
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+pub struct DekuTest {
+    field_a: u8,
+    #[deku(cond = "*field_a == 0x01")]
+    field_b: Option<u8>,
+    #[deku(cond = "*field_b == Some(0xFF)", default = "Some(0x05)")]
+    field_c: Option<u8>,
+    #[deku(skip, cond = "*field_a == 0x01", default = "Some(0x06)")]
+    field_d: Option<u8>,
+}
+
+let data: Vec<u8> = vec![0x01, 0x02];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest { field_a: 0x01, field_b: Some(0x02), field_c: Some(0x05), field_d: Some(0x06)},
+    value
+);
+
+assert_eq!(
+    vec![0x01, 0x02, 0x05],
+    value.to_bytes().unwrap(),
+)
+```
+
 # default
 
-Default code tokens used with [skip](#skip)
+Default code tokens used with [skip](#skip) or [cond](#cond)
 
 Defaults to `Default::default()`
 

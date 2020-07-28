@@ -17,13 +17,13 @@ This crate provides bit-level, symmetric, serialization/deserialization implemen
 
 ```toml
 [dependencies]
-deku = "0.6"
+deku = "0.7"
 ```
 
 no_std:
 ```toml
 [dependencies]
-deku = { version = "0.6", default-features = false, features = ["alloc"] }
+deku = { version = "0.7", default-features = false, features = ["alloc"] }
 ```
 
 ## Example

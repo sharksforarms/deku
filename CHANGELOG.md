@@ -1,6 +1,8 @@
 # Changelog
 
-## [0.7.0 - Unreleased]
+## [Unreleased]
+
+## [0.7.0] - 2020-07-28
 
 - Added `cond` attribute which allows for conditional parsing or skipping of a field
 - Added `id_pat` attribute which allows pattern matching for enum variants
@@ -21,6 +23,8 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.6.1...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.7.0...HEAD
+
+[0.7.0]: https://github.com/sharksforarms/deku/compare/deku-v0.6.1...deku-v0.7.0
 
 [0.6.1]: https://github.com/sharksforarms/deku/compare/deku-v0.6.0...deku-v0.6.1

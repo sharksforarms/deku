@@ -1,0 +1,13 @@
+error[E0308]: mismatched types
+ --> $DIR/attribute_token_stream.rs:5:19
+  |
+5 |     #[deku(cond = "0 == true")]
+  |                   ^^^^^^^^^^^ expected integer, found `bool`
+
+error[E0277]: can't compare `{integer}` with `bool`
+ --> $DIR/attribute_token_stream.rs:5:19
+  |
+5 |     #[deku(cond = "0 == true")]
+  |                   ^^^^^^^^^^^ no implementation for `{integer} == bool`
+  |
+  = help: the trait `std::cmp::PartialEq<bool>` is not implemented for `{integer}`

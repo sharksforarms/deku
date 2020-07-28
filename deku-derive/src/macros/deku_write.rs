@@ -42,7 +42,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 type Error = DekuError;
 
                 fn try_from(input: #ident) -> Result<Self, Self::Error> {
-                    input.to_bitvec()
+                    input.to_bits()
                 }
             }
 
@@ -56,11 +56,11 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
             impl #imp DekuContainerWrite for #ident #wher {
                 fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
-                    let mut acc: BitVec<Msb0, u8> = self.to_bitvec()?;
+                    let mut acc: BitVec<Msb0, u8> = self.to_bits()?;
                     Ok(acc.into_vec())
                 }
 
-                fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
+                fn to_bits(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
                     match *self {
                         #destructured => {
                             let mut acc: BitVec<Msb0, u8> = BitVec::new();
@@ -195,7 +195,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 type Error = DekuError;
 
                 fn try_from(input: #ident) -> Result<Self, Self::Error> {
-                    input.to_bitvec()
+                    input.to_bits()
                 }
             }
 
@@ -209,11 +209,11 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
             impl #imp DekuContainerWrite for #ident #wher {
                 fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
-                    let mut acc: BitVec<Msb0, u8> = self.to_bitvec()?;
+                    let mut acc: BitVec<Msb0, u8> = self.to_bits()?;
                     Ok(acc.into_vec())
                 }
 
-                fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
+                fn to_bits(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
                     let mut acc: BitVec<Msb0, u8> = BitVec::new();
 
                     match self {

@@ -252,7 +252,7 @@ pub trait DekuContainerWrite: DekuWrite<()> {
     fn to_bytes(&self) -> Result<Vec<u8>, DekuError>;
 
     /// Write struct/enum to BitVec
-    fn to_bitvec(&self) -> Result<BitVec<Msb0, u8>, DekuError>;
+    fn to_bits(&self) -> Result<BitVec<Msb0, u8>, DekuError>;
 }
 
 /// "Updater" trait: apply mutations to a type

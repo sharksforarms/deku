@@ -297,7 +297,7 @@ fn test_named_struct() {
     case(&hex!("0302AABB"), samples::EnumDeku::VarC{field_a: 0x02, field_b: vec![0xAA, 0xBB]}),
     case(&hex!("0402AABB"), samples::EnumDeku::VarD(0x02, vec![0xAA, 0xBB])),
 
-    #[should_panic(expected = "Parse(\"Could not match enum variant id = 255\")")]
+    #[should_panic(expected = "Parse(\"Could not match enum variant id = 255 on enum `EnumDeku`\")")]
     case(&hex!("FFAB"), samples::EnumDeku::VarA(0xFF))
 )]
 fn test_enum(input: &[u8], expected: samples::EnumDeku) {

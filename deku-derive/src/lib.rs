@@ -104,7 +104,7 @@ impl DekuData {
                 if receiver.id_bits.is_some() && receiver.id_bytes.is_some() {
                     return Err((
                         receiver.id_bits.span(),
-                        "conflicting: both \"id_bits\" and \"id_bytes\" specified on field",
+                        "conflicting: both `id_bits` and `id_bytes` specified on enum",
                     ));
                 }
 
@@ -229,7 +229,7 @@ impl FieldData {
             // FIXME: Ideally we need to use `Span::join` to encompass `bits` and `bytes` together.
             return Err((
                 receiver.bits.span(),
-                "conflicting: both \"bits\" and \"bytes\" specified on field",
+                "conflicting: both `bits` and `bytes` specified on field",
             ));
         }
 
@@ -305,7 +305,7 @@ impl VariantData {
             */
             return Err((
                 receiver.id.span(),
-                "conflicting: both \"id\" and \"id_pat\" specified on variant",
+                "conflicting: both `id` and `id_pat` specified on variant",
             ));
         }
 

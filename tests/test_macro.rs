@@ -196,6 +196,23 @@ pub mod samples {
             c: SubTypeNeedCtx,
         },
     }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    pub struct StructEnumId {
+        pub my_id: u8,
+        pub data: u8,
+        #[deku(ctx = "*my_id")]
+        pub enum_from_id: EnumId,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(ctx = "my_id: u8", id = "my_id")]
+    pub enum EnumId {
+        #[deku(id = "1")]
+        VarA(u8),
+        #[deku(id = "2")]
+        VarB,
+    }
 }
 
 #[test]
@@ -498,6 +515,24 @@ fn test_top_level_ctx_enum() {
 
     let ret_write = ret_read.write((1, 2)).unwrap();
     assert_eq!(ret_write.into_vec(), &test_data[..]);
+}
+
+#[test]
+fn test_struct_enum_ctx_id() {
+    let test_data = [0x01_u8, 0xff, 0xab];
+    let ret_read = samples::StructEnumId::try_from(test_data.as_ref()).unwrap();
+
+    assert_eq!(
+        samples::StructEnumId {
+            my_id: 0x01,
+            data: 0xff,
+            enum_from_id: samples::EnumId::VarA(0xab),
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(ret_write, test_data)
 }
 
 #[test]

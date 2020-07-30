@@ -115,8 +115,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
 
-    // checked in `DekuData::validate`
-    let id_type = input.id_type.as_ref().unwrap();
+    let id = input.id.as_ref();
+    let id_type = input.id_type.as_ref();
 
     let id_args = gen_id_args(input.endian.as_ref(), input.id_bits)?;
 
@@ -146,16 +146,27 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .map(|(i, f)| f.get_ident(i, true))
             .collect::<Vec<_>>();
 
-        let variant_id_write = if let Some(variant_id) = &variant.id {
-            let variant_id: TokenStream = variant_id.clone();
-
+        let variant_id_write = if id.is_some() {
             quote! {
+                // if we don't do this we may get a "unused variable" error if passed via `ctx`
+                // i.e. #[deku(ctx = "my_id: u8", id = "my_id")]
+                let _ = #id;
+            }
+        } else if id_type.is_some() {
+            if let Some(variant_id) = &variant.id {
+                let variant_id: TokenStream = variant_id.clone();
+
+                quote! {
                     let mut variant_id: #id_type = #variant_id;
                     let bits = variant_id.write((#id_args))?;
                     acc.extend(bits);
+                }
+            } else {
+                quote! {}
             }
         } else {
-            quote! {}
+            // either `id` or `id_type` needs to be specified
+            unreachable!();
         };
 
         let variant_match = super::gen_enum_init(variant_is_named, variant_ident, field_idents);

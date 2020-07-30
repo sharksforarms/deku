@@ -16,11 +16,11 @@ A documentation-only module for #[deku] attributes
 | [map](#map) | field | Apply a function over the result of reading
 | [reader](#readerwriter) | variant, field | Custom reader code
 | [writer](#readerwriter) | variant, field | Custom writer code
-| [id](#id) | variant | variant id value, paired with `id_type`
-| [id_pat](#id_pat) | variant | variant id match pattern, paired with `id_type`
-| [id_type](#id_type) | top-level (enum only) | Set the type of the variant `id`
-| [id_bits](#id_bits) | top-level (enum only) | Set the bit-size of the variant `id`
-| [id_bytes](#id_bytes) | top-level (enum only) | Set the byte-size of the variant `id`
+| enum: [id](#id) | top-level, variant | enum or variant id value
+| enum: [id_pat](#id_pat) | variant | variant id match pattern
+| enum: [id_type](#id_type) | top-level | Set the type of the variant `id`
+| enum: [id_bits](#id_bits) | top-level | Set the bit-size of the variant `id`
+| enum: [id_bytes](#id_bytes) | top-level | Set the byte-size of the variant `id`
 | [ctx](#top_level_ctx) | top-level | Context argument list for context sensitive parsing
 | [ctx](#field_level_ctx) | field | Context arguments to pass to field
 
@@ -381,7 +381,54 @@ assert_eq!(data, value);
 
 # id
 
+## id (top-level)
+
+Specify the enum id
+
+This is useful in cases when the enum `id` is already consumed or is given externally
+
+Example:
+
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+pub struct DekuTest {
+    pub my_id: u8,
+    pub data: u8,
+    #[deku(ctx = "*my_id")]
+    pub enum_from_id: MyEnum,
+}
+
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(ctx = "my_id: u8", id = "my_id")]
+pub enum MyEnum {
+    #[deku(id = "1")]
+    VariantA(u8),
+    #[deku(id = "2")]
+    VariantB,
+}
+
+let data: Vec<u8> = vec![0x01_u8, 0xff, 0xab];
+let ret_read = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest {
+        my_id: 0x01,
+        data: 0xff,
+        enum_from_id: MyEnum::VariantA(0xab),
+    },
+    ret_read
+);
+
+let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+assert_eq!(ret_write, data)
+```
+
+## id (variant)
+
 Specify the identifier of the enum variant, must be paired with [id_type](#id_type)
+or [id (top-level)](#id-top-level)
 
 **Note**: If no `id` is specified, the variant is treated as the "catch-all".
 
@@ -473,7 +520,7 @@ assert_eq!(data, variant_bytes);
 
 # id_type
 
-Specify the type of the enum variant id, see [example](#id)
+Specify the type of the enum variant id to consume, see [example](#id-variant)
 
 # id_bits
 

@@ -104,8 +104,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let ident = quote! { #ident #ty };
     let ident_as_string = ident.to_string();
 
-    // checked in `DekuData::validate`
-    let id_type = input.id_type.as_ref().unwrap();
+    let id = input.id.as_ref();
+    let id_type = input.id_type.as_ref();
 
     let id_args = gen_id_args(input.endian.as_ref(), input.id_bits)?;
 
@@ -180,8 +180,21 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
     }
 
+    let variant_id_read = if id.is_some() {
+        quote! {
+            let (new_rest, variant_id) = (rest, #id);
+        }
+    } else if id_type.is_some() {
+        quote! {
+            let (new_rest, variant_id) = #id_type::read(rest, (#id_args))?;
+        }
+    } else {
+        // either `id` or `id_type` needs to be specified
+        unreachable!();
+    };
+
     let variant_read = quote! {
-        let (new_rest, variant_id) = #id_type::read(rest, (#id_args))?;
+        #variant_id_read
 
         let value = match variant_id {
             #(#variant_matches),*

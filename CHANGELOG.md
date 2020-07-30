@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Added `id` attribute to top-level enums which allows to specify the enum id,
+for example a value coming via a context variable
+
 ## [0.7.0] - 2020-07-28
 
 - Added `cond` attribute which allows for conditional parsing or skipping of a field

@@ -1,5 +1,0 @@
-error: conflicting: both "id" and "id_pat" specified on variant
- --> $DIR/variant_id_id_pat_conflict.rs:6:17
-  |
-6 |     #[deku(id = "1", id_pat = "2..=3")] A(u8),
-  |                 ^^^

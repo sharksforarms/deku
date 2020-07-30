@@ -20,6 +20,9 @@ struct DekuData {
     /// top-level context, argument list
     ctx: Option<syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>>,
 
+    /// enum only: `id` value
+    id: Option<TokenStream>,
+
     /// enum only: type of the enum `id`
     id_type: Option<syn::Ident>,
 
@@ -68,6 +71,7 @@ impl DekuData {
             data,
             endian: receiver.endian,
             ctx,
+            id: receiver.id,
             id_type: receiver.id_type,
             id_bits,
         })
@@ -83,6 +87,8 @@ impl DekuData {
                 // Validate id_* attributes are being used on an enum
                 if receiver.id_type.is_some() {
                     Err((receiver.id_type.span(), "`id_type` only supported on enum"))
+                } else if receiver.id.is_some() {
+                    Err((receiver.id.span(), "`id` only supported on enum"))
                 } else if receiver.id_bytes.is_some() {
                     Err((
                         receiver.id_bytes.span(),
@@ -95,9 +101,20 @@ impl DekuData {
                 }
             }
             ast::Data::Enum(_) => {
-                // Validate `id_type` is specified
-                if receiver.id_type.is_none() {
-                    return Err((receiver.ident.span(), "`id_type` must be specified on enum"));
+                // Validate `id_type` or `id` is specified
+                if receiver.id_type.is_none() && receiver.id.is_none() {
+                    return Err((
+                        receiver.ident.span(),
+                        "`id_type` or `id` must be specified on enum",
+                    ));
+                }
+
+                // Validate either `id_type` or `id` is specified
+                if receiver.id_type.is_some() && receiver.id.is_some() {
+                    return Err((
+                        receiver.ident.span(),
+                        "conflicting: both `id_type` and `id` specified on enum",
+                    ));
                 }
 
                 // Validate either `id_bits` or `id_bytes` is specified
@@ -332,6 +349,10 @@ struct DekuReceiver {
     //       https://github.com/TedDriggs/darling/pull/98
     #[darling(default)]
     ctx: Option<syn::LitStr>,
+
+    /// enum only: `id` value
+    #[darling(default, map = "option_as_tokenstream")]
+    id: Option<TokenStream>,
 
     /// enum only: type of the enum `id`
     #[darling(default)]

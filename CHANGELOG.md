@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.7.1] - 2020-07-31
+
 - Added `id` attribute to top-level enums which allows to specify the enum id,
 for example a value coming via a context variable
 
@@ -26,7 +28,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.7.0...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.7.1...HEAD
+
+[0.7.1]: https://github.com/sharksforarms/deku/compare/deku-v0.7.0...deku-v0.7.1
 
 [0.7.0]: https://github.com/sharksforarms/deku/compare/deku-v0.6.1...deku-v0.7.0
 

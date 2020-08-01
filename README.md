@@ -7,11 +7,14 @@
 
 Declarative binary reading and writing
 
-This crate provides bit-level, symmetric, serialization/deserialization implementations for structs and enums
+This crate provides bit-level, symmetric, serialization/deserialization
+implementations for structs and enums
 
 ## Why use Deku
 
-**Productivity**: Deku will generate symmetric reader/writer functions for your type! Avoid the requirement of writing redundant, error-prone parsing and writing code for binary structs or network headers
+**Productivity**: Deku will generate symmetric reader/writer functions for your type!
+Avoid the requirement of writing redundant, error-prone parsing and writing code
+for binary structs or network headers
 
 ## Usage
 
@@ -28,9 +31,10 @@ deku = { version = "0.7", default-features = false, features = ["alloc"] }
 
 ## Example
 
-See [documentation](https://docs.rs/deku) or [examples](https://github.com/sharksforarms/deku/tree/master/examples) folder for more!
+See [documentation](https://docs.rs/deku) or
+[examples](https://github.com/sharksforarms/deku/tree/master/examples) folder for more!
 
-Simple example, let's read big-endian data into a struct, with fields containing different sizes, modify a value, and write it back
+Read big-endian data into a struct, modify a value, and write it
 
 ```rust
 use deku::prelude::*;

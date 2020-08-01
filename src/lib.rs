@@ -1,25 +1,32 @@
 /*!
 # Deku: Declarative binary reading and writing
 
-Deriving a struct or enum with `DekuRead` and `DekuWrite` provides bit-level, symmetric, serialization/deserialization implementations.
+Deriving a struct or enum with `DekuRead` and `DekuWrite` provides bit-level,
+symmetric, serialization/deserialization implementations.
 
-This allows the developer to focus on building and maintaining how the data is represented and manipulated and not on redundant, error-prone, parsing/writing code.
+This allows the developer to focus on building and maintaining how the data is
+represented and manipulated and not on redundant, error-prone, parsing/writing code.
 
-This approach is especially useful when dealing with binary structures such as TLVs or network protocols.
+This approach is especially useful when dealing with binary structures such as
+TLVs or network protocols.
 
-Under the hood, it makes use of the [bitvec](https://crates.io/crates/bitvec) crate as the "Reader" and “Writer”
+Under the hood, it makes use of the [bitvec](https://crates.io/crates/bitvec)
+crate as the "Reader" and “Writer”
 
-For documentation and examples on available `#deku[()]` attributes and features, see [attributes list](attributes/index.html)
+For documentation and examples on available `#deku[()]` attributes and features,
+see [attributes list](attributes/index.html)
 
-For more examples, see the [examples folder](https://github.com/sharksforarms/deku/tree/master/examples)!
+For more examples, see the
+[examples folder](https://github.com/sharksforarms/deku/tree/master/examples)!
 
 ## no_std
 
 For use in `no_std` environments, `alloc` is the single feature which is required on deku.
 
-# Simple Example
+# Example
 
-Let's read big-endian data into a struct, with fields containing different sizes, modify a value, and write it back
+Let's read big-endian data into a struct, with fields containing different sizes,
+modify a value, and write it back
 
 ```rust
 use deku::prelude::*;
@@ -50,7 +57,7 @@ assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 
 # Composing
 
-Deku structs/enums can be composed as long as they implement DekuRead / DekuWrite! (Which DekuRead/DekuWrite implement)
+Deku structs/enums can be composed as long as they implement DekuRead / DekuWrite traits
 
 ```rust
 use deku::prelude::*;
@@ -80,7 +87,8 @@ assert_eq!(data, data_out);
 
 # Vec
 
-Vec<T> can be used in combination with the [count](attributes/index.html#count) attribute (T must implement DekuRead/DekuWrite)
+Vec<T> can be used in combination with the [count](attributes/index.html#count)
+attribute (T must implement DekuRead/DekuWrite)
 
 If the length of Vec changes, the original field specified in `count` will not get updated.
 Calling `.update()` can be used to "update" the field!
@@ -130,11 +138,14 @@ assert_eq!(DekuTest {
 
 # Enums
 
-As enums can have multiple variants, each variant must have a way to match on the incoming data.
+As enums can have multiple variants, each variant must have a way to match on
+the incoming data.
 
-First the "type" is read using the `id_type`, then is matched against the variants given `id`. What happens after is the same as structs!
+First the "type" is read using the `id_type`, then is matched against the
+variants given `id`. What happens after is the same as structs!
 
-This is implemented with the [id](/attributes/index.html#id) and [id_type](attributes/index.html#id_type) attributes.
+This is implemented with the [id](/attributes/index.html#id) and
+[id_type](attributes/index.html#id_type) attributes.
 
 Example:
 
@@ -162,6 +173,8 @@ assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 # Context
 
 Child parsers can get access to the parent's parsed values using the `ctx` attribute
+
+For more information see [ctx attribute](attributes/index.html#ctx)
 
 Example:
 

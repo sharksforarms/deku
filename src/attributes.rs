@@ -21,8 +21,7 @@ A documentation-only module for #[deku] attributes
 | enum: [id_type](#id_type) | top-level | Set the type of the variant `id`
 | enum: [id_bits](#id_bits) | top-level | Set the bit-size of the variant `id`
 | enum: [id_bytes](#id_bytes) | top-level | Set the byte-size of the variant `id`
-| [ctx](#top_level_ctx) | top-level | Context argument list for context sensitive parsing
-| [ctx](#field_level_ctx) | field | Context arguments to pass to field
+| [ctx](#ctx) | top-level, field| Context list for context sensitive parsing
 
 # endian
 
@@ -37,7 +36,7 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(endian = "little")] // top-level, defaults to system endianness
+// #[deku(endian = "little")] // top-level, defaults to system endianness
 struct DekuTest {
     #[deku(endian = "big")] // field-level override
     field_be: u16,
@@ -52,6 +51,48 @@ assert_eq!(
     DekuTest {
        field_be: 0xABCD,
        field_default: 0xCDAB,
+    },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(data, value);
+```
+
+**Note**: The `endian` is passed as a context argument to sub-types
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(ctx = "endian: deku::ctx::Endian")] // context passed from `DekuTest` top-level endian
+struct Child {
+    #[deku(ctx = "endian")]
+    field_a: u16
+}
+
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "little")] // top-level, defaults to system endianness
+struct DekuTest {
+    #[deku(endian = "big")] // field-level override
+    field_be: u16,
+    field_default: u16, // defaults to top-level
+
+    // because a top-level endian is specified, and a endian is not specified,
+    // it is passed as a context
+    field_child: Child,
+}
+
+let data: Vec<u8> = vec![0xAB, 0xCD, 0xAB, 0xCD, 0xEF, 0xBE];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest {
+       field_be: 0xABCD,
+       field_default: 0xCDAB,
+       field_child: Child { field_a: 0xBEEF }
     },
     value
 );
@@ -181,6 +222,7 @@ struct DekuTest {
 
 let data: Vec<u8> = vec![0x02, 0xAB, 0xCD];
 
+// `mut` so it can be updated
 let mut value = DekuTest::try_from(data.as_ref()).unwrap();
 
 assert_eq!(
@@ -188,7 +230,10 @@ assert_eq!(
     value
 );
 
-value.items.push(0xFF); // new item!
+// push a new item to the vec
+value.items.push(0xFF);
+
+// update it, this will update the `count` field
 value.update().unwrap();
 
 assert_eq!(
@@ -373,7 +418,6 @@ assert_eq!(
     DekuTest { field_a: "1".to_string() },
     value
 );
-
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
@@ -582,54 +626,22 @@ let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
-# top_level_ctx
+# ctx
 
-Argument list of external context required for parsing/writing.
+This attribute allows sending and receiving context (variables/values) to sub-parsers/writers
 
-**Value**: The value of a ctx attribute must be a literal string which can be parsed to function
-argument list:
+**Note**: `endian`, `bytes`, `bits`, `count` attributes use `ctx` internally, see examples below
 
-```ignore
-#[deku(ctx = "a: u8, b: String")] // <-- valid
-struct A{}
-#[deku(ctx = "10, true")] // <-- invalid
-struct B{}
-```
+**top-level**: The value of a ctx attribute is a function argument list,
+for example `#[deku(ctx = "a: u8, b: String")]`
 
-Example:
-```rust
-# use deku::prelude::*;
-# use bitvec::slice::AsBits;
-#[derive(DekuRead, DekuWrite)]
-#[deku(ctx = "_a: u8")]
-struct Test {}
+**field-level**: The value of the ctx attribute is a list of expressions,
+for example `#[deku("a, b")]`
 
-let data: Vec<u8> = vec![0xEF, 0xBE, 0xFF];
-
-let (_, value) = Test::read(data.bits(), 10).unwrap();
-// let _ = Test::read(data.bits(), ""); <-- compile error.
-let _ = value.write(10);
-// let _ = Test::write(true); <-- compile error.
-```
-
-# field_level_ctx
-
-Pass context arguments to a type which accepts them.
-
-**Value**: This attribute accepts a literal string which can be parsed to expression list:
-```ignore
-struct Test {
-    p: u8,
-    #[deku(ctx = r#"p, 12, "str", true"#)] // <-- valid
-    a: u8,
-    #[deku(ctx = ",")] // <-- invalid
-    b: u8,
-}
-```
-
-**Visibility**: List of what you can access:
-1. All former fields which have been parsed (you can only access const reference, no move, no mut).
-2. Every context defined through `top-level-ctx` attribute.
+**Visibility**: The following can be accessed:
+1. All former fields which have been parsed (given as a reference).
+2. `endian`, `bytes`, `bits` attributes declared on the top-level
+    - These are prepended to the list of ctx variables
 
 Example
 ```rust
@@ -644,7 +656,7 @@ struct Subtype {
 #[derive(DekuRead, DekuWrite)]
 struct Test {
     a: u8,
-    #[deku(ctx = "*a")] // `a` is a reference
+    #[deku(ctx = "*a")] // pass `a` to `SubType`, `a` is a reference
     sub: Subtype
 }
 
@@ -655,16 +667,39 @@ assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
 
-In addition, currently, `endian`, `bytes` and `bits` are a sugar of `ctx`, examples below are equivalent:
+**Note**: In addition, `endian`, `bytes` and `bits` use the `ctx` concept internally, examples below are equivalent:
+
+Example:
 ```ignore
 struct Type1 {
     #[deku(endian = "big", bits = "1")]
     field: u8,
 }
 
-struct Type2 {
+// is equivalent to
+
+struct Type1 {
     #[deku(ctx = "Endian::Big, BitSize(1)")]
     field: u8,
+}
+```
+
+Example: Adding context
+```ignore
+#[deku(endian = "big")]
+struct Type1 {
+    field_a: u16,
+    #[deku(bits = "5", ctx = "*field_a")]
+    field_b: SubType,
+}
+
+// is equivalent to
+
+struct Type1 {
+    #[deku(ctx = "Endian::Big")]
+    field_a: u16,
+    #[deku(ctx = "Endian::Big, BitSize(5), *field_a")] // endian is prepended
+    field_b: SubType,
 }
 ```
 

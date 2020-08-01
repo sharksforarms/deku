@@ -30,7 +30,7 @@ bitvec = { version = "0.17", default-features = false }
 [dev-dependencies]
 hex-literal = "0.3"
 rstest = "0.6"
-criterion = "=0.3.2
+criterion = "=0.3.2"
 alloc_counter = "0.0.4"
 trybuild = "1.0"
 

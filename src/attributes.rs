@@ -350,7 +350,7 @@ struct DekuTest {
 }
 
 impl DekuTest {
-    // Read and convert to String
+    /// Read and convert to String
     fn read(
         rest: &BitSlice<Msb0, u8>,
     ) -> Result<(&BitSlice<Msb0, u8>, String), DekuError> {
@@ -358,7 +358,7 @@ impl DekuTest {
         Ok((rest, value.to_string()))
     }
 
-    // Parse from String to u8 and write
+    /// Parse from String to u8 and write
     fn write(field_a: &str) -> Result<BitVec<Msb0, u8>, DekuError> {
         let value = field_a.parse::<u8>().unwrap();
         value.write(())

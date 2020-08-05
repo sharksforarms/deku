@@ -765,11 +765,11 @@ mod tests {
         case::normal_bits_12_le([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Little, Some(12), 0b1110_1001_0110, bits![Msb0, u8; 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1]),
         case::normal_bits_12_be([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Big, Some(12), 0b1001_0110_1110, bits![Msb0, u8; 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1]),
         case::normal_bit_6([0b1001_0110].as_ref(), Endian::Little, Some(6), 0b1001_01, bits![Msb0, u8; 1, 0,]),
-        #[should_panic(expected = "Parse(\"not enough data: expected 32 got 0\")")]
+        #[should_panic(expected = "Parse(\"not enough data: expected 32 bits got 0 bits\")")]
         case::not_enough_data([].as_ref(), Endian::Little, Some(32), 0xFF, bits![Msb0, u8;]),
-        #[should_panic(expected = "Parse(\"not enough data: expected 32 got 16\")")]
+        #[should_panic(expected = "Parse(\"not enough data: expected 32 bits got 16 bits\")")]
         case::not_enough_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(32), 0xFF, bits![Msb0, u8;]),
-        #[should_panic(expected = "Parse(\"too much data: container of 32 cannot hold 64\")")]
+        #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 64 bits\")")]
         case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(64), 0xFF, bits![Msb0, u8;]),
     )]
     fn test_bit_read(
@@ -842,13 +842,13 @@ mod tests {
         case::count_1([0xAA, 0xBB].as_ref(), Endian::Little, Some(8), 1, vec![0xAA], bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
         case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Endian::Little, Some(8), 2, vec![0xAA, 0xBB], bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0]),
         case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), Endian::Little, Some(6), 2, vec![0b00_011010, 0b00_011110], bits![Msb0, u8; 1, 0, 0, 1]),
-        #[should_panic(expected = "Parse(\"too much data: container of 8 cannot hold 9\")")]
+        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
         case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
-        #[should_panic(expected = "Parse(\"too much data: container of 8 cannot hold 9\")")]
+        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
         case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
-        #[should_panic(expected = "Parse(\"not enough data: expected 8 got 0\")")]
+        #[should_panic(expected = "Parse(\"not enough data: expected 8 bits got 0 bits\")")]
         case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(8), 2, vec![], bits![Msb0, u8;]),
-        #[should_panic(expected = "Parse(\"too much data: container of 8 cannot hold 9\")")]
+        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
         case::too_much_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
     )]
     fn test_vec_read(

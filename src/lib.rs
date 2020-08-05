@@ -275,14 +275,14 @@ macro_rules! ImplDekuTraits {
 
                 if bit_size > max_type_bits {
                     return Err(DekuError::Parse(format!(
-                        "too much data: container of {} cannot hold {}",
+                        "too much data: container of {} bits cannot hold {} bits",
                         max_type_bits, bit_size
                     )));
                 }
 
                 if input.len() < bit_size {
                     return Err(DekuError::Parse(format!(
-                        "not enough data: expected {} got {}",
+                        "not enough data: expected {} bits got {} bits",
                         bit_size,
                         input.len()
                     )));

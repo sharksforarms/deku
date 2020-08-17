@@ -56,9 +56,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         impl #imp DekuContainerRead for #ident #wher {
             fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
                 use core::convert::TryFrom;
-                let input_bits = input.0.bits::<Msb0>();
+                let input_bits = input.0.view_bits::<Msb0>();
 
-                let mut rest = input.0.bits::<Msb0>();
+                let mut rest = input.0.view_bits::<Msb0>();
                 rest = &rest[input.1..];
 
                 #(#field_reads)*
@@ -220,9 +220,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         impl #imp DekuContainerRead for #ident #wher {
             fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
                 use core::convert::TryFrom;
-                let input_bits = input.0.bits::<Msb0>();
+                let input_bits = input.0.view_bits::<Msb0>();
 
-                let mut rest = input.0.bits::<Msb0>();
+                let mut rest = input.0.view_bits::<Msb0>();
                 rest = &rest[input.1..];
 
                 #variant_read

@@ -209,7 +209,7 @@ assert_eq!(value.sub.b, 0x01 + 0x02)
 extern crate alloc;
 
 #[cfg(feature = "alloc")]
-use alloc::{format, vec::Vec};
+use alloc::{format, string::ToString, vec::Vec};
 
 #[cfg(feature = "std")]
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -416,7 +416,10 @@ macro_rules! ImplDekuTraits {
 
                 let bit_size: usize = bit_size.into();
 
-                let input_bits: BitVec<Msb0, u8> = input.to_vec().into();
+                let input_bits: BitVec<Msb0, u8> = input
+                    .to_vec()
+                    .try_into()
+                    .map_err(|_e| DekuError::Unexpected("Converting Vec to BitVec".to_string()))?;
 
                 let res_bits: BitVec<Msb0, u8> = {
                     if bit_size > input_bits.len() {
@@ -472,7 +475,10 @@ macro_rules! ImplDekuTraits {
                     self.to_be_bytes()
                 };
 
-                Ok(input.to_vec().into())
+                Ok(input
+                    .to_vec()
+                    .try_into()
+                    .map_err(|_e| DekuError::Unexpected("Converting Vec to BitVec".to_string()))?)
             }
         }
 
@@ -499,9 +505,9 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Count, Ctx)> for Vec<T> {
     /// ```rust
     /// # use deku::ctx::*;
     /// # use deku::DekuRead;
-    /// # use bitvec::slice::AsBits;
+    /// # use bitvec::view::BitView;
     /// let input = vec![1u8, 2, 3, 4];
-    /// let (rest, v) = Vec::<u32>::read(input.bits(), (1.into(), Endian::Little)).unwrap();
+    /// let (rest, v) = Vec::<u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
     /// assert!(rest.is_empty());
     /// assert_eq!(v, vec![0x04030201])
     /// ```
@@ -569,9 +575,9 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<Ctx> for Option<T> {
     /// ```rust
     /// # use deku::ctx::*;
     /// # use deku::DekuRead;
-    /// # use bitvec::slice::AsBits;
+    /// # use bitvec::view::BitView;
     /// let input = vec![1u8, 2, 3, 4];
-    /// let (rest, v) = Option::<u32>::read(input.bits(), Endian::Little).unwrap();
+    /// let (rest, v) = Option::<u32>::read(input.view_bits(), Endian::Little).unwrap();
     /// assert!(rest.is_empty());
     /// assert_eq!(v, Some(0x04030201))
     /// ```
@@ -699,7 +705,7 @@ mod tests {
             #[test]
             fn $test_name() {
                 let input = $input;
-                let bit_slice = input.bits::<Msb0>();
+                let bit_slice = input.view_bits::<Msb0>();
                 let (_rest, res_read) = <$typ>::read(bit_slice, ENDIAN).unwrap();
                 assert_eq!($expected, res_read);
 
@@ -792,7 +798,7 @@ mod tests {
         expected: u32,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
-        let bit_slice = input.bits::<Msb0>();
+        let bit_slice = input.view_bits::<Msb0>();
 
         let (rest, res_read) = match bit_size {
             Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
@@ -830,7 +836,7 @@ mod tests {
         expected_rest: &BitSlice<Msb0, u8>,
         expected_write: Vec<u8>,
     ) {
-        let bit_slice = input.bits::<Msb0>();
+        let bit_slice = input.view_bits::<Msb0>();
 
         let (rest, res_read) = match bit_size {
             Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
@@ -872,7 +878,7 @@ mod tests {
         expected: Vec<u8>,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
-        let bit_slice = input.bits::<Msb0>();
+        let bit_slice = input.view_bits::<Msb0>();
 
         let (rest, res_read) = match bit_size {
             Some(bit_size) => {
@@ -906,7 +912,7 @@ mod tests {
         expected_rest: &BitSlice<Msb0, u8>,
         expected_write: Vec<u8>,
     ) {
-        let bit_slice = input.bits::<Msb0>();
+        let bit_slice = input.view_bits::<Msb0>();
 
         // Unwrap here because all test cases are `Some`.
         let bit_size = bit_size.unwrap();
@@ -935,7 +941,7 @@ mod tests {
         expected: Ipv4Addr,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
-        let bit_slice = input.bits::<Msb0>();
+        let bit_slice = input.view_bits::<Msb0>();
 
         let (rest, res_read) = Ipv4Addr::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
@@ -955,7 +961,7 @@ mod tests {
         expected: Ipv6Addr,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
-        let bit_slice = input.bits::<Msb0>();
+        let bit_slice = input.view_bits::<Msb0>();
 
         let (rest, res_read) = Ipv6Addr::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);

@@ -534,7 +534,7 @@ mod tests {
         expected: [u16; 2],
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
-        let bit_slice = input.bits::<Msb0>();
+        let bit_slice = input.view_bits::<Msb0>();
 
         let (rest, res_read) = <[u16; 2]>::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);

@@ -8,6 +8,8 @@ pub enum DekuError {
     Parse(String),
     /// Invalid parameter
     InvalidParam(String),
+    /// Unexpected error
+    Unexpected(String),
 }
 
 impl From<core::num::TryFromIntError> for DekuError {
@@ -33,6 +35,7 @@ impl core::fmt::Display for DekuError {
         match *self {
             DekuError::Parse(ref err) => write!(f, "Parse error: {}", err),
             DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {}", err),
+            DekuError::Unexpected(ref err) => write!(f, "Unexpected error: {}", err),
         }
     }
 }

@@ -509,7 +509,7 @@ fn test_ctx_struct() {
 #[test]
 fn test_top_level_ctx_enum() {
     let test_data = [0x01_u8, 0x03];
-    let (rest, ret_read) = samples::TopLevelCtxEnum::read(test_data.bits(), (1, 2)).unwrap();
+    let (rest, ret_read) = samples::TopLevelCtxEnum::read(test_data.view_bits(), (1, 2)).unwrap();
     assert!(rest.is_empty());
     assert_eq!(ret_read, samples::TopLevelCtxEnum::VariantA(0x06));
 

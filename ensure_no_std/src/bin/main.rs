@@ -16,7 +16,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 // raise a `trap` the WebAssembly execution if we panic at runtime.
 #[panic_handler]
 #[no_mangle]
-pub fn panic(_info: &::core::panic::PanicInfo) -> ! {
+unsafe fn panic(_info: &::core::panic::PanicInfo) -> ! {
     ::core::intrinsics::abort();
 }
 
@@ -24,14 +24,14 @@ pub fn panic(_info: &::core::panic::PanicInfo) -> ! {
 // the execution with trap.
 #[alloc_error_handler]
 #[no_mangle]
-pub extern "C" fn oom(_: ::core::alloc::Layout) -> ! {
+unsafe fn oom(_: ::core::alloc::Layout) -> ! {
     ::core::intrinsics::abort();
 }
 
 // Needed for non-wasm targets.
 #[lang = "eh_personality"]
 #[no_mangle]
-pub extern "C" fn eh_personality() {}
+extern fn eh_personality() {}
 
 use alloc::{format, vec, vec::Vec};
 use deku::prelude::*;

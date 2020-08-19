@@ -1,23 +1,54 @@
-error: Unknown endian
- --> $DIR/unknown_endian.rs:4:17
+error[E0425]: cannot find value `variable` in this scope
+ --> $DIR/unknown_endian.rs:3:10
   |
-4 | #[deku(endian = "1")]
-  |                 ^^^
+3 | #[derive(DekuRead)]
+  |          ^^^^^^^^ not found in this scope
+  |
+  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: Unknown endian
-  --> $DIR/unknown_endian.rs:11:21
-   |
-11 |     #[deku(endian = "2")]
-   |                     ^^^
+error[E0425]: cannot find value `variable` in this scope
+ --> $DIR/unknown_endian.rs:9:10
+  |
+9 | #[derive(DekuRead)]
+  |          ^^^^^^^^ not found in this scope
+  |
+  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: Unknown endian
-  --> $DIR/unknown_endian.rs:16:33
+error[E0425]: cannot find value `variable` in this scope
+  --> $DIR/unknown_endian.rs:15:10
    |
-16 | #[deku(id_type = "u8", endian = "3")]
-   |                                 ^^^
+15 | #[derive(DekuRead)]
+   |          ^^^^^^^^ not found in this scope
+   |
+   = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: Unknown endian
-  --> $DIR/unknown_endian.rs:23:23
+error[E0425]: cannot find value `variable` in this scope
+  --> $DIR/unknown_endian.rs:19:10
    |
-23 |     A(#[deku(endian = "4")] u8),
-   |                       ^^^
+19 | #[derive(DekuRead)]
+   |          ^^^^^^^^ not found in this scope
+   |
+   = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unreachable statement
+  --> $DIR/unknown_endian.rs:15:10
+   |
+15 | #[derive(DekuRead)]
+   |          ^^^^^^^^
+   |          |
+   |          unreachable statement
+   |          any code following this `match` expression is unreachable, as all arms diverge
+   |
+   = note: `#[warn(unreachable_code)]` on by default
+   = note: this warning originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unreachable expression
+  --> $DIR/unknown_endian.rs:15:10
+   |
+15 | #[derive(DekuRead)]
+   |          ^^^^^^^^
+   |          |
+   |          unreachable expression
+   |          any code following this `match` expression is unreachable, as all arms diverge
+   |
+   = note: this warning originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)

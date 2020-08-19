@@ -1,26 +1,26 @@
 use deku::prelude::*;
 
 #[derive(DekuRead)]
-#[deku(endian = "1")]
+#[deku(endian = "variable")]
 struct Test1 {
     a: u8,
 }
 
 #[derive(DekuRead)]
 struct Test2 {
-    #[deku(endian = "2")]
+    #[deku(endian = "variable")]
     a: u8,
 }
 
 #[derive(DekuRead)]
-#[deku(id_type = "u8", endian = "3")]
+#[deku(id_type = "u8", endian = "variable")]
 enum Test3 {}
 
 #[derive(DekuRead)]
 #[deku(id_type = "u8")]
 enum Test4 {
     #[deku(id = "1")]
-    A(#[deku(endian = "4")] u8),
+    A(#[deku(endian = "variable")] u8),
 }
 
 fn main() {}

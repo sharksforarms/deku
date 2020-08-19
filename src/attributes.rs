@@ -27,7 +27,7 @@ A documentation-only module for #[deku] attributes
 
 Set to read/write bytes in a specific byte order.
 
-Values: `big` or `little`
+Values: `big`, `little` or an expression which returns a [`Endian`](../ctx/enum.Endian.html)
 
 Precedence: field > top-level > system endianness (default)
 
@@ -66,9 +66,8 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(ctx = "endian: deku::ctx::Endian")] // context passed from `DekuTest` top-level endian
+#[deku(endian = "endian", ctx = "endian: deku::ctx::Endian")] // context passed from `DekuTest` top-level endian
 struct Child {
-    #[deku(ctx = "endian")]
     field_a: u16
 }
 
@@ -79,7 +78,7 @@ struct DekuTest {
     field_be: u16,
     field_default: u16, // defaults to top-level
 
-    // because a top-level endian is specified, and a endian is not specified,
+    // because a top-level endian is specified,
     // it is passed as a context
     field_child: Child,
 }

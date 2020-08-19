@@ -207,6 +207,10 @@ fn gen_endian_from_str(s: &syn::LitStr) -> syn::Result<TokenStream> {
     match s.value().as_str() {
         "little" => Ok(quote! {deku::ctx::Endian::Little}),
         "big" => Ok(quote! {deku::ctx::Endian::Big}),
-        _ => Err(syn::Error::new(s.span(), "Unknown endian")),
+        _ => {
+            // treat as variable, possibly from `ctx`
+            let v: TokenStream = s.value().parse()?;
+            Ok(quote! {#v})
+        }
     }
 }

@@ -117,6 +117,20 @@ impl DekuData {
                     ));
                 }
 
+                // Validate `id_*` used correctly
+                if receiver.id.is_some() && receiver.id_bits.is_some() {
+                    return Err((
+                        receiver.ident.span(),
+                        "error: cannot use `id_bits` with `id`",
+                    ));
+                }
+                if receiver.id.is_some() && receiver.id_bytes.is_some() {
+                    return Err((
+                        receiver.ident.span(),
+                        "error: cannot use `id_bytes` with `id`",
+                    ));
+                }
+
                 // Validate either `id_bits` or `id_bytes` is specified
                 if receiver.id_bits.is_some() && receiver.id_bytes.is_some() {
                     return Err((

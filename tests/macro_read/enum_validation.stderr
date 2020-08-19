@@ -43,3 +43,15 @@ error: `id` only supported on enum
    |
 42 | #[deku(id = "test")]
    |             ^^^^^^
+
+error: error: cannot use `id_bits` with `id`
+  --> $DIR/enum_validation.rs:50:6
+   |
+50 | enum Test8 {
+   |      ^^^^^
+
+error: error: cannot use `id_bytes` with `id`
+  --> $DIR/enum_validation.rs:57:6
+   |
+57 | enum Test9 {
+   |      ^^^^^

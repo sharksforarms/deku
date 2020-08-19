@@ -44,4 +44,18 @@ struct Test7 {
     a: u8
 }
 
+// test `id_bits` cannot be used with `id`
+#[derive(DekuRead)]
+#[deku(id = "test", id_bits = "4")]
+enum Test8 {
+    A
+}
+
+// test `id_bytes` cannot be used with `id`
+#[derive(DekuRead)]
+#[deku(id = "test", id_bytes = "4")]
+enum Test9 {
+    A
+}
+
 fn main() {}

@@ -20,6 +20,9 @@ struct DekuData {
     /// top-level context, argument list
     ctx: Option<syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>>,
 
+    /// default context passed to the field
+    ctx_default: Option<Punctuated<syn::Expr, syn::token::Comma>>,
+
     /// enum only: `id` value
     id: Option<TokenStream>,
 
@@ -62,6 +65,12 @@ impl DekuData {
             .transpose()
             .map_err(|e| e.to_compile_error())?;
 
+        let ctx_default = receiver
+            .ctx_default
+            .map(|s| s.parse_with(Punctuated::parse_terminated))
+            .transpose()
+            .map_err(|e| e.to_compile_error())?;
+
         let id_bits = receiver.id_bytes.map(|b| b * 8).or(receiver.id_bits);
 
         Ok(Self {
@@ -71,6 +80,7 @@ impl DekuData {
             data,
             endian: receiver.endian,
             ctx,
+            ctx_default,
             id: receiver.id,
             id_type: receiver.id_type,
             id_bits,
@@ -81,6 +91,14 @@ impl DekuData {
         /*
         FIXME: Issue with `span`, see `FieldData::validate`.
         */
+
+        // Validate `ctx_default`
+        if receiver.ctx_default.is_some() && receiver.ctx.is_none() {
+            return Err((
+                receiver.ctx_default.span(),
+                "`ctx_default` must be used with `ctx`",
+            ));
+        }
 
         match receiver.data {
             ast::Data::Struct(_) => {
@@ -363,6 +381,13 @@ struct DekuReceiver {
     //       https://github.com/TedDriggs/darling/pull/98
     #[darling(default)]
     ctx: Option<syn::LitStr>,
+
+    /// default context passed to the field
+    // TODO: The type of it should be
+    //       `syn::punctuated::Punctuated<syn::Expr, syn::token::Comma>`
+    //       https://github.com/TedDriggs/darling/pull/98
+    #[darling(default)]
+    ctx_default: Option<syn::LitStr>,
 
     /// enum only: `id` value
     #[darling(default, map = "option_as_tokenstream")]

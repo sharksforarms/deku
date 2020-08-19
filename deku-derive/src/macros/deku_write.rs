@@ -1,4 +1,6 @@
-use crate::macros::{gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_struct_destruction};
+use crate::macros::{
+    gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_struct_destruction, wrap_default_ctx,
+};
 use crate::{DekuData, FieldData};
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
@@ -36,7 +38,22 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let destructured = gen_struct_destruction(named, &input.ident, &field_idents);
 
     // Implement `DekuContainerWrite` for types that don't need a context
-    if input.ctx.is_none() {
+    if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
+        let to_bits_body = wrap_default_ctx(
+            quote! {
+                match *self {
+                    #destructured => {
+                        let mut acc: BitVec<Msb0, u8> = BitVec::new();
+                        #(#field_writes)*
+
+                        Ok(acc)
+                    }
+                }
+            },
+            &input.ctx,
+            &input.ctx_default,
+        );
+
         tokens.extend(quote! {
             impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
                 type Error = DekuError;
@@ -60,21 +77,26 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     Ok(acc.into_vec())
                 }
 
+                #[allow(unused_variables)]
                 fn to_bits(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
-                    match *self {
-                        #destructured => {
-                            let mut acc: BitVec<Msb0, u8> = BitVec::new();
-                            #(#field_writes)*
-
-                            Ok(acc)
-                        }
-                    }
+                    #to_bits_body
                 }
             }
-        })
+        });
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
+
+    let write_body = quote! {
+        match *self {
+            #destructured => {
+                let mut acc: BitVec<Msb0, u8> = BitVec::new();
+                #(#field_writes)*
+
+                Ok(acc)
+            }
+        }
+    };
 
     tokens.extend(quote! {
         impl #imp DekuUpdate for #ident #wher {
@@ -87,18 +109,25 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
 
         impl #imp DekuWrite<#ctx_types> for #ident #wher {
+            #[allow(unused_variables)]
             fn write(&self, #ctx_arg) -> Result<BitVec<Msb0, u8>, DekuError> {
-                match *self {
-                    #destructured => {
-                        let mut acc: BitVec<Msb0, u8> = BitVec::new();
-                        #(#field_writes)*
-
-                        Ok(acc)
-                    }
-                }
+                #write_body
             }
         }
     });
+
+    if input.ctx.is_some() && input.ctx_default.is_some() {
+        let write_body = wrap_default_ctx(write_body, &input.ctx, &input.ctx_default);
+
+        tokens.extend(quote! {
+            impl #imp DekuWrite for #ident #wher {
+                #[allow(unused_variables)]
+                fn write(&self, _: ()) -> Result<BitVec<Msb0, u8>, DekuError> {
+                    #write_body
+                }
+            }
+        });
+    }
 
     // println!("{}", tokens.to_string());
     Ok(tokens)
@@ -200,7 +229,21 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     }
 
     // Implement `DekuContainerWrite` for types that don't need a context
-    if input.ctx.is_none() {
+    if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
+        let to_bits_body = wrap_default_ctx(
+            quote! {
+                let mut acc: BitVec<Msb0, u8> = BitVec::new();
+
+                match self {
+                    #(#variant_writes),*
+                }
+
+                Ok(acc)
+            },
+            &input.ctx,
+            &input.ctx_default,
+        );
+
         tokens.extend(quote! {
             impl #imp core::convert::TryFrom<#ident> for BitVec<Msb0, u8> #wher {
                 type Error = DekuError;
@@ -224,14 +267,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     Ok(acc.into_vec())
                 }
 
+                #[allow(unused_variables)]
                 fn to_bits(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
-                    let mut acc: BitVec<Msb0, u8> = BitVec::new();
-
-                    match self {
-                        #(#variant_writes),*
-                    }
-
-                    Ok(acc)
+                    #to_bits_body
                 }
             }
         })
@@ -239,6 +277,15 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
 
+    let write_body = quote! {
+        let mut acc: BitVec<Msb0, u8> = BitVec::new();
+
+        match self {
+            #(#variant_writes),*
+        }
+
+        Ok(acc)
+    };
     tokens.extend(quote! {
         impl #imp DekuUpdate for #ident #wher {
             fn update(&mut self) -> Result<(), DekuError> {
@@ -253,17 +300,25 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
 
         impl #imp DekuWrite<#ctx_types> for #ident #wher {
+            #[allow(unused_variables)]
             fn write(&self, #ctx_arg) -> Result<BitVec<Msb0, u8>, DekuError> {
-                let mut acc: BitVec<Msb0, u8> = BitVec::new();
-
-                match self {
-                    #(#variant_writes),*
-                }
-
-                Ok(acc)
+                #write_body
             }
         }
     });
+
+    if input.ctx.is_some() && input.ctx_default.is_some() {
+        let write_body = wrap_default_ctx(write_body, &input.ctx, &input.ctx_default);
+
+        tokens.extend(quote! {
+            impl #imp DekuWrite for #ident #wher {
+                #[allow(unused_variables)]
+                fn write(&self, _: ()) -> Result<BitVec<Msb0, u8>, DekuError> {
+                    #write_body
+                }
+            }
+        });
+    }
 
     // println!("{}", tokens.to_string());
     Ok(tokens)

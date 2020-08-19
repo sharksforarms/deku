@@ -165,6 +165,15 @@ pub mod samples {
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(ctx = "a: u8, b: u8", ctx_default = "1, 2")]
+    pub struct TopLevelCtxStructDefault {
+        #[deku(cond = "a == 1")]
+        pub a: Option<u8>,
+        #[deku(cond = "b == 1")]
+        pub b: Option<u8>,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     pub struct FieldLevelCtxStruct {
         pub a: u8,
         pub b: u8,
@@ -175,6 +184,19 @@ pub mod samples {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(id_type = "u8", ctx = "a: u8, b: u8")]
     pub enum TopLevelCtxEnum {
+        #[deku(id = "1")]
+        VariantA(
+            #[deku(
+                reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})(rest)",
+                writer = "(|c|{u8::write(&(c-a-b), ())})(field_0)"
+            )]
+            u8,
+        ),
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(id_type = "u8", ctx = "a: u8, b: u8", ctx_default = "1,2")]
+    pub enum TopLevelCtxEnumDefault {
         #[deku(id = "1")]
         VariantA(
             #[deku(
@@ -518,6 +540,26 @@ fn test_top_level_ctx_enum() {
 }
 
 #[test]
+fn test_top_level_ctx_enum_default() {
+    let expected = samples::TopLevelCtxEnumDefault::VariantA(0x06);
+    let test_data = [0x01_u8, 0x03];
+
+    // Use default
+    let ret_read = samples::TopLevelCtxEnumDefault::try_from(test_data.as_ref()).unwrap();
+    assert_eq!(expected, ret_read);
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(test_data.to_vec(), ret_write);
+
+    // Use context
+    let (rest, ret_read) =
+        samples::TopLevelCtxEnumDefault::read(test_data.view_bits(), (1, 2)).unwrap();
+    assert!(rest.is_empty());
+    assert_eq!(ret_read, samples::TopLevelCtxEnumDefault::VariantA(0x06));
+    let ret_write = ret_read.write((1, 2)).unwrap();
+    assert_eq!(test_data.to_vec(), ret_write.into_vec());
+}
+
+#[test]
 fn test_struct_enum_ctx_id() {
     let test_data = [0x01_u8, 0xff, 0xab];
     let ret_read = samples::StructEnumId::try_from(test_data.as_ref()).unwrap();
@@ -533,6 +575,30 @@ fn test_struct_enum_ctx_id() {
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(ret_write, test_data)
+}
+
+#[test]
+fn test_ctx_default_struct() {
+    let expected = samples::TopLevelCtxStructDefault {
+        a: Some(0xff),
+        b: None,
+    };
+
+    let test_data = [0xffu8];
+
+    // Use default
+    let ret_read = samples::TopLevelCtxStructDefault::try_from(test_data.as_ref()).unwrap();
+    assert_eq!(expected, ret_read);
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(ret_write, test_data);
+
+    // Use context
+    let (rest, ret_read) =
+        samples::TopLevelCtxStructDefault::read(test_data.view_bits(), (1, 2)).unwrap();
+    assert!(rest.is_empty());
+    assert_eq!(expected, ret_read);
+    let ret_write = ret_read.write((1, 2)).unwrap();
+    assert_eq!(test_data.to_vec(), ret_write.into_vec());
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use crate::macros::{
     gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_internal_field_ident,
-    gen_internal_field_idents,
+    gen_internal_field_idents, wrap_default_ctx,
 };
 use crate::{DekuData, FieldData};
 use darling::ast::{Data, Fields};
@@ -39,7 +39,27 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let initialize_struct = super::gen_struct_init(is_named_struct, internal_fields);
 
     // Implement `DekuContainerRead` for types that don't need a context
-    if input.ctx.is_none() {
+    if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
+        let from_bytes_body = wrap_default_ctx(
+            quote! {
+                use core::convert::TryFrom;
+                let input_bits = input.0.view_bits::<Msb0>();
+
+                let mut rest = input.0.view_bits::<Msb0>();
+                rest = &rest[input.1..];
+
+                #(#field_reads)*
+                let value = #initialize_struct;
+
+                let pad = 8 * ((rest.len() + 7) / 8) - rest.len();
+                let read_idx = input_bits.len() - (rest.len() + pad);
+
+                Ok(((input_bits[read_idx..].as_slice(), pad), value))
+            },
+            &input.ctx,
+            &input.ctx_default,
+        );
+
         tokens.extend(quote! {
         impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
             type Error = DekuError;
@@ -55,38 +75,43 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         impl #imp DekuContainerRead for #ident #wher {
             fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
-                use core::convert::TryFrom;
-                let input_bits = input.0.view_bits::<Msb0>();
-
-                let mut rest = input.0.view_bits::<Msb0>();
-                rest = &rest[input.1..];
-
-                #(#field_reads)*
-                let value = #initialize_struct;
-
-                let pad = 8 * ((rest.len() + 7) / 8) - rest.len();
-                let read_idx = input_bits.len() - (rest.len() + pad);
-
-                Ok(((&input_bits[read_idx..].as_slice(), pad), value))
+                #from_bytes_body
             }
-        }})
+        }
+        })
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
 
+    let read_body = quote! {
+        use core::convert::TryFrom;
+        let mut rest = input;
+
+        #(#field_reads)*
+        let value = #initialize_struct;
+
+        Ok((rest, value))
+    };
+
     tokens.extend(quote! {
         impl #imp DekuRead<#ctx_types> for #ident #wher {
             fn read<'a>(input: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
-                use core::convert::TryFrom;
-                let mut rest = input;
-
-                #(#field_reads)*
-                let value = #initialize_struct;
-
-                Ok((rest, value))
+                #read_body
             }
         }
     });
+
+    if input.ctx.is_some() && input.ctx_default.is_some() {
+        let read_body = wrap_default_ctx(read_body, &input.ctx, &input.ctx_default);
+
+        tokens.extend(quote! {
+            impl #imp DekuRead for #ident #wher {
+                fn read<'a>(input: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+                    #read_body
+                }
+            }
+        });
+    }
 
     // println!("{}", tokens.to_string());
     Ok(tokens)
@@ -202,9 +227,27 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     };
 
     // Implement `DekuContainerRead` for types that don't need a context
-    if input.ctx.is_none() {
-        tokens.extend(quote! {
+    if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
+        let from_bytes_body = wrap_default_ctx(
+            quote! {
+                use core::convert::TryFrom;
+                let input_bits = input.0.bits::<Msb0>();
 
+                let mut rest = input.0.bits::<Msb0>();
+                rest = &rest[input.1..];
+
+                #variant_read
+
+                let pad = 8 * ((rest.len() + 7) / 8) - rest.len();
+                let read_idx = input_bits.len() - (rest.len() + pad);
+
+                Ok(((input_bits[read_idx..].as_slice(), pad), value))
+            },
+            &input.ctx,
+            &input.ctx_default,
+        );
+
+        tokens.extend(quote! {
         impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
             type Error = DekuError;
 
@@ -219,18 +262,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         impl #imp DekuContainerRead for #ident #wher {
             fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
-                use core::convert::TryFrom;
-                let input_bits = input.0.view_bits::<Msb0>();
-
-                let mut rest = input.0.view_bits::<Msb0>();
-                rest = &rest[input.1..];
-
-                #variant_read
-
-                let pad = 8 * ((rest.len() + 7) / 8) - rest.len();
-                let read_idx = input_bits.len() - (rest.len() + pad);
-
-                Ok(((&input_bits[read_idx..].as_slice(), pad), value))
+                #from_bytes_body
             }
         }
         })
@@ -238,18 +270,34 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
 
+    let read_body = quote! {
+        use core::convert::TryFrom;
+        let mut rest = input;
+
+        #variant_read
+
+        Ok((rest, value))
+    };
+
     tokens.extend(quote! {
         impl #imp DekuRead<#ctx_types> for #ident #wher {
             fn read<'a>(input: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
-                use core::convert::TryFrom;
-                let mut rest = input;
-
-                #variant_read
-
-                Ok((rest, value))
+                #read_body
             }
         }
     });
+
+    if input.ctx.is_some() && input.ctx_default.is_some() {
+        let read_body = wrap_default_ctx(read_body, &input.ctx, &input.ctx_default);
+
+        tokens.extend(quote! {
+            impl #imp DekuRead for #ident #wher {
+                fn read<'a>(input: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+                    #read_body
+                }
+            }
+        });
+    }
 
     // println!("{}", tokens.to_string());
     Ok(tokens)

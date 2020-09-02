@@ -132,7 +132,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let id = input.id.as_ref();
     let id_type = input.id_type.as_ref();
 
-    let id_args = gen_id_args(input.endian.as_ref(), input.id_bits)?;
+    let id_args = gen_id_args(input.endian.as_ref(), input.bits)?;
 
     let mut variant_matches = vec![];
     let mut has_default_match = false;

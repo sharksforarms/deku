@@ -1,4 +1,4 @@
-error: conflicting: both `id_bits` and `id_bytes` specified on enum
+error: conflicting: both `bits` and `id_bytes` specified on enum
  --> $DIR/bits_bytes_conflict.rs:3:10
   |
 3 | #[derive(DekuRead)]

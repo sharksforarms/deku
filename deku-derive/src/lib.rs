@@ -137,10 +137,7 @@ impl DekuData {
 
                 // Validate `id_*` used correctly
                 if receiver.id.is_some() && receiver.bits.is_some() {
-                    return Err((
-                        receiver.ident.span(),
-                        "error: cannot use `bits` with `id`",
-                    ));
+                    return Err((receiver.ident.span(), "error: cannot use `bits` with `id`"));
                 }
                 if receiver.id.is_some() && receiver.id_bytes.is_some() {
                     return Err((

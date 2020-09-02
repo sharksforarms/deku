@@ -141,11 +141,11 @@ assert_eq!(DekuTest {
 As enums can have multiple variants, each variant must have a way to match on
 the incoming data.
 
-First the "type" is read using the `id_type`, then is matched against the
+First the "type" is read using the `type`, then is matched against the
 variants given `id`. What happens after is the same as structs!
 
 This is implemented with the [id](/attributes/index.html#id) and
-[id_type](attributes/index.html#id_type) attributes.
+[type](attributes/index.html#type) attributes.
 
 Example:
 
@@ -153,7 +153,7 @@ Example:
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u8")]
+#[deku(type = "u8")]
 enum DekuTest {
     #[deku(id = "0x01")]
     VariantA,

@@ -20,7 +20,7 @@ A documentation-only module for #[deku] attributes
 | [ctx_default](#ctx_default) | top-level, field| Default context values
 | enum: [id](#id) | top-level, variant | enum or variant id value
 | enum: [id_pat](#id_pat) | variant | variant id match pattern
-| enum: [id_type](#id_type) | top-level | Set the type of the variant `id`
+| enum: [type](#type) | top-level | Set the type of the variant `id`
 | enum: [id_bits](#id_bits) | top-level | Set the bit-size of the variant `id`
 | enum: [id_bytes](#id_bytes) | top-level | Set the byte-size of the variant `id`
 
@@ -585,7 +585,7 @@ assert_eq!(ret_write, data)
 
 ## id (variant)
 
-Specify the identifier of the enum variant, must be paired with [id_type](#id_type)
+Specify the identifier of the enum variant, must be paired with [type](#type)
 or [id (top-level)](#id-top-level)
 
 **Note**: If no `id` is specified, the variant is treated as the "catch-all".
@@ -595,7 +595,7 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(id_type = "u8")]
+#[deku(type = "u8")]
 enum DekuTest {
     #[deku(id = "0x01")]
     VariantA(u8),
@@ -653,7 +653,7 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(id_type = "u8")]
+#[deku(type = "u8")]
 enum DekuTest {
     #[deku(id = "0x01")]
     VariantA(u8),
@@ -676,7 +676,7 @@ let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, variant_bytes);
 ```
 
-# id_type
+# type
 
 Specify the type of the enum variant id to consume, see [example](#id-variant)
 
@@ -691,7 +691,7 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(id_type = "u8", id_bits = "4")]
+#[deku(type = "u8", id_bits = "4")]
 enum DekuTest {
     #[deku(id = "0b1001")]
     VariantA( #[deku(bits = "4")] u8, u8),
@@ -721,7 +721,7 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(id_type = "u32", id_bytes = "2")]
+#[deku(type = "u32", id_bytes = "2")]
 enum DekuTest {
     #[deku(id = "0xBEEF")]
     VariantA(u8),

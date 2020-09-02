@@ -4,21 +4,21 @@ use deku::prelude::*;
 #[derive(DekuRead)]
 enum Test1 {}
 
-// test conflict `id_type` and `id`
+// test conflict `type` and `id`
 #[derive(DekuRead)]
-#[deku(id_type = "u8", id = "test")]
+#[deku(type = "u8", id = "test")]
 enum Test2 {}
 
 // test conflict `id` and `id_pat`
 #[derive(DekuRead)]
-#[deku(id_type = "u8")]
+#[deku(type = "u8")]
 enum Test3 {
     #[deku(id = "1", id_pat = "2..=3")] A(u8),
 }
 
-// test `id_type` only allowed on enum
+// test `type` only allowed on enum
 #[derive(DekuRead)]
-#[deku(id_type = "u8")]
+#[deku(type = "u8")]
 struct Test4 {
     a: u8
 }

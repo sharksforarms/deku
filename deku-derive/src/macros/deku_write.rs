@@ -194,7 +194,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 quote! {}
             }
         } else {
-            // either `id` or `id_type` needs to be specified
+            // either `id` or `type` needs to be specified
             unreachable!();
         };
 

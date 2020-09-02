@@ -12,7 +12,7 @@ struct NestedStruct {
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u8", ctx = "_endian: Endian")]
+#[deku(type = "u8", ctx = "_endian: Endian")]
 enum NestedEnum {
     #[deku(id = "0x01")]
     VarA(u8),

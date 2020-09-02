@@ -1,7 +1,7 @@
 use deku::prelude::*;
 
 #[derive(DekuRead)]
-#[deku(id_type = "u8", id_bits = "1", id_bytes = "2")]
+#[deku(id_type = "u8", bits = "1", id_bytes = "2")]
 enum Test1 {}
 
 #[derive(DekuRead)]

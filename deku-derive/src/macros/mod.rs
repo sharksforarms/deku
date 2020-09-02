@@ -160,7 +160,7 @@ fn gen_ctx_types_and_arg(
 }
 
 /// Generate argument for `id`:
-/// `#deku(endian = "big", id_bits = "1")` -> `Endian::Big, BitSize(1)`
+/// `#deku(endian = "big", bits = "1")` -> `Endian::Big, BitSize(1)`
 fn gen_id_args(endian: Option<&syn::LitStr>, bits: Option<usize>) -> syn::Result<TokenStream> {
     let endian = endian.map(gen_endian_from_str).transpose()?;
     let bits = bits.map(|n| quote! {deku::ctx::BitSize(#n)});
@@ -179,7 +179,7 @@ fn gen_id_args(endian: Option<&syn::LitStr>, bits: Option<usize>) -> syn::Result
 
 /// Generate argument for fields:
 ///
-/// `#deku(endian = "big", id_bits = "1", ctx = "a")` -> `Endian::Big, BitSize(1), a`
+/// `#deku(endian = "big", bits = "1", ctx = "a")` -> `Endian::Big, BitSize(1), a`
 fn gen_field_args(
     endian: Option<&syn::LitStr>,
     bits: Option<usize>,

@@ -21,7 +21,7 @@ A documentation-only module for #[deku] attributes
 | enum: [id](#id) | top-level, variant | enum or variant id value
 | enum: [id_pat](#id_pat) | variant | variant id match pattern
 | enum: [id_type](#id_type) | top-level | Set the type of the variant `id`
-| enum: [id_bits](#id_bits) | top-level | Set the bit-size of the variant `id`
+| enum: [bits](#bits) | top-level | Set the bit-size of the variant `id`
 | enum: [id_bytes](#id_bytes) | top-level | Set the byte-size of the variant `id`
 
 # endian
@@ -680,7 +680,7 @@ assert_eq!(data, variant_bytes);
 
 Specify the type of the enum variant id to consume, see [example](#id-variant)
 
-# id_bits
+# bits
 
 Set the bit size of the enum variant `id`
 
@@ -691,7 +691,7 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(id_type = "u8", id_bits = "4")]
+#[deku(id_type = "u8", bits = "4")]
 enum DekuTest {
     #[deku(id = "0b1001")]
     VariantA( #[deku(bits = "4")] u8, u8),
@@ -714,7 +714,7 @@ assert_eq!(data, value);
 
 Set the byte size of the enum variant `id`
 
-**Note**: Cannot be used in combination with [id_bits](#id_bits)
+**Note**: Cannot be used in combination with [bits](#bits)
 
 Example:
 ```rust

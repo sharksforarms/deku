@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.7.1] - 2020-09-02
+
+- Added `ctx_default` attribute, this allows the ability to specify defaults to
+types accepting a `ctx` if none are provided
+- Updated documentation regarding the concept of context and how it
+applies to some attributes
+- Added validation to `id` attribute
+- `endian` attribute now accepts an expression (still accepts `big` or `little`)
+- Updated bitvec dependency
+
 ## [0.7.1] - 2020-07-31
 
 - Added `id` attribute to top-level enums which allows to specify the enum id,
@@ -29,6 +39,8 @@ Community:
 - Added `CHANGELOG.md` to track changes
 
 [Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.7.1...HEAD
+
+[0.7.2]: https://github.com/sharksforarms/deku/compare/deku-v0.7.1...deku-v0.7.2
 
 [0.7.1]: https://github.com/sharksforarms/deku/compare/deku-v0.7.0...deku-v0.7.1
 

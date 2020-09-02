@@ -235,6 +235,19 @@ pub mod samples {
         #[deku(id = "2")]
         VarB,
     }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    pub struct EnumTypeEndian {
+        #[deku(endian = "big")]
+        pub t: EnumTypeEndianCtx,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(id_type = "u32", endian = "endian", ctx = "endian: deku::ctx::Endian")]
+    pub enum EnumTypeEndianCtx {
+        #[deku(id = "0xDEADBEEF")]
+        VarA(u8),
+    }
 }
 
 #[test]
@@ -599,6 +612,22 @@ fn test_ctx_default_struct() {
     assert_eq!(expected, ret_read);
     let ret_write = ret_read.write((1, 2)).unwrap();
     assert_eq!(test_data.to_vec(), ret_write.into_vec());
+}
+
+#[test]
+fn test_enum_endian_ctx() {
+    let test_data = [0xdeu8, 0xad, 0xbe, 0xef, 0xff];
+    let ret_read = samples::EnumTypeEndian::try_from(test_data.as_ref()).unwrap();
+
+    assert_eq!(
+        samples::EnumTypeEndian {
+            t: samples::EnumTypeEndianCtx::VarA(0xFF)
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(ret_write, test_data)
 }
 
 #[test]

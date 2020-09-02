@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- Deprecated `id_type` in favor of `type`
 - Deprecated `id_bits` in favor of `bits`
 
 ## [0.7.1] - 2020-09-02

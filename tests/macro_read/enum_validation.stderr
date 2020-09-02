@@ -1,10 +1,10 @@
-error: `id_type` or `id` must be specified on enum
+error: `type` or `id` must be specified on enum
  --> $DIR/enum_validation.rs:5:6
   |
 5 | enum Test1 {}
   |      ^^^^^
 
-error: conflicting: both `id_type` and `id` specified on enum
+error: conflicting: both `type` and `id` specified on enum
   --> $DIR/enum_validation.rs:10:6
    |
 10 | enum Test2 {}
@@ -16,11 +16,11 @@ error: conflicting: both `id` and `id_pat` specified on variant
 16 |     #[deku(id = "1", id_pat = "2..=3")] A(u8),
    |                 ^^^
 
-error: `id_type` only supported on enum
-  --> $DIR/enum_validation.rs:21:18
+error: `type` only supported on enum
+  --> $DIR/enum_validation.rs:21:15
    |
-21 | #[deku(id_type = "u8")]
-   |                  ^^^^
+21 | #[deku(type = "u8")]
+   |               ^^^^
 
 error: `bits` only supported on enum
   --> $DIR/enum_validation.rs:27:10

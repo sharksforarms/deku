@@ -7,7 +7,7 @@ struct DekuByte {
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u8")]
+#[deku(type = "u8")]
 enum DekuEnum {
     #[deku(id = "0x01")]
     VariantA(u8),

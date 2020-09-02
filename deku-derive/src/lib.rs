@@ -104,7 +104,7 @@ impl DekuData {
             ast::Data::Struct(_) => {
                 // Validate id_* attributes are being used on an enum
                 if receiver.id_type.is_some() {
-                    Err((receiver.id_type.span(), "`id_type` only supported on enum"))
+                    Err((receiver.id_type.span(), "`type` only supported on enum"))
                 } else if receiver.id.is_some() {
                     Err((receiver.id.span(), "`id` only supported on enum"))
                 } else if receiver.id_bytes.is_some() {
@@ -119,19 +119,19 @@ impl DekuData {
                 }
             }
             ast::Data::Enum(_) => {
-                // Validate `id_type` or `id` is specified
+                // Validate `type` or `id` is specified
                 if receiver.id_type.is_none() && receiver.id.is_none() {
                     return Err((
                         receiver.ident.span(),
-                        "`id_type` or `id` must be specified on enum",
+                        "`type` or `id` must be specified on enum",
                     ));
                 }
 
-                // Validate either `id_type` or `id` is specified
+                // Validate either `type` or `id` is specified
                 if receiver.id_type.is_some() && receiver.id.is_some() {
                     return Err((
                         receiver.ident.span(),
-                        "conflicting: both `id_type` and `id` specified on enum",
+                        "conflicting: both `type` and `id` specified on enum",
                     ));
                 }
 
@@ -391,7 +391,7 @@ struct DekuReceiver {
     id: Option<TokenStream>,
 
     /// enum only: type of the enum `id`
-    #[darling(default)]
+    #[darling(rename = "type", default)]
     id_type: Option<syn::Ident>,
 
     /// enum only: bit size of the enum `id`
@@ -578,9 +578,9 @@ mod tests {
         }"#),
 
         // Valid Enum
-        case::enum_empty(r#"#[deku(id_type = "u8")] enum Test {}"#),
+        case::enum_empty(r#"#[deku(type = "u8")] enum Test {}"#),
         case::enum_all(r#"
-        #[deku(id_type = "u8")]
+        #[deku(type = "u8")]
         enum Test {
             #[deku(id = "1")]
             A,

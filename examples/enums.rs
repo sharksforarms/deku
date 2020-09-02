@@ -3,7 +3,7 @@ use hex_literal::hex;
 use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u8")]
+#[deku(type = "u8")]
 enum DekuTest {
     #[deku(id = "0")]
     Var1,

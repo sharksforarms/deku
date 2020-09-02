@@ -31,7 +31,7 @@ fn test_from_bytes_struct() {
 #[test]
 fn test_from_bytes_enum() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-    #[deku(id_type = "u8", bits = "4")]
+    #[deku(type = "u8", bits = "4")]
     enum TestDeku {
         #[deku(id = "0b0110")]
         VariantA(#[deku(bits = "4")] u8),

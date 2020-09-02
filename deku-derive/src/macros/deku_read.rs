@@ -214,7 +214,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             let (new_rest, variant_id) = #id_type::read(rest, (#id_args))?;
         }
     } else {
-        // either `id` or `id_type` needs to be specified
+        // either `id` or `type` needs to be specified
         unreachable!();
     };
 

@@ -51,7 +51,7 @@ pub mod samples {
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(id_type = "u8")]
+    #[deku(type = "u8")]
     pub enum EnumDeku {
         #[deku(id = "1")]
         VarA(u8),
@@ -72,7 +72,7 @@ pub mod samples {
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(id_type = "u8")]
+    #[deku(type = "u8")]
     pub enum EnumDekuDefault {
         #[deku(id = "1")]
         VarA(u8),
@@ -111,7 +111,7 @@ pub mod samples {
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(id_type = "u8")]
+    #[deku(type = "u8")]
     pub enum GenericEnumDeku<T: deku::DekuRead + deku::DekuWrite>
     where
         T: deku::DekuWrite + deku::DekuRead,
@@ -182,7 +182,7 @@ pub mod samples {
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(id_type = "u8", ctx = "a: u8, b: u8")]
+    #[deku(type = "u8", ctx = "a: u8, b: u8")]
     pub enum TopLevelCtxEnum {
         #[deku(id = "1")]
         VariantA(
@@ -195,7 +195,7 @@ pub mod samples {
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(id_type = "u8", ctx = "a: u8, b: u8", ctx_default = "1,2")]
+    #[deku(type = "u8", ctx = "a: u8, b: u8", ctx_default = "1,2")]
     pub enum TopLevelCtxEnumDefault {
         #[deku(id = "1")]
         VariantA(
@@ -208,7 +208,7 @@ pub mod samples {
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(id_type = "u8")]
+    #[deku(type = "u8")]
     pub enum VariantLevelCtxEnum {
         #[deku(id = "1")]
         VariantA {
@@ -243,7 +243,7 @@ pub mod samples {
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(id_type = "u32", endian = "endian", ctx = "endian: deku::ctx::Endian")]
+    #[deku(type = "u32", endian = "endian", ctx = "endian: deku::ctx::Endian")]
     pub enum EnumTypeEndianCtx {
         #[deku(id = "0xDEADBEEF")]
         VarA(u8),

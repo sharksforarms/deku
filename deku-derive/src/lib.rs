@@ -108,10 +108,7 @@ impl DekuData {
                 } else if receiver.id.is_some() {
                     Err((receiver.id.span(), "`id` only supported on enum"))
                 } else if receiver.bytes.is_some() {
-                    Err((
-                        receiver.bytes.span(),
-                        "`bytes` only supported on enum",
-                    ))
+                    Err((receiver.bytes.span(), "`bytes` only supported on enum"))
                 } else if receiver.bits.is_some() {
                     Err((receiver.bits.span(), "`bits` only supported on enum"))
                 } else {
@@ -140,10 +137,7 @@ impl DekuData {
                     return Err((receiver.ident.span(), "error: cannot use `bits` with `id`"));
                 }
                 if receiver.id.is_some() && receiver.bytes.is_some() {
-                    return Err((
-                        receiver.ident.span(),
-                        "error: cannot use `bytes` with `id`",
-                    ));
+                    return Err((receiver.ident.span(), "error: cannot use `bytes` with `id`"));
                 }
 
                 // Validate either `bits` or `bytes` is specified

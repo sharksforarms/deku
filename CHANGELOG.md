@@ -1,11 +1,13 @@
 # Changelog
 
 ## [Unreleased]
-- Deprecated `id_type` in favor of `type`
-- Deprecated `id_bits` in favor of `bits`
-- Deprecated `id_bytes` in favor of `bytes`
 
-## [0.7.1] - 2020-09-02
+The following items have been renamed: ([@wcampbell0x2a](https://github.com/wcampbell0x2a))
+- Renamed `id_type` in favor of `type`
+- Renamed `id_bits` in favor of `bits`
+- Renamed `id_bytes` in favor of `bytes`
+
+## [0.7.2] - 2020-09-02
 
 - Added `ctx_default` attribute, this allows the ability to specify defaults to
 types accepting a `ctx` if none are provided
@@ -41,7 +43,7 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.7.1...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.7.2...HEAD
 
 [0.7.2]: https://github.com/sharksforarms/deku/compare/deku-v0.7.1...deku-v0.7.2
 

@@ -3,6 +3,7 @@
 ## [Unreleased]
 - Deprecated `id_type` in favor of `type`
 - Deprecated `id_bits` in favor of `bits`
+- Deprecated `id_bytes` in favor of `bytes`
 
 ## [0.7.1] - 2020-09-02
 

@@ -50,7 +50,7 @@ error: error: cannot use `bits` with `id`
 50 | enum Test8 {
    |      ^^^^^
 
-error: error: cannot use `id_bytes` with `id`
+error: error: cannot use `bytes` with `id`
   --> $DIR/enum_validation.rs:57:6
    |
 57 | enum Test9 {

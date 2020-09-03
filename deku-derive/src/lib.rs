@@ -30,7 +30,7 @@ struct DekuData {
     id_type: Option<syn::Ident>,
 
     /// enum only: bit size of the enum `id`
-    /// `id_bytes` is converted to `bits` if provided
+    /// `bytes` is converted to `bits` if provided
     bits: Option<usize>,
 }
 
@@ -71,7 +71,7 @@ impl DekuData {
             .transpose()
             .map_err(|e| e.to_compile_error())?;
 
-        let bits = receiver.id_bytes.map(|b| b * 8).or(receiver.bits);
+        let bits = receiver.bytes.map(|b| b * 8).or(receiver.bits);
 
         Ok(Self {
             vis: receiver.vis,
@@ -107,10 +107,10 @@ impl DekuData {
                     Err((receiver.id_type.span(), "`type` only supported on enum"))
                 } else if receiver.id.is_some() {
                     Err((receiver.id.span(), "`id` only supported on enum"))
-                } else if receiver.id_bytes.is_some() {
+                } else if receiver.bytes.is_some() {
                     Err((
-                        receiver.id_bytes.span(),
-                        "`id_bytes` only supported on enum",
+                        receiver.bytes.span(),
+                        "`bytes` only supported on enum",
                     ))
                 } else if receiver.bits.is_some() {
                     Err((receiver.bits.span(), "`bits` only supported on enum"))
@@ -139,18 +139,18 @@ impl DekuData {
                 if receiver.id.is_some() && receiver.bits.is_some() {
                     return Err((receiver.ident.span(), "error: cannot use `bits` with `id`"));
                 }
-                if receiver.id.is_some() && receiver.id_bytes.is_some() {
+                if receiver.id.is_some() && receiver.bytes.is_some() {
                     return Err((
                         receiver.ident.span(),
-                        "error: cannot use `id_bytes` with `id`",
+                        "error: cannot use `bytes` with `id`",
                     ));
                 }
 
-                // Validate either `bits` or `id_bytes` is specified
-                if receiver.bits.is_some() && receiver.id_bytes.is_some() {
+                // Validate either `bits` or `bytes` is specified
+                if receiver.bits.is_some() && receiver.bytes.is_some() {
                     return Err((
                         receiver.bits.span(),
-                        "conflicting: both `bits` and `id_bytes` specified on enum",
+                        "conflicting: both `bits` and `bytes` specified on enum",
                     ));
                 }
 
@@ -400,7 +400,7 @@ struct DekuReceiver {
 
     /// enum only: byte size of the enum `id`
     #[darling(default)]
-    id_bytes: Option<usize>,
+    bytes: Option<usize>,
 }
 
 /// Parse a TokenStream from an Option<LitStr>

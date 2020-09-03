@@ -22,7 +22,7 @@ A documentation-only module for #[deku] attributes
 | enum: [id_pat](#id_pat) | variant | variant id match pattern
 | enum: [type](#type) | top-level | Set the type of the variant `id`
 | enum: [bits](#bits) | top-level | Set the bit-size of the variant `id`
-| enum: [id_bytes](#id_bytes) | top-level | Set the byte-size of the variant `id`
+| enum: [bytes](#bytes) | top-level | Set the byte-size of the variant `id`
 
 # endian
 
@@ -684,7 +684,7 @@ Specify the type of the enum variant id to consume, see [example](#id-variant)
 
 Set the bit size of the enum variant `id`
 
-**Note**: Cannot be used in combination with [id_bytes](#id_bytes)
+**Note**: Cannot be used in combination with [bytes](#bytes)
 
 Example:
 ```rust
@@ -710,7 +710,7 @@ let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
-# id_bytes
+# bytes
 
 Set the byte size of the enum variant `id`
 
@@ -721,7 +721,7 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u32", id_bytes = "2")]
+#[deku(type = "u32", bytes = "2")]
 enum DekuTest {
     #[deku(id = "0xBEEF")]
     VariantA(u8),

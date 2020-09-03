@@ -30,7 +30,7 @@ struct Test5 {
     a: u8
 }
 
-// test `id_bytes` only allowed on enum
+// test `bytes` only allowed on enum
 #[derive(DekuRead)]
 #[deku(bits = "1")]
 struct Test6 {
@@ -51,9 +51,9 @@ enum Test8 {
     A
 }
 
-// test `id_bytes` cannot be used with `id`
+// test `bytes` cannot be used with `id`
 #[derive(DekuRead)]
-#[deku(id = "test", id_bytes = "4")]
+#[deku(id = "test", bytes = "4")]
 enum Test9 {
     A
 }

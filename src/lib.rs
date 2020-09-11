@@ -550,7 +550,7 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Vec<T> {
     /// * **inner_ctx** - The context required by `T`.
     /// # Examples
     /// ```rust
-    /// # use deku::{ctx::Endian, DekuWrite};
+    /// # use deku::{ctx::Endian, DekuWrite, prelude::Lsb0};
     /// # use bitvec::bitvec;
     /// let data = vec![1u8];
     /// let output = data.write(Endian::Big).unwrap();
@@ -598,7 +598,7 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Option<T> {
     /// * **inner_ctx** - The context required by `T`.
     /// # Examples
     /// ```rust
-    /// # use deku::{ctx::Endian, DekuWrite};
+    /// # use deku::{ctx::Endian, DekuWrite, prelude::Lsb0};
     /// # use bitvec::bitvec;
     /// let data = Some(1u8);
     /// let output = data.write(Endian::Big).unwrap();

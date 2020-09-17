@@ -28,7 +28,7 @@ deku_derive = { version = "^0.7.0", path = "deku-derive" }
 bitvec = { version = "0.19", default-features = false }
 
 [dev-dependencies]
-hex-literal = "0.3"
+hexlit = "0.3.0"
 rstest = "0.6"
 criterion = "=0.3.2"
 alloc_counter = "0.0.4"

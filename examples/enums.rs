@@ -1,5 +1,5 @@
 use deku::prelude::*;
-use hex_literal::hex;
+use hexlit::hex;
 use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]

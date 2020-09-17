@@ -38,7 +38,7 @@ mod tests {
 
     use super::*;
     use alloc_counter::count_alloc;
-    use hex_literal::hex;
+    use hexlit::hex;
     use std::convert::TryFrom;
 
     #[test]

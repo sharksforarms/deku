@@ -408,8 +408,6 @@ macro_rules! ImplDekuTraits {
                 output: &mut BitVec<Msb0, u8>,
                 (endian, bit_size): (Endian, BitSize),
             ) -> Result<(), DekuError> {
-                todo!()
-                /*
                 let output_is_le = endian.is_le();
                 let input = if output_is_le {
                     self.to_le_bytes()
@@ -419,12 +417,8 @@ macro_rules! ImplDekuTraits {
 
                 let bit_size: usize = bit_size.into();
 
-                let input_bits: BitVec<Msb0, u8> = input
-                    .to_vec()
-                    .try_into()
-                    .map_err(|_e| DekuError::Unexpected("Converting Vec to BitVec".to_string()))?;
+                let input_bits = input.view_bits::<Msb0>();
 
-                let res_bits: BitVec<Msb0, u8> = {
                     if bit_size > input_bits.len() {
                         return Err(DekuError::InvalidParam(format!(
                             "bit size {} is larger then input {}",
@@ -436,37 +430,36 @@ macro_rules! ImplDekuTraits {
                     if output_is_le {
                         // Example read 10 bits u32 [0xAB, 0b11_000000]
                         // => [10101011, 00000011, 00000000, 00000000]
-                        let mut res_bits = BitVec::<Msb0, u8>::with_capacity(bit_size);
                         let mut remaining_bits = bit_size;
                         for chunk in input_bits.chunks(8) {
                             if chunk.len() > remaining_bits {
                                 let bits = &chunk[chunk.len() - remaining_bits..];
                                 for b in bits {
-                                    res_bits.push(*b);
+                                    output.push(*b);
                                 }
                                 // https://github.com/myrrlyn/bitvec/issues/62
-                                // res_bits.extend_from_slice(chunk[chunk.len() - remaining_bits..]);
+                                // output.extend_from_slice(chunk[chunk.len() - remaining_bits..]);
                                 break;
                             } else {
                                 for b in chunk {
-                                    res_bits.push(*b);
+                                    output.push(*b);
                                 }
                                 // https://github.com/myrrlyn/bitvec/issues/62
-                                // res_bits.extend_from_slice(chunk)
+                                // output.extend_from_slice(chunk)
                             }
                             remaining_bits -= chunk.len();
                         }
-
-                        res_bits
                     } else {
                         // Example read 10 bits u32 [0xAB, 0b11_000000]
                         // => [00000000, 00000000, 00000010, 10101111]
-                        input_bits[input_bits.len() - bit_size..].into()
+                        let bits = &input_bits[input_bits.len() - bit_size..];
+                        for b in bits {
+                            output.push(*b);
+                        }
+                        // https://github.com/myrrlyn/bitvec/issues/62
+                        // output.extend_from_slice(input_bits[input_bits.len() - bit_size..]);
                     }
-                };
-
-                Ok(res_bits)
-                */
+                Ok(())
             }
         }
 
@@ -813,7 +806,7 @@ mod tests {
         case::normal_le(0xDDCC_BBAA, Endian::Little, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
         case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
         case::bit_size_le_smaller(0x03AB, Endian::Little, Some(10), vec![0xAB, 0b11_000000]),
-        case::bit_size_be_smaller(0x03AB, Endian::Big, Some(10), vec![0b11, 0xAB]),
+        case::bit_size_be_smaller(0x03AB, Endian::Big, Some(10), vec![0b11_1010_10, 0b11_000000]),
         #[should_panic(expected = "InvalidParam(\"bit size 100 is larger then input 32\")")]
         case::bit_size_le_bigger(0x03AB, Endian::Little, Some(100), vec![0xAB, 0b11_000000]),
     )]

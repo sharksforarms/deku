@@ -389,7 +389,7 @@ Example:
 struct DekuTest {
     #[deku(
         reader = "DekuTest::read(rest)",
-        writer = "DekuTest::write(&self.field_a)"
+        writer = "DekuTest::write(output, &self.field_a)"
     )]
     field_a: String,
 }
@@ -404,9 +404,9 @@ impl DekuTest {
     }
 
     /// Parse from String to u8 and write
-    fn write(field_a: &str) -> Result<BitVec<Msb0, u8>, DekuError> {
+    fn write(output: &mut BitVec<Msb0, u8>, field_a: &str) -> Result<(), DekuError> {
         let value = field_a.parse::<u8>().unwrap();
-        value.write(())
+        value.write(output, ())
     }
 }
 

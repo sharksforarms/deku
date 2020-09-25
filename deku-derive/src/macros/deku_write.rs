@@ -44,6 +44,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 match *self {
                     #destructured => {
                         let mut acc: BitVec<Msb0, u8> = BitVec::new();
+                        let output = &mut acc;
                         #(#field_writes)*
 
                         Ok(acc)
@@ -90,10 +91,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let write_body = quote! {
         match *self {
             #destructured => {
-                let mut acc: BitVec<Msb0, u8> = BitVec::new();
                 #(#field_writes)*
 
-                Ok(acc)
+                Ok(())
             }
         }
     };
@@ -110,7 +110,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         impl #imp DekuWrite<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
-            fn write(&self, #ctx_arg) -> Result<BitVec<Msb0, u8>, DekuError> {
+            fn write(&self, output: &mut BitVec<Msb0, u8>, #ctx_arg) -> Result<(), DekuError> {
                 #write_body
             }
         }
@@ -122,7 +122,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             impl #imp DekuWrite for #ident #wher {
                 #[allow(unused_variables)]
-                fn write(&self, _: ()) -> Result<BitVec<Msb0, u8>, DekuError> {
+                fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
                     #write_body
                 }
             }
@@ -187,8 +187,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
                 quote! {
                     let mut variant_id: #id_type = #variant_id;
-                    let bits = variant_id.write((#id_args))?;
-                    acc.extend(bits);
+                    variant_id.write(output, (#id_args))?;
                 }
             } else {
                 quote! {}
@@ -233,6 +232,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let to_bits_body = wrap_default_ctx(
             quote! {
                 let mut acc: BitVec<Msb0, u8> = BitVec::new();
+                let output = &mut acc;
 
                 match self {
                     #(#variant_writes),*
@@ -278,13 +278,11 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
 
     let write_body = quote! {
-        let mut acc: BitVec<Msb0, u8> = BitVec::new();
-
         match self {
             #(#variant_writes),*
         }
 
-        Ok(acc)
+        Ok(())
     };
     tokens.extend(quote! {
         impl #imp DekuUpdate for #ident #wher {
@@ -301,7 +299,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         impl #imp DekuWrite<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
-            fn write(&self, #ctx_arg) -> Result<BitVec<Msb0, u8>, DekuError> {
+            fn write(&self, output: &mut BitVec<Msb0, u8>, #ctx_arg) -> Result<(), DekuError> {
                 #write_body
             }
         }
@@ -313,7 +311,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             impl #imp DekuWrite for #ident #wher {
                 #[allow(unused_variables)]
-                fn write(&self, _: ()) -> Result<BitVec<Msb0, u8>, DekuError> {
+                fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
                     #write_body
                 }
             }
@@ -392,12 +390,11 @@ fn emit_field_write(
     } else {
         let write_args = gen_field_args(field_endian, f.bits, f.ctx.as_ref())?;
 
-        quote! { #object_prefix #field_ident.write((#write_args)) }
+        quote! { #object_prefix #field_ident.write(output, (#write_args)) }
     };
 
     let field_write_normal = quote! {
-        let bits = #field_write_func ?;
-        acc.extend(bits);
+        #field_write_func ?;
     };
 
     let field_write_tokens = match (f.skip, &f.cond) {

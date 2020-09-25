@@ -1,3 +1,4 @@
+use bitvec::bitvec;
 use deku::prelude::*;
 use hexlit::hex;
 use rstest::rstest;
@@ -159,7 +160,7 @@ pub mod samples {
     pub struct SubTypeNeedCtx {
         #[deku(
             reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c) as usize))})(rest)",
-            writer = "(|c|{u8::write(&(c-a-b), ())})(self.i as u8)"
+            writer = "(|c|{u8::write(&(c-a-b), output, ())})(self.i as u8)"
         )]
         pub(crate) i: usize,
     }
@@ -188,7 +189,7 @@ pub mod samples {
         VariantA(
             #[deku(
                 reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})(rest)",
-                writer = "(|c|{u8::write(&(c-a-b), ())})(field_0)"
+                writer = "(|c|{u8::write(&(c-a-b), output, ())})(field_0)"
             )]
             u8,
         ),
@@ -201,7 +202,7 @@ pub mod samples {
         VariantA(
             #[deku(
                 reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})(rest)",
-                writer = "(|c|{u8::write(&(c-a-b), ())})(field_0)"
+                writer = "(|c|{u8::write(&(c-a-b), output, ())})(field_0)"
             )]
             u8,
         ),

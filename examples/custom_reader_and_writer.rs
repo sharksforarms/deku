@@ -42,7 +42,9 @@ fn bit_flipper_write(
     // flip the bits on value if field_a is 0x01
     let value = if field_a == 0x01 { !field_b } else { field_b };
 
-    value.write(bit_size)
+    let mut acc: BitVec<Msb0, u8> = BitVec::new();
+    value.write(&mut acc, bit_size)?;
+    Ok(acc)
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]

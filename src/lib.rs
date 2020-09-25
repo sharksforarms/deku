@@ -209,7 +209,7 @@ assert_eq!(value.sub.b, 0x01 + 0x02)
 extern crate alloc;
 
 #[cfg(feature = "alloc")]
-use alloc::{format, string::ToString, vec::Vec};
+use alloc::{format, vec::Vec};
 
 #[cfg(feature = "std")]
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -255,7 +255,7 @@ pub trait DekuWrite<Ctx = ()> {
     /// Write type to bits
     /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.
-    fn write(&self, ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError>;
+    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError>;
 }
 
 /// "Writer" trait: implemented on DekuWrite struct and enum containers. A `container` is a type which
@@ -405,8 +405,11 @@ macro_rules! ImplDekuTraits {
         impl DekuWrite<(Endian, BitSize)> for $typ {
             fn write(
                 &self,
+                output: &mut BitVec<Msb0, u8>,
                 (endian, bit_size): (Endian, BitSize),
-            ) -> Result<BitVec<Msb0, u8>, DekuError> {
+            ) -> Result<(), DekuError> {
+                todo!()
+                /*
                 let output_is_le = endian.is_le();
                 let input = if output_is_le {
                     self.to_le_bytes()
@@ -463,35 +466,33 @@ macro_rules! ImplDekuTraits {
                 };
 
                 Ok(res_bits)
+                */
             }
         }
 
         // Only have `endian`, return all input
         impl DekuWrite<Endian> for $typ {
-            fn write(&self, endian: Endian) -> Result<BitVec<Msb0, u8>, DekuError> {
+            fn write(&self, output: &mut BitVec<Msb0, u8>, endian: Endian) -> Result<(), DekuError> {
                 let input = if endian.is_le() {
                     self.to_le_bytes()
                 } else {
                     self.to_be_bytes()
                 };
-
-                Ok(input
-                    .to_vec()
-                    .try_into()
-                    .map_err(|_e| DekuError::Unexpected("Converting Vec to BitVec".to_string()))?)
+                output.extend_from_bitslice(input.view_bits());
+                Ok(())
             }
         }
 
         // Only have `bit_size`, set `endian` to `Endian::default`.
         impl DekuWrite<BitSize> for $typ {
-            fn write(&self, bit_size: BitSize) -> Result<BitVec<Msb0, u8>, DekuError> {
-                <$typ>::write(self, (Endian::default(), bit_size))
+            fn write(&self, output: &mut BitVec<Msb0, u8>, bit_size: BitSize) -> Result<(), DekuError> {
+                <$typ>::write(self, output, (Endian::default(), bit_size))
             }
         }
 
         impl DekuWrite for $typ {
-            fn write(&self, _: ()) -> Result<BitVec<Msb0, u8>, DekuError> {
-                <$typ>::write(self, Endian::default())
+            fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
+                <$typ>::write(self, output, Endian::default())
             }
         }
     };
@@ -556,15 +557,11 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Vec<T> {
     /// let output = data.write(Endian::Big).unwrap();
     /// assert_eq!(output, bitvec![0, 0, 0, 0, 0, 0, 0, 1])
     /// ```
-    fn write(&self, inner_ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError> {
-        let mut acc = BitVec::new();
-
+    fn write(&self, output: &mut BitVec<Msb0, u8>, inner_ctx: Ctx) -> Result<(), DekuError> {
         for v in self {
-            let r = v.write(inner_ctx)?;
-            acc.extend(r);
+            v.write(output, inner_ctx)?;
         }
-
-        Ok(acc)
+        Ok(())
     }
 }
 
@@ -604,11 +601,11 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Option<T> {
     /// let output = data.write(Endian::Big).unwrap();
     /// assert_eq!(output, bitvec![0, 0, 0, 0, 0, 0, 0, 1])
     /// ```
-    fn write(&self, inner_ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError> {
+    fn write(&self, output: &mut BitVec<Msb0, u8>, inner_ctx: Ctx) -> Result<(), DekuError> {
         if let Some(v) = self {
-            v.write(inner_ctx)
+            v.write(output, inner_ctx)
         } else {
-            Ok(bitvec![Msb0, u8;])
+            Ok(())
         }
     }
 }
@@ -647,9 +644,9 @@ impl<Ctx> DekuWrite<Ctx> for Ipv4Addr
 where
     u32: DekuWrite<Ctx>,
 {
-    fn write(&self, ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError> {
+    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
         let ip: u32 = (*self).into();
-        ip.write(ctx)
+        ip.write(output, ctx)
     }
 }
 
@@ -672,9 +669,9 @@ impl<Ctx> DekuWrite<Ctx> for Ipv6Addr
 where
     u128: DekuWrite<Ctx>,
 {
-    fn write(&self, ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError> {
+    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
         let ip: u128 = (*self).into();
-        ip.write(ctx)
+        ip.write(output, ctx)
     }
 }
 
@@ -684,10 +681,10 @@ where
     Ipv6Addr: DekuWrite<Ctx>,
     Ipv4Addr: DekuWrite<Ctx>,
 {
-    fn write(&self, ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError> {
+    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
         match self {
-            IpAddr::V4(ipv4) => ipv4.write(ctx),
-            IpAddr::V6(ipv6) => ipv6.write(ctx),
+            IpAddr::V4(ipv4) => ipv4.write(output, ctx),
+            IpAddr::V6(ipv6) => ipv6.write(output, ctx),
         }
     }
 }

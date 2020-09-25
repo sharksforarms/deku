@@ -37,15 +37,11 @@ macro_rules! ImplDekuSliceTraits {
         where
             $typ: DekuWrite<Ctx>,
         {
-            fn write(&self, ctx: Ctx) -> Result<BitVec<Msb0, u8>, DekuError> {
-                let mut acc = BitVec::new();
-
+            fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
                 for v in self {
-                    let r = v.write(ctx)?;
-                    acc.extend(r);
+                    v.write(output, ctx)?;
                 }
-
-                Ok(acc)
+                Ok(())
             }
         }
     };

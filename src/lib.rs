@@ -419,53 +419,57 @@ macro_rules! ImplDekuTraits {
 
                 let input_bits = input.view_bits::<Msb0>();
 
-                    if bit_size > input_bits.len() {
-                        return Err(DekuError::InvalidParam(format!(
-                            "bit size {} is larger then input {}",
-                            bit_size,
-                            input_bits.len()
-                        )));
-                    }
+                if bit_size > input_bits.len() {
+                    return Err(DekuError::InvalidParam(format!(
+                        "bit size {} is larger then input {}",
+                        bit_size,
+                        input_bits.len()
+                    )));
+                }
 
-                    if output_is_le {
-                        // Example read 10 bits u32 [0xAB, 0b11_000000]
-                        // => [10101011, 00000011, 00000000, 00000000]
-                        let mut remaining_bits = bit_size;
-                        for chunk in input_bits.chunks(8) {
-                            if chunk.len() > remaining_bits {
-                                let bits = &chunk[chunk.len() - remaining_bits..];
-                                for b in bits {
-                                    output.push(*b);
-                                }
-                                // https://github.com/myrrlyn/bitvec/issues/62
-                                // output.extend_from_slice(chunk[chunk.len() - remaining_bits..]);
-                                break;
-                            } else {
-                                for b in chunk {
-                                    output.push(*b);
-                                }
-                                // https://github.com/myrrlyn/bitvec/issues/62
-                                // output.extend_from_slice(chunk)
+                if output_is_le {
+                    // Example read 10 bits u32 [0xAB, 0b11_000000]
+                    // => [10101011, 00000011, 00000000, 00000000]
+                    let mut remaining_bits = bit_size;
+                    for chunk in input_bits.chunks(8) {
+                        if chunk.len() > remaining_bits {
+                            let bits = &chunk[chunk.len() - remaining_bits..];
+                            for b in bits {
+                                output.push(*b);
                             }
-                            remaining_bits -= chunk.len();
+                            // https://github.com/myrrlyn/bitvec/issues/62
+                            // output.extend_from_slice(chunk[chunk.len() - remaining_bits..]);
+                            break;
+                        } else {
+                            for b in chunk {
+                                output.push(*b);
+                            }
+                            // https://github.com/myrrlyn/bitvec/issues/62
+                            // output.extend_from_slice(chunk)
                         }
-                    } else {
-                        // Example read 10 bits u32 [0xAB, 0b11_000000]
-                        // => [00000000, 00000000, 00000010, 10101111]
-                        let bits = &input_bits[input_bits.len() - bit_size..];
-                        for b in bits {
-                            output.push(*b);
-                        }
-                        // https://github.com/myrrlyn/bitvec/issues/62
-                        // output.extend_from_slice(input_bits[input_bits.len() - bit_size..]);
+                        remaining_bits -= chunk.len();
                     }
+                } else {
+                    // Example read 10 bits u32 [0xAB, 0b11_000000]
+                    // => [00000000, 00000000, 00000010, 10101111]
+                    let bits = &input_bits[input_bits.len() - bit_size..];
+                    for b in bits {
+                        output.push(*b);
+                    }
+                    // https://github.com/myrrlyn/bitvec/issues/62
+                    // output.extend_from_slice(input_bits[input_bits.len() - bit_size..]);
+                }
                 Ok(())
             }
         }
 
         // Only have `endian`, return all input
         impl DekuWrite<Endian> for $typ {
-            fn write(&self, output: &mut BitVec<Msb0, u8>, endian: Endian) -> Result<(), DekuError> {
+            fn write(
+                &self,
+                output: &mut BitVec<Msb0, u8>,
+                endian: Endian,
+            ) -> Result<(), DekuError> {
                 let input = if endian.is_le() {
                     self.to_le_bytes()
                 } else {
@@ -478,7 +482,11 @@ macro_rules! ImplDekuTraits {
 
         // Only have `bit_size`, set `endian` to `Endian::default`.
         impl DekuWrite<BitSize> for $typ {
-            fn write(&self, output: &mut BitVec<Msb0, u8>, bit_size: BitSize) -> Result<(), DekuError> {
+            fn write(
+                &self,
+                output: &mut BitVec<Msb0, u8>,
+                bit_size: BitSize,
+            ) -> Result<(), DekuError> {
                 <$typ>::write(self, output, (Endian::default(), bit_size))
             }
         }
@@ -813,7 +821,9 @@ mod tests {
     fn test_bit_write(input: u32, endian: Endian, bit_size: Option<usize>, expected: Vec<u8>) {
         let mut res_write = bitvec![Msb0, u8;];
         match bit_size {
-            Some(bit_size) => input.write(&mut res_write, (endian, BitSize(bit_size))).unwrap(),
+            Some(bit_size) => input
+                .write(&mut res_write, (endian, BitSize(bit_size)))
+                .unwrap(),
             None => input.write(&mut res_write, endian).unwrap(),
         };
         assert_eq!(expected, res_write.into_vec());

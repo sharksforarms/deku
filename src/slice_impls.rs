@@ -542,7 +542,8 @@ mod tests {
         case::normal_be([0xDDCC, 0xBBAA], Endian::Big, vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
     fn test_bit_write(input: [u16; 2], endian: Endian, expected: Vec<u8>) {
-        let res_write = input.write(endian).unwrap().into_vec();
-        assert_eq!(expected, res_write);
+        let mut res_write = bitvec![Msb0, u8;];
+        input.write(&mut res_write, endian).unwrap();
+        assert_eq!(expected, res_write.into_vec());
     }
 }

@@ -554,7 +554,8 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Vec<T> {
     /// # use deku::{ctx::Endian, DekuWrite, prelude::Lsb0};
     /// # use bitvec::bitvec;
     /// let data = vec![1u8];
-    /// let output = data.write(Endian::Big).unwrap();
+    /// let mut output = bitvec![Msb0, u8;];
+    /// data.write(&mut output, Endian::Big).unwrap();
     /// assert_eq!(output, bitvec![0, 0, 0, 0, 0, 0, 0, 1])
     /// ```
     fn write(&self, output: &mut BitVec<Msb0, u8>, inner_ctx: Ctx) -> Result<(), DekuError> {
@@ -598,7 +599,8 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Option<T> {
     /// # use deku::{ctx::Endian, DekuWrite, prelude::Lsb0};
     /// # use bitvec::bitvec;
     /// let data = Some(1u8);
-    /// let output = data.write(Endian::Big).unwrap();
+    /// let mut output = bitvec![Msb0, u8;];
+    /// data.write(&mut output, Endian::Big).unwrap();
     /// assert_eq!(output, bitvec![0, 0, 0, 0, 0, 0, 0, 1])
     /// ```
     fn write(&self, output: &mut BitVec<Msb0, u8>, inner_ctx: Ctx) -> Result<(), DekuError> {
@@ -706,8 +708,9 @@ mod tests {
                 let (_rest, res_read) = <$typ>::read(bit_slice, ENDIAN).unwrap();
                 assert_eq!($expected, res_read);
 
-                let res_write = res_read.write(ENDIAN).unwrap().into_vec();
-                assert_eq!(input, res_write);
+                let mut res_write = bitvec![Msb0, u8;];
+                res_read.write(&mut res_write, ENDIAN).unwrap();
+                assert_eq!(input, res_write.into_vec());
             }
         };
     }
@@ -815,11 +818,12 @@ mod tests {
         case::bit_size_le_bigger(0x03AB, Endian::Little, Some(100), vec![0xAB, 0b11_000000]),
     )]
     fn test_bit_write(input: u32, endian: Endian, bit_size: Option<usize>, expected: Vec<u8>) {
-        let res_write = match bit_size {
-            Some(bit_size) => input.write((endian, BitSize(bit_size))).unwrap().into_vec(),
-            None => input.write(endian).unwrap().into_vec(),
+        let mut res_write = bitvec![Msb0, u8;];
+        match bit_size {
+            Some(bit_size) => input.write(&mut res_write, (endian, BitSize(bit_size))).unwrap(),
+            None => input.write(&mut res_write, endian).unwrap(),
         };
-        assert_eq!(expected, res_write);
+        assert_eq!(expected, res_write.into_vec());
     }
 
     #[rstest(input, endian, bit_size, expected, expected_rest, expected_write,
@@ -842,15 +846,15 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write = match bit_size {
+        let mut res_write = bitvec![Msb0, u8;];
+        match bit_size {
             Some(bit_size) => res_read
-                .write((endian, BitSize(bit_size)))
-                .unwrap()
-                .into_vec(),
-            None => res_read.write(endian).unwrap().into_vec(),
+                .write(&mut res_write, (endian, BitSize(bit_size)))
+                .unwrap(),
+            None => res_read.write(&mut res_write, endian).unwrap(),
         };
 
-        assert_eq!(expected_write, res_write);
+        assert_eq!(expected_write, res_write.into_vec());
     }
 
     #[rstest(input,endian,bit_size,count,expected,expected_rest,
@@ -892,8 +896,9 @@ mod tests {
         case::normal(vec![0xAABB, 0xCCDD], Endian::Little, vec![0xBB, 0xAA, 0xDD, 0xCC]),
     )]
     fn test_vec_write(input: Vec<u16>, endian: Endian, expected: Vec<u8>) {
-        let res_write = input.write(endian).unwrap().into_vec();
-        assert_eq!(expected, res_write);
+        let mut res_write = bitvec![Msb0, u8;];
+        input.write(&mut res_write, endian).unwrap();
+        assert_eq!(expected, res_write.into_vec());
     }
 
     #[rstest(input, endian, bit_size, count, expected, expected_rest, expected_write,
@@ -919,11 +924,11 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write: Vec<u8> = res_read
-            .write((endian, BitSize(bit_size)))
-            .unwrap()
-            .into_vec();
-        assert_eq!(expected_write, res_write);
+        let mut res_write = bitvec![Msb0, u8;];
+        res_read
+            .write(&mut res_write, (endian, BitSize(bit_size)))
+            .unwrap();
+        assert_eq!(expected_write, res_write.into_vec());
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
     }
@@ -944,8 +949,9 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write: Vec<u8> = res_read.write(endian).unwrap().into_vec();
-        assert_eq!(input.to_vec(), res_write);
+        let mut res_write = bitvec![Msb0, u8;];
+        res_read.write(&mut res_write, endian).unwrap();
+        assert_eq!(input.to_vec(), res_write.into_vec());
     }
 
     #[rstest(input, endian, expected, expected_rest,
@@ -964,24 +970,27 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let res_write: Vec<u8> = res_read.write(endian).unwrap().into_vec();
-        assert_eq!(input.to_vec(), res_write);
+        let mut res_write = bitvec![Msb0, u8;];
+        res_read.write(&mut res_write, endian).unwrap();
+        assert_eq!(input.to_vec(), res_write.into_vec());
     }
 
     #[test]
     fn test_ip_addr_write() {
         let ip_addr = IpAddr::V4(Ipv4Addr::new(145, 254, 160, 237));
-        let ret_write = ip_addr.write(Endian::Little).unwrap().into_vec();
-        assert_eq!(vec![237, 160, 254, 145], ret_write);
+        let mut ret_write = bitvec![Msb0, u8;];
+        ip_addr.write(&mut ret_write, Endian::Little).unwrap();
+        assert_eq!(vec![237, 160, 254, 145], ret_write.into_vec());
 
         let ip_addr = IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff));
-        let ret_write = ip_addr.write(Endian::Little).unwrap().into_vec();
+        let mut ret_write = bitvec![Msb0, u8;];
+        ip_addr.write(&mut ret_write, Endian::Little).unwrap();
         assert_eq!(
             vec![
                 0xFF, 0x02, 0x0A, 0xC0, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00
             ],
-            ret_write
+            ret_write.into_vec()
         );
     }
 }

@@ -407,11 +407,9 @@ macro_rules! ImplDekuTraits {
                 &self,
                 (endian, bit_size): (Endian, BitSize),
             ) -> Result<BitVec<Msb0, u8>, DekuError> {
-                let output_is_le = endian.is_le();
-                let input = if output_is_le {
-                    self.to_le_bytes()
-                } else {
-                    self.to_be_bytes()
+                let input = match endian {
+                    Endian::Little => self.to_le_bytes(),
+                    Endian::Big => self.to_be_bytes(),
                 };
 
                 let bit_size: usize = bit_size.into();
@@ -430,7 +428,7 @@ macro_rules! ImplDekuTraits {
                         )));
                     }
 
-                    if output_is_le {
+                    if matches!(endian, Endian::Little) {
                         // Example read 10 bits u32 [0xAB, 0b11_000000]
                         // => [10101011, 00000011, 00000000, 00000000]
                         let mut res_bits = BitVec::<Msb0, u8>::with_capacity(bit_size);
@@ -469,10 +467,9 @@ macro_rules! ImplDekuTraits {
         // Only have `endian`, return all input
         impl DekuWrite<Endian> for $typ {
             fn write(&self, endian: Endian) -> Result<BitVec<Msb0, u8>, DekuError> {
-                let input = if endian.is_le() {
-                    self.to_le_bytes()
-                } else {
-                    self.to_be_bytes()
+                let input = match endian {
+                    Endian::Little => self.to_le_bytes(),
+                    Endian::Big => self.to_be_bytes(),
                 };
 
                 Ok(input

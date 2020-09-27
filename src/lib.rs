@@ -408,11 +408,9 @@ macro_rules! ImplDekuTraits {
                 output: &mut BitVec<Msb0, u8>,
                 (endian, bit_size): (Endian, BitSize),
             ) -> Result<(), DekuError> {
-                let output_is_le = endian.is_le();
-                let input = if output_is_le {
-                    self.to_le_bytes()
-                } else {
-                    self.to_be_bytes()
+                let input = match endian {
+                    Endian::Little => self.to_le_bytes(),
+                    Endian::Big => self.to_be_bytes(),
                 };
 
                 let bit_size: usize = bit_size.into();
@@ -427,7 +425,7 @@ macro_rules! ImplDekuTraits {
                     )));
                 }
 
-                if output_is_le {
+                if matches!(endian, Endian::Little) {
                     // Example read 10 bits u32 [0xAB, 0b11_000000]
                     // => [10101011, 00000011, 00000000, 00000000]
                     let mut remaining_bits = bit_size;
@@ -470,10 +468,9 @@ macro_rules! ImplDekuTraits {
                 output: &mut BitVec<Msb0, u8>,
                 endian: Endian,
             ) -> Result<(), DekuError> {
-                let input = if endian.is_le() {
-                    self.to_le_bytes()
-                } else {
-                    self.to_be_bytes()
+                let input = match endian {
+                    Endian::Little => self.to_le_bytes(),
+                    Endian::Big => self.to_be_bytes(),
                 };
                 output.extend_from_bitslice(input.view_bits());
                 Ok(())

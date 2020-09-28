@@ -635,6 +635,7 @@ fn test_enum_endian_ctx() {
 }
 
 #[test]
+#[cfg(not(tarpaulin))]
 fn test_compile() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/macro_read/*.rs");

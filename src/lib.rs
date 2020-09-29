@@ -253,6 +253,7 @@ pub trait DekuContainerRead: DekuRead<()> {
 /// "Writer" trait: write from type to bits
 pub trait DekuWrite<Ctx = ()> {
     /// Write type to bits
+    /// * **output** - Sink to store resulting bits
     /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.
     fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError>;

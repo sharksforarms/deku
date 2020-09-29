@@ -1,11 +1,20 @@
 # Changelog
 
-## [Unreleased]
+## [0.8.0] - 2020-09-29
+
+- `write` now takes a `&mut BitVec` instead of returning a BitVec, this optimization
+speeds up serialization ([@agausmann](https://github.com/agausmann))
 
 The following items have been renamed: ([@wcampbell0x2a](https://github.com/wcampbell0x2a))
 - Renamed `id_type` in favor of `type`
 - Renamed `id_bits` in favor of `bits`
 - Renamed `id_bytes` in favor of `bytes`
+
+Internal:
+- Updated criterion to latest
+- Using tarpaulin for code coverage now
+- Swapped hex! macro ([@inspier](https://github.com/inspier))
+- Code improvements ([@wcampbell0x2a](https://github.com/wcampbell0x2a))
 
 ## [0.7.2] - 2020-09-02
 
@@ -43,7 +52,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.7.2...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.8.0...HEAD
+
+[0.8.0]: https://github.com/sharksforarms/deku/compare/deku-v0.7.2...deku-v0.8.0
 
 [0.7.2]: https://github.com/sharksforarms/deku/compare/deku-v0.7.1...deku-v0.7.2
 

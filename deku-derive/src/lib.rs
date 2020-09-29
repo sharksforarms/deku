@@ -1,3 +1,9 @@
+/*!
+    Procedural macros that implement `DekuRead` and `DekuWrite` traits
+*/
+
+#![warn(missing_docs)]
+
 use darling::{ast, FromDeriveInput, FromField, FromVariant};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -507,6 +513,7 @@ struct DekuVariantReceiver {
 }
 
 #[proc_macro_derive(DekuRead, attributes(deku))]
+/// Entry function for `DekuRead` proc-macro
 pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = match syn::parse(input) {
         Ok(input) => input,
@@ -527,6 +534,7 @@ pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 }
 
 #[proc_macro_derive(DekuWrite, attributes(deku))]
+/// Entry function for `DekuWrite` proc-macro
 pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = match syn::parse(input) {
         Ok(input) => input,

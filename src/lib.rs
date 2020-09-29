@@ -203,6 +203,7 @@ assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
 
 */
+#![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "alloc")]

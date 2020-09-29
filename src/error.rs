@@ -1,4 +1,7 @@
+//! Error module
+
 #![cfg(feature = "alloc")]
+
 use alloc::{format, string::String, string::ToString};
 
 /// Deku errors

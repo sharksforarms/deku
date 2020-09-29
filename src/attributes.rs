@@ -1,5 +1,5 @@
 /*!
-A documentation-only module for #[deku] attributes
+A documentation-only module for #\[deku\] attributes
 
 # List of attributes
 

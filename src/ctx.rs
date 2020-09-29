@@ -1,4 +1,4 @@
-//! This module provides types for context representation could be used in context-sensitive parsing.
+//! Types for context representation
 //! See [ctx attribute](../attributes/index.html#ctx) for more information.
 
 use core::ops::{Deref, DerefMut};
@@ -7,7 +7,9 @@ use core::str::FromStr;
 /// An endian
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Endian {
+    /// Little endian
     Little,
+    /// Big endian
     Big,
 }
 

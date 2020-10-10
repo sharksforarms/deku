@@ -591,10 +591,26 @@ mod tests {
             #[deku(id = "3")]
             C { field_n: u8 },
         }"#),
+        case::valid_bits(r#"struct Test(#[deku(bits=8)] u8);"#),
 
-        // TODO: these tests should error/warn eventually?
-        // error: trying to store 9 bits in 8 bit type
+        // error: invalid bit container size for deku bits/bytes attribute
+        #[should_panic(expected="field `field_0` of type `u8` with bit size: 8, not big enough for bits = 9")]
         case::invalid_storage(r#"struct Test(#[deku(bits=9)] u8);"#),
+        #[should_panic(expected="field `field_a` of type `u16` with bit size: 16, not big enough for bits = 24")]
+        case::invalid_storage(r#"
+        struct Invalid {
+            #[deku(bytes = 3)]
+            pub field_a: u16
+        }
+        "#),
+        #[should_panic(expected="field `ganondorf` of type `u8` with bit size: 8, not big enough for bits = 120")]
+        case::invalid_storage(r#"
+        struct Invalid {
+            #[deku(bits = 120)]
+            pub ganondorf: u8
+        }
+        "#),
+        // TODO
         // warn: trying to set endian on a type which wouldn't make a difference
         case::invalid_endian(r#"struct Test(#[endian=big] u8);"#),
     )]

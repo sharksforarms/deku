@@ -288,13 +288,6 @@ macro_rules! ImplDekuTraits {
 
                 let input_is_le = endian.is_le();
 
-                if bit_size > max_type_bits {
-                    return Err(DekuError::Parse(format!(
-                        "too much data: container of {} bits cannot hold {} bits",
-                        max_type_bits, bit_size
-                    )));
-                }
-
                 if input.len() < bit_size {
                     return Err(DekuError::Parse(format!(
                         "not enough data: expected {} bits got {} bits",
@@ -864,14 +857,8 @@ mod tests {
         case::count_1([0xAA, 0xBB].as_ref(), Endian::Little, Some(8), 1, vec![0xAA], bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
         case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Endian::Little, Some(8), 2, vec![0xAA, 0xBB], bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0]),
         case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), Endian::Little, Some(6), 2, vec![0b00_011010, 0b00_011110], bits![Msb0, u8; 1, 0, 0, 1]),
-        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
-        case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
-        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
-        case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"not enough data: expected 8 bits got 0 bits\")")]
         case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(8), 2, vec![], bits![Msb0, u8;]),
-        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
-        case::too_much_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
     )]
     fn test_vec_read(
         input: &[u8],

@@ -340,6 +340,9 @@ fn emit_field_read(
 
     let field_ident = f.get_ident(i, true);
 
+    // Check field container size vs bits entered
+    check_bitsize_container(f.bits, field_type, &field_ident);
+
     let internal_field_ident = gen_internal_field_ident(field_ident.clone());
 
     let field_read_func = if field_reader.is_some() {
@@ -418,4 +421,41 @@ fn emit_field_read(
     };
 
     Ok((field_ident, field_read))
+}
+
+/// Assert that container for bits must contain more than bit_size. Panic if not true.
+fn check_bitsize_container(
+    bits: Option<usize>,
+    ty: &syn::Type,
+    field_ident: &syn::export::TokenStream2,
+) {
+    if let Some(bit_size) = bits {
+        if let syn::Type::Path(type_path) = &ty {
+            if let Some(ident) = &type_path.path.get_ident() {
+                let max_bit_size = match ident.to_string().as_ref() {
+                    "u8" => core::mem::size_of::<u8>() * 8,
+                    "u16" => core::mem::size_of::<u16>() * 8,
+                    "u32" => core::mem::size_of::<u32>() * 8,
+                    "u64" => core::mem::size_of::<u64>() * 8,
+                    "u128" => core::mem::size_of::<u128>() * 8,
+                    "usize" => core::mem::size_of::<usize>() * 8,
+                    "i8" => core::mem::size_of::<i8>() * 8,
+                    "i16" => core::mem::size_of::<i16>() * 8,
+                    "i32" => core::mem::size_of::<i32>() * 8,
+                    "i64" => core::mem::size_of::<i64>() * 8,
+                    "i128" => core::mem::size_of::<i128>() * 8,
+                    "isize" => core::mem::size_of::<isize>() * 8,
+                    "f32" => core::mem::size_of::<f32>() * 8,
+                    "f64" => core::mem::size_of::<f64>() * 8,
+                    &_ => panic!("unsupported"),
+                };
+                if max_bit_size < bit_size {
+                    panic!(
+                        "field `{}` of type `{}` with bit size: {}, not big enough for bits = {}",
+                        field_ident, ident, max_bit_size, bit_size
+                    );
+                }
+            }
+        }
+    }
 }

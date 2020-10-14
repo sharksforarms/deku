@@ -781,8 +781,6 @@ mod tests {
         case::not_enough_data([].as_ref(), Endian::Little, Some(32), 0xFF, bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"not enough data: expected 32 bits got 16 bits\")")]
         case::not_enough_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(32), 0xFF, bits![Msb0, u8;]),
-        #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 64 bits\")")]
-        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(64), 0xFF, bits![Msb0, u8;]),
     )]
     fn test_bit_read(
         input: &[u8],

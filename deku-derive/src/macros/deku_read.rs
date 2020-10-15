@@ -485,7 +485,7 @@ fn check_bitsize_ctx(
             if let syn::Expr::Path(path) = &*call.func {
                 for path in path.path.segments.iter() {
                     // If we find a BitSize ident, parse the following argument
-                    if path.ident.to_string() == "BitSize" {
+                    if path.ident == "BitSize" {
                         // check call.args token
                         let args = call.args.first().unwrap();
                         if let syn::Expr::Lit(lit) = args {

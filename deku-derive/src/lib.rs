@@ -616,6 +616,13 @@ mod tests {
             pub ganondorf: u8
         }
         "#),
+        #[should_panic(expected="field `ganondorf` of type `u8` with bit size: 8, not big enough for bits = 9")]
+        case::invalid_storage(r#"
+        struct Invalid {
+            #[deku(ctx = "deku::ctx::BitSize(9)")]
+            pub ganondorf: u8
+        }
+        "#),
         // TODO
         // warn: trying to set endian on a type which wouldn't make a difference
         case::invalid_endian(r#"struct Test(#[endian=big] u8);"#),

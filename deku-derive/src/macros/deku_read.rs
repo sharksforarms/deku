@@ -340,8 +340,11 @@ fn emit_field_read(
 
     let field_ident = f.get_ident(i, true);
 
-    // Check field container size vs bits entered
-    check_bitsize_container(f.bits, field_type, &field_ident);
+    // Check field container size vs bits entered for attribute `bytes` and `bits`
+    check_bitsize_bits_bytes(f.bits, field_type, &field_ident);
+
+    // Check field container size vs bits entered for attribute `deku::ctx::Bitsize(n)`
+    check_bitsize_ctx(f.ctx.as_ref(), field_type, &field_ident);
 
     let internal_field_ident = gen_internal_field_ident(field_ident.clone());
 
@@ -423,16 +426,31 @@ fn emit_field_read(
     Ok((field_ident, field_read))
 }
 
+/// Panic if type_bit_size < max_bit_size from `bytes`, `bits`, or `ctx::BitSize`
+fn check_bitsize(
+    max_bit_size: usize,
+    type_bit_size: usize,
+    field_ident: &syn::export::TokenStream2,
+    type_ident: &syn::Ident,
+) {
+    if max_bit_size > type_bit_size {
+        panic!(
+            "field `{}` of type `{}` with bit size: {}, not big enough for bits = {}",
+            field_ident, type_ident, type_bit_size, max_bit_size
+        );
+    }
+}
+
 /// Assert that container for bits must contain more than bit_size. Panic if not true.
-fn check_bitsize_container(
+fn check_bitsize_bits_bytes(
     bits: Option<usize>,
     ty: &syn::Type,
     field_ident: &syn::export::TokenStream2,
 ) {
-    if let Some(bit_size) = bits {
+    if let Some(max_bit_size) = bits {
         if let syn::Type::Path(type_path) = &ty {
-            if let Some(ident) = &type_path.path.get_ident() {
-                let max_bit_size = match ident.to_string().as_ref() {
+            if let Some(type_ident) = &type_path.path.get_ident() {
+                let type_bit_size = match type_ident.to_string().as_ref() {
                     "u8" => core::mem::size_of::<u8>() * 8,
                     "u16" => core::mem::size_of::<u16>() * 8,
                     "u32" => core::mem::size_of::<u32>() * 8,
@@ -449,11 +467,35 @@ fn check_bitsize_container(
                     "f64" => core::mem::size_of::<f64>() * 8,
                     &_ => panic!("unsupported"),
                 };
-                if max_bit_size < bit_size {
-                    panic!(
-                        "field `{}` of type `{}` with bit size: {}, not big enough for bits = {}",
-                        field_ident, ident, max_bit_size, bit_size
-                    );
+                check_bitsize(max_bit_size, type_bit_size, field_ident, type_ident);
+            }
+        }
+    }
+}
+
+/// Convert `ctx::BitSize` into usize and check with `check_bitsize_bits_bytes`
+fn check_bitsize_ctx(
+    ctx: Option<&syn::punctuated::Punctuated<syn::Expr, syn::token::Comma>>,
+    ty: &syn::Type,
+    field_ident: &syn::export::TokenStream2,
+) {
+    if let Some(ctx) = ctx {
+        if let syn::Expr::Call(call) = ctx.first().unwrap() {
+            // Check if call.funcs have BitSize
+            if let syn::Expr::Path(path) = &*call.func {
+                for path in path.path.segments.iter() {
+                    // If we find a BitSize ident, parse the following argument
+                    if path.ident.to_string() == "BitSize" {
+                        // check call.args token
+                        let args = call.args.first().unwrap();
+                        if let syn::Expr::Lit(lit) = args {
+                            if let syn::Lit::Int(int) = &lit.lit {
+                                let ident_int = int.base10_parse::<u32>().unwrap() as usize;
+                                // Check with normal function now that we have the ident_int
+                                check_bitsize_bits_bytes(Some(ident_int), ty, field_ident);
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -578,6 +578,12 @@ mod tests {
             #[deku(skip, default = "5")]
             field_e: u32,
         }"#),
+        case::valid_ctx_bitsize(r#"
+        struct Invalid {
+            #[deku(ctx = "deku::ctx::BitSize(7)")]
+            pub hey_listen: u8
+        }
+        "#),
 
         // Valid Enum
         case::enum_empty(r#"#[deku(type = "u8")] enum Test {}"#),

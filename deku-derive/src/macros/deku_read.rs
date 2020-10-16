@@ -38,6 +38,23 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let initialize_struct = super::gen_struct_init(is_named_struct, internal_fields);
 
+    let check_magic = if let Some(magic) = &input.magic {
+        quote!{
+            let magic = #magic;
+
+            for byte in magic {
+                let (new_rest, read_byte) = u8::read(rest, ())?;
+                if *byte != read_byte {
+                    return Err(DekuError::Parse(format!("Missing magic value {:?}", #magic)));
+                }
+
+                rest = new_rest;
+            }
+        }
+    } else {
+        quote!{}
+    };
+
     // Implement `DekuContainerRead` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
         let from_bytes_body = wrap_default_ctx(
@@ -47,6 +64,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
                 let mut rest = input.0.view_bits::<Msb0>();
                 rest = &rest[input.1..];
+
+                #check_magic
 
                 #(#field_reads)*
                 let value = #initialize_struct;
@@ -70,6 +89,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let read_body = quote! {
         use core::convert::TryFrom;
         let mut rest = input;
+
+        #check_magic
 
         #(#field_reads)*
         let value = #initialize_struct;

@@ -29,6 +29,9 @@ struct DekuData {
     /// default context passed to the field
     ctx_default: Option<Punctuated<syn::Expr, syn::token::Comma>>,
 
+    /// A magic value that must appear at the start of this struct's data
+    magic: Option<syn::LitByteStr>,
+
     /// enum only: `id` value
     id: Option<TokenStream>,
 
@@ -87,6 +90,7 @@ impl DekuData {
             endian: receiver.endian,
             ctx,
             ctx_default,
+            magic: receiver.magic,
             id: receiver.id,
             id_type: receiver.id_type,
             bits,
@@ -385,6 +389,10 @@ struct DekuReceiver {
     //       https://github.com/TedDriggs/darling/pull/98
     #[darling(default)]
     ctx_default: Option<syn::LitStr>,
+
+    /// A magic value that must appear at the start of this struct's data
+    #[darling(default)]
+    magic: Option<syn::LitByteStr>,
 
     /// enum only: `id` value
     #[darling(default, map = "option_as_tokenstream")]

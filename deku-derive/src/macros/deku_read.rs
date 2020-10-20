@@ -60,25 +60,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             &input.ctx_default,
         );
 
-        tokens.extend(quote! {
-        impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
-            type Error = DekuError;
+        tokens.extend(emit_try_from(&imp, &ident, wher));
 
-            fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
-                let (rest, res) = Self::from_bytes((input, 0))?;
-                if !rest.0.is_empty() {
-                    return Err(DekuError::Parse(format!("Too much data")));
-                }
-                Ok(res)
-            }
-        }
-
-        impl #imp DekuContainerRead for #ident #wher {
-            fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
-                #from_bytes_body
-            }
-        }
-        })
+        tokens.extend(emit_from_bytes(&imp, &ident, wher, from_bytes_body));
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
@@ -247,25 +231,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             &input.ctx_default,
         );
 
-        tokens.extend(quote! {
-        impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
-            type Error = DekuError;
+        tokens.extend(emit_try_from(&imp, &ident, wher));
 
-            fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
-                let (rest, res) = Self::from_bytes((input, 0))?;
-                if !rest.0.is_empty() {
-                    return Err(DekuError::Parse(format!("Too much data")));
-                }
-                Ok(res)
-            }
-        }
-
-        impl #imp DekuContainerRead for #ident #wher {
-            fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
-                #from_bytes_body
-            }
-        }
-        })
+        tokens.extend(emit_from_bytes(&imp, &ident, wher, from_bytes_body));
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
@@ -418,4 +386,41 @@ fn emit_field_read(
     };
 
     Ok((field_ident, field_read))
+}
+
+/// emit `from_bytes()` for struct/enum
+pub fn emit_from_bytes(
+    imp: &syn::ImplGenerics,
+    ident: &TokenStream,
+    wher: Option<&syn::WhereClause>,
+    body: TokenStream,
+) -> TokenStream {
+    quote! {
+        impl #imp DekuContainerRead for #ident #wher {
+            fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
+                #body
+            }
+        }
+    }
+}
+
+/// emit `TryFrom` trait for struct/enum
+pub fn emit_try_from(
+    imp: &syn::ImplGenerics,
+    ident: &TokenStream,
+    wher: Option<&syn::WhereClause>,
+) -> TokenStream {
+    quote! {
+        impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
+            type Error = DekuError;
+
+            fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
+                let (rest, res) = Self::from_bytes((input, 0))?;
+                if !rest.0.is_empty() {
+                    return Err(DekuError::Parse(format!("Too much data")));
+                }
+                Ok(res)
+            }
+        }
+    }
 }

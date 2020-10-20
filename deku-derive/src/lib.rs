@@ -512,8 +512,8 @@ struct DekuVariantReceiver {
     id_pat: Option<TokenStream>,
 }
 
-#[proc_macro_derive(DekuRead, attributes(deku))]
 /// Entry function for `DekuRead` proc-macro
+#[proc_macro_derive(DekuRead, attributes(deku))]
 pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = match syn::parse(input) {
         Ok(input) => input,
@@ -533,8 +533,8 @@ pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     data.emit_reader().into()
 }
 
-#[proc_macro_derive(DekuWrite, attributes(deku))]
 /// Entry function for `DekuWrite` proc-macro
+#[proc_macro_derive(DekuWrite, attributes(deku))]
 pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = match syn::parse(input) {
         Ok(input) => input,

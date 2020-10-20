@@ -98,10 +98,13 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
     };
 
+    // avoid outputing `use core::convert::TryInto` if update() function is empty
+    let update_use = check_use_update(&field_updates);
+
     tokens.extend(quote! {
         impl #imp DekuUpdate for #ident #wher {
             fn update(&mut self) -> Result<(), DekuError> {
-                use core::convert::TryInto;
+                #update_use
                 #(#field_updates)*
 
                 Ok(())
@@ -284,10 +287,14 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         Ok(())
     };
+
+    // avoid outputing `use core::convert::TryInto` if update() function is empty
+    let update_use = check_use_update(&variant_updates);
+
     tokens.extend(quote! {
         impl #imp DekuUpdate for #ident #wher {
             fn update(&mut self) -> Result<(), DekuError> {
-                use core::convert::TryInto;
+                #update_use
 
                 match self {
                     #(#variant_updates),*
@@ -426,4 +433,13 @@ fn emit_field_write(
     };
 
     Ok(field_write)
+}
+
+/// avoid outputing `use core::convert::TryInto` if update() function is generated with empty Vec
+fn check_use_update<T>(vec: &[T]) -> TokenStream {
+    if !vec.is_empty() {
+        quote! {use core::convert::TryInto;}
+    } else {
+        quote! {}
+    }
 }

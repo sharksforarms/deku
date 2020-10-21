@@ -2,6 +2,8 @@ use alloc_counter::AllocCounterSystem;
 use deku::ctx::Endian;
 use deku::prelude::*;
 
+// Smoke tests for allocation counting
+
 #[global_allocator]
 static A: AllocCounterSystem = AllocCounterSystem;
 

@@ -32,28 +32,13 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         .and_then(|v| v.ident.as_ref())
         .is_some();
 
+    let magic_read = emit_magic_read(input)?;
+
     let (field_idents, field_reads) = emit_field_reads(input, &fields)?;
 
     let internal_fields = gen_internal_field_idents(is_named_struct, field_idents);
 
     let initialize_struct = super::gen_struct_init(is_named_struct, internal_fields);
-
-    let check_magic = if let Some(magic) = &input.magic {
-        quote!{
-            let magic = #magic;
-
-            for byte in magic {
-                let (new_rest, read_byte) = u8::read(rest, ())?;
-                if *byte != read_byte {
-                    return Err(DekuError::Parse(format!("Missing magic value {:?}", #magic)));
-                }
-
-                rest = new_rest;
-            }
-        }
-    } else {
-        quote!{}
-    };
 
     // Implement `DekuContainerRead` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
@@ -65,7 +50,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 let mut rest = input.0.view_bits::<Msb0>();
                 rest = &rest[input.1..];
 
-                #check_magic
+                #magic_read
 
                 #(#field_reads)*
                 let value = #initialize_struct;
@@ -90,7 +75,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         use core::convert::TryFrom;
         let mut rest = input;
 
-        #check_magic
+        #magic_read
 
         #(#field_reads)*
         let value = #initialize_struct;
@@ -289,6 +274,29 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     }
 
     // println!("{}", tokens.to_string());
+    Ok(tokens)
+}
+
+fn emit_magic_read(
+    input: &DekuData
+) -> Result<TokenStream, syn::Error> {
+    let tokens = if let Some(magic) = &input.magic {
+        quote!{
+            let magic = #magic;
+
+            for byte in magic {
+                let (new_rest, read_byte) = u8::read(rest, ())?;
+                if *byte != read_byte {
+                    return Err(DekuError::Parse(format!("Missing magic value {:?}", #magic)));
+                }
+
+                rest = new_rest;
+            }
+        }
+    } else {
+        quote!{}
+    };
+
     Ok(tokens)
 }
 

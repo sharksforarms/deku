@@ -124,6 +124,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let id_args = gen_id_args(input.endian.as_ref(), input.bits)?;
 
+    let magic_read = emit_magic_read(input)?;
+
     let mut variant_matches = vec![];
     let mut has_default_match = false;
 
@@ -226,6 +228,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 let mut rest = input.0.bits::<Msb0>();
                 rest = &rest[input.1..];
 
+                #magic_read
+
                 #variant_read
 
                 let pad = 8 * ((rest.len() + 7) / 8) - rest.len();
@@ -247,6 +251,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let read_body = quote! {
         use core::convert::TryFrom;
         let mut rest = input;
+
+        #magic_read
 
         #variant_read
 

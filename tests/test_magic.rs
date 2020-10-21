@@ -20,7 +20,7 @@ pub mod samples {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(magic = b"UKED")]
     pub struct NestedMagicDeku {
-        pub nested: MagicDeku
+        pub nested: MagicDeku,
     }
 }
 
@@ -45,10 +45,7 @@ pub mod samples {
 fn test_magic_struct(input: &[u8]) {
     let ret_read = samples::MagicDeku::try_from(input).unwrap();
 
-    assert_eq!(
-        samples::MagicDeku{},
-        ret_read
-    );
+    assert_eq!(samples::MagicDeku {}, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(ret_write, input)
@@ -78,10 +75,7 @@ fn test_magic_struct(input: &[u8]) {
 fn test_magic_enum(input: &[u8]) {
     let ret_read = samples::EnumMagicDeku::try_from(input).unwrap();
 
-    assert_eq!(
-        samples::EnumMagicDeku::Variant,
-        ret_read
-    );
+    assert_eq!(samples::EnumMagicDeku::Variant, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(ret_write, input)
@@ -100,7 +94,9 @@ fn test_nested_magic_struct(input: &[u8]) {
     let ret_read = samples::NestedMagicDeku::try_from(input).unwrap();
 
     assert_eq!(
-        samples::NestedMagicDeku{nested: samples::MagicDeku{}},
+        samples::NestedMagicDeku {
+            nested: samples::MagicDeku {}
+        },
         ret_read
     );
 

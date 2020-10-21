@@ -283,11 +283,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     Ok(tokens)
 }
 
-fn emit_magic_read(
-    input: &DekuData
-) -> Result<TokenStream, syn::Error> {
+fn emit_magic_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let tokens = if let Some(magic) = &input.magic {
-        quote!{
+        quote! {
             let magic = #magic;
 
             for byte in magic {
@@ -300,7 +298,7 @@ fn emit_magic_read(
             }
         }
     } else {
-        quote!{}
+        quote! {}
     };
 
     Ok(tokens)

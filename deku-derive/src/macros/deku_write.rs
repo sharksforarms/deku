@@ -339,15 +339,13 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     Ok(tokens)
 }
 
-fn emit_magic_write(
-    input: &DekuData,
-) -> Result<TokenStream, syn::Error> {
+fn emit_magic_write(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let tokens = if let Some(magic) = &input.magic {
-        quote!{
+        quote! {
             #magic.write(output, ())?;
         }
     } else {
-        quote!{}
+        quote! {}
     };
 
     Ok(tokens)

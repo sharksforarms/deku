@@ -29,7 +29,7 @@ struct DekuData {
     /// default context passed to the field
     ctx_default: Option<Punctuated<syn::Expr, syn::token::Comma>>,
 
-    /// A magic value that must appear at the start of this struct's data
+    /// A magic value that must appear at the start of this struct/enum's data
     magic: Option<syn::LitByteStr>,
 
     /// enum only: `id` value
@@ -390,7 +390,7 @@ struct DekuReceiver {
     #[darling(default)]
     ctx_default: Option<syn::LitStr>,
 
-    /// A magic value that must appear at the start of this struct's data
+    /// A magic value that must appear at the start of this struct/enum's data
     #[darling(default)]
     magic: Option<syn::LitByteStr>,
 

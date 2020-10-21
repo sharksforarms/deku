@@ -604,11 +604,7 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Option<T> {
     /// assert_eq!(output, bitvec![0, 0, 0, 0, 0, 0, 0, 1])
     /// ```
     fn write(&self, output: &mut BitVec<Msb0, u8>, inner_ctx: Ctx) -> Result<(), DekuError> {
-        if let Some(v) = self {
-            v.write(output, inner_ctx)
-        } else {
-            Ok(())
-        }
+        self.as_ref().map_or(Ok(()), |v| v.write(output, inner_ctx))
     }
 }
 

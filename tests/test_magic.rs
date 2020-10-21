@@ -1,7 +1,7 @@
 use deku::prelude::*;
 use hexlit::hex;
 use rstest::rstest;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 pub mod samples {
     use super::*;
@@ -48,7 +48,10 @@ fn test_magic_struct(input: &[u8]) {
     assert_eq!(
         samples::MagicDeku{},
         ret_read
-    )
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(ret_write, input)
 }
 
 #[rstest(input,
@@ -78,7 +81,10 @@ fn test_magic_enum(input: &[u8]) {
     assert_eq!(
         samples::EnumMagicDeku::Variant,
         ret_read
-    )
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(ret_write, input)
 }
 
 #[rstest(input,
@@ -96,5 +102,8 @@ fn test_nested_magic_struct(input: &[u8]) {
     assert_eq!(
         samples::NestedMagicDeku{nested: samples::MagicDeku{}},
         ret_read
-    )
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(ret_write, input)
 }

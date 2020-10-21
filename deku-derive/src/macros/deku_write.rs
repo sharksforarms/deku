@@ -21,6 +21,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
 
+    let magic_write = emit_magic_write(input)?;
+
     // Checked in `emit_deku_write`.
     let fields = input.data.as_ref().take_struct().unwrap();
 
@@ -45,6 +47,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     #destructured => {
                         let mut acc: BitVec<Msb0, u8> = BitVec::new();
                         let output = &mut acc;
+                        #magic_write
                         #(#field_writes)*
 
                         Ok(acc)
@@ -91,6 +94,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let write_body = quote! {
         match *self {
             #destructured => {
+                #magic_write
                 #(#field_writes)*
 
                 Ok(())
@@ -140,6 +144,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut tokens = TokenStream::new();
 
     let (imp, ty, wher) = input.generics.split_for_impl();
+
+    let magic_write = emit_magic_write(input)?;
 
     // checked in emit_deku_write
     let variants = input.data.as_ref().take_enum().unwrap();
@@ -237,6 +243,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 let mut acc: BitVec<Msb0, u8> = BitVec::new();
                 let output = &mut acc;
 
+                #magic_write
+
                 match self {
                     #(#variant_writes),*
                 }
@@ -281,6 +289,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
 
     let write_body = quote! {
+        #magic_write
+
         match self {
             #(#variant_writes),*
         }
@@ -326,6 +336,20 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     }
 
     // println!("{}", tokens.to_string());
+    Ok(tokens)
+}
+
+fn emit_magic_write(
+    input: &DekuData,
+) -> Result<TokenStream, syn::Error> {
+    let tokens = if let Some(magic) = &input.magic {
+        quote!{
+            #magic.write(output, ())?;
+        }
+    } else {
+        quote!{}
+    };
+
     Ok(tokens)
 }
 

@@ -359,7 +359,7 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    DekuRead::read(rest, (deku::ctx::Count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
+                    DekuRead::read(rest, (usize::try_from(*((#field_count).borrow()))?.into(), (#read_args)))
                 }
             }
         } else {

@@ -215,7 +215,7 @@ use alloc::{format, vec::Vec};
 #[cfg(feature = "std")]
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use crate::ctx::{BitSize, Count, Endian};
+use crate::ctx::{BitSize, Endian, Limit};
 use bitvec::prelude::*;
 use core::convert::TryInto;
 pub use deku_derive::*;
@@ -498,7 +498,7 @@ macro_rules! ImplDekuTraits {
     };
 }
 
-impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Count, Ctx)> for Vec<T> {
+impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Limit, Ctx)> for Vec<T> {
     /// Read the specified number of `T`s from input.
     /// * `count` - the number of `T`s you want to read.
     /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s when constructing.
@@ -514,12 +514,12 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Count, Ctx)> for Vec<T> {
     /// ```
     fn read(
         input: &BitSlice<Msb0, u8>,
-        (count, inner_ctx): (Count, Ctx),
+        (limit, inner_ctx): (Limit, Ctx),
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
     {
-        let count: usize = count.into();
+        let count: usize = limit.into();
 
         let mut res = Vec::with_capacity(count);
         let mut rest = input;
@@ -533,16 +533,16 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Count, Ctx)> for Vec<T> {
     }
 }
 
-impl<T: DekuRead> DekuRead<Count> for Vec<T> {
+impl<T: DekuRead> DekuRead<Limit> for Vec<T> {
     /// Read the specified number of `T`s from input for types which don't require context.
     fn read(
         input: &BitSlice<Msb0, u8>,
-        count: Count,
+        limit: Limit,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
     {
-        Vec::read(input, (count, ()))
+        Vec::read(input, (limit, ()))
     }
 }
 
@@ -881,9 +881,9 @@ mod tests {
 
         let (rest, res_read) = match bit_size {
             Some(bit_size) => {
-                Vec::<u8>::read(bit_slice, (Count(count), (endian, BitSize(bit_size)))).unwrap()
+                Vec::<u8>::read(bit_slice, (count.into(), (endian, BitSize(bit_size)))).unwrap()
             }
-            None => Vec::<u8>::read(bit_slice, (Count(count), (endian))).unwrap(),
+            None => Vec::<u8>::read(bit_slice, (count.into(), (endian))).unwrap(),
         };
 
         assert_eq!(expected, res_read);
@@ -918,7 +918,7 @@ mod tests {
         let bit_size = bit_size.unwrap();
 
         let (rest, res_read) =
-            Vec::<u16>::read(bit_slice, (Count(count), (endian, BitSize(bit_size)))).unwrap();
+            Vec::<u16>::read(bit_slice, (count.into(), (endian, BitSize(bit_size)))).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 

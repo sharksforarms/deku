@@ -72,33 +72,24 @@ impl FromStr for Endian {
     }
 }
 
-/// The count of a container's elements
+/// A limit placed on a contaner's elements
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Count(pub usize);
+pub enum Limit {
+    /// Read a specific count of elements
+    Count(usize),
+}
 
-impl Into<usize> for Count {
+impl Into<usize> for Limit {
     fn into(self) -> usize {
-        self.0
+        match self {
+            Limit::Count(count) => count,
+        }
     }
 }
 
-impl From<usize> for Count {
+impl From<usize> for Limit {
     fn from(n: usize) -> Self {
-        Self(n)
-    }
-}
-
-impl Deref for Count {
-    type Target = usize;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Count {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        Limit::Count(n)
     }
 }
 

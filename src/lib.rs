@@ -498,6 +498,27 @@ macro_rules! ImplDekuTraits {
     };
 }
 
+fn read_vec_with_predicate<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool>(
+    input: &BitSlice<Msb0, u8>,
+    vec: Vec<T>,
+    ctx: Ctx,
+    mut predicate: Predicate,
+) -> Result<(&BitSlice<Msb0, u8>, Vec<T>), DekuError> {
+    let mut res = vec;
+    let mut rest = input;
+    loop {
+        let (new_rest, val) = <T>::read(rest, ctx)?;
+        res.push(val);
+        rest = new_rest;
+
+        if predicate(res.last().unwrap()) {
+            break;
+        }
+    }
+
+    Ok((rest, res))
+}
+
 impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Limit, Ctx)> for Vec<T> {
     /// Read the specified number of `T`s from input.
     /// * `count` - the number of `T`s you want to read.
@@ -519,17 +540,20 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<(Limit, Ctx)> for Vec<T> {
     where
         Self: Sized,
     {
-        let count: usize = limit.into();
+        match limit {
+            Limit::Count(mut count) => {
+                // Handle the trivial case of reading an empty vector
+                if count == 0 {
+                    return Ok((input, Vec::new()));
+                }
 
-        let mut res = Vec::with_capacity(count);
-        let mut rest = input;
-        for _i in 0..count {
-            let (new_rest, val) = <T>::read(rest, inner_ctx)?;
-            res.push(val);
-            rest = new_rest;
+                // Otherwise, read until we have read `count` elements
+                read_vec_with_predicate(input, Vec::with_capacity(count), inner_ctx, move |_| {
+                    count -= 1;
+                    count == 0
+                })
+            }
         }
-
-        Ok((rest, res))
     }
 }
 

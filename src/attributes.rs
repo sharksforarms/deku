@@ -106,8 +106,7 @@ assert_eq!(data, value);
 
 Sets a "magic" value that must be present in the data at the start of
 a struct/enum when reading, and that is written out of the start of
-that type's data when writing, without needing to be explicitly stored
-in a field
+that type's data when writing.
 
 Example:
 ```rust

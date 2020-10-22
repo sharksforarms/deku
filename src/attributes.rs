@@ -115,16 +115,16 @@ Example:
 # use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(magic = b"deku")]
-pub struct MagicDeku {
+pub struct DekuTest {
     data: u8
 }
 
 let data: Vec<u8> = vec![0x64, 0x65, 0x6B, 0x75, 50];
 
-let value = MagicDeku::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data.as_ref()).unwrap();
 
 assert_eq!(
-    MagicDeku { data: 50 },
+    DekuTest { data: 50 },
     value
 );
 

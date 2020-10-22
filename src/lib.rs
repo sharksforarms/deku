@@ -896,25 +896,27 @@ mod tests {
         assert_eq!(expected_write, res_write.into_vec());
     }
 
-    #[rstest(input,endian,bit_size,count,expected,expected_rest,
-        case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0, vec![], bits![Msb0, u8; 1, 0, 1, 0, 1, 0, 1, 0]),
-        case::count_1([0xAA, 0xBB].as_ref(), Endian::Little, Some(8), 1, vec![0xAA], bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
-        case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Endian::Little, Some(8), 2, vec![0xAA, 0xBB], bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0]),
-        case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), Endian::Little, Some(6), 2, vec![0b00_011010, 0b00_011110], bits![Msb0, u8; 1, 0, 0, 1]),
+    #[rstest(input,endian,bit_size,limit,expected,expected_rest,
+        case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), vec![], bits![Msb0, u8; 1, 0, 1, 0, 1, 0, 1, 0]),
+        case::count_1([0xAA, 0xBB].as_ref(), Endian::Little, Some(8), 1.into(), vec![0xAA], bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
+        case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Endian::Little, Some(8), 2.into(), vec![0xAA, 0xBB], bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0]),
+        case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, None, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0], bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
+        case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(8).into(), vec![0xAA], bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
+        case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), Endian::Little, Some(6), 2.into(), vec![0b00_011010, 0b00_011110], bits![Msb0, u8; 1, 0, 0, 1]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
-        case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
+        case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1.into(), vec![], bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
-        case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
+        case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(9), 1.into(), vec![], bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"not enough data: expected 8 bits got 0 bits\")")]
-        case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(8), 2, vec![], bits![Msb0, u8;]),
+        case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(8), 2.into(), vec![], bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
-        case::too_much_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(9), 1, vec![], bits![Msb0, u8;]),
+        case::too_much_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(9), 1.into(), vec![], bits![Msb0, u8;]),
     )]
-    fn test_vec_read(
+    fn test_vec_read<Predicate: FnMut(&u8) -> bool>(
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        count: usize,
+        limit: Limit<u8, Predicate>,
         expected: Vec<u8>,
         expected_rest: &BitSlice<Msb0, u8>,
     ) {
@@ -922,9 +924,9 @@ mod tests {
 
         let (rest, res_read) = match bit_size {
             Some(bit_size) => {
-                Vec::<u8>::read(bit_slice, (count.into(), (endian, BitSize(bit_size)))).unwrap()
+                Vec::<u8>::read(bit_slice, (limit, (endian, BitSize(bit_size)))).unwrap()
             }
-            None => Vec::<u8>::read(bit_slice, (count.into(), (endian))).unwrap(),
+            None => Vec::<u8>::read(bit_slice, (limit, (endian))).unwrap(),
         };
 
         assert_eq!(expected, res_read);

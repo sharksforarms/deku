@@ -522,8 +522,8 @@ fn read_vec_with_predicate<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(usize, 
 impl<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool> DekuRead<(Limit<T, Predicate>, Ctx)>
     for Vec<T>
 {
-    /// Read the specified number of `T`s from input.
-    /// * `count` - the number of `T`s you want to read.
+    /// Read `T`s until the given limit
+    /// * `limit` - the limiting factor on the amount of `T`s to read
     /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s when constructing.
     /// # Examples
     /// ```rust
@@ -575,7 +575,7 @@ impl<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool> DekuRead<(Limit<
 }
 
 impl<T: DekuRead, Predicate: FnMut(&T) -> bool> DekuRead<Limit<T, Predicate>> for Vec<T> {
-    /// Read the specified number of `T`s from input for types which don't require context.
+    /// Read `T`s until the given limit from input for types which don't require context.
     fn read(
         input: &BitSlice<Msb0, u8>,
         limit: Limit<T, Predicate>,

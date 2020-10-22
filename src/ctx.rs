@@ -1,6 +1,7 @@
 //! Types for context representation
 //! See [ctx attribute](../attributes/index.html#ctx) for more information.
 
+use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::str::FromStr;
 
@@ -74,22 +75,23 @@ impl FromStr for Endian {
 
 /// A limit placed on a contaner's elements
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub enum Limit {
+pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
     /// Read a specific count of elements
     Count(usize),
+
+    /// Read until a given predicate holds true
+    Until(Predicate, PhantomData<T>),
 }
 
-impl Into<usize> for Limit {
-    fn into(self) -> usize {
-        match self {
-            Limit::Count(count) => count,
-        }
+impl<T> From<usize> for Limit<T, fn(&T) -> bool> {
+    fn from(n: usize) -> Self {
+        Limit::Count(n)
     }
 }
 
-impl From<usize> for Limit {
-    fn from(n: usize) -> Self {
-        Limit::Count(n)
+impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> From<Predicate> for Limit<T, Predicate> {
+    fn from(predicate: Predicate) -> Self {
+        Limit::Until(predicate, PhantomData)
     }
 }
 

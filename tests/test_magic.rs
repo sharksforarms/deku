@@ -70,4 +70,3 @@ fn test_magic_enum(input: &[u8]) {
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(ret_write, input)
 }
-

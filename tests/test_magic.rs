@@ -3,27 +3,6 @@ use hexlit::hex;
 use rstest::rstest;
 use std::convert::{TryFrom, TryInto};
 
-pub mod samples {
-    use super::*;
-
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(magic = b"deku")]
-    pub struct MagicDeku {}
-
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(magic = b"deku", type = "u8")]
-    pub enum EnumMagicDeku {
-        #[deku(id = "0")]
-        Variant,
-    }
-
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(magic = b"UKED")]
-    pub struct NestedMagicDeku {
-        pub nested: MagicDeku,
-    }
-}
-
 #[rstest(input,
     case(&hex!("64656b75")),
 
@@ -43,9 +22,13 @@ pub mod samples {
     case(&hex!("64656b")),
 )]
 fn test_magic_struct(input: &[u8]) {
-    let ret_read = samples::MagicDeku::try_from(input).unwrap();
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(magic = b"deku")]
+    pub struct TestStruct {}
 
-    assert_eq!(samples::MagicDeku {}, ret_read);
+    let ret_read = TestStruct::try_from(input).unwrap();
+
+    assert_eq!(TestStruct {}, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(ret_write, input)
@@ -73,33 +56,18 @@ fn test_magic_struct(input: &[u8]) {
     case(&hex!("64656b")),
 )]
 fn test_magic_enum(input: &[u8]) {
-    let ret_read = samples::EnumMagicDeku::try_from(input).unwrap();
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(magic = b"deku", type = "u8")]
+    pub enum TestEnum {
+        #[deku(id = "0")]
+        Variant,
+    }
 
-    assert_eq!(samples::EnumMagicDeku::Variant, ret_read);
+    let ret_read = TestEnum::try_from(input).unwrap();
 
-    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(ret_write, input)
-}
-
-#[rstest(input,
-    case(&hex!("554b454464656b75")),
-
-    #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
-    case(&hex!("554b4544deadbeef")),
-
-    #[should_panic(expected = "Parse(\"Missing magic value [85, 75, 69, 68]\")")]
-    case(&hex!("deadbeef64656b75")),
-)]
-fn test_nested_magic_struct(input: &[u8]) {
-    let ret_read = samples::NestedMagicDeku::try_from(input).unwrap();
-
-    assert_eq!(
-        samples::NestedMagicDeku {
-            nested: samples::MagicDeku {}
-        },
-        ret_read
-    );
+    assert_eq!(TestEnum::Variant, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(ret_write, input)
 }
+

@@ -81,6 +81,9 @@ pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
 
     /// Read until a given predicate holds true
     Until(Predicate, PhantomData<T>),
+
+    /// Read until a given quantity of bits have been read
+    Bits(BitSize),
 }
 
 impl<T> From<usize> for Limit<T, fn(&T) -> bool> {
@@ -92,6 +95,12 @@ impl<T> From<usize> for Limit<T, fn(&T) -> bool> {
 impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> From<Predicate> for Limit<T, Predicate> {
     fn from(predicate: Predicate) -> Self {
         Limit::Until(predicate, PhantomData)
+    }
+}
+
+impl<T> From<BitSize> for Limit<T, fn(&T) -> bool> {
+    fn from(bits: BitSize) -> Self {
+        Limit::Bits(bits)
     }
 }
 

@@ -32,6 +32,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         .and_then(|v| v.ident.as_ref())
         .is_some();
 
+    let magic_read = emit_magic_read(input)?;
+
     let (field_idents, field_reads) = emit_field_reads(input, &fields)?;
 
     let internal_fields = gen_internal_field_idents(is_named_struct, field_idents);
@@ -47,6 +49,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
                 let mut rest = input.0.view_bits::<Msb0>();
                 rest = &rest[input.1..];
+
+                #magic_read
 
                 #(#field_reads)*
                 let value = #initialize_struct;
@@ -70,6 +74,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let read_body = quote! {
         use core::convert::TryFrom;
         let mut rest = input;
+
+        #magic_read
 
         #(#field_reads)*
         let value = #initialize_struct;
@@ -117,6 +123,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let id_type = input.id_type.as_ref();
 
     let id_args = gen_id_args(input.endian.as_ref(), input.bits)?;
+
+    let magic_read = emit_magic_read(input)?;
 
     let mut variant_matches = vec![];
     let mut has_default_match = false;
@@ -220,6 +228,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 let mut rest = input.0.bits::<Msb0>();
                 rest = &rest[input.1..];
 
+                #magic_read
+
                 #variant_read
 
                 let pad = 8 * ((rest.len() + 7) / 8) - rest.len();
@@ -241,6 +251,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let read_body = quote! {
         use core::convert::TryFrom;
         let mut rest = input;
+
+        #magic_read
 
         #variant_read
 
@@ -268,6 +280,27 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     }
 
     // println!("{}", tokens.to_string());
+    Ok(tokens)
+}
+
+fn emit_magic_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
+    let tokens = if let Some(magic) = &input.magic {
+        quote! {
+            let magic = #magic;
+
+            for byte in magic {
+                let (new_rest, read_byte) = u8::read(rest, ())?;
+                if *byte != read_byte {
+                    return Err(DekuError::Parse(format!("Missing magic value {:?}", #magic)));
+                }
+
+                rest = new_rest;
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     Ok(tokens)
 }
 

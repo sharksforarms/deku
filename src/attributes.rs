@@ -6,6 +6,7 @@ A documentation-only module for #\[deku\] attributes
 | Attribute | Scope | Description
 |-----------|------------------|------------
 | [endian](#endian) | top-level, field | Set the endianness
+| [magic](#magic) | top-level | A magic value that must be present at the start of this struct/enum
 | [bits](#bits) | field | Set the bit-size of the field
 | [bytes](#bytes) | field | Set the byte-size of the field
 | [count](#count) | field | Set the field representing the element count of a container
@@ -94,6 +95,35 @@ assert_eq!(
        field_default: 0xCDAB,
        field_child: Child { field_a: 0xBEEF }
     },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(data, value);
+```
+
+# magic
+
+Sets a "magic" value that must be present in the data at the start of
+a struct/enum when reading, and that is written out of the start of
+that type's data when writing.
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(magic = b"deku")]
+pub struct DekuTest {
+    data: u8
+}
+
+let data: Vec<u8> = vec![0x64, 0x65, 0x6B, 0x75, 50];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest { data: 50 },
     value
 );
 

@@ -4,7 +4,7 @@ use std::convert::{TryFrom, TryInto};
 #[test]
 fn test_generic_struct() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    pub struct TestStruct<T: deku::DekuWrite + deku::DekuRead>
+    pub struct TestStruct<T>
     where
         T: deku::DekuWrite + deku::DekuRead,
     {
@@ -24,7 +24,7 @@ fn test_generic_struct() {
 fn test_generic_enum() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(type = "u8")]
-    pub enum TestEnum<T: deku::DekuRead + deku::DekuWrite>
+    pub enum TestEnum<T>
     where
         T: deku::DekuWrite + deku::DekuRead,
     {

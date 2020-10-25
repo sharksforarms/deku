@@ -205,6 +205,9 @@ struct FieldData {
     /// tokens providing the length of the container
     count: Option<TokenStream>,
 
+    /// tokens providing the number of bits for the length of the container
+    bits_read: Option<TokenStream>,
+
     /// apply a function to the field after it's read
     map: Option<TokenStream>,
 
@@ -237,6 +240,11 @@ impl FieldData {
 
         let bits = receiver.bytes.map(|b| b * 8).or(receiver.bits);
 
+        let bits_read = receiver
+            .bytes_read
+            .map(|tokens| quote! { (#tokens) * 8 })
+            .or(receiver.bits_read);
+
         let default = receiver.default.unwrap_or(quote! { Default::default() });
 
         let ctx = receiver
@@ -251,6 +259,7 @@ impl FieldData {
             endian: receiver.endian,
             bits,
             count: receiver.count,
+            bits_read,
             map: receiver.map,
             ctx,
             update: receiver.update,
@@ -459,6 +468,14 @@ struct DekuFieldReceiver {
     /// tokens providing the length of the container
     #[darling(default, map = "option_as_tokenstream")]
     count: Option<TokenStream>,
+
+    /// tokens providing the number of bits for the length of the container
+    #[darling(default, map = "option_as_tokenstream")]
+    bits_read: Option<TokenStream>,
+
+    /// tokens providing the number of bytes for the length of the container
+    #[darling(default, map = "option_as_tokenstream")]
+    bytes_read: Option<TokenStream>,
 
     /// apply a function to the field after it's read
     #[darling(default, map = "option_as_tokenstream")]

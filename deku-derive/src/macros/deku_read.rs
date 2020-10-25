@@ -348,18 +348,25 @@ fn emit_field_read(
     } else {
         let read_args = gen_field_args(field_endian, f.bits, f.ctx.as_ref())?;
 
-        // Count is special, we need to generate `(count, (other, ..))` for it.
+        // The container limiting options are special, we need to generate `(limit, (other, ..))` for them.
+        // These have a problem where when it isn't a copy type, the field will be moved.
+        // e.g. struct FooBar {
+        //   a: Baz // a type implement `Into<usize>` but not `Copy`.
+        //   #[deku(count = "a") <-- Oops, use of moved value: `a`
+        //   b: Vec<_>
+        // }
         if let Some(field_count) = &f.count {
-            // The count has same problem, when it isn't a copy type, the field will be moved.
-            // e.g. struct FooBar {
-            //   a: Baz // a type implement `Into<usize>` but not `Copy`.
-            //   #[deku(count = "a") <-- Oops, use of moved value: `a`
-            //   b: Vec<_>
-            // }
             quote! {
                 {
                     use core::borrow::Borrow;
                     DekuRead::read(rest, (usize::try_from(*((#field_count).borrow()))?.into(), (#read_args)))
+                }
+            }
+        } else if let Some(field_bits) = &f.bits_read {
+            quote! {
+                {
+                    use core::borrow::Borrow;
+                    DekuRead::read(rest, (deku::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?).into(), (#read_args)))
                 }
             }
         } else {

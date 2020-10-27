@@ -574,9 +574,7 @@ impl<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool> DekuRead<(Limit<
 
             // Read until a given predicate returns true
             Limit::Until(mut predicate, _) => {
-                read_vec_with_predicate(input, None, inner_ctx, move |_, value| {
-                    predicate(value)
-                })
+                read_vec_with_predicate(input, None, inner_ctx, move |_, value| predicate(value))
             }
 
             // Read until a given quanity of bits have been read

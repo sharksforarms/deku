@@ -500,12 +500,18 @@ macro_rules! ImplDekuTraits {
 
 fn read_vec_with_predicate<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(usize, &T) -> bool>(
     input: &BitSlice<Msb0, u8>,
-    vec: Vec<T>,
+    capacity: Option<usize>,
     ctx: Ctx,
     mut predicate: Predicate,
 ) -> Result<(&BitSlice<Msb0, u8>, Vec<T>), DekuError> {
-    let mut res = vec;
+    let mut res = if let Some(capacity) = capacity {
+        Vec::with_capacity(capacity)
+    } else {
+        Vec::new()
+    };
+
     let mut rest = input;
+
     loop {
         let (new_rest, val) = <T>::read(rest, ctx)?;
         res.push(val);
@@ -551,7 +557,7 @@ impl<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool> DekuRead<(Limit<
                 }
 
                 // Otherwise, read until we have read `count` elements
-                read_vec_with_predicate(input, Vec::with_capacity(count), inner_ctx, move |_, _| {
+                read_vec_with_predicate(input, Some(count), inner_ctx, move |_, _| {
                     count -= 1;
                     count == 0
                 })
@@ -559,14 +565,14 @@ impl<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool> DekuRead<(Limit<
 
             // Read until a given predicate returns true
             Limit::Until(mut predicate, _) => {
-                read_vec_with_predicate(input, Vec::new(), inner_ctx, move |_, value| {
+                read_vec_with_predicate(input, None, inner_ctx, move |_, value| {
                     predicate(value)
                 })
             }
 
             // Read until a given quanity of bits have been read
             Limit::Bits(bits) => {
-                read_vec_with_predicate(input, Vec::new(), inner_ctx, move |read_bits, _| {
+                read_vec_with_predicate(input, None, inner_ctx, move |read_bits, _| {
                     read_bits == bits.into()
                 })
             }

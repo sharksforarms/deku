@@ -498,6 +498,13 @@ macro_rules! ImplDekuTraits {
     };
 }
 
+/// Read `T`s into a vec until a given predicate returns true
+/// * `capacity` - an optional capacity to pre-allocate the vector with
+/// * `ctx` - The context required by `T`. It will be passed to every `T` when constructing.
+/// * `predicate` - the predicate that decides when to stop reading `T`s
+/// The predicate takes two parameters: the number of bits that have been read so far,
+/// and a borrow of the latest value to have been read. It should return `true` if reading
+/// should now stop, and `false` otherwise
 fn read_vec_with_predicate<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(usize, &T) -> bool>(
     input: &BitSlice<Msb0, u8>,
     capacity: Option<usize>,

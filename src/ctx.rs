@@ -73,7 +73,7 @@ impl FromStr for Endian {
     }
 }
 
-/// A limit placed on a contaner's elements
+/// A limit placed on a container's elements
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
     /// Read a specific count of elements

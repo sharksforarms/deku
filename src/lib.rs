@@ -517,6 +517,8 @@ fn read_vec_with_predicate<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(usize, 
         res.push(val);
         rest = new_rest;
 
+        // This unwrap is safe as we are pushing to the vec immediately before it,
+        // so there will always be a last element
         if predicate(input.offset_from(rest) as usize, res.last().unwrap()) {
             break;
         }

@@ -369,6 +369,10 @@ fn emit_field_read(
                     DekuRead::read(rest, (deku::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?).into(), (#read_args)))
                 }
             }
+        } else if let Some(field_until) = &f.until {
+            // We wrap the input into another closure here to enforce that it is actually a callable
+            // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
+            quote! {DekuRead::read(rest, ((|__deku_v: &_| (#field_until)(__deku_v)).into(), (#read_args)))}
         } else {
             quote! {DekuRead::read(rest, (#read_args))}
         }

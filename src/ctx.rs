@@ -1,6 +1,7 @@
 //! Types for context representation
 //! See [ctx attribute](../attributes/index.html#ctx) for more information.
 
+use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::str::FromStr;
 
@@ -72,33 +73,34 @@ impl FromStr for Endian {
     }
 }
 
-/// The count of a container's elements
+/// A limit placed on a container's elements
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Count(pub usize);
+pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
+    /// Read a specific count of elements
+    Count(usize),
 
-impl Into<usize> for Count {
-    fn into(self) -> usize {
-        self.0
-    }
+    /// Read until a given predicate holds true
+    Until(Predicate, PhantomData<T>),
+
+    /// Read until a given quantity of bits have been read
+    Bits(BitSize),
 }
 
-impl From<usize> for Count {
+impl<T> From<usize> for Limit<T, fn(&T) -> bool> {
     fn from(n: usize) -> Self {
-        Self(n)
+        Limit::Count(n)
     }
 }
 
-impl Deref for Count {
-    type Target = usize;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> From<Predicate> for Limit<T, Predicate> {
+    fn from(predicate: Predicate) -> Self {
+        Limit::Until(predicate, PhantomData)
     }
 }
 
-impl DerefMut for Count {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+impl<T> From<BitSize> for Limit<T, fn(&T) -> bool> {
+    fn from(bits: BitSize) -> Self {
+        Limit::Bits(bits)
     }
 }
 

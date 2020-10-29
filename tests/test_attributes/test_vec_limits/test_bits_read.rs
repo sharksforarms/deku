@@ -38,12 +38,12 @@ fn test_bits_read_from_field() {
         data: Vec<u16>,
     }
 
-    let test_data: Vec<u8> = [0x10, 0xAA, 0xBB].to_vec();
+    let test_data: Vec<u8> = [16, 0xAA, 0xBB].to_vec();
 
     let mut ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
     assert_eq!(
         TestStruct {
-            bits: 0x10,
+            bits: 16,
 
             // We should read 16 bits, not 16 elements,
             // thus resulting in a single u16 element
@@ -55,10 +55,10 @@ fn test_bits_read_from_field() {
     // Add an item to the vec
     ret_read.data.push(0xFFEE);
 
-    // `bits` is still 0x02, this is intended. `update` attribute should be
+    // `bits` is still 16, this is intended. `update` attribute should be
     // used if `bits` is to be updated
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!([0x10, 0xAA, 0xBB, 0xEE, 0xFF].to_vec(), ret_write);
+    assert_eq!([16, 0xAA, 0xBB, 0xEE, 0xFF].to_vec(), ret_write);
 }
 
 #[test]
@@ -72,7 +72,7 @@ fn test_bits_read_error() {
         data: Vec<u16>,
     }
 
-    let test_data: Vec<u8> = [0x11, 0xAA, 0xBB].to_vec();
+    let test_data: Vec<u8> = [17, 0xAA, 0xBB].to_vec();
 
     let _ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
 }

@@ -359,20 +359,20 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    DekuRead::read(rest, (usize::try_from(*((#field_count).borrow()))?.into(), (#read_args)))
+                    DekuRead::read(rest, (deku::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
                 }
             }
         } else if let Some(field_bits) = &f.bits_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    DekuRead::read(rest, (deku::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?).into(), (#read_args)))
+                    DekuRead::read(rest, (deku::ctx::Limit::new_bits(deku::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_until) = &f.until {
             // We wrap the input into another closure here to enforce that it is actually a callable
             // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
-            quote! {DekuRead::read(rest, ((|__deku_v: &_| (#field_until)(__deku_v)).into(), (#read_args)))}
+            quote! {DekuRead::read(rest, (deku::ctx::Limit::new_until(#field_until), (#read_args)))}
         } else {
             quote! {DekuRead::read(rest, (#read_args))}
         }

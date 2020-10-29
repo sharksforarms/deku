@@ -104,6 +104,27 @@ impl<T> From<BitSize> for Limit<T, fn(&T) -> bool> {
     }
 }
 
+impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> Limit<T, Predicate> {
+    /// Constructs a new Limit that reads until the given predicate returns true
+    /// The predicate is given a reference to the latest read value and must return
+    /// true to stop reading
+    pub fn new_until(predicate: Predicate) -> Self {
+        predicate.into()
+    }
+}
+
+impl<T> Limit<T, fn(&T) -> bool> {
+    /// Constructs a new Limit that reads unil the given number of elements are read
+    pub fn new_count(count: usize) -> Self {
+        count.into()
+    }
+
+    /// Constructs a new Limit that reads until the given number of bits have been read
+    pub fn new_bits(bits: BitSize) -> Self {
+        bits.into()
+    }
+}
+
 /// The number bits in a field
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct BitSize(pub usize);

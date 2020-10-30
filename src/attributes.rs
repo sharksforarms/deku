@@ -10,6 +10,9 @@ A documentation-only module for #\[deku\] attributes
 | [bits](#bits) | field | Set the bit-size of the field
 | [bytes](#bytes) | field | Set the byte-size of the field
 | [count](#count) | field | Set the field representing the element count of a container
+| [bits_read](#bits_read) | field | Set the field representing the number of bits to read into a container
+| [bytes_read](#bytes_read) | field | Set the field representing the number of bytes to read into a container
+| [until](#until) | field | Set a predicate returning when to stop reading elements into a container
 | [update](#update) | field | Apply code over the field when `.update()` is called
 | [skip](#skip) | field | Skip the reading/writing of a field
 | [cond](#cond) | field | Conditional expression for the field
@@ -233,6 +236,88 @@ assert_eq!(data, value);
 ```
 
 **Note**: See [update](#update) for more information on the attribute!
+
+
+# bytes_read
+
+Specify the field representing the total number of bytes to read into a container
+
+See the following example, where `InnerDekuTest` is 2 bytes, so setting `bytes_read` to
+4 will read 2 items into the container:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct InnerDekuTest {
+    field_a: u8,
+    field_b: u8
+}
+
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(update = "(self.items.len() / 2)")]
+    bytes: u8,
+
+    #[deku(bytes_read = "bytes")]
+    items: Vec<InnerDekuTest>,
+}
+
+let data: Vec<u8> = vec![0x04, 0xAB, 0xBC, 0xDE, 0xEF];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest {
+       bytes: 0x04,
+       items: vec![
+           InnerDekuTest{field_a: 0xAB, field_b: 0xBC},
+           InnerDekuTest{field_a: 0xDE, field_b: 0xEF}],
+    },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(data, value);
+```
+
+**Note**: See [update](#update) for more information on the attribute!
+
+
+# bits_read
+
+This is equivalent to [bytes_read](#bytes_read), however specifies the bit limit instead
+of a byte limit
+
+
+# until
+
+Specifies a predicate which sets when to stop reading values into the container.
+
+The predicate is given a borrow to each item as it is read, and must return a boolean
+as to whether this should be the last item or not. If it returns true, then reading stops.
+
+A good example of this is to read a null-terminated string:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# use std::ffi::CString;
+# #[derive(Debug, PartialEq, DekuRead)]
+struct DekuTest {
+    #[deku(until = "|v: &u8| *v == 0")]
+    string: Vec<u8>
+}
+
+let data: Vec<u8> = vec![72, 101, 108, 108, 111, 0];
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest {
+        string: CString::new(b"Hello".to_vec()).unwrap().into_bytes_with_nul()
+    },
+    value
+);
+```
+
 
 # update
 

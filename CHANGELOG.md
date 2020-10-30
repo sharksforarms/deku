@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+
+## [0.9.0] - 2020-10-30
+
+- Added `magic` attribute, this allows the ability to specify a set of bytes
+which must be present at the start of the data
+([@samuelsleight](https://github.com/samuelsleight))
+- Added `until` attribute, this allows the ability to read until a given predicate
+([@samuelsleight](https://github.com/samuelsleight))
+- Added `bits_read` and `bytes_read` container attributes, this allows the ability to specify
+an amount of bits/bytes to read inside a Vec<T>
+([@samuelsleight](https://github.com/samuelsleight))
+- Improved documentation
+- Refactored test cases
+- Code improvements ([@wcampbell0x2a](https://github.com/wcampbell0x2a))
+
 ## [0.8.0] - 2020-09-29
 
 - `write` now takes a `&mut BitVec` instead of returning a BitVec, this optimization
@@ -52,7 +69,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.8.0...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.9.0...HEAD
+
+[0.9.0]: https://github.com/sharksforarms/deku/compare/deku-v0.8.0...deku-v0.9.0
 
 [0.8.0]: https://github.com/sharksforarms/deku/compare/deku-v0.7.2...deku-v0.8.0
 

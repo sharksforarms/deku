@@ -276,6 +276,31 @@ impl FieldData {
     }
 
     fn validate(receiver: &DekuFieldReceiver) -> Result<(), (proc_macro2::Span, &str)> {
+        // Validate either `read_bytes` or `read_bits` is specified
+        if receiver.bits_read.is_some() && receiver.bytes_read.is_some() {
+            return Err((
+                receiver.bits_read.span(),
+                "conflicting: both `bits_read` and `bytes_read` specified on field",
+            ));
+        }
+
+        // Validate either `count` or `bits_read`/`bytes_read` is specified
+        if receiver.count.is_some()
+            && (receiver.bits_read.is_some() || receiver.bytes_read.is_some())
+        {
+            if receiver.bits_read.is_some() {
+                return Err((
+                    receiver.count.span(),
+                    "conflicting: both `count` and `bits_read` specified on field",
+                ));
+            } else {
+                return Err((
+                    receiver.count.span(),
+                    "conflicting: both `count` and `bytes_read` specified on field",
+                ));
+            }
+        }
+
         // Validate either `bits` or `bytes` is specified
         if receiver.bits.is_some() && receiver.bytes.is_some() {
             /*

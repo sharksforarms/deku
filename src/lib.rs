@@ -90,6 +90,10 @@ assert_eq!(data, data_out);
 Vec<T> can be used in combination with the [count](attributes/index.html#count)
 attribute (T must implement DekuRead/DekuWrite)
 
+[bytes_read](attributes/index.html#bytes_read) or [bits_read](attributes/index.html#bits_read)
+can also be used instead of `count` to read a specific size of each.
+
+
 If the length of Vec changes, the original field specified in `count` will not get updated.
 Calling `.update()` can be used to "update" the field!
 

@@ -1,0 +1,23 @@
+error: conflicting: both `bits_read` and `bytes_read` specified on field
+ --> $DIR/count_read_conflict.rs:5:24
+  |
+5 |     #[deku(bits_read = "1", bytes_read = "2")]
+  |                        ^^^
+
+error: conflicting: both `bits_read` and `bytes_read` specified on field
+  --> $DIR/count_read_conflict.rs:11:37
+   |
+11 |     #[deku(count = "1", bits_read = "1", bytes_read = "2")]
+   |                                     ^^^
+
+error: conflicting: both `count` and `bits_read` specified on field
+  --> $DIR/count_read_conflict.rs:17:20
+   |
+17 |     #[deku(count = "1", bits_read = "1")]
+   |                    ^^^
+
+error: conflicting: both `count` and `bytes_read` specified on field
+  --> $DIR/count_read_conflict.rs:23:20
+   |
+23 |     #[deku(count = "1", bytes_read = "2")]
+   |                    ^^^

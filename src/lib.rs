@@ -437,31 +437,17 @@ macro_rules! ImplDekuTraits {
                     let mut remaining_bits = bit_size;
                     for chunk in input_bits.chunks(8) {
                         if chunk.len() > remaining_bits {
-                            let bits = &chunk[chunk.len() - remaining_bits..];
-                            for b in bits {
-                                output.push(*b);
-                            }
-                            // https://github.com/myrrlyn/bitvec/issues/62
-                            // output.extend_from_slice(chunk[chunk.len() - remaining_bits..]);
+                            output.extend_from_bitslice(&chunk[chunk.len() - remaining_bits..]);
                             break;
                         } else {
-                            for b in chunk {
-                                output.push(*b);
-                            }
-                            // https://github.com/myrrlyn/bitvec/issues/62
-                            // output.extend_from_slice(chunk)
+                            output.extend_from_bitslice(chunk)
                         }
                         remaining_bits -= chunk.len();
                     }
                 } else {
                     // Example read 10 bits u32 [0xAB, 0b11_000000]
                     // => [00000000, 00000000, 00000010, 10101111]
-                    let bits = &input_bits[input_bits.len() - bit_size..];
-                    for b in bits {
-                        output.push(*b);
-                    }
-                    // https://github.com/myrrlyn/bitvec/issues/62
-                    // output.extend_from_slice(input_bits[input_bits.len() - bit_size..]);
+                    output.extend_from_bitslice(&input_bits[input_bits.len() - bit_size..]);
                 }
                 Ok(())
             }

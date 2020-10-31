@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2020-10-31
+- Changed minimum bitvec version to 0.19.4 to have desired `offset_from`
+functionality (https://github.com/myrrlyn/bitvec/issues/86). This was missed in
+0.9.0 release.
+- Code improvements ([@wcampbell0x2a](https://github.com/wcampbell0x2a))
 
 ## [0.9.0] - 2020-10-30
 
@@ -69,7 +74,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.9.0...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.9.1...HEAD
+
+[0.9.1]: https://github.com/sharksforarms/deku/compare/deku-v0.9.0...deku-v0.9.1
 
 [0.9.0]: https://github.com/sharksforarms/deku/compare/deku-v0.8.0...deku-v0.9.0
 

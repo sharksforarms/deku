@@ -336,15 +336,13 @@ macro_rules! ImplDekuTraits {
                         bits.force_align();
 
                         // Some padding to next byte
-                        if input_is_le {
-                            let ins_index = bits.len() - (8 - pad);
-                            for _ in 0..pad {
-                                bits.insert(ins_index, false);
-                            }
+                        let index = if input_is_le {
+                            bits.len() - (8 - pad)
                         } else {
-                            for _ in 0..pad {
-                                bits.insert(0, false);
-                            }
+                            0
+                        };
+                        for _ in 0..pad {
+                            bits.insert(index, false);
                         }
 
                         // Pad up-to size of type

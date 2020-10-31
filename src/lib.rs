@@ -514,9 +514,11 @@ fn read_vec_with_predicate<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(usize, 
         res.push(val);
         rest = new_rest;
 
+        // Compare the rest bitsize vs the inputed bitsize, and use the last T.
+        //
         // This unwrap is safe as we are pushing to the vec immediately before it,
         // so there will always be a last element
-        if predicate(input.offset_from(rest) as usize, res.last().unwrap()) {
+        if predicate(input.len() - rest.len(), res.last().unwrap()) {
             break;
         }
     }
@@ -570,7 +572,7 @@ impl<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool> DekuRead<(Limit<
             // Read until a given quanity of bits have been read
             Limit::Bits(bits) => {
                 read_vec_with_predicate(input, None, inner_ctx, move |read_bits, _| {
-                    read_bits == bits.into()
+                    read_bits == *bits
                 })
             }
         }

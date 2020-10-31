@@ -121,7 +121,7 @@ pub struct DekuTest {
     data: u8
 }
 
-let data: Vec<u8> = vec![0x64, 0x65, 0x6B, 0x75, 50];
+let data: Vec<u8> = vec![b'd', b'e', b'k', b'u', 50];
 
 let value = DekuTest::try_from(data.as_ref()).unwrap();
 
@@ -307,7 +307,7 @@ struct DekuTest {
     string: Vec<u8>
 }
 
-let data: Vec<u8> = vec![72, 101, 108, 108, 111, 0];
+let data: Vec<u8> = vec![b'H', b'e', b'l', b'l', b'o', 0];
 let value = DekuTest::try_from(data.as_ref()).unwrap();
 
 assert_eq!(

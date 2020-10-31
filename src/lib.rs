@@ -329,9 +329,7 @@ macro_rules! ImplDekuTraits {
                         let mut bits = BitVec::with_capacity(bit_slice.len() + pad);
 
                         // Copy bits to new BitVec
-                        for b in bit_slice {
-                            bits.push(*b);
-                        }
+                        bits.extend_from_bitslice(bit_slice);
 
                         // Force align
                         //i.e. [1110, 10010110] -> [11101001, 0110]

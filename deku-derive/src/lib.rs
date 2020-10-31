@@ -165,18 +165,14 @@ impl DekuData {
 
     /// Emit a reader. On error, a compiler error is emitted
     fn emit_reader(&self) -> TokenStream {
-        match self.emit_reader_checked() {
-            Ok(tks) => tks,
-            Err(e) => e.to_compile_error(),
-        }
+        self.emit_reader_checked()
+            .map_or_else(|e| e.to_compile_error(), |tks| tks)
     }
 
     /// Emit a writer. On error, a compiler error is emitted
     fn emit_writer(&self) -> TokenStream {
-        match self.emit_writer_checked() {
-            Ok(tks) => tks,
-            Err(e) => e.to_compile_error(),
-        }
+        self.emit_writer_checked()
+            .map_or_else(|e| e.to_compile_error(), |tks| tks)
     }
 
     /// Same as `emit_reader`, but won't auto convert error to compile error

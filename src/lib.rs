@@ -14,7 +14,7 @@ Under the hood, it makes use of the [bitvec](https://crates.io/crates/bitvec)
 crate as the "Reader" and “Writer”
 
 For documentation and examples on available `#deku[()]` attributes and features,
-see [attributes list](attributes/index.html)
+see [attributes list](attributes)
 
 For more examples, see the
 [examples folder](https://github.com/sharksforarms/deku/tree/master/examples)!
@@ -87,10 +87,10 @@ assert_eq!(data, data_out);
 
 # Vec
 
-Vec<T> can be used in combination with the [count](attributes/index.html#count)
+Vec<T> can be used in combination with the [count](attributes#count)
 attribute (T must implement DekuRead/DekuWrite)
 
-[bytes_read](attributes/index.html#bytes_read) or [bits_read](attributes/index.html#bits_read)
+[bytes_read](attributes#bytes_read) or [bits_read](attributes#bits_read)
 can also be used instead of `count` to read a specific size of each.
 
 
@@ -149,7 +149,7 @@ First the "type" is read using the `type`, then is matched against the
 variants given `id`. What happens after is the same as structs!
 
 This is implemented with the [id](/attributes/index.html#id) and
-[type](attributes/index.html#type) attributes.
+[type](attributes#type) attributes.
 
 Example:
 
@@ -178,7 +178,7 @@ assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 
 Child parsers can get access to the parent's parsed values using the `ctx` attribute
 
-For more information see [ctx attribute](attributes/index.html#ctx)
+For more information see [ctx attribute](attributes#ctx)
 
 Example:
 

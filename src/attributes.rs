@@ -32,7 +32,7 @@ A documentation-only module for #\[deku\] attributes
 
 Set to read/write bytes in a specific byte order.
 
-Values: `big`, `little` or an expression which returns a [`Endian`](../ctx/enum.Endian.html)
+Values: `big`, `little` or an expression which returns a [`Endian`](super::ctx::Endian)
 
 Precedence: field > top-level > system endianness (default)
 

@@ -1,6 +1,6 @@
 /*! Crate prelude
 
-[What is a prelude?](https://doc.rust-lang.org/std/prelude/)
+[What is a prelude?](std::prelude)
 */
 pub use crate::{
     error::DekuError, DekuContainerRead, DekuContainerWrite, DekuRead, DekuUpdate, DekuWrite,

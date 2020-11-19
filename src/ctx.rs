@@ -1,5 +1,5 @@
 //! Types for context representation
-//! See [ctx attribute](../attributes/index.html#ctx) for more information.
+//! See [ctx attribute](super::attributes#ctx) for more information.
 
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
@@ -16,14 +16,14 @@ pub enum Endian {
 
 /// Error returned when parsing a `Endian` using [`from_str`]
 ///
-/// [`from_str`]: enum.Endian.html#method.from_str
+/// [`from_str`]: Endian::from_str()
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseEndianError {}
 
 impl Endian {
     /// [`Endian::default`], but const.
     ///
-    /// [`Endian::default`]: #method.default
+    /// [`Endian::default`]: Endian::default()
     pub const fn new() -> Self {
         #[cfg(target_endian = "little")]
         let endian = Endian::Little;

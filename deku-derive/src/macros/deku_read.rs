@@ -129,7 +129,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let id = input.id.as_ref();
     let id_type = input.id_type.as_ref();
 
-    let id_args = gen_id_args(input.endian.as_ref(), input.bits)?;
+    let id_args = gen_id_args(input.endian.as_ref(), input.bits, input.bytes)?;
 
     let magic_read = emit_magic_read(input)?;
 
@@ -368,7 +368,7 @@ fn emit_field_read(
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
     } else {
-        let read_args = gen_field_args(field_endian, f.bits, f.ctx.as_ref())?;
+        let read_args = gen_field_args(field_endian, f.bits, f.bytes, f.ctx.as_ref())?;
 
         // The container limiting options are special, we need to generate `(limit, (other, ..))` for them.
         // These have a problem where when it isn't a copy type, the field will be moved.
@@ -388,7 +388,7 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    DekuRead::read(rest, (deku::ctx::Limit::new_bits(deku::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
+                    DekuRead::read(rest, (deku::ctx::Limit::new_bits(deku::ctx::Size::Bits(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_until) = &f.until {

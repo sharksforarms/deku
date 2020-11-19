@@ -39,8 +39,10 @@ struct DekuData {
     id_type: Option<syn::Ident>,
 
     /// enum only: bit size of the enum `id`
-    /// `bytes` is converted to `bits` if provided
     bits: Option<usize>,
+
+    /// enum only: byte size of the enum `id`
+    bytes: Option<usize>,
 }
 
 impl DekuData {
@@ -80,8 +82,6 @@ impl DekuData {
             .transpose()
             .map_err(|e| e.to_compile_error())?;
 
-        let bits = receiver.bytes.map(|b| b * 8).or(receiver.bits);
-
         Ok(Self {
             vis: receiver.vis,
             ident: receiver.ident,
@@ -93,7 +93,8 @@ impl DekuData {
             magic: receiver.magic,
             id: receiver.id,
             id_type: receiver.id_type,
-            bits,
+            bits: receiver.bits,
+            bytes: receiver.bytes,
         })
     }
 
@@ -198,6 +199,9 @@ struct FieldData {
     /// field bit size
     bits: Option<usize>,
 
+    /// field byte size
+    bytes: Option<usize>,
+
     /// tokens providing the length of the container
     count: Option<TokenStream>,
 
@@ -240,8 +244,6 @@ impl FieldData {
         FieldData::validate(&receiver)
             .map_err(|(span, msg)| syn::Error::new(span, msg).to_compile_error())?;
 
-        let bits = receiver.bytes.map(|b| b * 8).or(receiver.bits);
-
         let bits_read = receiver
             .bytes_read
             .map(|tokens| quote! { (#tokens) * 8 })
@@ -259,7 +261,8 @@ impl FieldData {
             ident: receiver.ident,
             ty: receiver.ty,
             endian: receiver.endian,
-            bits,
+            bits: receiver.bits,
+            bytes: receiver.bytes,
             count: receiver.count,
             bits_read,
             until: receiver.until,

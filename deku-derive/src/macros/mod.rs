@@ -160,13 +160,18 @@ fn gen_ctx_types_and_arg(
 }
 
 /// Generate argument for `id`:
-/// `#deku(endian = "big", bits = "1")` -> `Endian::Big, BitSize(1)`
-fn gen_id_args(endian: Option<&syn::LitStr>, bits: Option<usize>) -> syn::Result<TokenStream> {
+/// `#deku(endian = "big", bits = "1")` -> `Endian::Big, Size::Bits(1)`
+fn gen_id_args(
+    endian: Option<&syn::LitStr>,
+    bits: Option<usize>,
+    bytes: Option<usize>,
+) -> syn::Result<TokenStream> {
     let endian = endian.map(gen_endian_from_str).transpose()?;
-    let bits = bits.map(|n| quote! {deku::ctx::BitSize(#n)});
+    let bits = bits.map(|n| quote! {deku::ctx::Size::Bits(#n)});
+    let bytes = bytes.map(|n| quote! {deku::ctx::Size::Bytes(#n)});
 
     // FIXME: Should be `into_iter` here, see https://github.com/rust-lang/rust/issues/66145.
-    let id_args = [endian.as_ref(), bits.as_ref()]
+    let id_args = [endian.as_ref(), bits.as_ref(), bytes.as_ref()]
         .iter()
         .filter_map(|i| *i)
         .collect::<Vec<_>>();
@@ -179,18 +184,20 @@ fn gen_id_args(endian: Option<&syn::LitStr>, bits: Option<usize>) -> syn::Result
 
 /// Generate argument for fields:
 ///
-/// `#deku(endian = "big", bits = "1", ctx = "a")` -> `Endian::Big, BitSize(1), a`
+/// `#deku(endian = "big", bits = "1", ctx = "a")` -> `Endian::Big, Size::Bits(1), a`
 fn gen_field_args(
     endian: Option<&syn::LitStr>,
     bits: Option<usize>,
+    bytes: Option<usize>,
     ctx: Option<&Punctuated<syn::Expr, syn::token::Comma>>,
 ) -> syn::Result<TokenStream> {
     let endian = endian.map(gen_endian_from_str).transpose()?;
-    let bits = bits.map(|n| quote! {deku::ctx::BitSize(#n)});
+    let bits = bits.map(|n| quote! {deku::ctx::Size::Bits(#n)});
+    let bytes = bytes.map(|n| quote! {deku::ctx::Size::Bytes(#n)});
     let ctx = ctx.map(|c| quote! {#c});
 
     // FIXME: Should be `into_iter` here, see https://github.com/rust-lang/rust/issues/66145.
-    let field_args = [endian.as_ref(), bits.as_ref(), ctx.as_ref()]
+    let field_args = [endian.as_ref(), bits.as_ref(), bytes.as_ref(), ctx.as_ref()]
         .iter()
         .filter_map(|i| *i)
         .collect::<Vec<_>>();

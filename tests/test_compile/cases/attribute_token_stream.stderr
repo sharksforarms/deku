@@ -10,4 +10,4 @@ error[E0277]: can't compare `{integer}` with `bool`
 5 |     #[deku(cond = "0 == true")]
   |                   ^^^^^^^^^^^ no implementation for `{integer} == bool`
   |
-  = help: the trait `std::cmp::PartialEq<bool>` is not implemented for `{integer}`
+  = help: the trait `PartialEq<bool>` is not implemented for `{integer}`

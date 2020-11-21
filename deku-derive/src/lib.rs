@@ -400,6 +400,15 @@ impl VariantData {
             ));
         }
 
+        if let Some(id) = &receiver.id {
+            if id.to_string() == "_" {
+                return Err((
+                    receiver.ident.span(),
+                    "error: `id_pat` should be used for `_`",
+                ));
+            }
+        }
+
         Ok(())
     }
 }

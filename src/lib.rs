@@ -148,8 +148,14 @@ the incoming data.
 First the "type" is read using the `type`, then is matched against the
 variants given `id`. What happens after is the same as structs!
 
-This is implemented with the [id](/attributes/index.html#id) and
-[type](attributes#type) attributes.
+This is implemented with the [id](/attributes/index.html#id),
+[id_pat](/attributes/index.html#id_pat) and
+[type](attributes#type) attributes. See these for more examples.
+
+If no `id` is specified, the variant will default to it's discriminant value.
+
+If no variant can be matched, a [DekuError::Parse](crate::error::DekuError)
+error will be returned.
 
 Example:
 

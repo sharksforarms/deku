@@ -58,4 +58,21 @@ enum Test9 {
     A
 }
 
+// test `id` cannot be `_`
+#[derive(DekuRead)]
+#[deku(type = "u8")]
+enum Test10 {
+    #[deku(id = "_")]
+    A
+}
+
+// test missing `id`
+#[derive(DekuRead)]
+#[deku(type = "u8")]
+enum Test11 {
+    #[deku(id = "1")]
+    A,
+    B(u8)
+}
+
 fn main() {}

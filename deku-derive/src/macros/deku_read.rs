@@ -133,12 +133,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let magic_read = emit_magic_read(input)?;
 
-    let mut variant_matches = vec![];
     let mut has_default_match = false;
+    let mut pre_match_tokens = vec![];
+    let mut variant_matches = vec![];
 
-    /*
-    FIXME: The loop body is too big
-    */
     for variant in variants {
         // check if the first field has an ident, if not, it's a unnamed struct
         let variant_is_named = variant
@@ -148,15 +146,27 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .and_then(|v| v.ident.as_ref())
             .is_some();
 
-        let variant_id = if let Some(variant_id) = &variant.id {
-            variant_id.clone()
+        let (consume_id, variant_id) = if let Some(variant_id) = &variant.id {
+            (true, variant_id.clone())
         } else if let Some(variant_id_pat) = &variant.id_pat {
-            variant_id_pat.clone()
+            (false, variant_id_pat.clone())
+        } else if variant.fields.style.is_unit() {
+            let ident = &variant.ident;
+            let internal_ident = gen_internal_field_ident(&quote!(#ident));
+            pre_match_tokens.push(quote! {
+                let #internal_ident = #id_type::try_from(Self::#ident as isize)?;
+            });
+            (true, quote! { _ if variant_id == #internal_ident })
         } else {
-            // id attribute not provided, treat it as a catch-all default
-            has_default_match = true;
-            quote! { _ }
+            return Err(syn::Error::new(
+                variant.ident.span(),
+                "DekuRead: `id` must be specified on non-unit variants",
+            ));
         };
+
+        if variant_id.to_string() == "_" {
+            has_default_match = true;
+        }
 
         let variant_ident = &variant.ident;
         let variant_reader = &variant.reader;
@@ -178,7 +188,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 super::gen_enum_init(variant_is_named, variant_ident, internal_fields);
 
             // if we're consuming an id, set the rest to new_rest before reading the variant
-            let new_rest = if variant.id.is_some() {
+            let new_rest = if consume_id {
                 quote! {
                     rest = new_rest;
                 }
@@ -206,7 +216,13 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if !has_default_match {
         variant_matches.push(quote! {
             _ => {
-                return Err(DekuError::Parse(format!("Could not match enum variant id = {:?} on enum `{}`", variant_id, #ident_as_string)));
+                return Err(DekuError::Parse(
+                            format!(
+                                "Could not match enum variant id = {:?} on enum `{}`",
+                                variant_id,
+                                #ident_as_string
+                            )
+                        ));
             }
         });
     }
@@ -226,6 +242,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let variant_read = quote! {
         #variant_id_read
+
+        #(#pre_match_tokens)*
 
         let value = match variant_id {
             #(#variant_matches),*
@@ -274,6 +292,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     };
 
     tokens.extend(quote! {
+        #[allow(non_snake_case)]
         impl #imp DekuRead<#ctx_types> for #ident #wher {
             fn read<'a>(input: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                 #read_body
@@ -285,6 +304,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let read_body = wrap_default_ctx(read_body, &input.ctx, &input.ctx_default);
 
         tokens.extend(quote! {
+            #[allow(non_snake_case)]
             impl #imp DekuRead for #ident #wher {
                 fn read<'a>(input: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                     #read_body
@@ -463,6 +483,7 @@ pub fn emit_from_bytes(
 ) -> TokenStream {
     quote! {
         impl #imp DekuContainerRead for #ident #wher {
+            #[allow(non_snake_case)]
             fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
                 #body
             }

@@ -36,6 +36,13 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let (field_idents, field_reads) = emit_field_reads(input, &fields)?;
 
+    // filter out temporary fields
+    let field_idents: Vec<&TokenStream> = field_idents
+        .iter()
+        .filter(|f| !f.is_temp)
+        .map(|f| &f.field_ident)
+        .collect();
+
     let internal_fields = gen_internal_field_idents(is_named_struct, field_idents);
 
     let initialize_struct = super::gen_struct_init(is_named_struct, internal_fields);
@@ -158,6 +165,13 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             quote! { #variant_reader; }
         } else {
             let (field_idents, field_reads) = emit_field_reads(input, &variant.fields.as_ref())?;
+
+            // filter out temporary fields
+            let field_idents: Vec<&TokenStream> = field_idents
+                .iter()
+                .filter(|f| !f.is_temp)
+                .map(|f| &f.field_ident)
+                .collect();
 
             let internal_fields = gen_internal_field_idents(variant_is_named, field_idents);
             let initialize_enum =
@@ -304,16 +318,24 @@ fn emit_magic_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
     Ok(tokens)
 }
 
+struct FieldIdent {
+    field_ident: TokenStream,
+    is_temp: bool,
+}
+
 fn emit_field_reads(
     input: &DekuData,
     fields: &Fields<&FieldData>,
-) -> Result<(Vec<TokenStream>, Vec<TokenStream>), syn::Error> {
+) -> Result<(Vec<FieldIdent>, Vec<TokenStream>), syn::Error> {
     let mut field_reads = vec![];
     let mut field_idents = vec![];
 
     for (i, f) in fields.iter().enumerate() {
         let (field_ident, field_read) = emit_field_read(input, i, f)?;
-        field_idents.push(field_ident);
+        field_idents.push(FieldIdent {
+            field_ident,
+            is_temp: f.temp,
+        });
         field_reads.push(field_read);
     }
 
@@ -341,7 +363,7 @@ fn emit_field_read(
 
     let field_ident = f.get_ident(i, true);
 
-    let internal_field_ident = gen_internal_field_ident(field_ident.clone());
+    let internal_field_ident = gen_internal_field_ident(&field_ident);
 
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }

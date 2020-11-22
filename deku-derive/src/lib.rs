@@ -4,13 +4,13 @@
 
 #![warn(missing_docs)]
 
-use darling::{ast, FromDeriveInput, FromField, FromVariant};
+use crate::macros::{deku_read::emit_deku_read, deku_write::emit_deku_write};
+use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::{punctuated::Punctuated, spanned::Spanned, AttributeArgs};
+
 mod macros;
-use crate::macros::{deku_read::emit_deku_read, deku_write::emit_deku_write};
-use syn::punctuated::Punctuated;
-use syn::spanned::Spanned;
 
 /// A post-processed version of `DekuReceiver`
 #[derive(Debug)]
@@ -225,6 +225,9 @@ struct FieldData {
     /// skip field reading/writing
     skip: bool,
 
+    /// read field as temporary value, isn't stored
+    temp: bool,
+
     /// default value code when used with skip or cond
     default: TokenStream,
 
@@ -266,6 +269,7 @@ impl FieldData {
             reader: receiver.reader,
             writer: receiver.writer,
             skip: receiver.skip,
+            temp: receiver.temp,
             default,
             cond: receiver.cond,
         })
@@ -533,6 +537,10 @@ struct DekuFieldReceiver {
     #[darling(default)]
     skip: bool,
 
+    /// read field as temporary value, isn't stored
+    #[darling(default)]
+    temp: bool,
+
     /// default value code when used with skip
     #[darling(default, map = "option_as_tokenstream")]
     default: Option<TokenStream>,
@@ -606,6 +614,131 @@ pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     };
 
     data.emit_writer().into()
+}
+
+fn is_not_deku(attr: &syn::Attribute) -> bool {
+    attr.path
+        .get_ident()
+        .map(|ident| ident != "deku" && ident != "deku_derive")
+        .unwrap_or(true)
+}
+
+fn is_temp(field: &syn::Field) -> bool {
+    DekuFieldReceiver::from_field(field)
+        .map(|attrs| attrs.temp)
+        .unwrap_or(false)
+}
+
+fn remove_deku_temp_fields(fields: &mut syn::punctuated::Punctuated<syn::Field, syn::Token![,]>) {
+    *fields = fields
+        .clone()
+        .into_pairs()
+        .filter(|x| !is_temp(x.value()))
+        .collect()
+}
+fn remove_deku_field_attrs(fields: &mut syn::punctuated::Punctuated<syn::Field, syn::Token![,]>) {
+    *fields = fields
+        .clone()
+        .into_pairs()
+        .map(|mut field| {
+            field.value_mut().attrs.retain(is_not_deku);
+            field
+        })
+        .collect()
+}
+
+fn remove_deku_attrs(fields: &mut syn::Fields) {
+    match fields {
+        syn::Fields::Named(ref mut fields) => remove_deku_field_attrs(&mut fields.named),
+        syn::Fields::Unnamed(ref mut fields) => remove_deku_field_attrs(&mut fields.unnamed),
+        syn::Fields::Unit => (),
+    }
+}
+
+fn remove_temp_fields(fields: &mut syn::Fields) {
+    match fields {
+        syn::Fields::Named(ref mut fields) => remove_deku_temp_fields(&mut fields.named),
+        syn::Fields::Unnamed(ref mut fields) => remove_deku_temp_fields(&mut fields.unnamed),
+        syn::Fields::Unit => (),
+    }
+}
+
+#[derive(Debug, FromMeta)]
+struct DekuDerive {
+    #[darling(default, rename = "DekuRead")]
+    read: bool,
+    #[darling(default, rename = "DekuWrite")]
+    write: bool,
+}
+
+/// Entry function for `deku_derive` proc-macro
+/// This attribute macro is used to derive `DekuRead` and `DekuWrite`
+/// while removing temporary variables.
+#[proc_macro_attribute]
+pub fn deku_derive(
+    attr: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let mut derives = vec![];
+
+    // Parse `deku_derive` attribute
+    let attr_args = syn::parse_macro_input!(attr as AttributeArgs);
+    let args = match DekuDerive::from_list(&attr_args) {
+        Ok(v) => v,
+        Err(e) => {
+            return proc_macro::TokenStream::from(e.write_errors());
+        }
+    };
+
+    // Generate `DekuRead` impl
+    if args.read {
+        let derive: TokenStream = proc_deku_read(item.clone()).into();
+        derives.push(derive);
+    }
+
+    // Remove the temp fields
+    let mut input = syn::parse_macro_input!(item as syn::DeriveInput);
+
+    match input.data {
+        syn::Data::Struct(ref mut input_struct) => remove_temp_fields(&mut input_struct.fields),
+        syn::Data::Enum(ref mut input_enum) => {
+            for variant in input_enum.variants.iter_mut() {
+                remove_temp_fields(&mut variant.fields)
+            }
+        }
+        _ => unimplemented!(),
+    }
+
+    // Generate `DekuWrite` impl
+    if args.write {
+        let input = input.clone();
+        let derive: TokenStream = proc_deku_write(input.into_token_stream().into()).into();
+        derives.push(derive);
+    }
+
+    // Remove attributes
+    match input.data {
+        syn::Data::Struct(ref mut input_struct) => {
+            input.attrs.retain(is_not_deku);
+            remove_deku_attrs(&mut input_struct.fields)
+        }
+        syn::Data::Enum(ref mut input_enum) => {
+            for variant in input_enum.variants.iter_mut() {
+                variant.attrs.retain(is_not_deku);
+                remove_deku_attrs(&mut variant.fields)
+            }
+        }
+        _ => unimplemented!(),
+    }
+
+    input.attrs.retain(is_not_deku);
+
+    quote!(
+        #(#derives)*
+
+        #input
+    )
+    .into()
 }
 
 #[cfg(test)]

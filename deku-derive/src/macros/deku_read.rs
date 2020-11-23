@@ -223,9 +223,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let from_bytes_body = wrap_default_ctx(
             quote! {
                 use core::convert::TryFrom;
-                let input_bits = input.0.bits::<Msb0>();
+                let input_bits = input.0.view_bits::<Msb0>();
 
-                let mut rest = input.0.bits::<Msb0>();
+                let mut rest = input.0.view_bits::<Msb0>();
                 rest = &rest[input.1..];
 
                 #magic_read

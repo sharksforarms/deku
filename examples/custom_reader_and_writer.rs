@@ -1,11 +1,11 @@
-use deku::ctx::BitSize;
+use deku::ctx::Size;
 use deku::prelude::*;
 use std::convert::TryInto;
 
 fn bit_flipper_read(
     field_a: u8,
     rest: &BitSlice<Msb0, u8>,
-    bit_size: BitSize,
+    bit_size: Size,
 ) -> Result<(&BitSlice<Msb0, u8>, u8), DekuError> {
     // Access to previously read fields
     println!("field_a = 0x{:X}", field_a);
@@ -29,7 +29,7 @@ fn bit_flipper_write(
     field_a: u8,
     field_b: u8,
     output: &mut BitVec<Msb0, u8>,
-    bit_size: BitSize,
+    bit_size: Size,
 ) -> Result<(), DekuError> {
     // Access to previously written fields
     println!("field_a = 0x{:X}", field_a);
@@ -51,8 +51,8 @@ struct DekuTest {
     field_a: u8,
 
     #[deku(
-        reader = "bit_flipper_read(*field_a, rest, BitSize(8))",
-        writer = "bit_flipper_write(*field_a, *field_b, output, BitSize(8))"
+        reader = "bit_flipper_read(*field_a, rest, Size::Bits(8))",
+        writer = "bit_flipper_write(*field_a, *field_b, output, Size::Bits(8))"
     )]
     field_b: u8,
 }

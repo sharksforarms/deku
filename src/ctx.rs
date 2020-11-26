@@ -1,9 +1,12 @@
 //! Types for context representation
 //! See [ctx attribute](super::attributes#ctx) for more information.
 
+use crate::error::DekuError;
 use core::marker::PhantomData;
-use core::ops::{Deref, DerefMut};
 use core::str::FromStr;
+
+#[cfg(feature = "alloc")]
+use alloc::format;
 
 /// An endian
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -83,7 +86,7 @@ pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
     Until(Predicate, PhantomData<T>),
 
     /// Read until a given quantity of bits have been read
-    Bits(BitSize),
+    Size(Size),
 }
 
 impl<T> From<usize> for Limit<T, fn(&T) -> bool> {
@@ -98,9 +101,9 @@ impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> From<Predicate> for Limit<T, Pr
     }
 }
 
-impl<T> From<BitSize> for Limit<T, fn(&T) -> bool> {
-    fn from(bits: BitSize) -> Self {
-        Limit::Bits(bits)
+impl<T> From<Size> for Limit<T, fn(&T) -> bool> {
+    fn from(size: Size) -> Self {
+        Limit::Size(size)
     }
 }
 
@@ -120,72 +123,77 @@ impl<T> Limit<T, fn(&T) -> bool> {
     }
 
     /// Constructs a new Limit that reads until the given number of bits have been read
-    pub fn new_bits(bits: BitSize) -> Self {
+    pub fn new_bits(bits: Size) -> Self {
         bits.into()
     }
 }
 
-/// The number bits in a field
+/// The size of a field
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct BitSize(pub usize);
+pub enum Size {
+    /// bit size
+    Bits(usize),
+    /// byte size
+    Bytes(usize),
+}
 
-impl BitSize {
+impl Size {
     /// Convert the size in bytes to a bit size.
-    /// # Examples
-    /// ```rust
-    /// # use std::mem::size_of;
-    /// # use deku::ctx::BitSize;
-    ///
-    /// assert_eq!(BitSize::with_byte_size(1), BitSize(8));
-    /// ```
     ///
     /// # Panic
     /// Panic if `byte_size * 8` is greater than `usize::MAX`.
-    pub fn with_byte_size(byte_size: usize) -> Self {
-        Self(byte_size.checked_mul(8).expect("bit size overflow"))
+    fn bits_from_bytes(byte_size: usize) -> Self {
+        Self::Bits(byte_size.checked_mul(8).expect("bit size overflow"))
     }
 
     /// Returns the bit size of a type.
     /// # Examples
     /// ```rust
-    /// # use deku::ctx::BitSize;
+    /// # use deku::ctx::Size;
     ///
-    /// assert_eq!(BitSize::of::<i32>(), BitSize(4 * 8));
+    /// assert_eq!(Size::of::<i32>(), Size::Bits(4 * 8));
     /// ```
+    ///
     /// # Panics
     /// Panic if the bit size of given type is greater than `usize::MAX`
     pub fn of<T>() -> Self {
-        Self::with_byte_size(core::mem::size_of::<T>())
+        Self::bits_from_bytes(core::mem::size_of::<T>())
     }
 
     /// Returns the bit size of the pointed-to value
     pub fn of_val<T: ?Sized>(val: &T) -> Self {
-        Self::with_byte_size(core::mem::size_of_val(val))
+        Self::bits_from_bytes(core::mem::size_of_val(val))
     }
-}
 
-impl Into<usize> for BitSize {
-    fn into(self) -> usize {
-        self.0
+    /// Returns the size in bits of a Size
+    ///
+    /// # Panics
+    /// Panic if the bit size of Size::Bytes(n) is greater than `usize::MAX`
+    pub fn bit_size(&self) -> usize {
+        match *self {
+            Size::Bits(size) => size,
+            Size::Bytes(size) => size.checked_mul(8).expect("bit size overflow"),
+        }
     }
-}
 
-impl From<usize> for BitSize {
-    fn from(n: usize) -> Self {
-        Self(n)
-    }
-}
-
-impl Deref for BitSize {
-    type Target = usize;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for BitSize {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+    /// Returns the size in bytes of a Size
+    ///
+    /// # Panics
+    /// Panic if the bit size of Size::Bytes(n) is greater than `usize::MAX`
+    pub fn byte_size(&self) -> Result<usize, DekuError> {
+        match *self {
+            Size::Bits(size) => {
+                if size % 8 == 0 {
+                    Ok(size / 8)
+                } else {
+                    Err(DekuError::InvalidParam(format!(
+                        "Bit size of {} is not a multiple of 8.
+                        Cannot be represented in bytes",
+                        size
+                    )))
+                }
+            }
+            Size::Bytes(size) => Ok(size),
+        }
     }
 }

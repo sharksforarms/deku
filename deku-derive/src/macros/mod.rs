@@ -86,7 +86,7 @@ fn gen_struct_destruction<I: ToTokens, F: ToTokens>(
 
 /// Convert a field ident to internal ident:
 /// `a` -> `__deku_a`
-fn gen_internal_field_ident(ident: TokenStream) -> TokenStream {
+fn gen_internal_field_ident(ident: &TokenStream) -> TokenStream {
     // Concat token: https://github.com/rust-lang/rust/issues/29599
     let span = ident.span();
     let s = ident.to_string();
@@ -100,7 +100,7 @@ fn gen_internal_field_ident(ident: TokenStream) -> TokenStream {
 ///
 /// - Named: `{ a: __deku_a }`
 /// - Unnamed: `( __deku_a )`
-fn gen_internal_field_idents(named: bool, idents: Vec<TokenStream>) -> Vec<TokenStream> {
+fn gen_internal_field_idents(named: bool, idents: Vec<&TokenStream>) -> Vec<TokenStream> {
     if named {
         idents
             .into_iter()

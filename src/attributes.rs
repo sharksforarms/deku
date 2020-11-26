@@ -511,15 +511,15 @@ struct DekuTest {
 
 impl DekuTest {
     /// Read and convert to String
-    fn read(
-        rest: &BitSlice<Msb0, u8>,
-    ) -> Result<(&BitSlice<Msb0, u8>, String), DekuError> {
+    fn read<B: BitOrder>(
+        rest: &BitSlice<B, u8>,
+    ) -> Result<(&BitSlice<B, u8>, String), DekuError> {
         let (rest, value) = u8::read(rest, ())?;
         Ok((rest, value.to_string()))
     }
 
     /// Parse from String to u8 and write
-    fn write(output: &mut BitVec<Msb0, u8>, field_a: &str) -> Result<(), DekuError> {
+    fn write<B: BitOrder>(output: &mut BitVec<B, u8>, field_a: &str) -> Result<(), DekuError> {
         let value = field_a.parse::<u8>().unwrap();
         value.write(output, ())
     }

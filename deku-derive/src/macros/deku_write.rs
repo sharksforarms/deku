@@ -45,7 +45,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             quote! {
                 match *self {
                     #destructured => {
-                        let mut acc: BitVec<Msb0, u8> = BitVec::new();
+                        let mut acc: BitVec<B, u8> = BitVec::new();
                         let output = &mut acc;
                         #magic_write
                         #(#field_writes)*
@@ -82,7 +82,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 }
 
                 #[allow(unused_variables)]
-                fn to_bits(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
+                fn to_bits<B: BitOrder>(&self) -> Result<BitVec<B, u8>, DekuError> {
                     #to_bits_body
                 }
             }
@@ -117,7 +117,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         impl #imp DekuWrite<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
-            fn write(&self, output: &mut BitVec<Msb0, u8>, #ctx_arg) -> Result<(), DekuError> {
+            fn write<B: BitOrder>(&self, output: &mut BitVec<B, u8>, #ctx_arg) -> Result<(), DekuError> {
                 #write_body
             }
         }
@@ -129,7 +129,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             impl #imp DekuWrite for #ident #wher {
                 #[allow(unused_variables)]
-                fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
+                fn write<B: BitOrder>(&self, output: &mut BitVec<B, u8>, _: ()) -> Result<(), DekuError> {
                     #write_body
                 }
             }
@@ -240,7 +240,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
         let to_bits_body = wrap_default_ctx(
             quote! {
-                let mut acc: BitVec<Msb0, u8> = BitVec::new();
+                let mut acc: BitVec<B, u8> = BitVec::new();
                 let output = &mut acc;
 
                 #magic_write
@@ -279,7 +279,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 }
 
                 #[allow(unused_variables)]
-                fn to_bits(&self) -> Result<BitVec<Msb0, u8>, DekuError> {
+                fn to_bits<B: BitOrder>(&self) -> Result<BitVec<B, u8>, DekuError> {
                     #to_bits_body
                 }
             }
@@ -316,7 +316,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         impl #imp DekuWrite<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
-            fn write(&self, output: &mut BitVec<Msb0, u8>, #ctx_arg) -> Result<(), DekuError> {
+            fn write<B: BitOrder>(&self, output: &mut BitVec<B, u8>, #ctx_arg) -> Result<(), DekuError> {
                 #write_body
             }
         }
@@ -328,7 +328,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             impl #imp DekuWrite for #ident #wher {
                 #[allow(unused_variables)]
-                fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
+                fn write<B: BitOrder>(&self, output: &mut BitVec<B, u8>, _: ()) -> Result<(), DekuError> {
                     #write_body
                 }
             }

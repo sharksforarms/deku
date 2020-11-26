@@ -238,7 +238,10 @@ pub trait DekuRead<Ctx = ()> {
     /// * **input** - Input as bits
     /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.
-    fn read(input: &BitSlice<Msb0, u8>, ctx: Ctx) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    fn read<B: BitOrder>(
+        input: &BitSlice<B, u8>,
+        ctx: Ctx,
+    ) -> Result<(&BitSlice<B, u8>, Self), DekuError>
     where
         Self: Sized;
 }
@@ -261,7 +264,7 @@ pub trait DekuWrite<Ctx = ()> {
     /// * **output** - Sink to store resulting bits
     /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.
-    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError>;
+    fn write<B: BitOrder>(&self, output: &mut BitVec<B, u8>, ctx: Ctx) -> Result<(), DekuError>;
 }
 
 /// "Writer" trait: implemented on DekuWrite struct and enum containers. A `container` is a type which
@@ -271,7 +274,7 @@ pub trait DekuContainerWrite: DekuWrite<()> {
     fn to_bytes(&self) -> Result<Vec<u8>, DekuError>;
 
     /// Write struct/enum to BitVec
-    fn to_bits(&self) -> Result<BitVec<Msb0, u8>, DekuError>;
+    fn to_bits<B: BitOrder>(&self) -> Result<BitVec<B, u8>, DekuError>;
 }
 
 /// "Updater" trait: apply mutations to a type
@@ -283,10 +286,10 @@ pub trait DekuUpdate {
 macro_rules! ImplDekuTraits {
     ($typ:ty) => {
         impl DekuRead<(Endian, BitSize)> for $typ {
-            fn read(
-                input: &BitSlice<Msb0, u8>,
+            fn read<B: BitOrder>(
+                input: &BitSlice<B, u8>,
                 (endian, bit_size): (Endian, BitSize),
-            ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+            ) -> Result<(&BitSlice<B, u8>, Self), DekuError> {
                 let max_type_bits: usize = BitSize::of::<$typ>().into();
                 let bit_size: usize = bit_size.into();
 
@@ -325,7 +328,7 @@ macro_rules! ImplDekuTraits {
                 } else {
                     // Create a new BitVec from the slice and pad un-aligned chunks
                     // i.e. [10010110, 1110] -> [10010110, 00001110]
-                    let bits: BitVec<Msb0, u8> = {
+                    let bits: BitVec<B, u8> = {
                         let mut bits = BitVec::with_capacity(bit_slice.len() + pad);
 
                         // Copy bits to new BitVec
@@ -373,10 +376,10 @@ macro_rules! ImplDekuTraits {
 
         // Only have `endian`, set `bit_size` to `BitSize::of::<Type>()`
         impl DekuRead<Endian> for $typ {
-            fn read(
-                input: &BitSlice<Msb0, u8>,
+            fn read<B: BitOrder>(
+                input: &BitSlice<B, u8>,
                 endian: Endian,
-            ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+            ) -> Result<(&BitSlice<B, u8>, Self), DekuError> {
                 let max_type_bits = BitSize::of::<$typ>();
 
                 <$typ>::read(input, (endian, max_type_bits))
@@ -385,10 +388,10 @@ macro_rules! ImplDekuTraits {
 
         // Only have `bit_size`, set `endian` to `Endian::default`.
         impl DekuRead<BitSize> for $typ {
-            fn read(
-                input: &BitSlice<Msb0, u8>,
+            fn read<B: BitOrder>(
+                input: &BitSlice<B, u8>,
                 bit_size: BitSize,
-            ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+            ) -> Result<(&BitSlice<B, u8>, Self), DekuError> {
                 let endian = Endian::default();
 
                 <$typ>::read(input, (endian, bit_size))
@@ -396,18 +399,18 @@ macro_rules! ImplDekuTraits {
         }
 
         impl DekuRead for $typ {
-            fn read(
-                input: &BitSlice<Msb0, u8>,
+            fn read<B: BitOrder>(
+                input: &BitSlice<B, u8>,
                 _: (),
-            ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+            ) -> Result<(&BitSlice<B, u8>, Self), DekuError> {
                 <$typ>::read(input, Endian::default())
             }
         }
 
         impl DekuWrite<(Endian, BitSize)> for $typ {
-            fn write(
+            fn write<B: BitOrder>(
                 &self,
-                output: &mut BitVec<Msb0, u8>,
+                output: &mut BitVec<B, u8>,
                 (endian, bit_size): (Endian, BitSize),
             ) -> Result<(), DekuError> {
                 let input = match endian {
@@ -417,7 +420,7 @@ macro_rules! ImplDekuTraits {
 
                 let bit_size: usize = bit_size.into();
 
-                let input_bits = input.view_bits::<Msb0>();
+                let input_bits = input.view_bits::<B>();
 
                 if bit_size > input_bits.len() {
                     return Err(DekuError::InvalidParam(format!(
@@ -451,9 +454,9 @@ macro_rules! ImplDekuTraits {
 
         // Only have `endian`, return all input
         impl DekuWrite<Endian> for $typ {
-            fn write(
+            fn write<B: BitOrder>(
                 &self,
-                output: &mut BitVec<Msb0, u8>,
+                output: &mut BitVec<B, u8>,
                 endian: Endian,
             ) -> Result<(), DekuError> {
                 let input = match endian {
@@ -467,9 +470,9 @@ macro_rules! ImplDekuTraits {
 
         // Only have `bit_size`, set `endian` to `Endian::default`.
         impl DekuWrite<BitSize> for $typ {
-            fn write(
+            fn write<B: BitOrder>(
                 &self,
-                output: &mut BitVec<Msb0, u8>,
+                output: &mut BitVec<B, u8>,
                 bit_size: BitSize,
             ) -> Result<(), DekuError> {
                 <$typ>::write(self, output, (Endian::default(), bit_size))
@@ -477,7 +480,11 @@ macro_rules! ImplDekuTraits {
         }
 
         impl DekuWrite for $typ {
-            fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
+            fn write<B: BitOrder>(
+                &self,
+                output: &mut BitVec<B, u8>,
+                _: (),
+            ) -> Result<(), DekuError> {
                 <$typ>::write(self, output, Endian::default())
             }
         }
@@ -491,12 +498,17 @@ macro_rules! ImplDekuTraits {
 /// The predicate takes two parameters: the number of bits that have been read so far,
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
-fn read_vec_with_predicate<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(usize, &T) -> bool>(
-    input: &BitSlice<Msb0, u8>,
+fn read_vec_with_predicate<
+    B: BitOrder,
+    T: DekuRead<Ctx>,
+    Ctx: Copy,
+    Predicate: FnMut(usize, &T) -> bool,
+>(
+    input: &BitSlice<B, u8>,
     capacity: Option<usize>,
     ctx: Ctx,
     mut predicate: Predicate,
-) -> Result<(&BitSlice<Msb0, u8>, Vec<T>), DekuError> {
+) -> Result<(&BitSlice<B, u8>, Vec<T>), DekuError> {
     let mut res = if let Some(capacity) = capacity {
         Vec::with_capacity(capacity)
     } else {
@@ -528,18 +540,17 @@ impl<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool> DekuRead<(Limit<
     /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s when constructing.
     /// # Examples
     /// ```rust
+    /// # use deku::prelude::*;
     /// # use deku::ctx::*;
-    /// # use deku::DekuRead;
-    /// # use bitvec::view::BitView;
     /// let input = vec![1u8, 2, 3, 4];
-    /// let (rest, v) = Vec::<u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
+    /// let (rest, v) = Vec::<u32>::read(input.view_bits::<Msb0>(), (1.into(), Endian::Little)).unwrap();
     /// assert!(rest.is_empty());
     /// assert_eq!(v, vec![0x04030201])
     /// ```
-    fn read(
-        input: &BitSlice<Msb0, u8>,
+    fn read<B: BitOrder>(
+        input: &BitSlice<B, u8>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
-    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&BitSlice<B, u8>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -575,10 +586,10 @@ impl<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool> DekuRead<(Limit<
 
 impl<T: DekuRead, Predicate: FnMut(&T) -> bool> DekuRead<Limit<T, Predicate>> for Vec<T> {
     /// Read `T`s until the given limit from input for types which don't require context.
-    fn read(
-        input: &BitSlice<Msb0, u8>,
+    fn read<B: BitOrder>(
+        input: &BitSlice<B, u8>,
         limit: Limit<T, Predicate>,
-    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&BitSlice<B, u8>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -598,7 +609,11 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Vec<T> {
     /// data.write(&mut output, Endian::Big).unwrap();
     /// assert_eq!(output, bitvec![0, 0, 0, 0, 0, 0, 0, 1])
     /// ```
-    fn write(&self, output: &mut BitVec<Msb0, u8>, inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn write<B: BitOrder>(
+        &self,
+        output: &mut BitVec<B, u8>,
+        inner_ctx: Ctx,
+    ) -> Result<(), DekuError> {
         for v in self {
             v.write(output, inner_ctx)?;
         }
@@ -611,18 +626,17 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<Ctx> for Option<T> {
     /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s when constructing.
     /// # Examples
     /// ```rust
+    /// # use deku::prelude::*;
     /// # use deku::ctx::*;
-    /// # use deku::DekuRead;
-    /// # use bitvec::view::BitView;
     /// let input = vec![1u8, 2, 3, 4];
-    /// let (rest, v) = Option::<u32>::read(input.view_bits(), Endian::Little).unwrap();
+    /// let (rest, v) = Option::<u32>::read(input.view_bits::<Msb0>(), Endian::Little).unwrap();
     /// assert!(rest.is_empty());
     /// assert_eq!(v, Some(0x04030201))
     /// ```
-    fn read(
-        input: &BitSlice<Msb0, u8>,
+    fn read<B: BitOrder>(
+        input: &BitSlice<B, u8>,
         inner_ctx: Ctx,
-    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&BitSlice<B, u8>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -643,7 +657,11 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Option<T> {
     /// data.write(&mut output, Endian::Big).unwrap();
     /// assert_eq!(output, bitvec![0, 0, 0, 0, 0, 0, 0, 1])
     /// ```
-    fn write(&self, output: &mut BitVec<Msb0, u8>, inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn write<B: BitOrder>(
+        &self,
+        output: &mut BitVec<B, u8>,
+        inner_ctx: Ctx,
+    ) -> Result<(), DekuError> {
         self.as_ref().map_or(Ok(()), |v| v.write(output, inner_ctx))
     }
 }
@@ -668,7 +686,10 @@ impl<Ctx> DekuRead<Ctx> for Ipv4Addr
 where
     u32: DekuRead<Ctx>,
 {
-    fn read(input: &BitSlice<Msb0, u8>, ctx: Ctx) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    fn read<B: BitOrder>(
+        input: &BitSlice<B, u8>,
+        ctx: Ctx,
+    ) -> Result<(&BitSlice<B, u8>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -682,7 +703,7 @@ impl<Ctx> DekuWrite<Ctx> for Ipv4Addr
 where
     u32: DekuWrite<Ctx>,
 {
-    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
+    fn write<B: BitOrder>(&self, output: &mut BitVec<B, u8>, ctx: Ctx) -> Result<(), DekuError> {
         let ip: u32 = (*self).into();
         ip.write(output, ctx)
     }
@@ -693,7 +714,10 @@ impl<Ctx> DekuRead<Ctx> for Ipv6Addr
 where
     u128: DekuRead<Ctx>,
 {
-    fn read(input: &BitSlice<Msb0, u8>, ctx: Ctx) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    fn read<B: BitOrder>(
+        input: &BitSlice<B, u8>,
+        ctx: Ctx,
+    ) -> Result<(&BitSlice<B, u8>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -707,7 +731,7 @@ impl<Ctx> DekuWrite<Ctx> for Ipv6Addr
 where
     u128: DekuWrite<Ctx>,
 {
-    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
+    fn write<B: BitOrder>(&self, output: &mut BitVec<B, u8>, ctx: Ctx) -> Result<(), DekuError> {
         let ip: u128 = (*self).into();
         ip.write(output, ctx)
     }
@@ -719,7 +743,7 @@ where
     Ipv6Addr: DekuWrite<Ctx>,
     Ipv4Addr: DekuWrite<Ctx>,
 {
-    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
+    fn write<B: BitOrder>(&self, output: &mut BitVec<B, u8>, ctx: Ctx) -> Result<(), DekuError> {
         match self {
             IpAddr::V4(ipv4) => ipv4.write(output, ctx),
             IpAddr::V6(ipv6) => ipv6.write(output, ctx),

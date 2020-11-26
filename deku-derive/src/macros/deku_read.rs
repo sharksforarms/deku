@@ -85,7 +85,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp DekuRead<#ctx_types> for #ident #wher {
-            fn read<'a>(input: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+            fn read<'a, B: BitOrder>(input: &'a BitSlice<B, u8>, #ctx_arg) -> Result<(&'a BitSlice<B, u8>, Self), DekuError> {
                 #read_body
             }
         }
@@ -96,7 +96,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp DekuRead for #ident #wher {
-                fn read<'a>(input: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+                fn read<'a, B: BitOrder>(input: &'a BitSlice<B, u8>, _: ()) -> Result<(&'a BitSlice<B, u8>, Self), DekuError> {
                     #read_body
                 }
             }
@@ -261,7 +261,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp DekuRead<#ctx_types> for #ident #wher {
-            fn read<'a>(input: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+            fn read<'a, B: BitOrder>(input: &'a BitSlice<B, u8>, #ctx_arg) -> Result<(&'a BitSlice<B, u8>, Self), DekuError> {
                 #read_body
             }
         }
@@ -272,7 +272,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp DekuRead for #ident #wher {
-                fn read<'a>(input: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+                fn read<'a, B: BitOrder>(input: &'a BitSlice<B, u8>, _: ()) -> Result<(&'a BitSlice<B, u8>, Self), DekuError> {
                     #read_body
                 }
             }

@@ -14,10 +14,10 @@ macro_rules! ImplDekuSliceTraits {
         where
             $typ: DekuRead<Ctx>,
         {
-            fn read(
-                input: &BitSlice<Msb0, u8>,
+            fn read<B: BitOrder>(
+                input: &BitSlice<B, u8>,
                 ctx: Ctx,
-            ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+            ) -> Result<(&BitSlice<B, u8>, Self), DekuError>
             where
                 Self: Sized,
             {
@@ -37,7 +37,11 @@ macro_rules! ImplDekuSliceTraits {
         where
             $typ: DekuWrite<Ctx>,
         {
-            fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
+            fn write<B: BitOrder>(
+                &self,
+                output: &mut BitVec<B, u8>,
+                ctx: Ctx,
+            ) -> Result<(), DekuError> {
                 for v in self {
                     v.write(output, ctx)?;
                 }

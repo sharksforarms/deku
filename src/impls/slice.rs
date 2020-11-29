@@ -1,10 +1,6 @@
 //! Implementations of DekuRead and DekuWrite for [T; N] where 0 < N <= 32
 
-// Forked out DekuRead and DekuWrite impls for [T; N] into a separate file
-// since the list of impls is long
-
-use super::{DekuRead, DekuWrite};
-use crate::error::DekuError;
+use crate::{DekuError, DekuRead, DekuWrite};
 use bitvec::prelude::*;
 pub use deku_derive::*;
 
@@ -46,23 +42,6 @@ macro_rules! ImplDekuSliceTraits {
         }
     )+ };
 }
-
-/*
-Generate the list with:
-
-```python
-TYPES = [
-    'u8', 'u16', 'u32', 'u64', 'u128', 'usize',
-    'i8', 'i16', 'i32', 'i64', 'i128', 'isize',
-    'f32', 'f64',
-]
-MAX_SIZE = 32
-
-for typ in TYPES:
-    for size in range(1, MAX_SIZE + 1):
-        print(f"ImplDekuSliceTraits!({typ}, {size});")
-```
-*/
 
 ImplDekuSliceTraits!(i8; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32);
 ImplDekuSliceTraits!(i16; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32);

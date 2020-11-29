@@ -1,3 +1,4 @@
+mod nonzero;
 mod option;
 mod primitive;
 mod slice;

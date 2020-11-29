@@ -26,10 +26,8 @@ pub enum TestEnum {
         #[deku(count = "field_0")] Vec<u8>,
     ),
 
-    VarDefault {
-        id: u8,
-        value: u8,
-    },
+    #[deku(id_pat = "_")]
+    VarDefault { id: u8, value: u8 },
 }
 
 #[rstest(input,expected,
@@ -61,6 +59,29 @@ fn test_enum_error() {
     }
 
     let test_data: Vec<u8> = [0x02, 0x02].to_vec();
-
     let _ret_read = TestEnum::try_from(test_data.as_ref()).unwrap();
+}
+
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(type = "u8")]
+pub enum TestEnumDiscriminant {
+    VarA = 0x00,
+    VarB,
+    VarC = 0x02,
+}
+
+#[rstest(input, expected,
+    case(&hex!("00"), TestEnumDiscriminant::VarA),
+    case(&hex!("01"), TestEnumDiscriminant::VarB),
+    case(&hex!("02"), TestEnumDiscriminant::VarC),
+
+    #[should_panic(expected = "Could not match enum variant id = 3 on enum `TestEnumDiscriminant`")]
+    case(&hex!("03"), TestEnumDiscriminant::VarA),
+)]
+fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
+    let ret_read = TestEnumDiscriminant::try_from(input).unwrap();
+    assert_eq!(expected, ret_read);
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(input.to_vec(), ret_write);
 }

@@ -743,7 +743,9 @@ assert_eq!(ret_write, data)
 Specify the identifier of the enum variant, must be paired with [type](#type)
 or [id (top-level)](#id-top-level)
 
-**Note**: If no `id` is specified, the variant is treated as the "catch-all".
+**Note**:
+    - If no `id` is specified, it is defaulted to the discriminant value.
+    - The discriminant value is retreived using the `as` keyword.
 
 Example:
 ```rust
@@ -756,13 +758,9 @@ enum DekuTest {
     VariantA(u8),
     #[deku(id = "0x02")]
     VariantB(u8, u16),
-
-    VariantCatchAll { // Catch-all variant
-        type_: u8
-    },
 }
 
-let data: Vec<u8> = vec![0x01, 0xFF, 0x02, 0xAB, 0xEF, 0xBE, 0xFF];
+let data: Vec<u8> = vec![0x01, 0xFF, 0x02, 0xAB, 0xEF, 0xBE];
 
 let (rest, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 
@@ -783,18 +781,40 @@ assert_eq!(
 
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x02, 0xAB, 0xEF, 0xBE], variant_bytes);
+```
 
-let (rest, value) = DekuTest::from_bytes(rest).unwrap();
-# assert_eq!(0, rest.0.len());
-# assert_eq!(0, rest.1);
+Example discriminant
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(type = "u8")]
+enum DekuTest {
+    VariantA = 0x01,
+    VariantB,
+}
+
+let data: Vec<u8> = vec![0x01, 0x02];
+
+let (rest, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 
 assert_eq!(
-    DekuTest::VariantCatchAll { type_: 0xFF },
+    DekuTest::VariantA,
     value
 );
 
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
-assert_eq!(vec![0xFF], variant_bytes);
+assert_eq!(vec![0x01], variant_bytes);
+
+let (rest, value) = DekuTest::from_bytes(rest).unwrap();
+
+assert_eq!(
+    DekuTest::VariantB,
+    value
+);
+
+let variant_bytes: Vec<u8> = value.try_into().unwrap();
+assert_eq!(vec![0x02], variant_bytes);
 ```
 
 # id_pat
@@ -816,19 +836,31 @@ enum DekuTest {
     VariantB {
         id: u8
     },
+    #[deku(id_pat = "_")]
+    VariantC(u8),
 }
 
-let data: Vec<u8> = vec![0x02];
+let data: Vec<u8> = vec![0x03, 0xFF];
 
 let (rest, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 
 assert_eq!(
-    DekuTest::VariantB { id: 0x02 },
+    DekuTest::VariantB { id: 0x03 },
     value
 );
 
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
-assert_eq!(data, variant_bytes);
+assert_eq!(vec![0x03], variant_bytes);
+
+let (rest, value) = DekuTest::from_bytes(rest).unwrap();
+
+assert_eq!(
+    DekuTest::VariantC(0xFF),
+    value
+);
+
+let variant_bytes: Vec<u8> = value.try_into().unwrap();
+assert_eq!(vec![0xFF], variant_bytes);
 ```
 
 # type

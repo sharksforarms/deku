@@ -161,9 +161,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut variant_writes = vec![];
     let mut variant_updates = vec![];
 
-    /*
-        FIXME: The loop body is too big.
-    */
     for variant in variants {
         // check if the first field has an ident, if not, it's a unnamed struct
         let variant_is_named = variant
@@ -192,14 +189,22 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         } else if id_type.is_some() {
             if let Some(variant_id) = &variant.id {
-                let variant_id: TokenStream = variant_id.clone();
-
                 quote! {
                     let mut variant_id: #id_type = #variant_id;
                     variant_id.write(output, (#id_args))?;
                 }
-            } else {
+            } else if variant.id_pat.is_some() {
                 quote! {}
+            } else if variant.fields.style.is_unit() {
+                quote! {
+                    let mut variant_id: #id_type = Self::#variant_ident as #id_type;
+                    variant_id.write(output, (#id_args))?;
+                }
+            } else {
+                return Err(syn::Error::new(
+                    variant.ident.span(),
+                    "DekuWrite: `id` must be specified on non-unit variants",
+                ));
             }
         } else {
             // either `id` or `type` needs to be specified
@@ -298,7 +303,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         Ok(())
     };
 
-    // avoid outputing `use core::convert::TryInto` if update() function is empty
+    // avoid outputting `use core::convert::TryInto` if update() function is empty
     let update_use = check_update_use(&variant_updates);
 
     tokens.extend(quote! {

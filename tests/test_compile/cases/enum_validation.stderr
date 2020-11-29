@@ -55,3 +55,15 @@ error: error: cannot use `bytes` with `id`
    |
 57 | enum Test9 {
    |      ^^^^^
+
+error: error: `id_pat` should be used for `_`
+  --> $DIR/enum_validation.rs:66:5
+   |
+66 |     A
+   |     ^
+
+error: DekuRead: `id` must be specified on non-unit variants
+  --> $DIR/enum_validation.rs:75:5
+   |
+75 |     B(u8)
+   |     ^

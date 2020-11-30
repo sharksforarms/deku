@@ -1,6 +1,6 @@
 use crate::macros::{
     gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_internal_field_ident,
-    gen_internal_field_idents, wrap_default_ctx,
+    gen_internal_field_idents, token_contains_string, wrap_default_ctx,
 };
 use crate::{DekuData, FieldData};
 use darling::ast::{Data, Fields};
@@ -54,7 +54,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use core::convert::TryFrom;
                 let input_bits = input.0.view_bits::<Msb0>();
 
-                let mut rest = input.0.view_bits::<Msb0>();
+                let mut rest = input_bits;
                 rest = &rest[input.1..];
 
                 #magic_read
@@ -80,7 +80,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let read_body = quote! {
         use core::convert::TryFrom;
-        let mut rest = input;
+        let mut rest = input_bits;
 
         #magic_read
 
@@ -92,7 +92,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp DekuRead<#ctx_types> for #ident #wher {
-            fn read<'a>(input: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+            fn read<'a>(input_bits: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                 #read_body
             }
         }
@@ -103,7 +103,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp DekuRead for #ident #wher {
-                fn read<'a>(input: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+                fn read<'a>(input_bits: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                     #read_body
                 }
             }
@@ -257,7 +257,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use core::convert::TryFrom;
                 let input_bits = input.0.view_bits::<Msb0>();
 
-                let mut rest = input.0.view_bits::<Msb0>();
+                let mut rest = input_bits;
                 rest = &rest[input.1..];
 
                 #magic_read
@@ -282,7 +282,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let read_body = quote! {
         use core::convert::TryFrom;
-        let mut rest = input;
+        let mut rest = input_bits;
 
         #magic_read
 
@@ -294,7 +294,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     tokens.extend(quote! {
         #[allow(non_snake_case)]
         impl #imp DekuRead<#ctx_types> for #ident #wher {
-            fn read<'a>(input: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+            fn read<'a>(input_bits: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                 #read_body
             }
         }
@@ -306,7 +306,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             #[allow(non_snake_case)]
             impl #imp DekuRead for #ident #wher {
-                fn read<'a>(input: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+                fn read<'a>(input_bits: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                     #read_body
                 }
             }
@@ -362,6 +362,36 @@ fn emit_field_reads(
     Ok((field_idents, field_reads))
 }
 
+fn emit_bit_byte_offsets(
+    fields: &[&Option<TokenStream>],
+) -> (Option<TokenStream>, Option<TokenStream>) {
+    // determine if we should include `bit_offset` and `byte_offset`
+    let byte_offset = if fields
+        .iter()
+        .any(|v| token_contains_string(v, "byte_offset"))
+    {
+        Some(quote! {
+            let byte_offset = bit_offset / 8;
+        })
+    } else {
+        None
+    };
+
+    let bit_offset = if fields
+        .iter()
+        .any(|v| token_contains_string(v, "bit_offset"))
+        || byte_offset.is_some()
+    {
+        Some(quote! {
+            let bit_offset = usize::try_from(input_bits.offset_from(rest))?;
+        })
+    } else {
+        None
+    };
+
+    (bit_offset, byte_offset)
+}
+
 fn emit_field_read(
     input: &DekuData,
     i: usize,
@@ -372,6 +402,20 @@ fn emit_field_read(
     let field_endian = f.endian.as_ref().or_else(|| input.endian.as_ref());
 
     let field_reader = &f.reader;
+
+    let field_check_vars = [
+        &f.count,
+        &f.bits_read,
+        &f.bytes_read,
+        &f.until,
+        &f.cond,
+        &Some(f.default.clone()),
+        &f.map,
+        &f.reader,
+        &f.ctx.as_ref().map(|v| quote!(#v)),
+    ];
+
+    let (bit_offset, byte_offset) = emit_bit_byte_offsets(&field_check_vars);
 
     let field_map = f
         .map
@@ -472,6 +516,9 @@ fn emit_field_read(
     };
 
     let field_read = quote! {
+        #bit_offset
+        #byte_offset
+
         let #internal_field_ident = {
             #field_read_tokens
         };

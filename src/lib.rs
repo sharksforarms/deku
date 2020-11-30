@@ -212,6 +212,52 @@ assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
 
+# Internal and previously read fields
+
+Along similar lines to Context variables, previously read variables
+are exposed and can be referenced:
+
+Example:
+
+```rust
+# use deku::prelude::*;
+#[derive(DekuRead)]
+struct DekuTest {
+    num_items: u8,
+    #[deku(count = "num_items")]
+    items: Vec<u16>,
+}
+```
+
+The following variables are reserved keywords which can be used in attributes accepting
+tokens such as `reader`, `writer`, `map`, `count`, etc.
+
+These are provided as a convenience to the user.
+
+Always included:
+- `input: (&[u8], usize)` - The initial input byte slice and bit offset
+(available when using [from_bytes](crate::DekuContainerRead::from_bytes))
+- `input_bits: &BitSlice<Msb0, u8>` - The initial input in bits
+- `rest: &BitSlice<Msb0, u8>` - Remaining bits to read
+- `output: &mut BitSlice<Msb0, u8>` - The output bit stream
+
+Conditionally included if referenced:
+- `bit_offset: usize` - Current bit offset from the input
+- `byte_offset: usize` - Current byte offset from the input
+
+Example:
+```rust
+# use deku::prelude::*;
+#[derive(DekuRead)]
+#[deku(ctx = "size: u32")]
+pub struct EncodedString {
+    encoding: u8,
+
+    #[deku(count = "size as usize - byte_offset")]
+    data: Vec<u8>
+}
+```
+
 */
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]

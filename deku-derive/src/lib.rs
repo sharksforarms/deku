@@ -208,6 +208,9 @@ struct FieldData {
     /// tokens providing the number of bits for the length of the container
     bits_read: Option<TokenStream>,
 
+    /// tokens providing the number of bytes for the length of the container
+    bytes_read: Option<TokenStream>,
+
     /// a predicate to decide when to stop reading elements into the container
     until: Option<TokenStream>,
 
@@ -244,11 +247,6 @@ impl FieldData {
         FieldData::validate(&receiver)
             .map_err(|(span, msg)| syn::Error::new(span, msg).to_compile_error())?;
 
-        let bits_read = receiver
-            .bytes_read
-            .map(|tokens| quote! { (#tokens) * 8 })
-            .or(receiver.bits_read);
-
         let default = receiver.default.unwrap_or(quote! { Default::default() });
 
         let ctx = receiver
@@ -264,7 +262,8 @@ impl FieldData {
             bits: receiver.bits,
             bytes: receiver.bytes,
             count: receiver.count,
-            bits_read,
+            bits_read: receiver.bits_read,
+            bytes_read: receiver.bytes_read,
             until: receiver.until,
             map: receiver.map,
             ctx,

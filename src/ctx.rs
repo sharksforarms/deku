@@ -117,14 +117,14 @@ impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> Limit<T, Predicate> {
 }
 
 impl<T> Limit<T, fn(&T) -> bool> {
-    /// Constructs a new Limit that reads unil the given number of elements are read
+    /// Constructs a new Limit that reads until the given number of elements are read
     pub fn new_count(count: usize) -> Self {
         count.into()
     }
 
-    /// Constructs a new Limit that reads until the given number of bits have been read
-    pub fn new_bits(bits: Size) -> Self {
-        bits.into()
+    /// Constructs a new Limit that reads until the given size
+    pub fn new_size(size: Size) -> Self {
+        size.into()
     }
 }
 

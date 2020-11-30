@@ -294,6 +294,8 @@ of a byte limit
 
 Specifies a predicate which sets when to stop reading values into the container.
 
+**Note**: The last value which matches the predicate is read
+
 The predicate is given a borrow to each item as it is read, and must return a boolean
 as to whether this should be the last item or not. If it returns true, then reading stops.
 

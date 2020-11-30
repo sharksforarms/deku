@@ -240,3 +240,13 @@ fn wrap_default_ctx(
         body
     }
 }
+
+/// Returns true if the literal substring `s` is in the token
+fn token_contains_string(tok: &Option<TokenStream>, s: &str) -> bool {
+    tok.as_ref()
+        .map(|v| {
+            let v = v.to_string();
+            v.contains(s)
+        })
+        .unwrap_or(false)
+}

@@ -1,0 +1,5 @@
+error[E0425]: cannot find value `fail` in this scope
+  --> $DIR/internal_variables.rs:90:5
+   |
+90 |     fail
+   |     ^^^^ not found in this scope

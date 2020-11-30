@@ -1,5 +1,6 @@
 use crate::macros::{
-    gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_struct_destruction, wrap_default_ctx,
+    gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_struct_destruction,
+    token_contains_string, wrap_default_ctx,
 };
 use crate::{DekuData, FieldData};
 use darling::ast::{Data, Fields};
@@ -408,6 +409,36 @@ fn emit_field_update(
     Ok(field_updates)
 }
 
+fn emit_bit_byte_offsets(
+    fields: &[&Option<TokenStream>],
+) -> (Option<TokenStream>, Option<TokenStream>) {
+    // determine if we should include `bit_offset` and `byte_offset`
+    let byte_offset = if fields
+        .iter()
+        .any(|v| token_contains_string(v, "byte_offset"))
+    {
+        Some(quote! {
+            let byte_offset = bit_offset / 8;
+        })
+    } else {
+        None
+    };
+
+    let bit_offset = if fields
+        .iter()
+        .any(|v| token_contains_string(v, "bit_offset"))
+        || byte_offset.is_some()
+    {
+        Some(quote! {
+            let bit_offset = output.len();
+        })
+    } else {
+        None
+    };
+
+    (bit_offset, byte_offset)
+}
+
 fn emit_field_write(
     input: &DekuData,
     i: usize,
@@ -415,6 +446,10 @@ fn emit_field_write(
     object_prefix: &Option<TokenStream>,
 ) -> Result<TokenStream, syn::Error> {
     let field_endian = f.endian.as_ref().or_else(|| input.endian.as_ref());
+
+    let field_check_vars = [&f.writer, &f.cond, &f.ctx.as_ref().map(|v| quote!(#v))];
+
+    let (bit_offset, byte_offset) = emit_bit_byte_offsets(&field_check_vars);
 
     let field_writer = &f.writer;
     let field_ident = f.get_ident(i, object_prefix.is_none());
@@ -456,6 +491,8 @@ fn emit_field_write(
     };
 
     let field_write = quote! {
+        #bit_offset
+        #byte_offset
         #field_write_tokens
     };
 

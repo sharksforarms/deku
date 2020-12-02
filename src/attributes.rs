@@ -118,7 +118,7 @@ Example:
 # use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(magic = b"deku")]
-pub struct DekuTest {
+struct DekuTest {
     data: u8
 }
 
@@ -416,11 +416,11 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-pub struct DekuTest {
-    pub field_a: u8,
+struct DekuTest {
+    field_a: u8,
     #[deku(skip)]
-    pub field_b: Option<u8>,
-    pub field_c: u8,
+    field_b: Option<u8>,
+    field_c: u8,
 }
 
 let data: Vec<u8> = vec![0x01, 0x02];
@@ -445,7 +445,7 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-pub struct DekuTest {
+struct DekuTest {
     field_a: u8,
     #[deku(cond = "*field_a == 0x01")]
     field_b: Option<u8>,
@@ -482,11 +482,11 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-pub struct DekuTest {
-    pub field_a: u8,
+struct DekuTest {
+    field_a: u8,
     #[deku(skip, default = "Some(*field_a)")]
-    pub field_b: Option<u8>,
-    pub field_c: u8,
+    field_b: Option<u8>,
+    field_c: u8,
 }
 
 let data: Vec<u8> = vec![0x01, 0x02];
@@ -511,11 +511,11 @@ Read a `u8` and apply a function to convert it to a `String`.
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead)]
-pub struct DekuTest {
+struct DekuTest {
     #[deku(map = "|field: u8| -> Result<_, DekuError> { Ok(field.to_string()) }")]
-    pub field_a: String,
+    field_a: String,
     #[deku(map = "DekuTest::map_field_b")]
-    pub field_b: String,
+    field_b: String,
 }
 
 impl DekuTest {
@@ -708,16 +708,16 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-pub struct DekuTest {
-    pub my_id: u8,
-    pub data: u8,
+struct DekuTest {
+    my_id: u8,
+    data: u8,
     #[deku(ctx = "*my_id")]
-    pub enum_from_id: MyEnum,
+    enum_from_id: MyEnum,
 }
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(ctx = "my_id: u8", id = "my_id")]
-pub enum MyEnum {
+enum MyEnum {
     #[deku(id = "1")]
     VariantA(u8),
     #[deku(id = "2")]

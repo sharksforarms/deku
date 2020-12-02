@@ -392,6 +392,22 @@ fn emit_bit_byte_offsets(
     (bit_offset, byte_offset)
 }
 
+fn emit_skip_bits(bit_size: &TokenStream) -> TokenStream {
+    quote! {
+        let __deku_skip_bits = #bit_size;
+        if rest.len() >= __deku_skip_bits {
+            let (__deku_skipped_bits, new_rest) = rest.split_at(__deku_skip_bits);
+            rest = new_rest;
+        } else {
+            return Err(DekuError::Parse(format!(
+                "not enough data: expected {} bits got {} bits",
+                __deku_skip_bits,
+                rest.len()
+            )));
+        }
+    }
+}
+
 fn emit_field_read(
     input: &DekuData,
     i: usize,
@@ -471,6 +487,15 @@ fn emit_field_read(
         }
     };
 
+    let skip_bits = match (f.skip_bits.as_ref(), f.skip_bytes.as_ref()) {
+        (Some(skip_bits), Some(skip_bytes)) => {
+            emit_skip_bits(&quote! { #skip_bits + (#skip_bytes * 8) })
+        }
+        (Some(skip_bits), None) => emit_skip_bits(skip_bits),
+        (None, Some(skip_bytes)) => emit_skip_bits(&quote! {(#skip_bytes * 8)}),
+        (None, None) => quote!(),
+    };
+
     let field_read_normal = quote! {
         let (new_rest, value) = #field_read_func?;
         let value: #field_type = #field_map(value)?;
@@ -479,6 +504,7 @@ fn emit_field_read(
 
         value
     };
+
     let field_default = &f.default;
 
     let field_read_tokens = match (f.skip, &f.cond) {
@@ -516,6 +542,8 @@ fn emit_field_read(
     };
 
     let field_read = quote! {
+        #skip_bits
+
         #bit_offset
         #byte_offset
 

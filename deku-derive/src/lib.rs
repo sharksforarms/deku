@@ -232,6 +232,12 @@ struct FieldData {
     /// skip field reading/writing
     skip: bool,
 
+    /// skip a number of bits
+    skip_bits: Option<TokenStream>,
+
+    /// skip a number of bytes
+    skip_bytes: Option<TokenStream>,
+
     /// read field as temporary value, isn't stored
     temp: bool,
 
@@ -271,6 +277,8 @@ impl FieldData {
             reader: receiver.reader,
             writer: receiver.writer,
             skip: receiver.skip,
+            skip_bits: receiver.skip_bits,
+            skip_bytes: receiver.skip_bytes,
             temp: receiver.temp,
             default,
             cond: receiver.cond,
@@ -547,6 +555,14 @@ struct DekuFieldReceiver {
     /// skip field reading/writing
     #[darling(default)]
     skip: bool,
+
+    /// skip a number of bits
+    #[darling(default, map = "option_as_tokenstream")]
+    skip_bits: Option<TokenStream>,
+
+    /// skip a number of bytes
+    #[darling(default, map = "option_as_tokenstream")]
+    skip_bytes: Option<TokenStream>,
 
     /// read field as temporary value, isn't stored
     #[darling(default)]

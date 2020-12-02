@@ -321,6 +321,18 @@ struct FieldData {
     /// skip field reading/writing
     skip: bool,
 
+    /// pad a number of bits before
+    pad_bits_before: Option<TokenStream>,
+
+    /// pad a number of bytes before
+    pad_bytes_before: Option<TokenStream>,
+
+    /// pad a number of bits after
+    pad_bits_after: Option<TokenStream>,
+
+    /// pad a number of bytes after
+    pad_bytes_after: Option<TokenStream>,
+
     /// read field as temporary value, isn't stored
     temp: bool,
 
@@ -355,6 +367,10 @@ impl FieldData {
             reader: receiver.reader?,
             writer: receiver.writer?,
             skip: receiver.skip,
+            pad_bits_before: receiver.pad_bits_before?,
+            pad_bytes_before: receiver.pad_bytes_before?,
+            pad_bits_after: receiver.pad_bits_after?,
+            pad_bytes_after: receiver.pad_bytes_after?,
             temp: receiver.temp,
             default: receiver.default?,
             cond: receiver.cond?,
@@ -672,6 +688,22 @@ struct DekuFieldReceiver {
     /// skip field reading/writing
     #[darling(default)]
     skip: bool,
+
+    /// pad a number of bits before
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    pad_bits_before: Result<Option<TokenStream>, ReplacementError>,
+
+    /// pad a number of bytes before
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    pad_bytes_before: Result<Option<TokenStream>, ReplacementError>,
+
+    /// pad a number of bits after
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    pad_bits_after: Result<Option<TokenStream>, ReplacementError>,
+
+    /// pad a number of bytes after
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    pad_bytes_after: Result<Option<TokenStream>, ReplacementError>,
 
     /// read field as temporary value, isn't stored
     #[darling(default)]

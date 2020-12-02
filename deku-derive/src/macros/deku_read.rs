@@ -431,6 +431,31 @@ fn emit_bit_byte_offsets(
     (bit_offset, byte_offset)
 }
 
+fn emit_padding(bit_size: &TokenStream) -> TokenStream {
+    quote! {
+        {
+            use core::convert::TryFrom;
+            let __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                DekuError::InvalidParam(format!(
+                    "Invalid padding param \"{}\": cannot convert to usize",
+                    stringify!(#bit_size)
+                ))
+            )?;
+
+            if __deku_rest.len() >= __deku_pad {
+                let (__deku_padded_bits, new_rest) = __deku_rest.split_at(__deku_pad);
+                __deku_rest = new_rest;
+            } else {
+                return Err(DekuError::Parse(format!(
+                    "not enough data for padding: expected {} bits got {} bits",
+                    __deku_pad,
+                    __deku_rest.len()
+                )));
+            }
+        }
+    }
+}
+
 fn emit_field_read(
     input: &DekuData,
     i: usize,
@@ -515,6 +540,20 @@ fn emit_field_read(
         }
     };
 
+    let pad_bits_before = match (f.pad_bits_before.as_ref(), f.pad_bytes_before.as_ref()) {
+        (Some(pad_bits), Some(pad_bytes)) => emit_padding(&quote! { #pad_bits + (#pad_bytes * 8) }),
+        (Some(pad_bits), None) => emit_padding(pad_bits),
+        (None, Some(pad_bytes)) => emit_padding(&quote! {(#pad_bytes * 8)}),
+        (None, None) => quote!(),
+    };
+
+    let pad_bits_after = match (f.pad_bits_after.as_ref(), f.pad_bytes_after.as_ref()) {
+        (Some(pad_bits), Some(pad_bytes)) => emit_padding(&quote! { #pad_bits + (#pad_bytes * 8) }),
+        (Some(pad_bits), None) => emit_padding(pad_bits),
+        (None, Some(pad_bytes)) => emit_padding(&quote! {(#pad_bytes * 8)}),
+        (None, None) => quote!(),
+    };
+
     let field_read_normal = quote! {
         let (new_rest, value) = #field_read_func?;
         let value: #field_type = #field_map(value)?;
@@ -523,6 +562,7 @@ fn emit_field_read(
 
         value
     };
+
     let field_default = &f.default;
 
     let field_read_tokens = match (f.skip, &f.cond) {
@@ -560,6 +600,8 @@ fn emit_field_read(
     };
 
     let field_read = quote! {
+        #pad_bits_before
+
         #bit_offset
         #byte_offset
 
@@ -567,6 +609,8 @@ fn emit_field_read(
             #field_read_tokens
         };
         let #field_ident = &#internal_field_ident;
+
+        #pad_bits_after
     };
 
     Ok((field_ident, field_read))

@@ -5,42 +5,57 @@ use bitvec::prelude::*;
 pub use deku_derive::*;
 
 macro_rules! ImplDekuSliceTraits {
-    ($typ:ty; $($count:expr),+ $(,)?) => { $(
-        impl<Ctx: Copy> DekuRead<Ctx> for [$typ; $count]
-        where
-            $typ: DekuRead<Ctx>,
-        {
-            fn read(
-                input: &BitSlice<Msb0, u8>,
-                ctx: Ctx,
-            ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
-            where
-                Self: Sized,
-            {
-                let mut slice: [$typ; $count] = Default::default();
-                let mut rest = input;
-                for i in 0..$count {
-                    let (new_rest, value) = <$typ>::read(rest, ctx)?;
-                    slice[i] = value;
-                    rest = new_rest;
-                }
+    ($typ:ty; $($count:expr),+ $(,)?) => {
 
-                Ok((rest, slice))
-            }
-        }
-
-        impl<Ctx: Copy> DekuWrite<Ctx> for [$typ; $count]
+        impl<Ctx: Copy> DekuWrite<Ctx> for &[$typ]
         where
             $typ: DekuWrite<Ctx>,
         {
             fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
-                for v in self {
+                for v in *self {
                     v.write(output, ctx)?;
                 }
                 Ok(())
             }
         }
-    )+ };
+
+        $(
+            impl<Ctx: Copy> DekuRead<Ctx> for [$typ; $count]
+            where
+                $typ: DekuRead<Ctx>,
+            {
+                fn read(
+                    input: &BitSlice<Msb0, u8>,
+                    ctx: Ctx,
+                ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+                where
+                    Self: Sized,
+                {
+                    let mut slice: [$typ; $count] = Default::default();
+                    let mut rest = input;
+                    for i in 0..$count {
+                        let (new_rest, value) = <$typ>::read(rest, ctx)?;
+                        slice[i] = value;
+                        rest = new_rest;
+                    }
+
+                    Ok((rest, slice))
+                }
+            }
+
+            impl<Ctx: Copy> DekuWrite<Ctx> for [$typ; $count]
+            where
+                $typ: DekuWrite<Ctx>,
+            {
+                fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
+                    for v in self {
+                        v.write(output, ctx)?;
+                    }
+                    Ok(())
+                }
+            }
+        )+
+    };
 }
 
 ImplDekuSliceTraits!(i8; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32);
@@ -87,6 +102,12 @@ mod tests {
         case::normal_be([0xDDCC, 0xBBAA], Endian::Big, vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
     fn test_bit_write(input: [u16; 2], endian: Endian, expected: Vec<u8>) {
+        let mut res_write = bitvec![Msb0, u8;];
+        input.write(&mut res_write, endian).unwrap();
+        assert_eq!(expected, res_write.into_vec());
+
+        // test &slice
+        let input = input.as_ref();
         let mut res_write = bitvec![Msb0, u8;];
         input.write(&mut res_write, endian).unwrap();
         assert_eq!(expected, res_write.into_vec());

@@ -16,8 +16,12 @@ A documentation-only module for #\[deku\] attributes
 | [update](#update) | field | Apply code over the field when `.update()` is called
 | [temp](#temp) | field | Read the field but exclude it from the struct/enum
 | [skip](#skip) | field | Skip the reading/writing of a field
+| [pad_bytes_before](#pad_bytes_before) | field | Skip bytes before reading, pad before writing
+| [pad_bits_before](#pad_bits_before) | field | Skip bits before reading, pad before writing
+| [pad_bytes_after](#pad_bytes_after) | field | Skip bytes after reading, pad after writing
+| [pad_bits_after](#pad_bits_after) | field | Skip bits after reading, pad after writing
 | [cond](#cond) | field | Conditional expression for the field
-| [default](#default) | field | Custom defaulting code when `skip` is true
+| [default](#default) | field | Provide default value. Used with [skip](#skip) or [cond](#cond)
 | [map](#map) | field | Apply a function over the result of reading
 | [reader](#readerwriter) | variant, field | Custom reader code
 | [writer](#readerwriter) | variant, field | Custom writer code
@@ -431,6 +435,136 @@ assert_eq!(
     DekuTest { field_a: 0x01, field_b: None, field_c: 0x02 },
     value
 );
+```
+
+# pad_bytes_before
+
+Skip a number of bytes before reading, pad with 0x00s before writing
+
+Example:
+
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+pub struct DekuTest {
+    pub field_a: u8,
+    #[deku(pad_bytes_before = "2")]
+    pub field_b: u8,
+}
+
+let data: Vec<u8> = vec![0xAA, 0xBB, 0xCC, 0xDD];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest {
+        field_a: 0xAA,
+        field_b: 0xDD,
+    },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(vec![0xAA, 0x00, 0x00, 0xDD], value);
+```
+
+# pad_bits_before
+
+Skip a number of bytes before reading, pad with 0s before writing
+
+Example:
+
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(bits = 2)]
+    field_a: u8,
+    #[deku(pad_bits_before = "2", bits = 4)]
+    field_b: u8,
+}
+
+let data: Vec<u8> = vec![0b10_01_1001];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest {
+        field_a: 0b10,
+        field_b: 0b1001,
+    },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(vec![0b10_00_1001], value);
+```
+
+# pad_bytes_after
+
+Skip a number of bytes after reading, pad with 0x00s after writing
+
+Example:
+
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+pub struct DekuTest {
+    #[deku(pad_bytes_after = "2")]
+    pub field_a: u8,
+    pub field_b: u8,
+}
+
+let data: Vec<u8> = vec![0xAA, 0xBB, 0xCC, 0xDD];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest {
+        field_a: 0xAA,
+        field_b: 0xDD,
+    },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(vec![0xAA, 0x00, 0x00, 0xDD], value);
+```
+
+# pad_bits_after
+
+Skip a number of bytes after reading, pad with 0s after writing
+
+Example:
+
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(bits = 2, pad_bits_after = "2")]
+    field_a: u8,
+    #[deku(bits = 4)]
+    field_b: u8,
+}
+
+let data: Vec<u8> = vec![0b10_01_1001];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest {
+        field_a: 0b10,
+        field_b: 0b1001,
+    },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(vec![0b10_00_1001], value);
 ```
 
 # cond

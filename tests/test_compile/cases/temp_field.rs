@@ -6,3 +6,5 @@ struct Test1 {
     #[deku(temp)]
     field_a: u8,
 }
+
+fn main() {}

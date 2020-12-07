@@ -51,8 +51,8 @@ struct DekuTest {
     field_a: u8,
 
     #[deku(
-        reader = "bit_flipper_read(*field_a, rest, Size::Bits(8))",
-        writer = "bit_flipper_write(*field_a, *field_b, output, Size::Bits(8))"
+        reader = "bit_flipper_read(*field_a, deku::rest, Size::Bits(8))",
+        writer = "bit_flipper_write(*field_a, *field_b, deku::output, Size::Bits(8))"
     )]
     field_b: u8,
 }

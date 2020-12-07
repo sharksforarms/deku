@@ -46,12 +46,13 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             quote! {
                 match *self {
                     #destructured => {
-                        let mut acc: BitVec<Msb0, u8> = BitVec::new();
-                        let output = &mut acc;
+                        let mut __deku_acc: BitVec<Msb0, u8> = BitVec::new();
+                        let __deku_output = &mut __deku_acc;
+
                         #magic_write
                         #(#field_writes)*
 
-                        Ok(acc)
+                    Ok(__deku_acc)
                     }
                 }
             },
@@ -118,7 +119,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         impl #imp DekuWrite<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
-            fn write(&self, output: &mut BitVec<Msb0, u8>, #ctx_arg) -> Result<(), DekuError> {
+            fn write(&self, __deku_output: &mut BitVec<Msb0, u8>, #ctx_arg) -> Result<(), DekuError> {
                 #write_body
             }
         }
@@ -130,7 +131,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             impl #imp DekuWrite for #ident #wher {
                 #[allow(unused_variables)]
-                fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
+                fn write(&self, __deku_output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
                     #write_body
                 }
             }
@@ -192,14 +193,14 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             if let Some(variant_id) = &variant.id {
                 quote! {
                     let mut variant_id: #id_type = #variant_id;
-                    variant_id.write(output, (#id_args))?;
+                    variant_id.write(__deku_output, (#id_args))?;
                 }
             } else if variant.id_pat.is_some() {
                 quote! {}
             } else if variant.fields.style.is_unit() {
                 quote! {
                     let mut variant_id: #id_type = Self::#variant_ident as #id_type;
-                    variant_id.write(output, (#id_args))?;
+                    variant_id.write(__deku_output, (#id_args))?;
                 }
             } else {
                 return Err(syn::Error::new(
@@ -246,8 +247,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
         let to_bits_body = wrap_default_ctx(
             quote! {
-                let mut acc: BitVec<Msb0, u8> = BitVec::new();
-                let output = &mut acc;
+                let mut __deku_acc: BitVec<Msb0, u8> = BitVec::new();
+                let __deku_output = &mut __deku_acc;
 
                 #magic_write
 
@@ -255,7 +256,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     #(#variant_writes),*
                 }
 
-                Ok(acc)
+                Ok(__deku_acc)
             },
             &input.ctx,
             &input.ctx_default,
@@ -322,7 +323,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         impl #imp DekuWrite<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
-            fn write(&self, output: &mut BitVec<Msb0, u8>, #ctx_arg) -> Result<(), DekuError> {
+            fn write(&self, __deku_output: &mut BitVec<Msb0, u8>, #ctx_arg) -> Result<(), DekuError> {
                 #write_body
             }
         }
@@ -334,7 +335,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             impl #imp DekuWrite for #ident #wher {
                 #[allow(unused_variables)]
-                fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
+                fn write(&self, __deku_output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
                     #write_body
                 }
             }
@@ -348,7 +349,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 fn emit_magic_write(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let tokens = if let Some(magic) = &input.magic {
         quote! {
-            #magic.write(output, ())?;
+            #magic.write(__deku_output, ())?;
         }
     } else {
         quote! {}
@@ -415,10 +416,10 @@ fn emit_bit_byte_offsets(
     // determine if we should include `bit_offset` and `byte_offset`
     let byte_offset = if fields
         .iter()
-        .any(|v| token_contains_string(v, "byte_offset"))
+        .any(|v| token_contains_string(v, "__deku_byte_offset"))
     {
         Some(quote! {
-            let byte_offset = bit_offset / 8;
+            let __deku_byte_offset = __deku_bit_offset / 8;
         })
     } else {
         None
@@ -426,11 +427,11 @@ fn emit_bit_byte_offsets(
 
     let bit_offset = if fields
         .iter()
-        .any(|v| token_contains_string(v, "bit_offset"))
+        .any(|v| token_contains_string(v, "__deku_bit_offset"))
         || byte_offset.is_some()
     {
         Some(quote! {
-            let bit_offset = output.len();
+            let __deku_bit_offset = __deku_output.len();
         })
     } else {
         None
@@ -459,7 +460,7 @@ fn emit_field_write(
     } else {
         let write_args = gen_field_args(field_endian, f.bits, f.bytes, f.ctx.as_ref())?;
 
-        quote! { #object_prefix #field_ident.write(output, (#write_args)) }
+        quote! { #object_prefix #field_ident.write(__deku_output, (#write_args)) }
     };
 
     let field_write_normal = quote! {

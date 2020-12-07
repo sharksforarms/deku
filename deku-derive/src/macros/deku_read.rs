@@ -52,20 +52,20 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let from_bytes_body = wrap_default_ctx(
             quote! {
                 use core::convert::TryFrom;
-                let input_bits = input.0.view_bits::<Msb0>();
+                let __deku_input_bits = __deku_input.0.view_bits::<Msb0>();
 
-                let mut rest = input_bits;
-                rest = &rest[input.1..];
+                let mut __deku_rest = __deku_input_bits;
+                __deku_rest = &__deku_rest[__deku_input.1..];
 
                 #magic_read
 
                 #(#field_reads)*
                 let value = #initialize_struct;
 
-                let pad = 8 * ((rest.len() + 7) / 8) - rest.len();
-                let read_idx = input_bits.len() - (rest.len() + pad);
+                let pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
+                let read_idx = __deku_input_bits.len() - (__deku_rest.len() + pad);
 
-                Ok(((input_bits[read_idx..].as_slice(), pad), value))
+                Ok(((__deku_input_bits[read_idx..].as_slice(), pad), value))
             },
             &input.ctx,
             &input.ctx_default,
@@ -80,19 +80,19 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let read_body = quote! {
         use core::convert::TryFrom;
-        let mut rest = input_bits;
+        let mut __deku_rest = __deku_input_bits;
 
         #magic_read
 
         #(#field_reads)*
         let value = #initialize_struct;
 
-        Ok((rest, value))
+        Ok((__deku_rest, value))
     };
 
     tokens.extend(quote! {
         impl #imp DekuRead<#ctx_types> for #ident #wher {
-            fn read<'a>(input_bits: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+            fn read<'a>(__deku_input_bits: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                 #read_body
             }
         }
@@ -103,7 +103,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp DekuRead for #ident #wher {
-                fn read<'a>(input_bits: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+                fn read<'a>(__deku_input_bits: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                     #read_body
                 }
             }
@@ -190,7 +190,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             // if we're consuming an id, set the rest to new_rest before reading the variant
             let new_rest = if consume_id {
                 quote! {
-                    rest = new_rest;
+                    __deku_rest = new_rest;
                 }
             } else {
                 quote! {}
@@ -229,11 +229,11 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let variant_id_read = if id.is_some() {
         quote! {
-            let (new_rest, variant_id) = (rest, #id);
+            let (new_rest, variant_id) = (__deku_rest, #id);
         }
     } else if id_type.is_some() {
         quote! {
-            let (new_rest, variant_id) = #id_type::read(rest, (#id_args))?;
+            let (new_rest, variant_id) = #id_type::read(__deku_rest, (#id_args))?;
         }
     } else {
         // either `id` or `type` needs to be specified
@@ -255,19 +255,19 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let from_bytes_body = wrap_default_ctx(
             quote! {
                 use core::convert::TryFrom;
-                let input_bits = input.0.view_bits::<Msb0>();
+                let __deku_input_bits = __deku_input.0.view_bits::<Msb0>();
 
-                let mut rest = input_bits;
-                rest = &rest[input.1..];
+                let mut __deku_rest = __deku_input_bits;
+                __deku_rest = &__deku_rest[__deku_input.1..];
 
                 #magic_read
 
                 #variant_read
 
-                let pad = 8 * ((rest.len() + 7) / 8) - rest.len();
-                let read_idx = input_bits.len() - (rest.len() + pad);
+                let pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
+                let read_idx = __deku_input_bits.len() - (__deku_rest.len() + pad);
 
-                Ok(((input_bits[read_idx..].as_slice(), pad), value))
+                Ok(((__deku_input_bits[read_idx..].as_slice(), pad), value))
             },
             &input.ctx,
             &input.ctx_default,
@@ -282,19 +282,19 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let read_body = quote! {
         use core::convert::TryFrom;
-        let mut rest = input_bits;
+        let mut __deku_rest = __deku_input_bits;
 
         #magic_read
 
         #variant_read
 
-        Ok((rest, value))
+        Ok((__deku_rest, value))
     };
 
     tokens.extend(quote! {
         #[allow(non_snake_case)]
         impl #imp DekuRead<#ctx_types> for #ident #wher {
-            fn read<'a>(input_bits: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+            fn read<'a>(__deku_input_bits: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                 #read_body
             }
         }
@@ -306,7 +306,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             #[allow(non_snake_case)]
             impl #imp DekuRead for #ident #wher {
-                fn read<'a>(input_bits: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+                fn read<'a>(__deku_input_bits: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
                     #read_body
                 }
             }
@@ -323,12 +323,12 @@ fn emit_magic_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
             let magic = #magic;
 
             for byte in magic {
-                let (new_rest, read_byte) = u8::read(rest, ())?;
+                let (new_rest, read_byte) = u8::read(__deku_rest, ())?;
                 if *byte != read_byte {
                     return Err(DekuError::Parse(format!("Missing magic value {:?}", #magic)));
                 }
 
-                rest = new_rest;
+                __deku_rest = new_rest;
             }
         }
     } else {
@@ -368,10 +368,10 @@ fn emit_bit_byte_offsets(
     // determine if we should include `bit_offset` and `byte_offset`
     let byte_offset = if fields
         .iter()
-        .any(|v| token_contains_string(v, "byte_offset"))
+        .any(|v| token_contains_string(v, "__deku_byte_offset"))
     {
         Some(quote! {
-            let byte_offset = bit_offset / 8;
+            let __deku_byte_offset = __deku_bit_offset / 8;
         })
     } else {
         None
@@ -379,11 +379,11 @@ fn emit_bit_byte_offsets(
 
     let bit_offset = if fields
         .iter()
-        .any(|v| token_contains_string(v, "bit_offset"))
+        .any(|v| token_contains_string(v, "__deku_bit_offset"))
         || byte_offset.is_some()
     {
         Some(quote! {
-            let bit_offset = usize::try_from(input_bits.offset_from(rest))?;
+            let __deku_bit_offset = usize::try_from(__deku_input_bits.offset_from(__deku_rest))?;
         })
     } else {
         None
@@ -445,29 +445,29 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    DekuRead::read(rest, (deku::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
+                    DekuRead::read(__deku_rest, (deku::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
                 }
             }
         } else if let Some(field_bits) = &f.bits_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    DekuRead::read(rest, (deku::ctx::Limit::new_size(deku::ctx::Size::Bits(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
+                    DekuRead::read(__deku_rest, (deku::ctx::Limit::new_size(deku::ctx::Size::Bits(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_bytes) = &f.bytes_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    DekuRead::read(rest, (deku::ctx::Limit::new_size(deku::ctx::Size::Bytes(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
+                    DekuRead::read(__deku_rest, (deku::ctx::Limit::new_size(deku::ctx::Size::Bytes(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_until) = &f.until {
             // We wrap the input into another closure here to enforce that it is actually a callable
             // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
-            quote! {DekuRead::read(rest, (deku::ctx::Limit::new_until(#field_until), (#read_args)))}
+            quote! {DekuRead::read(__deku_rest, (deku::ctx::Limit::new_until(#field_until), (#read_args)))}
         } else {
-            quote! {DekuRead::read(rest, (#read_args))}
+            quote! {DekuRead::read(__deku_rest, (#read_args))}
         }
     };
 
@@ -475,7 +475,7 @@ fn emit_field_read(
         let (new_rest, value) = #field_read_func?;
         let value: #field_type = #field_map(value)?;
 
-        rest = new_rest;
+        __deku_rest = new_rest;
 
         value
     };
@@ -538,7 +538,7 @@ pub fn emit_from_bytes(
     quote! {
         impl #imp DekuContainerRead for #ident #wher {
             #[allow(non_snake_case)]
-            fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
+            fn from_bytes(__deku_input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
                 #body
             }
         }

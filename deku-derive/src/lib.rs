@@ -429,7 +429,7 @@ struct DekuReceiver {
     // TODO: The type of it should be
     //       `syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>`
     //       https://github.com/TedDriggs/darling/pull/98
-    #[darling(default)]
+    #[darling(default, map = "apply_replacements")]
     ctx: Option<syn::LitStr>,
 
     /// default context passed to the field
@@ -460,9 +460,32 @@ struct DekuReceiver {
     bytes: Option<usize>,
 }
 
+fn apply_replacements(input: Option<syn::LitStr>) -> Option<syn::LitStr> {
+    input.map(|v| {
+        if v.value().contains("__deku_") {
+            panic!(
+                "error: attribute cannot contain `__deku_` these are internal variables. Please use the `deku::` instead."
+            );
+        }
+
+        let v_str = v
+            .value()
+            .replace("deku::input", "__deku_input") // part of the public API `from_bytes`
+            .replace("deku::input_bits", "__deku_input_bits") // part of the public API `read`
+            .replace("deku::output", "__deku_output") // part of the public API `write`
+            .replace("deku::rest", "__deku_rest")
+            .replace("deku::bit_offset", "__deku_bit_offset")
+            .replace("deku::byte_offset", "__deku_byte_offset");
+
+        syn::LitStr::new(&v_str, v.span())
+    })
+}
+
 /// Parse a TokenStream from an Option<LitStr>
+/// Also replaces any namespaced variables to internal variables found in `input`
 fn option_as_tokenstream(input: Option<syn::LitStr>) -> Option<TokenStream> {
     input.map(|v| {
+        let v = apply_replacements(Some(v)).unwrap();
         v.parse::<TokenStream>()
             .expect("could not parse token stream")
     })
@@ -529,7 +552,7 @@ struct DekuFieldReceiver {
     /// A comma separated argument list.
     // TODO: The type of it should be `Punctuated<Expr, Comma>`
     //       https://github.com/TedDriggs/darling/pull/98
-    #[darling(default)]
+    #[darling(default, map = "apply_replacements")]
     ctx: Option<syn::LitStr>,
 
     /// map field when updating struct

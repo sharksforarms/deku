@@ -1,5 +1,15 @@
-error[E0425]: cannot find value `fail` in this scope
-  --> $DIR/internal_variables.rs:90:5
+error: proc-macro derive panicked
+  --> $DIR/internal_variables.rs:89:20
    |
-90 |     fail
-   |     ^^^^ not found in this scope
+89 | #[derive(DekuRead, DekuWrite)]
+   |                    ^^^^^^^^^
+   |
+   = help: message: error: attribute cannot contain `__deku_` these are internal variables. Please use the `deku::` instead.
+
+error: proc-macro derive panicked
+  --> $DIR/internal_variables.rs:89:10
+   |
+89 | #[derive(DekuRead, DekuWrite)]
+   |          ^^^^^^^^
+   |
+   = help: message: error: attribute cannot contain `__deku_` these are internal variables. Please use the `deku::` instead.

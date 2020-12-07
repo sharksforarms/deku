@@ -212,9 +212,9 @@ assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
 
-# Internal and previously read fields
+# Internal variables and previously read fields
 
-Along similar lines to Context variables, previously read variables
+Along similar lines to [Context](#Context) variables, previously read variables
 are exposed and can be referenced:
 
 Example:
@@ -229,21 +229,21 @@ struct DekuTest {
 }
 ```
 
-The following variables are reserved keywords which can be used in attributes accepting
+The following variables are internals which can be used in attributes accepting
 tokens such as `reader`, `writer`, `map`, `count`, etc.
 
 These are provided as a convenience to the user.
 
 Always included:
-- `input: (&[u8], usize)` - The initial input byte slice and bit offset
+- `deku::input: (&[u8], usize)` - The initial input byte slice and bit offset
 (available when using [from_bytes](crate::DekuContainerRead::from_bytes))
-- `input_bits: &BitSlice<Msb0, u8>` - The initial input in bits
-- `rest: &BitSlice<Msb0, u8>` - Remaining bits to read
-- `output: &mut BitSlice<Msb0, u8>` - The output bit stream
+- `deku::input_bits: &BitSlice<Msb0, u8>` - The initial input in bits
+- `deku::rest: &BitSlice<Msb0, u8>` - Remaining bits to read
+- `deku::output: &mut BitSlice<Msb0, u8>` - The output bit stream
 
 Conditionally included if referenced:
-- `bit_offset: usize` - Current bit offset from the input
-- `byte_offset: usize` - Current byte offset from the input
+- `deku::bit_offset: usize` - Current bit offset from the input
+- `deku::byte_offset: usize` - Current byte offset from the input
 
 Example:
 ```rust
@@ -253,7 +253,7 @@ Example:
 pub struct EncodedString {
     encoding: u8,
 
-    #[deku(count = "size as usize - byte_offset")]
+    #[deku(count = "size as usize - deku::byte_offset")]
     data: Vec<u8>
 }
 ```

@@ -545,8 +545,8 @@ Example:
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(
-        reader = "DekuTest::read(rest)",
-        writer = "DekuTest::write(output, &self.field_a)"
+        reader = "DekuTest::read(deku::rest)",
+        writer = "DekuTest::write(deku::output, &self.field_a)"
     )]
     field_a: String,
 }

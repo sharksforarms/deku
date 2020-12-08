@@ -11,12 +11,17 @@ use alloc::vec::Vec;
 /// The predicate takes two parameters: the number of bits that have been read so far,
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
-fn read_vec_with_predicate<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(usize, &T) -> bool>(
-    input: &BitSlice<Msb0, u8>,
+fn read_vec_with_predicate<
+    'a,
+    T: DekuRead<'a, Ctx>,
+    Ctx: Copy,
+    Predicate: FnMut(usize, &T) -> bool,
+>(
+    input: &'a BitSlice<Msb0, u8>,
     capacity: Option<usize>,
     ctx: Ctx,
     mut predicate: Predicate,
-) -> Result<(&BitSlice<Msb0, u8>, Vec<T>), DekuError> {
+) -> Result<(&'a BitSlice<Msb0, u8>, Vec<T>), DekuError> {
     let mut res = if let Some(capacity) = capacity {
         Vec::with_capacity(capacity)
     } else {
@@ -40,8 +45,8 @@ fn read_vec_with_predicate<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(usize, 
     Ok((rest, res))
 }
 
-impl<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool> DekuRead<(Limit<T, Predicate>, Ctx)>
-    for Vec<T>
+impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool>
+    DekuRead<'a, (Limit<T, Predicate>, Ctx)> for Vec<T>
 {
     /// Read `T`s until the given limit
     /// * `limit` - the limiting factor on the amount of `T`s to read
@@ -54,12 +59,12 @@ impl<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool> DekuRead<(Limit<
     /// let input = vec![1u8, 2, 3, 4];
     /// let (rest, v) = Vec::<u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
     /// assert!(rest.is_empty());
-    /// assert_eq!(v, vec![0x04030201])
+    /// assert_eq!(vec![0x04030201], v)
     /// ```
     fn read(
-        input: &BitSlice<Msb0, u8>,
+        input: &'a BitSlice<Msb0, u8>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
-    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -84,29 +89,24 @@ impl<T: DekuRead<Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool> DekuRead<(Limit<
             }
 
             // Read until a given quantity of bits have been read
-            Limit::Size(size) => match size {
-                Size::Bits(bit_size) => {
-                    read_vec_with_predicate(input, None, inner_ctx, move |read_bits, _| {
-                        read_bits == bit_size
-                    })
-                }
-                Size::Bytes(_) => {
-                    let bit_size = size.bit_size();
-                    read_vec_with_predicate(input, None, inner_ctx, move |read_bits, _| {
-                        read_bits == bit_size
-                    })
-                }
-            },
+            Limit::Size(size) => {
+                let bit_size = size.bit_size();
+                read_vec_with_predicate(input, None, inner_ctx, move |read_bits, _| {
+                    read_bits == bit_size
+                })
+            }
         }
     }
 }
 
-impl<T: DekuRead, Predicate: FnMut(&T) -> bool> DekuRead<Limit<T, Predicate>> for Vec<T> {
+impl<'a, T: DekuRead<'a>, Predicate: FnMut(&T) -> bool> DekuRead<'a, Limit<T, Predicate>>
+    for Vec<T>
+{
     /// Read `T`s until the given limit from input for types which don't require context.
     fn read(
-        input: &BitSlice<Msb0, u8>,
+        input: &'a BitSlice<Msb0, u8>,
         limit: Limit<T, Predicate>,
-    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
     {

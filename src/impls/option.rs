@@ -1,7 +1,7 @@
 use crate::{DekuError, DekuRead, DekuWrite};
 use bitvec::prelude::*;
 
-impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<Ctx> for Option<T> {
+impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy> DekuRead<'a, Ctx> for Option<T> {
     /// Read a T from input and store as Some(T)
     /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s when constructing.
     /// # Examples
@@ -15,9 +15,9 @@ impl<T: DekuRead<Ctx>, Ctx: Copy> DekuRead<Ctx> for Option<T> {
     /// assert_eq!(v, Some(0x04030201))
     /// ```
     fn read(
-        input: &BitSlice<Msb0, u8>,
+        input: &'a BitSlice<Msb0, u8>,
         inner_ctx: Ctx,
-    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
     {

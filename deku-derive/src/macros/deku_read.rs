@@ -17,6 +17,12 @@ pub(crate) fn emit_deku_read(input: &DekuData) -> Result<TokenStream, syn::Error
 fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut tokens = TokenStream::new();
 
+    let lifetime = input
+        .generics
+        .lifetimes()
+        .next()
+        .map_or(quote!('_), |v| quote!(#v));
+
     let (imp, ty, wher) = input.generics.split_for_impl();
 
     let ident = &input.ident;
@@ -71,9 +77,15 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             &input.ctx_default,
         );
 
-        tokens.extend(emit_try_from(&imp, &ident, wher));
+        tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
-        tokens.extend(emit_from_bytes(&imp, &ident, wher, from_bytes_body));
+        tokens.extend(emit_from_bytes(
+            &imp,
+            &lifetime,
+            &ident,
+            wher,
+            from_bytes_body,
+        ));
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
@@ -91,8 +103,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     };
 
     tokens.extend(quote! {
-        impl #imp DekuRead<#ctx_types> for #ident #wher {
-            fn read<'a>(__deku_input_bits: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+        impl #imp DekuRead<#lifetime, #ctx_types> for #ident #wher {
+            fn read(__deku_input_bits: &#lifetime BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&#lifetime BitSlice<Msb0, u8>, Self), DekuError> {
                 #read_body
             }
         }
@@ -102,8 +114,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let read_body = wrap_default_ctx(read_body, &input.ctx, &input.ctx_default);
 
         tokens.extend(quote! {
-            impl #imp DekuRead for #ident #wher {
-                fn read<'a>(__deku_input_bits: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+            impl #imp DekuRead<#lifetime> for #ident #wher {
+                fn read(__deku_input_bits: &#lifetime BitSlice<Msb0, u8>, _: ()) -> Result<(&#lifetime BitSlice<Msb0, u8>, Self), DekuError> {
                     #read_body
                 }
             }
@@ -116,6 +128,12 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
 fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut tokens = TokenStream::new();
+
+    let lifetime = input
+        .generics
+        .lifetimes()
+        .next()
+        .map_or(quote!('_), |v| quote!(#v));
 
     let (imp, ty, wher) = input.generics.split_for_impl();
 
@@ -273,9 +291,15 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             &input.ctx_default,
         );
 
-        tokens.extend(emit_try_from(&imp, &ident, wher));
+        tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
-        tokens.extend(emit_from_bytes(&imp, &ident, wher, from_bytes_body));
+        tokens.extend(emit_from_bytes(
+            &imp,
+            &lifetime,
+            &ident,
+            wher,
+            from_bytes_body,
+        ));
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
@@ -293,8 +317,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         #[allow(non_snake_case)]
-        impl #imp DekuRead<#ctx_types> for #ident #wher {
-            fn read<'a>(__deku_input_bits: &'a BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+        impl #imp DekuRead<#lifetime, #ctx_types> for #ident #wher {
+            fn read(__deku_input_bits: &#lifetime BitSlice<Msb0, u8>, #ctx_arg) -> Result<(&#lifetime BitSlice<Msb0, u8>, Self), DekuError> {
                 #read_body
             }
         }
@@ -305,8 +329,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             #[allow(non_snake_case)]
-            impl #imp DekuRead for #ident #wher {
-                fn read<'a>(__deku_input_bits: &'a BitSlice<Msb0, u8>, _: ()) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+            impl #imp DekuRead<#lifetime> for #ident #wher {
+                fn read(__deku_input_bits: &#lifetime BitSlice<Msb0, u8>, _: ()) -> Result<(&#lifetime BitSlice<Msb0, u8>, Self), DekuError> {
                     #read_body
                 }
             }
@@ -531,14 +555,15 @@ fn emit_field_read(
 /// emit `from_bytes()` for struct/enum
 pub fn emit_from_bytes(
     imp: &syn::ImplGenerics,
+    lifetime: &TokenStream,
     ident: &TokenStream,
     wher: Option<&syn::WhereClause>,
     body: TokenStream,
 ) -> TokenStream {
     quote! {
-        impl #imp DekuContainerRead for #ident #wher {
+        impl #imp DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
-            fn from_bytes(__deku_input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError> {
+            fn from_bytes(__deku_input: (&#lifetime [u8], usize)) -> Result<((&#lifetime [u8], usize), Self), DekuError> {
                 #body
             }
         }
@@ -548,14 +573,15 @@ pub fn emit_from_bytes(
 /// emit `TryFrom` trait for struct/enum
 pub fn emit_try_from(
     imp: &syn::ImplGenerics,
+    lifetime: &TokenStream,
     ident: &TokenStream,
     wher: Option<&syn::WhereClause>,
 ) -> TokenStream {
     quote! {
-        impl #imp core::convert::TryFrom<&[u8]> for #ident #wher {
+        impl #imp core::convert::TryFrom<&#lifetime [u8]> for #ident #wher {
             type Error = DekuError;
 
-            fn try_from(input: &[u8]) -> Result<Self, Self::Error> {
+            fn try_from(input: &#lifetime [u8]) -> Result<Self, Self::Error> {
                 let (rest, res) = Self::from_bytes((input, 0))?;
                 if !rest.0.is_empty() {
                     return Err(DekuError::Parse(format!("Too much data")));

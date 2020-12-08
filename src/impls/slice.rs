@@ -1,8 +1,93 @@
 //! Implementations of DekuRead and DekuWrite for [T; N] where 0 < N <= 32
 
-use crate::{DekuError, DekuRead, DekuWrite};
+use crate::{ctx::Limit, DekuError, DekuRead, DekuWrite};
 use bitvec::prelude::*;
 pub use deku_derive::*;
+
+/// Read `u8`s and returns a byte slice up until a given predicate returns true
+/// * `ctx` - The context required by `u8`. It will be passed to every `u8` when constructing.
+/// * `predicate` - the predicate that decides when to stop reading `u8`s
+/// The predicate takes two parameters: the number of bits that have been read so far,
+/// and a borrow of the latest value to have been read. It should return `true` if reading
+/// should now stop, and `false` otherwise
+fn read_slice_with_predicate<'a, Ctx: Copy, Predicate: FnMut(usize, &u8) -> bool>(
+    input: &'a BitSlice<Msb0, u8>,
+    ctx: Ctx,
+    mut predicate: Predicate,
+) -> Result<(&'a BitSlice<Msb0, u8>, &[u8]), DekuError>
+where
+    u8: DekuRead<'a, Ctx>,
+{
+    let mut rest = input;
+    let mut value;
+
+    loop {
+        let (new_rest, val) = u8::read(rest, ctx)?;
+        rest = new_rest;
+
+        let read_idx = input.offset_from(rest) as usize;
+        value = input[..read_idx].as_slice();
+
+        if predicate(read_idx, &val) {
+            break;
+        }
+    }
+
+    Ok((rest, value))
+}
+
+impl<'a, Ctx: Copy, Predicate: FnMut(&u8) -> bool> DekuRead<'a, (Limit<u8, Predicate>, Ctx)>
+    for &'a [u8]
+where
+    u8: DekuRead<'a, Ctx>,
+{
+    /// Read `u8`s until the given limit
+    /// * `limit` - the limiting factor on the amount of `u8`s to read
+    /// * `inner_ctx` - The context required by `u8`. It will be passed to every `u8`s when constructing.
+    /// # Examples
+    /// ```rust
+    /// # use deku::ctx::*;
+    /// # use deku::DekuRead;
+    /// # use bitvec::view::BitView;
+    /// let input = vec![1u8, 2, 3, 4];
+    /// let (rest, v) = <&[u8]>::read(input.view_bits(), (4.into(), Endian::Little)).unwrap();
+    /// assert!(rest.is_empty());
+    /// assert_eq!(&[1u8, 2, 3, 4], v)
+    /// ```
+    fn read(
+        input: &'a BitSlice<Msb0, u8>,
+        (limit, inner_ctx): (Limit<u8, Predicate>, Ctx),
+    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+        match limit {
+            // Read a given count of elements
+            Limit::Count(mut count) => {
+                // Handle the trivial case of reading an empty slice
+                if count == 0 {
+                    return Ok((input, &input.as_slice()[..0]));
+                }
+
+                // Otherwise, read until we have read `count` elements
+                read_slice_with_predicate(input, inner_ctx, move |_, _| {
+                    count -= 1;
+                    count == 0
+                })
+            }
+
+            // Read until a given predicate returns true
+            Limit::Until(mut predicate, _) => {
+                read_slice_with_predicate(input, inner_ctx, move |_, value| predicate(value))
+            }
+
+            // Read until a given quantity of bits have been read
+            Limit::Size(size) => {
+                let bit_size = size.bit_size();
+                read_slice_with_predicate(input, inner_ctx, move |read_bits, _| {
+                    read_bits == bit_size
+                })
+            }
+        }
+    }
+}
 
 macro_rules! ImplDekuSliceTraits {
     ($typ:ty; $($count:expr),+ $(,)?) => {
@@ -20,14 +105,14 @@ macro_rules! ImplDekuSliceTraits {
         }
 
         $(
-            impl<Ctx: Copy> DekuRead<Ctx> for [$typ; $count]
+            impl<'a, Ctx: Copy> DekuRead<'a, Ctx> for [$typ; $count]
             where
-                $typ: DekuRead<Ctx>,
+                $typ: DekuRead<'a, Ctx>,
             {
                 fn read(
-                    input: &BitSlice<Msb0, u8>,
+                    input: &'a BitSlice<Msb0, u8>,
                     ctx: Ctx,
-                ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+                ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
                 where
                     Self: Sized,
                 {

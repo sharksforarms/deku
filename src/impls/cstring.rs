@@ -14,11 +14,14 @@ where
     }
 }
 
-impl<Ctx: Copy> DekuRead<Ctx> for CString
+impl<'a, Ctx: Copy> DekuRead<'a, Ctx> for CString
 where
-    u8: DekuRead<Ctx>,
+    u8: DekuRead<'a, Ctx>,
 {
-    fn read(input: &BitSlice<Msb0, u8>, ctx: Ctx) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    fn read(
+        input: &'a BitSlice<Msb0, u8>,
+        ctx: Ctx,
+    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
     {

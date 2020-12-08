@@ -202,7 +202,7 @@ fn gen_field_args(
         .filter_map(|i| *i)
         .collect::<Vec<_>>();
 
-    // Because `impl DekuRead<(T1, T2)>` but `impl DekuRead<T1>`(not tuple)
+    // Because `impl DekuRead<'_, (T1, T2)>` but `impl DekuRead<'_, T1>`(not tuple)
     match &field_args[..] {
         [arg] => Ok(quote! {#arg}),
         args => Ok(quote! {#(#args),*}),

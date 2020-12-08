@@ -2,11 +2,14 @@ use crate::{DekuError, DekuRead, DekuWrite};
 use bitvec::prelude::*;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-impl<Ctx> DekuRead<Ctx> for Ipv4Addr
+impl<'a, Ctx> DekuRead<'a, Ctx> for Ipv4Addr
 where
-    u32: DekuRead<Ctx>,
+    u32: DekuRead<'a, Ctx>,
 {
-    fn read(input: &BitSlice<Msb0, u8>, ctx: Ctx) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    fn read(
+        input: &'a BitSlice<Msb0, u8>,
+        ctx: Ctx,
+    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -25,11 +28,14 @@ where
     }
 }
 
-impl<Ctx> DekuRead<Ctx> for Ipv6Addr
+impl<'a, Ctx> DekuRead<'a, Ctx> for Ipv6Addr
 where
-    u128: DekuRead<Ctx>,
+    u128: DekuRead<'a, Ctx>,
 {
-    fn read(input: &BitSlice<Msb0, u8>, ctx: Ctx) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    fn read(
+        input: &'a BitSlice<Msb0, u8>,
+        ctx: Ctx,
+    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized,
     {

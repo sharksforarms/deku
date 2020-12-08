@@ -7,7 +7,7 @@ use alloc::format;
 
 macro_rules! ImplDekuTraitsCtx {
     ($typ:ty, $readtype:ty, $ctx_arg:tt, $ctx_type:tt) => {
-        impl DekuRead<$ctx_type> for $typ {
+        impl DekuRead<'_, $ctx_type> for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
                 $ctx_arg: $ctx_type,

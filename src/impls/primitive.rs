@@ -7,7 +7,7 @@ use alloc::format;
 
 macro_rules! ImplDekuTraits {
     ($typ:ty) => {
-        impl DekuRead<(Endian, Size)> for $typ {
+        impl DekuRead<'_, (Endian, Size)> for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
                 (endian, size): (Endian, Size),
@@ -97,7 +97,7 @@ macro_rules! ImplDekuTraits {
         }
 
         // Only have `endian`, set `bit_size` to `Size::of::<Type>()`
-        impl DekuRead<Endian> for $typ {
+        impl DekuRead<'_, Endian> for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
                 endian: Endian,
@@ -109,7 +109,7 @@ macro_rules! ImplDekuTraits {
         }
 
         // Only have `bit_size`, set `endian` to `Endian::default`.
-        impl DekuRead<Size> for $typ {
+        impl DekuRead<'_, Size> for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
                 bit_size: Size,
@@ -120,7 +120,7 @@ macro_rules! ImplDekuTraits {
             }
         }
 
-        impl DekuRead for $typ {
+        impl DekuRead<'_> for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
                 _: (),

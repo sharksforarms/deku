@@ -281,24 +281,27 @@ pub mod prelude;
 pub use crate::error::DekuError;
 
 /// "Reader" trait: read bits and construct type
-pub trait DekuRead<Ctx = ()> {
+pub trait DekuRead<'a, Ctx = ()> {
     /// Read bits and construct type
     /// * **input** - Input as bits
     /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.
-    fn read(input: &BitSlice<Msb0, u8>, ctx: Ctx) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    fn read(
+        input: &'a BitSlice<Msb0, u8>,
+        ctx: Ctx,
+    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
     where
         Self: Sized;
 }
 
 /// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which
 /// doesn't need any context information.
-pub trait DekuContainerRead: DekuRead<()> {
+pub trait DekuContainerRead<'a>: DekuRead<'a, ()> {
     /// Read bytes and construct type
     /// * **input** - Input as a tuple of (bytes, bit_offset)
     ///
     /// Returns a tuple of the remaining data as (bytes, bit_offset) and a constructed value
-    fn from_bytes(input: (&[u8], usize)) -> Result<((&[u8], usize), Self), DekuError>
+    fn from_bytes(input: (&'a [u8], usize)) -> Result<((&'a [u8], usize), Self), DekuError>
     where
         Self: Sized;
 }

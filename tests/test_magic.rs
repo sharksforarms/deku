@@ -24,7 +24,7 @@ use std::convert::{TryFrom, TryInto};
 fn test_magic_struct(input: &[u8]) {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(magic = b"deku")]
-    pub struct TestStruct {}
+    struct TestStruct {}
 
     let ret_read = TestStruct::try_from(input).unwrap();
 
@@ -58,7 +58,7 @@ fn test_magic_struct(input: &[u8]) {
 fn test_magic_enum(input: &[u8]) {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(magic = b"deku", type = "u8")]
-    pub enum TestEnum {
+    enum TestEnum {
         #[deku(id = "0")]
         Variant,
     }

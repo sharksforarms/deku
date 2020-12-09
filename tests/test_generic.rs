@@ -4,11 +4,11 @@ use std::convert::{TryFrom, TryInto};
 #[test]
 fn test_generic_struct() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    pub struct TestStruct<T>
+    struct TestStruct<T>
     where
         T: deku::DekuWrite + for<'a> deku::DekuRead<'a>,
     {
-        pub field_a: T,
+        field_a: T,
     }
 
     let test_data: Vec<u8> = [0x01].to_vec();
@@ -24,7 +24,7 @@ fn test_generic_struct() {
 fn test_generic_enum() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(type = "u8")]
-    pub enum TestEnum<T>
+    enum TestEnum<T>
     where
         T: deku::DekuWrite + for<'a> deku::DekuRead<'a>,
     {

@@ -8,7 +8,7 @@ use std::convert::{TryFrom, TryInto};
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
-pub enum TestEnum {
+enum TestEnum {
     #[deku(id = "1")]
     VarA(u8),
     #[deku(id = "2")]
@@ -53,7 +53,7 @@ fn test_enum(input: &[u8], expected: TestEnum) {
 fn test_enum_error() {
     #[derive(DekuRead)]
     #[deku(type = "u8")]
-    pub enum TestEnum {
+    enum TestEnum {
         #[deku(id = "1")]
         VarA(u8),
     }
@@ -64,7 +64,7 @@ fn test_enum_error() {
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
-pub enum TestEnumDiscriminant {
+enum TestEnumDiscriminant {
     VarA = 0x00,
     VarB,
     VarC = 0x02,

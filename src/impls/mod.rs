@@ -2,6 +2,7 @@ mod nonzero;
 mod option;
 mod primitive;
 mod slice;
+mod unit;
 mod vec;
 
 #[cfg(feature = "std")]

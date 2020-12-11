@@ -1,31 +1,23 @@
 error: conflicting: both `bits` and `bytes` specified on enum
- --> $DIR/bits_bytes_conflict.rs:3:10
+ --> $DIR/bits_bytes_conflict.rs:4:28
   |
-3 | #[derive(DekuRead)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+4 | #[deku(type = "u8", bits = "1", bytes = "2")]
+  |                            ^^^
 
 error: conflicting: both `bits` and `bytes` specified on field
- --> $DIR/bits_bytes_conflict.rs:7:10
-  |
-7 | #[derive(DekuRead)]
-  |          ^^^^^^^^
-  |
-  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+  --> $DIR/bits_bytes_conflict.rs:10:21
+   |
+10 |     A(#[deku(bits = "1", bytes = "2")] u8),
+   |                     ^^^
 
 error: conflicting: both `bits` and `bytes` specified on field
-  --> $DIR/bits_bytes_conflict.rs:17:10
+  --> $DIR/bits_bytes_conflict.rs:19:19
    |
-17 | #[derive(DekuRead)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+19 |     #[deku(bits = "5", bytes = "6")]
+   |                   ^^^
 
 error: conflicting: both `bits` and `bytes` specified on field
-  --> $DIR/bits_bytes_conflict.rs:23:10
+  --> $DIR/bits_bytes_conflict.rs:24:28
    |
-23 | #[derive(DekuRead)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+24 | struct Test4(#[deku(bits = "7", bytes = "8")] u8);
+   |                            ^^^

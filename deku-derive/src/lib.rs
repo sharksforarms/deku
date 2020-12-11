@@ -12,6 +12,50 @@ use syn::{punctuated::Punctuated, spanned::Spanned, AttributeArgs};
 
 mod macros;
 
+#[derive(Debug)]
+struct Num(syn::LitInt);
+
+impl Num {
+    fn new(n: syn::LitInt) -> Self {
+        Self(n)
+    }
+}
+
+impl ToString for Num {
+    fn to_string(&self) -> String {
+        self.0.to_token_stream().to_string()
+    }
+}
+
+impl ToTokens for Num {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.to_tokens(tokens)
+    }
+}
+
+impl FromMeta for Num {
+    fn from_value(value: &syn::Lit) -> darling::Result<Self> {
+        (match *value {
+            syn::Lit::Str(ref s) => Ok(Num::new(syn::LitInt::new(
+                s.value()
+                    .as_str()
+                    .parse::<usize>()
+                    .map_err(|_| darling::Error::unknown_value(&s.value()))?
+                    .to_string()
+                    .as_str(),
+                s.span(),
+            ))),
+            syn::Lit::Int(ref s) => Ok(Num::new(s.clone())),
+            _ => Err(darling::Error::unexpected_lit_type(value)),
+        })
+        .map_err(|e| e.with_span(value))
+    }
+}
+
+fn cerror(span: proc_macro2::Span, msg: &str) -> TokenStream {
+    syn::Error::new(span, msg).to_compile_error()
+}
+
 /// A post-processed version of `DekuReceiver`
 #[derive(Debug)]
 struct DekuData {
@@ -39,20 +83,15 @@ struct DekuData {
     id_type: Option<syn::Ident>,
 
     /// enum only: bit size of the enum `id`
-    bits: Option<usize>,
+    bits: Option<Num>,
 
     /// enum only: byte size of the enum `id`
-    bytes: Option<usize>,
+    bytes: Option<Num>,
 }
 
 impl DekuData {
     /// Map a `DekuReceiver` to `DekuData`
-    /// It will check if attributes are valid, returns a compiler error if not
     fn from_receiver(receiver: DekuReceiver) -> Result<Self, TokenStream> {
-        // Validate
-        DekuData::validate(&receiver)
-            .map_err(|(span, msg)| syn::Error::new(span, msg).to_compile_error())?;
-
         let data = match receiver.data {
             ast::Data::Struct(fields) => ast::Data::Struct(ast::Fields::new(
                 fields.style,
@@ -71,7 +110,7 @@ impl DekuData {
         };
 
         let ctx = receiver
-            .ctx
+            .ctx?
             .map(|s| s.parse_with(syn::punctuated::Punctuated::parse_terminated))
             .transpose()
             .map_err(|e| e.to_compile_error())?;
@@ -82,7 +121,7 @@ impl DekuData {
             .transpose()
             .map_err(|e| e.to_compile_error())?;
 
-        Ok(Self {
+        let data = Self {
             vis: receiver.vis,
             ident: receiver.ident,
             generics: receiver.generics,
@@ -91,70 +130,77 @@ impl DekuData {
             ctx,
             ctx_default,
             magic: receiver.magic,
-            id: receiver.id,
+            id: receiver.id?,
             id_type: receiver.id_type,
             bits: receiver.bits,
             bytes: receiver.bytes,
-        })
+        };
+
+        DekuData::validate(&data)?;
+
+        Ok(data)
     }
 
-    fn validate(receiver: &DekuReceiver) -> Result<(), (proc_macro2::Span, &str)> {
-        /*
-        FIXME: Issue with `span`, see `FieldData::validate`.
-        */
-
+    fn validate(data: &DekuData) -> Result<(), TokenStream> {
         // Validate `ctx_default`
-        if receiver.ctx_default.is_some() && receiver.ctx.is_none() {
-            return Err((
-                receiver.ctx_default.span(),
+        if data.ctx_default.is_some() && data.ctx.is_none() {
+            // FIXME: Use `Span::join` once out of nightly
+            return Err(cerror(
+                data.ctx_default.span(),
                 "`ctx_default` must be used with `ctx`",
             ));
         }
 
-        match receiver.data {
+        match data.data {
             ast::Data::Struct(_) => {
                 // Validate id_* attributes are being used on an enum
-                if receiver.id_type.is_some() {
-                    Err((receiver.id_type.span(), "`type` only supported on enum"))
-                } else if receiver.id.is_some() {
-                    Err((receiver.id.span(), "`id` only supported on enum"))
-                } else if receiver.bytes.is_some() {
-                    Err((receiver.bytes.span(), "`bytes` only supported on enum"))
-                } else if receiver.bits.is_some() {
-                    Err((receiver.bits.span(), "`bits` only supported on enum"))
+                if data.id_type.is_some() {
+                    Err(cerror(data.id_type.span(), "`type` only supported on enum"))
+                } else if data.id.is_some() {
+                    Err(cerror(data.id.span(), "`id` only supported on enum"))
+                } else if data.bytes.is_some() {
+                    Err(cerror(data.bytes.span(), "`bytes` only supported on enum"))
+                } else if data.bits.is_some() {
+                    Err(cerror(data.bits.span(), "`bits` only supported on enum"))
                 } else {
                     Ok(())
                 }
             }
             ast::Data::Enum(_) => {
                 // Validate `type` or `id` is specified
-                if receiver.id_type.is_none() && receiver.id.is_none() {
-                    return Err((
-                        receiver.ident.span(),
+                if data.id_type.is_none() && data.id.is_none() {
+                    return Err(cerror(
+                        data.ident.span(),
                         "`type` or `id` must be specified on enum",
                     ));
                 }
 
                 // Validate either `type` or `id` is specified
-                if receiver.id_type.is_some() && receiver.id.is_some() {
-                    return Err((
-                        receiver.ident.span(),
+                if data.id_type.is_some() && data.id.is_some() {
+                    return Err(cerror(
+                        data.ident.span(),
                         "conflicting: both `type` and `id` specified on enum",
                     ));
                 }
 
                 // Validate `id_*` used correctly
-                if receiver.id.is_some() && receiver.bits.is_some() {
-                    return Err((receiver.ident.span(), "error: cannot use `bits` with `id`"));
+                if data.id.is_some() && data.bits.is_some() {
+                    return Err(cerror(
+                        data.ident.span(),
+                        "error: cannot use `bits` with `id`",
+                    ));
                 }
-                if receiver.id.is_some() && receiver.bytes.is_some() {
-                    return Err((receiver.ident.span(), "error: cannot use `bytes` with `id`"));
+                if data.id.is_some() && data.bytes.is_some() {
+                    return Err(cerror(
+                        data.ident.span(),
+                        "error: cannot use `bytes` with `id`",
+                    ));
                 }
 
                 // Validate either `bits` or `bytes` is specified
-                if receiver.bits.is_some() && receiver.bytes.is_some() {
-                    return Err((
-                        receiver.bits.span(),
+                if data.bits.is_some() && data.bytes.is_some() {
+                    return Err(cerror(
+                        data.bits.span(),
                         "conflicting: both `bits` and `bytes` specified on enum",
                     ));
                 }
@@ -197,10 +243,10 @@ struct FieldData {
     endian: Option<syn::LitStr>,
 
     /// field bit size
-    bits: Option<usize>,
+    bits: Option<Num>,
 
     /// field byte size
-    bytes: Option<usize>,
+    bytes: Option<Num>,
 
     /// tokens providing the length of the container
     count: Option<TokenStream>,
@@ -236,7 +282,7 @@ struct FieldData {
     temp: bool,
 
     /// default value code when used with skip or cond
-    default: TokenStream,
+    default: Option<TokenStream>,
 
     /// condition to parse field
     cond: Option<TokenStream>,
@@ -244,90 +290,78 @@ struct FieldData {
 
 impl FieldData {
     fn from_receiver(receiver: DekuFieldReceiver) -> Result<Self, TokenStream> {
-        FieldData::validate(&receiver)
-            .map_err(|(span, msg)| syn::Error::new(span, msg).to_compile_error())?;
-
-        let default = receiver.default.unwrap_or(quote! { Default::default() });
-
         let ctx = receiver
-            .ctx
+            .ctx?
             .map(|s| s.parse_with(Punctuated::parse_terminated))
             .transpose()
             .map_err(|e| e.to_compile_error())?;
 
-        Ok(Self {
+        let data = Self {
             ident: receiver.ident,
             ty: receiver.ty,
             endian: receiver.endian,
             bits: receiver.bits,
             bytes: receiver.bytes,
-            count: receiver.count,
-            bits_read: receiver.bits_read,
-            bytes_read: receiver.bytes_read,
-            until: receiver.until,
-            map: receiver.map,
+            count: receiver.count?,
+            bits_read: receiver.bits_read?,
+            bytes_read: receiver.bytes_read?,
+            until: receiver.until?,
+            map: receiver.map?,
             ctx,
-            update: receiver.update,
-            reader: receiver.reader,
-            writer: receiver.writer,
+            update: receiver.update?,
+            reader: receiver.reader?,
+            writer: receiver.writer?,
             skip: receiver.skip,
             temp: receiver.temp,
-            default,
-            cond: receiver.cond,
-        })
+            default: receiver.default?,
+            cond: receiver.cond?,
+        };
+
+        FieldData::validate(&data)?;
+
+        let default = data.default.or_else(|| Some(quote! { Default::default() }));
+
+        Ok(Self { default, ..data })
     }
 
-    fn validate(receiver: &DekuFieldReceiver) -> Result<(), (proc_macro2::Span, &str)> {
+    fn validate(data: &FieldData) -> Result<(), TokenStream> {
         // Validate either `read_bytes` or `read_bits` is specified
-        if receiver.bits_read.is_some() && receiver.bytes_read.is_some() {
-            return Err((
-                receiver.bits_read.span(),
+        if data.bits_read.is_some() && data.bytes_read.is_some() {
+            return Err(cerror(
+                data.bits_read.span(),
                 "conflicting: both `bits_read` and `bytes_read` specified on field",
             ));
         }
 
         // Validate either `count` or `bits_read`/`bytes_read` is specified
-        if receiver.count.is_some()
-            && (receiver.bits_read.is_some() || receiver.bytes_read.is_some())
-        {
-            if receiver.bits_read.is_some() {
-                return Err((
-                    receiver.count.span(),
+        if data.count.is_some() && (data.bits_read.is_some() || data.bytes_read.is_some()) {
+            if data.bits_read.is_some() {
+                return Err(cerror(
+                    data.count.span(),
                     "conflicting: both `count` and `bits_read` specified on field",
                 ));
             } else {
-                return Err((
-                    receiver.count.span(),
+                return Err(cerror(
+                    data.count.span(),
                     "conflicting: both `count` and `bytes_read` specified on field",
                 ));
             }
         }
 
         // Validate either `bits` or `bytes` is specified
-        if receiver.bits.is_some() && receiver.bytes.is_some() {
-            /*
-            FIXME: `receiver.bits.span()` will return `call_site`, that's unexpected. The compiler
-               error gives:    `#[derive(DekuRead)]`
-                                         ^^^^^^^^
-               instead of `#[deku(bits = "", bytes = "")]`
-                                  ^^^^^^^^^^^^^^^^^^^^^
-               A possible reason might be that the `span` was discarded by `darling`(because inner
-               type don't have a `span`).
-               Maybe we should parse it manually.
-            */
-
-            // FIXME: Ideally we need to use `Span::join` to encompass `bits` and `bytes` together.
-            return Err((
-                receiver.bits.span(),
+        if data.bits.is_some() && data.bytes.is_some() {
+            // FIXME: Use `Span::join` once out of nightly
+            return Err(cerror(
+                data.bits.span(),
                 "conflicting: both `bits` and `bytes` specified on field",
             ));
         }
 
         // Validate usage of `default` attribute
-        if receiver.default.is_some() && (!receiver.skip && receiver.cond.is_none()) {
-            // FIXME: Same issue with `receiver.bits.span()` see above.
-            return Err((
-                receiver.default.span(),
+        if data.default.is_some() && (!data.skip && data.cond.is_none()) {
+            // FIXME: Use `Span::join` once out of nightly
+            return Err(cerror(
+                data.default.span(),
                 "`default` attribute cannot be used here",
             ));
         }
@@ -365,9 +399,6 @@ struct VariantData {
 
 impl VariantData {
     fn from_receiver(receiver: DekuVariantReceiver) -> Result<Self, TokenStream> {
-        VariantData::validate(&receiver)
-            .map_err(|(span, msg)| syn::Error::new(span, msg).to_compile_error())?;
-
         let fields = ast::Fields::new(
             receiver.fields.style,
             receiver
@@ -378,31 +409,33 @@ impl VariantData {
                 .collect::<Result<Vec<_>, _>>()?,
         );
 
-        Ok(Self {
+        let ret = Self {
             ident: receiver.ident,
             fields,
-            reader: receiver.reader,
-            writer: receiver.writer,
-            id: receiver.id,
-            id_pat: receiver.id_pat,
-        })
+            reader: receiver.reader?,
+            writer: receiver.writer?,
+            id: receiver.id?,
+            id_pat: receiver.id_pat?,
+        };
+
+        VariantData::validate(&ret)?;
+
+        Ok(ret)
     }
 
-    fn validate(receiver: &DekuVariantReceiver) -> Result<(), (proc_macro2::Span, &str)> {
-        if receiver.id.is_some() && receiver.id_pat.is_some() {
-            /*
-            FIXME: Issue with `span`, see `FieldData::validate`.
-            */
-            return Err((
-                receiver.id.span(),
+    fn validate(data: &VariantData) -> Result<(), TokenStream> {
+        if data.id.is_some() && data.id_pat.is_some() {
+            // FIXME: Use `Span::join` once out of nightly
+            return Err(cerror(
+                data.id.span(),
                 "conflicting: both `id` and `id_pat` specified on variant",
             ));
         }
 
-        if let Some(id) = &receiver.id {
+        if let Some(id) = &data.id {
             if id.to_string() == "_" {
-                return Err((
-                    receiver.ident.span(),
+                return Err(cerror(
+                    data.ident.span(),
                     "error: `id_pat` should be used for `_`",
                 ));
             }
@@ -429,8 +462,8 @@ struct DekuReceiver {
     // TODO: The type of it should be
     //       `syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>`
     //       https://github.com/TedDriggs/darling/pull/98
-    #[darling(default, map = "apply_replacements")]
-    ctx: Option<syn::LitStr>,
+    #[darling(default = "default_res_opt", map = "map_option_litstr")]
+    ctx: Result<Option<syn::LitStr>, ReplacementError>,
 
     /// default context passed to the field
     // TODO: The type of it should be
@@ -444,8 +477,8 @@ struct DekuReceiver {
     magic: Option<syn::LitByteStr>,
 
     /// enum only: `id` value
-    #[darling(default, map = "option_as_tokenstream")]
-    id: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    id: Result<Option<TokenStream>, ReplacementError>,
 
     /// enum only: type of the enum `id`
     #[darling(rename = "type", default)]
@@ -453,41 +486,56 @@ struct DekuReceiver {
 
     /// enum only: bit size of the enum `id`
     #[darling(default)]
-    bits: Option<usize>,
+    bits: Option<Num>,
 
     /// enum only: byte size of the enum `id`
     #[darling(default)]
-    bytes: Option<usize>,
+    bytes: Option<Num>,
 }
 
-fn apply_replacements(input: Option<syn::LitStr>) -> Option<syn::LitStr> {
-    input.map(|v| {
-        if v.value().contains("__deku_") {
-            panic!(
-                "error: attribute cannot contain `__deku_` these are internal variables. Please use the `deku::` instead."
-            );
-        }
+type ReplacementError = TokenStream;
 
-        let v_str = v
-            .value()
-            .replace("deku::input", "__deku_input") // part of the public API `from_bytes`
-            .replace("deku::input_bits", "__deku_input_bits") // part of the public API `read`
-            .replace("deku::output", "__deku_output") // part of the public API `write`
-            .replace("deku::rest", "__deku_rest")
-            .replace("deku::bit_offset", "__deku_bit_offset")
-            .replace("deku::byte_offset", "__deku_byte_offset");
+fn apply_replacements(input: &syn::LitStr) -> Result<syn::LitStr, ReplacementError> {
+    if input.value().contains("__deku_") {
+        return Err(darling::Error::unsupported_format(
+            "attribute cannot contain `__deku_` these are internal variables. Please use the `deku::` instead."
+        )) .map_err(|e| e.with_span(&input).write_errors());
+    }
 
-        syn::LitStr::new(&v_str, v.span())
+    let input_str = input
+        .value()
+        .replace("deku::input", "__deku_input") // part of the public API `from_bytes`
+        .replace("deku::input_bits", "__deku_input_bits") // part of the public API `read`
+        .replace("deku::output", "__deku_output") // part of the public API `write`
+        .replace("deku::rest", "__deku_rest")
+        .replace("deku::bit_offset", "__deku_bit_offset")
+        .replace("deku::byte_offset", "__deku_byte_offset");
+
+    Ok(syn::LitStr::new(&input_str, input.span()))
+}
+
+/// Calls apply replacements on Option<LitStr>
+fn map_option_litstr(input: Option<syn::LitStr>) -> Result<Option<syn::LitStr>, ReplacementError> {
+    Ok(match input {
+        Some(v) => Some(apply_replacements(&v)?),
+        None => None,
     })
 }
 
 /// Parse a TokenStream from an Option<LitStr>
 /// Also replaces any namespaced variables to internal variables found in `input`
-fn option_as_tokenstream(input: Option<syn::LitStr>) -> Option<TokenStream> {
-    input.map(|v| {
-        let v = apply_replacements(Some(v)).unwrap();
-        v.parse::<TokenStream>()
-            .expect("could not parse token stream")
+fn map_litstr_as_tokenstream(
+    input: Option<syn::LitStr>,
+) -> Result<Option<TokenStream>, ReplacementError> {
+    Ok(match input {
+        Some(v) => {
+            let v = apply_replacements(&v)?;
+            Some(
+                v.parse::<TokenStream>()
+                    .expect("could not parse token stream"),
+            )
+        }
+        None => None,
     })
 }
 
@@ -509,6 +557,11 @@ fn gen_field_ident<T: ToString>(ident: Option<T>, index: usize, prefix: bool) ->
     field_name.parse().unwrap()
 }
 
+/// Provided default when a attribute is not available
+fn default_res_opt<T, E>() -> Result<Option<T>, E> {
+    Ok(None)
+}
+
 /// Receiver for the field-level attributes inside a struct/enum variant
 #[derive(Debug, FromField)]
 #[darling(attributes(deku))]
@@ -522,50 +575,50 @@ struct DekuFieldReceiver {
 
     /// field bit size
     #[darling(default)]
-    bits: Option<usize>,
+    bits: Option<Num>,
 
     /// field byte size
     #[darling(default)]
-    bytes: Option<usize>,
+    bytes: Option<Num>,
 
     /// tokens providing the length of the container
-    #[darling(default, map = "option_as_tokenstream")]
-    count: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    count: Result<Option<TokenStream>, ReplacementError>,
 
     /// tokens providing the number of bits for the length of the container
-    #[darling(default, map = "option_as_tokenstream")]
-    bits_read: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    bits_read: Result<Option<TokenStream>, ReplacementError>,
 
     /// tokens providing the number of bytes for the length of the container
-    #[darling(default, map = "option_as_tokenstream")]
-    bytes_read: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    bytes_read: Result<Option<TokenStream>, ReplacementError>,
 
     /// a predicate to decide when to stop reading elements into the container
-    #[darling(default, map = "option_as_tokenstream")]
-    until: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    until: Result<Option<TokenStream>, ReplacementError>,
 
     /// apply a function to the field after it's read
-    #[darling(default, map = "option_as_tokenstream")]
-    map: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    map: Result<Option<TokenStream>, ReplacementError>,
 
     /// context passed to the field.
     /// A comma separated argument list.
     // TODO: The type of it should be `Punctuated<Expr, Comma>`
     //       https://github.com/TedDriggs/darling/pull/98
-    #[darling(default, map = "apply_replacements")]
-    ctx: Option<syn::LitStr>,
+    #[darling(default = "default_res_opt", map = "map_option_litstr")]
+    ctx: Result<Option<syn::LitStr>, ReplacementError>,
 
     /// map field when updating struct
-    #[darling(default, map = "option_as_tokenstream")]
-    update: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    update: Result<Option<TokenStream>, ReplacementError>,
 
     /// custom field reader code
-    #[darling(default, map = "option_as_tokenstream")]
-    reader: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    reader: Result<Option<TokenStream>, ReplacementError>,
 
     /// custom field writer code
-    #[darling(default, map = "option_as_tokenstream")]
-    writer: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    writer: Result<Option<TokenStream>, ReplacementError>,
 
     /// skip field reading/writing
     #[darling(default)]
@@ -576,12 +629,12 @@ struct DekuFieldReceiver {
     temp: bool,
 
     /// default value code when used with skip
-    #[darling(default, map = "option_as_tokenstream")]
-    default: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    default: Result<Option<TokenStream>, ReplacementError>,
 
     /// condition to parse field
-    #[darling(default, map = "option_as_tokenstream")]
-    cond: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    cond: Result<Option<TokenStream>, ReplacementError>,
 }
 
 /// Receiver for the variant-level attributes inside a enum
@@ -592,20 +645,20 @@ struct DekuVariantReceiver {
     fields: ast::Fields<DekuFieldReceiver>,
 
     /// custom variant reader code
-    #[darling(default, map = "option_as_tokenstream")]
-    reader: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    reader: Result<Option<TokenStream>, ReplacementError>,
 
     /// custom variant reader code
-    #[darling(default, map = "option_as_tokenstream")]
-    writer: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    writer: Result<Option<TokenStream>, ReplacementError>,
 
     /// variant `id` value
-    #[darling(default, map = "option_as_tokenstream")]
-    id: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    id: Result<Option<TokenStream>, ReplacementError>,
 
     /// variant `id_pat` value
-    #[darling(default, map = "option_as_tokenstream")]
-    id_pat: Option<TokenStream>,
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    id_pat: Result<Option<TokenStream>, ReplacementError>,
 }
 
 /// Entry function for `DekuRead` proc-macro

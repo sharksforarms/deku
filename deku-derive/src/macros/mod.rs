@@ -1,3 +1,4 @@
+use crate::Num;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
@@ -163,8 +164,8 @@ fn gen_ctx_types_and_arg(
 /// `#deku(endian = "big", bits = "1")` -> `Endian::Big, Size::Bits(1)`
 fn gen_id_args(
     endian: Option<&syn::LitStr>,
-    bits: Option<usize>,
-    bytes: Option<usize>,
+    bits: Option<&Num>,
+    bytes: Option<&Num>,
 ) -> syn::Result<TokenStream> {
     let endian = endian.map(gen_endian_from_str).transpose()?;
     let bits = bits.map(|n| quote! {deku::ctx::Size::Bits(#n)});
@@ -187,8 +188,8 @@ fn gen_id_args(
 /// `#deku(endian = "big", bits = "1", ctx = "a")` -> `Endian::Big, Size::Bits(1), a`
 fn gen_field_args(
     endian: Option<&syn::LitStr>,
-    bits: Option<usize>,
-    bytes: Option<usize>,
+    bits: Option<&Num>,
+    bytes: Option<&Num>,
     ctx: Option<&Punctuated<syn::Expr, syn::token::Comma>>,
 ) -> syn::Result<TokenStream> {
     let endian = endian.map(gen_endian_from_str).transpose()?;

@@ -158,7 +158,11 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let id = input.id.as_ref();
     let id_type = input.id_type.as_ref();
 
-    let id_args = gen_id_args(input.endian.as_ref(), input.bits, input.bytes)?;
+    let id_args = gen_id_args(
+        input.endian.as_ref(),
+        input.bits.as_ref(),
+        input.bytes.as_ref(),
+    )?;
 
     let mut variant_writes = vec![];
     let mut variant_updates = vec![];
@@ -458,7 +462,12 @@ fn emit_field_write(
     let field_write_func = if field_writer.is_some() {
         quote! { #field_writer }
     } else {
-        let write_args = gen_field_args(field_endian, f.bits, f.bytes, f.ctx.as_ref())?;
+        let write_args = gen_field_args(
+            field_endian,
+            f.bits.as_ref(),
+            f.bytes.as_ref(),
+            f.ctx.as_ref(),
+        )?;
 
         quote! { #object_prefix #field_ident.write(__deku_output, (#write_args)) }
     };

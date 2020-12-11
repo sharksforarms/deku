@@ -147,7 +147,11 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let id = input.id.as_ref();
     let id_type = input.id_type.as_ref();
 
-    let id_args = gen_id_args(input.endian.as_ref(), input.bits, input.bytes)?;
+    let id_args = gen_id_args(
+        input.endian.as_ref(),
+        input.bits.as_ref(),
+        input.bytes.as_ref(),
+    )?;
 
     let magic_read = emit_magic_read(input)?;
 
@@ -433,7 +437,7 @@ fn emit_field_read(
         &f.bytes_read,
         &f.until,
         &f.cond,
-        &Some(f.default.clone()),
+        &f.default,
         &f.map,
         &f.reader,
         &f.ctx.as_ref().map(|v| quote!(#v)),
@@ -456,7 +460,12 @@ fn emit_field_read(
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
     } else {
-        let read_args = gen_field_args(field_endian, f.bits, f.bytes, f.ctx.as_ref())?;
+        let read_args = gen_field_args(
+            field_endian,
+            f.bits.as_ref(),
+            f.bytes.as_ref(),
+            f.ctx.as_ref(),
+        )?;
 
         // The container limiting options are special, we need to generate `(limit, (other, ..))` for them.
         // These have a problem where when it isn't a copy type, the field will be moved.

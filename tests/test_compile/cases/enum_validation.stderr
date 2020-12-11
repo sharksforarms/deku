@@ -23,20 +23,16 @@ error: `type` only supported on enum
    |               ^^^^
 
 error: `bits` only supported on enum
-  --> $DIR/enum_validation.rs:27:10
+  --> $DIR/enum_validation.rs:28:15
    |
-27 | #[derive(DekuRead)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+28 | #[deku(bits = "1")]
+   |               ^^^
 
 error: `bits` only supported on enum
-  --> $DIR/enum_validation.rs:34:10
+  --> $DIR/enum_validation.rs:35:15
    |
-34 | #[derive(DekuRead)]
-   |          ^^^^^^^^
-   |
-   = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+35 | #[deku(bits = "1")]
+   |               ^^^
 
 error: `id` only supported on enum
   --> $DIR/enum_validation.rs:42:13

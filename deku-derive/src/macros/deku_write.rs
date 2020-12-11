@@ -1,6 +1,9 @@
-use crate::macros::{
-    gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_struct_destruction,
-    token_contains_string, wrap_default_ctx,
+use crate::{
+    macros::{
+        gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_struct_destruction,
+        token_contains_string, wrap_default_ctx,
+    },
+    Id,
 };
 use crate::{DekuData, FieldData};
 use darling::ast::{Data, Fields};
@@ -167,6 +170,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut variant_writes = vec![];
     let mut variant_updates = vec![];
 
+    let has_discriminant = variants.iter().any(|v| v.discriminant.is_some());
+
     for variant in variants {
         // check if the first field has an ident, if not, it's a unnamed struct
         let variant_is_named = variant
@@ -195,13 +200,23 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         } else if id_type.is_some() {
             if let Some(variant_id) = &variant.id {
-                quote! {
-                    let mut variant_id: #id_type = #variant_id;
-                    variant_id.write(__deku_output, (#id_args))?;
+                match variant_id {
+                    Id::TokenStream(v) => {
+                        quote! {
+                            let mut variant_id: #id_type = #v;
+                            variant_id.write(__deku_output, (#id_args))?;
+                        }
+                    }
+                    Id::LitByteStr(v) => {
+                        quote! {
+                            let mut variant_id: #id_type = *#v;
+                            variant_id.write(__deku_output, (#id_args))?;
+                        }
+                    }
                 }
             } else if variant.id_pat.is_some() {
                 quote! {}
-            } else if variant.fields.style.is_unit() {
+            } else if has_discriminant {
                 quote! {
                     let mut variant_id: #id_type = Self::#variant_ident as #id_type;
                     variant_id.write(__deku_output, (#id_args))?;

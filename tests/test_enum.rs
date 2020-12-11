@@ -85,3 +85,23 @@ fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(input.to_vec(), ret_write);
 }
+
+#[test]
+fn test_enum_array_type() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(type = "[u8; 3]")]
+    enum TestEnumArray {
+        #[deku(id = b"123")]
+        VarA,
+        #[deku(id = "[1,1,1]")]
+        VarB,
+    }
+
+    let input = b"123".as_ref();
+
+    let ret_read = TestEnumArray::try_from(input).unwrap();
+    assert_eq!(TestEnumArray::VarA, ret_read);
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(input.to_vec(), ret_write);
+}

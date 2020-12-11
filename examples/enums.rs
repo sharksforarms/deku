@@ -19,7 +19,7 @@ enum DekuTest {
     },
     #[deku(id_pat = "4..=6")]
     Var5 { id: u8 },
-    #[deku(id_pat = "id if id > 6")]
+    #[deku(id_pat = "&id if id > 6")]
     Var6 { id: u8 },
 }
 

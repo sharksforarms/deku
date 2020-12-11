@@ -1,9 +1,15 @@
-use crate::macros::{
-    gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_internal_field_ident,
-    gen_internal_field_idents, token_contains_string, wrap_default_ctx,
+use crate::{
+    macros::{
+        gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_internal_field_ident,
+        gen_internal_field_idents, token_contains_string, wrap_default_ctx,
+    },
+    Id,
 };
 use crate::{DekuData, FieldData};
-use darling::ast::{Data, Fields};
+use darling::{
+    ast::{Data, Fields},
+    ToTokens,
+};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -159,6 +165,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut pre_match_tokens = vec![];
     let mut variant_matches = vec![];
 
+    let has_discriminant = variants.iter().any(|v| v.discriminant.is_some());
+
     for variant in variants {
         // check if the first field has an ident, if not, it's a unnamed struct
         let variant_is_named = variant
@@ -169,14 +177,17 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .is_some();
 
         let (consume_id, variant_id) = if let Some(variant_id) = &variant.id {
-            (true, variant_id.clone())
+            match variant_id {
+                Id::TokenStream(v) => (true, quote! {&#v}.into_token_stream()),
+                Id::LitByteStr(v) => (true, v.into_token_stream()),
+            }
         } else if let Some(variant_id_pat) = &variant.id_pat {
             (false, variant_id_pat.clone())
-        } else if variant.fields.style.is_unit() {
+        } else if has_discriminant {
             let ident = &variant.ident;
             let internal_ident = gen_internal_field_ident(&quote!(#ident));
             pre_match_tokens.push(quote! {
-                let #internal_ident = #id_type::try_from(Self::#ident as isize)?;
+                let #internal_ident = <#id_type>::try_from(Self::#ident as isize)?;
             });
             (true, quote! { _ if variant_id == #internal_ident })
         } else {
@@ -255,7 +266,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
     } else if id_type.is_some() {
         quote! {
-            let (new_rest, variant_id) = #id_type::read(__deku_rest, (#id_args))?;
+            let (new_rest, variant_id) = <#id_type>::read(__deku_rest, (#id_args))?;
         }
     } else {
         // either `id` or `type` needs to be specified
@@ -267,7 +278,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         #(#pre_match_tokens)*
 
-        let value = match variant_id {
+        let value = match &variant_id {
             #(#variant_matches),*
         };
     };

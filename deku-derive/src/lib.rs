@@ -13,6 +13,49 @@ use syn::{punctuated::Punctuated, spanned::Spanned, AttributeArgs};
 mod macros;
 
 #[derive(Debug)]
+enum Id {
+    TokenStream(TokenStream),
+    LitByteStr(syn::LitByteStr),
+}
+
+impl ToString for Id {
+    fn to_string(&self) -> String {
+        self.to_token_stream().to_string()
+    }
+}
+
+impl ToTokens for Id {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Id::TokenStream(v) => v.to_tokens(tokens),
+            Id::LitByteStr(v) => v.to_tokens(tokens),
+        }
+    }
+}
+
+impl FromMeta for Id {
+    fn from_value(value: &syn::Lit) -> darling::Result<Self> {
+        (match *value {
+            syn::Lit::Str(ref s) => Ok(Id::TokenStream(
+                apply_replacements(s)
+                    .map_err(darling::Error::custom)?
+                    .parse::<TokenStream>()
+                    .expect("could not parse token stream"),
+            )),
+            syn::Lit::ByteStr(ref s) => Ok(Id::LitByteStr(s.clone())),
+            _ => Err(darling::Error::unexpected_lit_type(value)),
+        })
+        .map_err(|e| e.with_span(value))
+    }
+
+    fn from_string(value: &str) -> darling::Result<Self> {
+        Ok(Id::TokenStream(
+            value.parse().expect("Failed to parse tokens"),
+        ))
+    }
+}
+
+#[derive(Debug)]
 struct Num(syn::LitInt);
 
 impl Num {
@@ -77,10 +120,10 @@ struct DekuData {
     magic: Option<syn::LitByteStr>,
 
     /// enum only: `id` value
-    id: Option<TokenStream>,
+    id: Option<Id>,
 
     /// enum only: type of the enum `id`
-    id_type: Option<syn::Ident>,
+    id_type: Option<TokenStream>,
 
     /// enum only: bit size of the enum `id`
     bits: Option<Num>,
@@ -130,8 +173,8 @@ impl DekuData {
             ctx,
             ctx_default,
             magic: receiver.magic,
-            id: receiver.id?,
-            id_type: receiver.id_type,
+            id: receiver.id,
+            id_type: receiver.id_type?,
             bits: receiver.bits,
             bytes: receiver.bytes,
         };
@@ -383,6 +426,7 @@ impl FieldData {
 struct VariantData {
     ident: syn::Ident,
     fields: ast::Fields<FieldData>,
+    discriminant: Option<syn::Expr>,
 
     /// custom variant reader code
     reader: Option<TokenStream>,
@@ -391,7 +435,7 @@ struct VariantData {
     writer: Option<TokenStream>,
 
     /// variant `id` value
-    id: Option<TokenStream>,
+    id: Option<Id>,
 
     /// variant `id_pat` value
     id_pat: Option<TokenStream>,
@@ -412,9 +456,10 @@ impl VariantData {
         let ret = Self {
             ident: receiver.ident,
             fields,
+            discriminant: receiver.discriminant,
             reader: receiver.reader?,
             writer: receiver.writer?,
-            id: receiver.id?,
+            id: receiver.id,
             id_pat: receiver.id_pat?,
         };
 
@@ -477,12 +522,16 @@ struct DekuReceiver {
     magic: Option<syn::LitByteStr>,
 
     /// enum only: `id` value
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
-    id: Result<Option<TokenStream>, ReplacementError>,
+    #[darling(default)]
+    id: Option<Id>,
 
     /// enum only: type of the enum `id`
-    #[darling(rename = "type", default)]
-    id_type: Option<syn::Ident>,
+    #[darling(
+        rename = "type",
+        default = "default_res_opt",
+        map = "map_litstr_as_tokenstream"
+    )]
+    id_type: Result<Option<TokenStream>, ReplacementError>,
 
     /// enum only: bit size of the enum `id`
     #[darling(default)]
@@ -643,6 +692,7 @@ struct DekuFieldReceiver {
 struct DekuVariantReceiver {
     ident: syn::Ident,
     fields: ast::Fields<DekuFieldReceiver>,
+    discriminant: Option<syn::Expr>,
 
     /// custom variant reader code
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
@@ -653,8 +703,8 @@ struct DekuVariantReceiver {
     writer: Result<Option<TokenStream>, ReplacementError>,
 
     /// variant `id` value
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
-    id: Result<Option<TokenStream>, ReplacementError>,
+    #[darling(default)]
+    id: Option<Id>,
 
     /// variant `id_pat` value
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]

@@ -17,7 +17,7 @@ syn = "1.0"
 # extra-traits gives us Debug
 # syn = {version = "1.0", features = ["extra-traits"]}
 proc-macro2 = "1.0"
-darling = "0.10"
+darling = "0.10.3"
 
 [dev-dependencies]
 rstest = "0.6"

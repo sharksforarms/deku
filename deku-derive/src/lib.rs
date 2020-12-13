@@ -52,14 +52,14 @@ impl DekuData {
             .map_err(|(span, msg)| syn::Error::new(span, msg).to_compile_error())?;
 
         let data = match receiver.data {
-            ast::Data::Struct(fields) => ast::Data::Struct(ast::Fields {
-                style: fields.style,
-                fields: fields
+            ast::Data::Struct(fields) => ast::Data::Struct(ast::Fields::new(
+                fields.style,
+                fields
                     .fields
                     .into_iter()
                     .map(FieldData::from_receiver)
                     .collect::<Result<Vec<_>, _>>()?,
-            }),
+            )),
             ast::Data::Enum(variants) => ast::Data::Enum(
                 variants
                     .into_iter()
@@ -362,15 +362,15 @@ impl VariantData {
         VariantData::validate(&receiver)
             .map_err(|(span, msg)| syn::Error::new(span, msg).to_compile_error())?;
 
-        let fields = ast::Fields {
-            style: receiver.fields.style,
-            fields: receiver
+        let fields = ast::Fields::new(
+            receiver.fields.style,
+            receiver
                 .fields
                 .fields
                 .into_iter()
                 .map(FieldData::from_receiver)
                 .collect::<Result<Vec<_>, _>>()?,
-        };
+        );
 
         Ok(Self {
             ident: receiver.ident,

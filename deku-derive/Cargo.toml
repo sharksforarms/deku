@@ -2,7 +2,7 @@
 authors = ["sharks <sharks@sharks>"]
 edition = "2018"
 name = "deku_derive"
-version = "0.9.1"
+version = "0.9.2"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/sharksforarms/deku"
 description = "bit level serialization/deserialization proc-macro for structs"
@@ -17,7 +17,7 @@ syn = "1.0"
 # extra-traits gives us Debug
 # syn = {version = "1.0", features = ["extra-traits"]}
 proc-macro2 = "1.0"
-darling = "0.10.3"
+darling = "0.11"
 
 [dev-dependencies]
 rstest = "0.6"

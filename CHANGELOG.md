@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## [0.9.2] - 2020-12-04
+- Patch release to fix darling semver breakage
+
 ## [0.9.1] - 2020-10-31
 - Changed minimum bitvec version to 0.19.4 to have desired `offset_from`
 functionality (https://github.com/myrrlyn/bitvec/issues/86). This was missed in
@@ -74,7 +77,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.9.1...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.9.2...HEAD
+
+[0.9.2]: https://github.com/sharksforarms/deku/compare/deku-v0.9.1...deku-v0.9.2
 
 [0.9.1]: https://github.com/sharksforarms/deku/compare/deku-v0.9.0...deku-v0.9.1
 

@@ -10,3 +10,6 @@ mod cstring;
 
 #[cfg(feature = "std")]
 mod ipaddr;
+
+#[cfg(feature = "alloc")]
+mod boxed;

@@ -189,6 +189,7 @@ mod tests {
         assert_eq!(expected, res_write.into_vec());
     }
 
+    // Note: These tests also exist in boxed.rs
     #[rstest(input, endian, bit_size, limit, expected, expected_rest, expected_write,
         case::normal_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), 2.into(), vec![0xBBAA, 0xDDCC], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
         case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), 2.into(), vec![0xAABB, 0xCCDD], bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),

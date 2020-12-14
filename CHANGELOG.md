@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2020-01-09
+### Breaking
+- Enum's which don't specify an `id` attribute now default to their discriminant value
+instead of being treated as a catch-all ([#139](https://github.com/sharksforarms/deku/pull/139))
+- Removed `BitSize` in favor of a new enum `Size` with two variants, `Bits` and `Bytes` ([#138](https://github.com/sharksforarms/deku/pull/138))
+- Added namespacing to internal variables. `deku::` is used to access internal variables in token fields. ([#150](https://github.com/sharksforarms/deku/pull/150))
+For example, `reader = "my_reader(deku::rest, deku::bit_offset)"` or `writer = "my_writer(deku::output)"`
+- Introduced a lifetime to `DekuRead` in support of zero-copy reading ([#158](https://github.com/sharksforarms/deku/pull/158))
+
+### Added
+- Zero-copy reading on &[u8] ([#158](https://github.com/sharksforarms/deku/pull/158))
+- Padding related attributes: `pad_bits_before`, `pad_bytes_before`, `pad_bits_after`, `pad_bytes_after` ([#163](https://github.com/sharksforarms/deku/pull/163))
+- Assertion related attributes: `assert`, `assert_eq` ([#164](https://github.com/sharksforarms/deku/pull/164))
+- Ability to use more types in enum's `type` attribute ([#162](https://github.com/sharksforarms/deku/pull/162))
+- Ability to use LitByteStr in enum's `id` attribute, for example `id = b"0x01"` ([#162](https://github.com/sharksforarms/deku/pull/162))
+- Access to read offset via bit_offset and byte_offset internal variables. ([#149](https://github.com/sharksforarms/deku/pull/149))
+These are accessed via `deku::` namespace, `deku::bit_offset` and `deku::byte_offset`. ([#150](https://github.com/sharksforarms/deku/pull/150))
+- `#[deku(temp)]` attribute, enabled via `deku_derive` proc-macro attribute. ([#136](https://github.com/sharksforarms/deku/pull/136))
+This allows reading/use of a field without it being stored in the container.
+- DekuRead+DekuWrite implementations for CString ([#144](https://github.com/sharksforarms/deku/pull/144))
+- DekuRead+DekuWrite implementations for NonZeroT types ([#140](https://github.com/sharksforarms/deku/pull/140))
+- DekuRead+DekuWrite implementations for bool ([#161](https://github.com/sharksforarms/deku/pull/161))
+- DekuRead+DekuWrite implementations for () ([#159](https://github.com/sharksforarms/deku/pull/159))
+- DekuRead+DekuWrite implementations for Box<T> and Box<[T]> ([#160](https://github.com/sharksforarms/deku/pull/160))
+
+### Other
+- Internal code/test refactoring
+- Code improvements ([@myrrlyn](https://github.com/myrrlyn), [@wcampbell0x2a](https://github.com/wcampbell0x2a), [@inspier](https://github.com/inspier))
+
+## [0.9.3] - 2020-12-14
+- Patch release to fix semver break in darling,
+[this has since been fixed](https://github.com/TedDriggs/darling/issues/107)
+
+## [0.9.2 - yanked] - 2020-12-14
+- Patch release to fix semver break in darling,
+[this has since been fixed](https://github.com/TedDriggs/darling/issues/107)
+
 ## [0.9.1] - 2020-10-31
 - Changed minimum bitvec version to 0.19.4 to have desired `offset_from`
 functionality (https://github.com/myrrlyn/bitvec/issues/86). This was missed in
@@ -74,7 +111,13 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.9.1...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.10.0...HEAD
+
+[0.10.0]: https://github.com/sharksforarms/deku/compare/deku-v0.9.3...deku-v0.10.0
+
+[0.9.3]: https://github.com/sharksforarms/deku/compare/deku-v0.9.1...deku-v0.9.3
+
+[0.9.2]: https://github.com/sharksforarms/deku/compare/deku-v0.9.1...deku-v0.9.2
 
 [0.9.1]: https://github.com/sharksforarms/deku/compare/deku-v0.9.0...deku-v0.9.1
 

@@ -1,3 +1,4 @@
+mod bool;
 mod nonzero;
 mod option;
 mod primitive;

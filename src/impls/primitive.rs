@@ -82,7 +82,7 @@ macro_rules! ImplDekuTraits {
                         bits
                     };
 
-                    let bytes: &[u8] = bits.as_slice();
+                    let bytes: &[u8] = bits.as_raw_slice();
 
                     // Read value
                     if input_is_le {
@@ -185,7 +185,7 @@ macro_rules! ImplDekuTraits {
                     Endian::Little => self.to_le_bytes(),
                     Endian::Big => self.to_be_bytes(),
                 };
-                output.extend_from_bitslice(input.view_bits());
+                output.extend_from_bitslice(input.view_bits::<Msb0>());
                 Ok(())
             }
         }

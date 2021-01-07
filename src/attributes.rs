@@ -7,6 +7,8 @@ A documentation-only module for #\[deku\] attributes
 |-----------|------------------|------------
 | [endian](#endian) | top-level, field | Set the endianness
 | [magic](#magic) | top-level | A magic value that must be present at the start of this struct/enum
+| [assert](#assert) | field | Assert a condition
+| [assert_eq](#assert_eq) | field | Assert equals on the field
 | [bits](#bits) | field | Set the bit-size of the field
 | [bytes](#bytes) | field | Set the byte-size of the field
 | [count](#count) | field | Set the field representing the element count of a container
@@ -137,6 +139,63 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
+```
+
+# assert
+
+Assert a condition after reading and before writing a field
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(assert = "*data >= 8")]
+    data: u8
+}
+
+let data: Vec<u8> = vec![0x00, 0x01, 0x02];
+
+let value = DekuTest::try_from(data.as_ref());
+
+assert_eq!(
+    Err(DekuError::Assertion("field 'data' failed assertion: * data >= 8".into())),
+    value
+);
+```
+
+# assert_eq
+
+Assert equals after reading and before writing a field
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(assert_eq = "0x01")]
+    data: u8,
+}
+
+let data: Vec<u8> = vec![0x01];
+
+let mut value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest { data: 0x01 },
+    value
+);
+
+value.data = 0x02;
+
+let value: Result<Vec<u8>, DekuError> = value.try_into();
+
+assert_eq!(
+    Err(DekuError::Assertion("field 'data' failed assertion: data == 0x01".into())),
+    value
+);
 ```
 
 # bits

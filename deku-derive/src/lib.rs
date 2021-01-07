@@ -341,6 +341,12 @@ struct FieldData {
 
     /// condition to parse field
     cond: Option<TokenStream>,
+
+    // assertion on field
+    assert: Option<TokenStream>,
+
+    // assert value of field
+    assert_eq: Option<TokenStream>,
 }
 
 impl FieldData {
@@ -374,6 +380,8 @@ impl FieldData {
             temp: receiver.temp,
             default: receiver.default?,
             cond: receiver.cond?,
+            assert: receiver.assert?,
+            assert_eq: receiver.assert_eq?,
         };
 
         FieldData::validate(&data)?;
@@ -716,6 +724,14 @@ struct DekuFieldReceiver {
     /// condition to parse field
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     cond: Result<Option<TokenStream>, ReplacementError>,
+
+    // assertion on field
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    assert: Result<Option<TokenStream>, ReplacementError>,
+
+    // assert value of field
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    assert_eq: Result<Option<TokenStream>, ReplacementError>,
 }
 
 /// Receiver for the variant-level attributes inside a enum

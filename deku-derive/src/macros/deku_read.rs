@@ -467,6 +467,7 @@ fn emit_field_read(
 
     let field_reader = &f.reader;
 
+    // fields to check usage of bit/byte offset
     let field_check_vars = [
         &f.count,
         &f.bits_read,
@@ -477,6 +478,8 @@ fn emit_field_read(
         &f.map,
         &f.reader,
         &f.ctx.as_ref().map(|v| quote!(#v)),
+        &f.assert,
+        &f.assert_eq,
     ];
 
     let (bit_offset, byte_offset) = emit_bit_byte_offsets(&field_check_vars);
@@ -490,8 +493,38 @@ fn emit_field_read(
         .or_else(|| Some(quote! { Result::<_, DekuError>::Ok }));
 
     let field_ident = f.get_ident(i, true);
-
+    let field_ident_str = field_ident.to_string();
     let internal_field_ident = gen_internal_field_ident(&field_ident);
+
+    let field_assert = f.assert.as_ref().map(|v| {
+        quote! {
+            if (!(#v)) {
+                // assertion is false, raise error
+                return Err(DekuError::Assertion(format!(
+                            "field '{}' failed assertion: {}",
+                            #field_ident_str,
+                            stringify!(#v)
+                        )));
+            } else {
+                // do nothing
+            }
+        }
+    });
+
+    let field_assert_eq = f.assert_eq.as_ref().map(|v| {
+        quote! {
+            if (!(#internal_field_ident == (#v))) {
+                // assertion is false, raise error
+                return Err(DekuError::Assertion(format!(
+                            "field '{}' failed assertion: {}",
+                            #field_ident_str,
+                            stringify!(#field_ident == #v)
+                        )));
+            } else {
+                // do nothing
+            }
+        }
+    });
 
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
@@ -609,6 +642,9 @@ fn emit_field_read(
             #field_read_tokens
         };
         let #field_ident = &#internal_field_ident;
+
+        #field_assert
+        #field_assert_eq
 
         #pad_bits_after
     };

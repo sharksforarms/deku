@@ -1,3 +1,5 @@
+mod test_assert;
+mod test_assert_eq;
 mod test_cond;
 mod test_ctx;
 mod test_limits;

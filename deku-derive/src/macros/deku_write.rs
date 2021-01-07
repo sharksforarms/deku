@@ -483,12 +483,50 @@ fn emit_field_write(
 ) -> Result<TokenStream, syn::Error> {
     let field_endian = f.endian.as_ref().or_else(|| input.endian.as_ref());
 
-    let field_check_vars = [&f.writer, &f.cond, &f.ctx.as_ref().map(|v| quote!(#v))];
+    // fields to check usage of bit/byte offset
+    let field_check_vars = [
+        &f.writer,
+        &f.cond,
+        &f.ctx.as_ref().map(|v| quote!(#v)),
+        &f.assert,
+        &f.assert_eq,
+    ];
 
     let (bit_offset, byte_offset) = emit_bit_byte_offsets(&field_check_vars);
 
     let field_writer = &f.writer;
     let field_ident = f.get_ident(i, object_prefix.is_none());
+    let field_ident_str = field_ident.to_string();
+
+    let field_assert = f.assert.as_ref().map(|v| {
+        quote! {
+            if (!(#v)) {
+                // assertion is false, raise error
+                return Err(DekuError::Assertion(format!(
+                            "field '{}' failed assertion: {}",
+                            #field_ident_str,
+                            stringify!(#v)
+                        )));
+            } else {
+                // do nothing
+            }
+        }
+    });
+
+    let field_assert_eq = f.assert_eq.as_ref().map(|v| {
+        quote! {
+            if (!(*(#field_ident) == (#v))) {
+                // assertion is false, raise error
+                return Err(DekuError::Assertion(format!(
+                            "field '{}' failed assertion: {}",
+                            #field_ident_str,
+                            stringify!(#field_ident == #v)
+                        )));
+            } else {
+                // do nothing
+            }
+        }
+    });
 
     let field_write_func = if field_writer.is_some() {
         quote! { #field_writer }
@@ -550,6 +588,9 @@ fn emit_field_write(
 
         #bit_offset
         #byte_offset
+
+        #field_assert
+        #field_assert_eq
 
         #field_write_tokens
 

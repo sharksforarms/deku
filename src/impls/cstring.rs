@@ -8,9 +8,7 @@ where
 {
     fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
         let bytes = self.as_bytes_with_nul();
-        bytes.write(output, ctx)?;
-
-        Ok(())
+        bytes.write(output, ctx)
     }
 }
 

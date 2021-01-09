@@ -382,14 +382,11 @@ fn emit_field_writes(
     fields: &Fields<&FieldData>,
     object_prefix: Option<TokenStream>,
 ) -> Result<Vec<TokenStream>, syn::Error> {
-    let mut field_writes = vec![];
-
-    for (i, f) in fields.iter().enumerate() {
-        let field_write = emit_field_write(input, i, f, &object_prefix)?;
-        field_writes.push(field_write);
-    }
-
-    Ok(field_writes)
+    fields
+        .iter()
+        .enumerate()
+        .map(|(i, f)| emit_field_write(input, i, f, &object_prefix))
+        .collect()
 }
 
 fn emit_field_updates(

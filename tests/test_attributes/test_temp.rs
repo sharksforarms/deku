@@ -54,7 +54,7 @@ fn test_temp_enum_field() {
             #[deku(count = "field_a")]
             field_b: Vec<u8>,
         },
-    };
+    }
 
     let test_data: Vec<u8> = [0xAB, 0x01, 0x02].to_vec();
 

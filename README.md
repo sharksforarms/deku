@@ -4,7 +4,7 @@
 [![Rust Documentation](https://docs.rs/deku/badge.svg)](https://docs.rs/deku)
 [![Actions Status](https://github.com/sharksforarms/deku/workflows/CI/badge.svg)](https://github.com/sharksforarms/deku/actions)
 [![codecov](https://codecov.io/gh/sharksforarms/deku/branch/master/graph/badge.svg)](https://codecov.io/gh/sharksforarms/deku)
-[![discord](https://img.shields.io/discord/771034826119053363?label=discord&logo=discord)](https://discord.gg/3ANfVS)
+[![Gitter](https://badges.gitter.im/rust-deku/community.svg)](https://gitter.im/rust-deku/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 Declarative binary reading and writing
 

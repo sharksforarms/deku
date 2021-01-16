@@ -836,7 +836,7 @@ fn remove_deku_attrs(fields: &mut syn::Fields) {
     match fields {
         syn::Fields::Named(ref mut fields) => remove_deku_field_attrs(&mut fields.named),
         syn::Fields::Unnamed(ref mut fields) => remove_deku_field_attrs(&mut fields.unnamed),
-        syn::Fields::Unit => (),
+        syn::Fields::Unit => {}
     }
 }
 
@@ -844,7 +844,7 @@ fn remove_temp_fields(fields: &mut syn::Fields) {
     match fields {
         syn::Fields::Named(ref mut fields) => remove_deku_temp_fields(&mut fields.named),
         syn::Fields::Unnamed(ref mut fields) => remove_deku_temp_fields(&mut fields.unnamed),
-        syn::Fields::Unit => (),
+        syn::Fields::Unit => {}
     }
 }
 

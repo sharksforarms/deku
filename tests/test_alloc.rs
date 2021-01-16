@@ -37,7 +37,6 @@ struct TestDeku {
 }
 
 mod tests {
-
     use super::*;
     use alloc_counter::count_alloc;
     use hexlit::hex;

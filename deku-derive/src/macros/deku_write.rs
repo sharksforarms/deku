@@ -203,14 +203,14 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 match variant_id {
                     Id::TokenStream(v) => {
                         quote! {
-                            let mut variant_id: #id_type = #v;
-                            variant_id.write(__deku_output, (#id_args))?;
+                            let mut __deku_variant_id: #id_type = #v;
+                            __deku_variant_id.write(__deku_output, (#id_args))?;
                         }
                     }
                     Id::LitByteStr(v) => {
                         quote! {
-                            let mut variant_id: #id_type = *#v;
-                            variant_id.write(__deku_output, (#id_args))?;
+                            let mut __deku_variant_id: #id_type = *#v;
+                            __deku_variant_id.write(__deku_output, (#id_args))?;
                         }
                     }
                 }
@@ -218,8 +218,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 quote! {}
             } else if has_discriminant {
                 quote! {
-                    let mut variant_id: #id_type = Self::#variant_ident as #id_type;
-                    variant_id.write(__deku_output, (#id_args))?;
+                    let mut __deku_variant_id: #id_type = Self::#variant_ident as #id_type;
+                    __deku_variant_id.write(__deku_output, (#id_args))?;
                 }
             } else {
                 return Err(syn::Error::new(

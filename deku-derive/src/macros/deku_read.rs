@@ -72,12 +72,12 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 #magic_read
 
                 #(#field_reads)*
-                let value = #initialize_struct;
+                let __deku_value = #initialize_struct;
 
-                let pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
-                let read_idx = __deku_input_bits.len() - (__deku_rest.len() + pad);
+                let __deku_pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
+                let __deku_read_idx = __deku_input_bits.len() - (__deku_rest.len() + __deku_pad);
 
-                Ok(((__deku_input_bits[read_idx..].as_slice(), pad), value))
+                Ok(((__deku_input_bits[__deku_read_idx..].as_slice(), __deku_pad), __deku_value))
             },
             &input.ctx,
             &input.ctx_default,
@@ -103,9 +103,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         #magic_read
 
         #(#field_reads)*
-        let value = #initialize_struct;
+        let __deku_value = #initialize_struct;
 
-        Ok((__deku_rest, value))
+        Ok((__deku_rest, __deku_value))
     };
 
     tokens.extend(quote! {
@@ -189,7 +189,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             pre_match_tokens.push(quote! {
                 let #internal_ident = <#id_type>::try_from(Self::#ident as isize)?;
             });
-            (true, quote! { _ if variant_id == #internal_ident })
+            (true, quote! { _ if __deku_variant_id == #internal_ident })
         } else {
             return Err(syn::Error::new(
                 variant.ident.span(),
@@ -223,7 +223,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             // if we're consuming an id, set the rest to new_rest before reading the variant
             let new_rest = if consume_id {
                 quote! {
-                    __deku_rest = new_rest;
+                    __deku_rest = __deku_new_rest;
                 }
             } else {
                 quote! {}
@@ -252,7 +252,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 return Err(DekuError::Parse(
                             format!(
                                 "Could not match enum variant id = {:?} on enum `{}`",
-                                variant_id,
+                                __deku_variant_id,
                                 #ident_as_string
                             )
                         ));
@@ -262,11 +262,11 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let variant_id_read = if id.is_some() {
         quote! {
-            let (new_rest, variant_id) = (__deku_rest, #id);
+            let (__deku_new_rest, __deku_variant_id) = (__deku_rest, #id);
         }
     } else if id_type.is_some() {
         quote! {
-            let (new_rest, variant_id) = <#id_type>::read(__deku_rest, (#id_args))?;
+            let (__deku_new_rest, __deku_variant_id) = <#id_type>::read(__deku_rest, (#id_args))?;
         }
     } else {
         // either `id` or `type` needs to be specified
@@ -278,7 +278,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         #(#pre_match_tokens)*
 
-        let value = match &variant_id {
+        let __deku_value = match &__deku_variant_id {
             #(#variant_matches),*
         };
     };
@@ -297,10 +297,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
                 #variant_read
 
-                let pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
-                let read_idx = __deku_input_bits.len() - (__deku_rest.len() + pad);
+                let __deku_pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
+                let __deku_read_idx = __deku_input_bits.len() - (__deku_rest.len() + __deku_pad);
 
-                Ok(((__deku_input_bits[read_idx..].as_slice(), pad), value))
+                Ok(((__deku_input_bits[__deku_read_idx..].as_slice(), __deku_pad), __deku_value))
             },
             &input.ctx,
             &input.ctx_default,
@@ -327,7 +327,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         #variant_read
 
-        Ok((__deku_rest, value))
+        Ok((__deku_rest, __deku_value))
     };
 
     tokens.extend(quote! {
@@ -359,15 +359,15 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 fn emit_magic_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let tokens = if let Some(magic) = &input.magic {
         quote! {
-            let magic = #magic;
+            let __deku_magic = #magic;
 
-            for byte in magic {
-                let (new_rest, read_byte) = u8::read(__deku_rest, ())?;
-                if *byte != read_byte {
+            for __deku_byte in __deku_magic {
+                let (__deku_new_rest, __deku_read_byte) = u8::read(__deku_rest, ())?;
+                if *__deku_byte != __deku_read_byte {
                     return Err(DekuError::Parse(format!("Missing magic value {:?}", #magic)));
                 }
 
-                __deku_rest = new_rest;
+                __deku_rest = __deku_new_rest;
             }
         }
     } else {
@@ -443,8 +443,8 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
             )?;
 
             if __deku_rest.len() >= __deku_pad {
-                let (__deku_padded_bits, new_rest) = __deku_rest.split_at(__deku_pad);
-                __deku_rest = new_rest;
+                let (__deku_padded_bits, __deku_new_rest) = __deku_rest.split_at(__deku_pad);
+                __deku_rest = __deku_new_rest;
             } else {
                 return Err(DekuError::Parse(format!(
                     "not enough data for padding: expected {} bits got {} bits",
@@ -588,12 +588,12 @@ fn emit_field_read(
     };
 
     let field_read_normal = quote! {
-        let (new_rest, value) = #field_read_func?;
-        let value: #field_type = #field_map(value)?;
+        let (__deku_new_rest, __deku_value) = #field_read_func?;
+        let __deku_value: #field_type = #field_map(__deku_value)?;
 
-        __deku_rest = new_rest;
+        __deku_rest = __deku_new_rest;
 
-        value
+        __deku_value
     };
 
     let field_default = &f.default;

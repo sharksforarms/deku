@@ -52,7 +52,7 @@ mod test_slice {
     }
 
     #[test]
-    #[should_panic(expected = "Parse(\"not enough data: expected 8 bits got 0 bits\")")]
+    #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
     fn test_until_error() {
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
         struct TestStruct<'a> {
@@ -119,7 +119,7 @@ mod test_vec {
     }
 
     #[test]
-    #[should_panic(expected = "Parse(\"not enough data: expected 8 bits got 0 bits\")")]
+    #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
     fn test_until_error() {
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
         struct TestStruct {

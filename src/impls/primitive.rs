@@ -25,11 +25,7 @@ macro_rules! ImplDekuTraits {
                 }
 
                 if input.len() < bit_size {
-                    return Err(DekuError::Parse(format!(
-                        "not enough data: expected {} bits got {} bits",
-                        bit_size,
-                        input.len()
-                    )));
+                    return Err(DekuError::Incomplete(crate::error::NeedSize::new(bit_size)));
                 }
 
                 let (bit_slice, rest) = input.split_at(bit_size);
@@ -316,9 +312,9 @@ mod tests {
         case::normal_bits_12_le([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Little, Some(12), 0b1110_1001_0110, bits![Msb0, u8; 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1]),
         case::normal_bits_12_be([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Big, Some(12), 0b1001_0110_1110, bits![Msb0, u8; 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1]),
         case::normal_bit_6([0b1001_0110].as_ref(), Endian::Little, Some(6), 0b1001_01, bits![Msb0, u8; 1, 0,]),
-        #[should_panic(expected = "Parse(\"not enough data: expected 32 bits got 0 bits\")")]
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
         case::not_enough_data([].as_ref(), Endian::Little, Some(32), 0xFF, bits![Msb0, u8;]),
-        #[should_panic(expected = "Parse(\"not enough data: expected 32 bits got 16 bits\")")]
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
         case::not_enough_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(32), 0xFF, bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 64 bits\")")]
         case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(64), 0xFF, bits![Msb0, u8;]),

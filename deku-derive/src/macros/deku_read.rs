@@ -444,11 +444,7 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
                 let (__deku_padded_bits, __deku_new_rest) = __deku_rest.split_at(__deku_pad);
                 __deku_rest = __deku_new_rest;
             } else {
-                return Err(DekuError::Parse(format!(
-                    "not enough data for padding: expected {} bits got {} bits",
-                    __deku_pad,
-                    __deku_rest.len()
-                )));
+                return Err(DekuError::Incomplete(NeedSize::new(__deku_pad)));
             }
         }
     }

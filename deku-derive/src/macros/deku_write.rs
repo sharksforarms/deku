@@ -25,13 +25,13 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let ident = &input.ident;
     let ident = quote! { #ident #ty };
 
-    let magic_write = emit_magic_write(input)?;
+    let magic_write = emit_magic_write(input);
 
     // Checked in `emit_deku_write`.
     let fields = input.data.as_ref().take_struct().unwrap();
 
     let field_writes = emit_field_writes(input, &fields, None)?;
-    let field_updates = emit_field_updates(&fields, Some(quote! { self. }))?;
+    let field_updates = emit_field_updates(&fields, Some(quote! { self. }));
 
     let named = fields.style.is_struct();
 
@@ -150,7 +150,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let (imp, ty, wher) = input.generics.split_for_impl();
 
-    let magic_write = emit_magic_write(input)?;
+    let magic_write = emit_magic_write(input);
 
     // checked in emit_deku_write
     let variants = input.data.as_ref().take_enum().unwrap();
@@ -247,7 +247,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         };
 
-        let variant_field_updates = emit_field_updates(&variant.fields.as_ref(), None)?;
+        let variant_field_updates = emit_field_updates(&variant.fields.as_ref(), None);
 
         variant_writes.push(quote! {
             Self :: #variant_match => {
@@ -365,16 +365,14 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     Ok(tokens)
 }
 
-fn emit_magic_write(input: &DekuData) -> Result<TokenStream, syn::Error> {
-    let tokens = if let Some(magic) = &input.magic {
+fn emit_magic_write(input: &DekuData) -> TokenStream {
+    if let Some(magic) = &input.magic {
         quote! {
             #magic.write(__deku_output, ())?;
         }
     } else {
         quote! {}
-    };
-
-    Ok(tokens)
+    }
 }
 
 fn emit_field_writes(
@@ -392,22 +390,22 @@ fn emit_field_writes(
 fn emit_field_updates(
     fields: &Fields<&FieldData>,
     object_prefix: Option<TokenStream>,
-) -> Result<Vec<TokenStream>, syn::Error> {
+) -> Vec<TokenStream> {
     let mut field_updates = vec![];
 
     for (i, f) in fields.iter().enumerate() {
-        let new_field_updates = emit_field_update(i, f, &object_prefix)?;
+        let new_field_updates = emit_field_update(i, f, &object_prefix);
         field_updates.extend(new_field_updates);
     }
 
-    Ok(field_updates)
+    field_updates
 }
 
 fn emit_field_update(
     i: usize,
     f: &FieldData,
     object_prefix: &Option<TokenStream>,
-) -> Result<Vec<TokenStream>, syn::Error> {
+) -> Vec<TokenStream> {
     let mut field_updates = vec![];
 
     let field_ident = f.get_ident(i, object_prefix.is_none());
@@ -423,7 +421,7 @@ fn emit_field_update(
         })
     }
 
-    Ok(field_updates)
+    field_updates
 }
 
 fn emit_bit_byte_offsets(

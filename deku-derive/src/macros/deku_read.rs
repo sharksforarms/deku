@@ -44,7 +44,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         .and_then(|v| v.ident.as_ref())
         .is_some();
 
-    let magic_read = emit_magic_read(input)?;
+    let magic_read = emit_magic_read(input);
 
     let (field_idents, field_reads) = emit_field_reads(input, &fields)?;
 
@@ -159,7 +159,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         input.bytes.as_ref(),
     )?;
 
-    let magic_read = emit_magic_read(input)?;
+    let magic_read = emit_magic_read(input);
 
     let mut has_default_match = false;
     let mut pre_match_tokens = vec![];
@@ -356,8 +356,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     Ok(tokens)
 }
 
-fn emit_magic_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
-    let tokens = if let Some(magic) = &input.magic {
+fn emit_magic_read(input: &DekuData) -> TokenStream {
+    if let Some(magic) = &input.magic {
         quote! {
             let __deku_magic = #magic;
 
@@ -372,9 +372,7 @@ fn emit_magic_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
     } else {
         quote! {}
-    };
-
-    Ok(tokens)
+    }
 }
 
 struct FieldIdent {

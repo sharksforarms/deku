@@ -631,6 +631,7 @@ fn gen_field_ident<T: ToString>(ident: Option<T>, index: usize, prefix: bool) ->
 }
 
 /// Provided default when a attribute is not available
+#[allow(clippy::unnecessary_wraps)]
 fn default_res_opt<T, E>() -> Result<Option<T>, E> {
     Ok(None)
 }

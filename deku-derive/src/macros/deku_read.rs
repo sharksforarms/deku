@@ -77,7 +77,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 let __deku_pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
                 let __deku_read_idx = __deku_input_bits.len() - (__deku_rest.len() + __deku_pad);
 
-                Ok(((__deku_input_bits[__deku_read_idx..].as_slice(), __deku_pad), __deku_value))
+                Ok(((__deku_input_bits[__deku_read_idx..].as_raw_slice(), __deku_pad), __deku_value))
             },
             &input.ctx,
             &input.ctx_default,
@@ -300,7 +300,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 let __deku_pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
                 let __deku_read_idx = __deku_input_bits.len() - (__deku_rest.len() + __deku_pad);
 
-                Ok(((__deku_input_bits[__deku_read_idx..].as_slice(), __deku_pad), __deku_value))
+                Ok(((__deku_input_bits[__deku_read_idx..].as_raw_slice(), __deku_pad), __deku_value))
             },
             &input.ctx,
             &input.ctx_default,

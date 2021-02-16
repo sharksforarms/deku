@@ -26,7 +26,7 @@ where
         rest = new_rest;
 
         let read_idx = input.offset_from(rest) as usize;
-        value = input[..read_idx].as_slice();
+        value = input[..read_idx].as_raw_slice();
 
         if predicate(read_idx, &val) {
             break;
@@ -63,7 +63,7 @@ where
             Limit::Count(mut count) => {
                 // Handle the trivial case of reading an empty slice
                 if count == 0 {
-                    return Ok((input, &input.as_slice()[..0]));
+                    return Ok((input, &input.as_raw_slice()[..0]));
                 }
 
                 // Otherwise, read until we have read `count` elements

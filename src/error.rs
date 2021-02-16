@@ -4,9 +4,35 @@
 
 use alloc::{format, string::String, string::ToString};
 
+/// Number of bits needed to retry parsing
+#[derive(Debug, PartialEq)]
+pub struct NeedSize {
+    bits: usize,
+}
+
+impl NeedSize {
+    /// Create new [NeedSize] from bits
+    pub fn new(bits: usize) -> Self {
+        Self { bits }
+    }
+
+    /// Number of bits needed
+    pub fn bit_size(&self) -> usize {
+        self.bits
+    }
+
+    /// Number of bytes needed
+    pub fn byte_size(&self) -> usize {
+        (self.bits + 7) / 8
+    }
+}
+
 /// Deku errors
 #[derive(Debug, PartialEq)]
+#[non_exhaustive]
 pub enum DekuError {
+    /// Parsing error when reading
+    Incomplete(NeedSize),
     /// Parsing error when reading
     Parse(String),
     /// Invalid parameter
@@ -38,6 +64,12 @@ impl From<core::convert::Infallible> for DekuError {
 impl core::fmt::Display for DekuError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match *self {
+            DekuError::Incomplete(ref size) => write!(
+                f,
+                "Not enough data, need {} bits (or {} bytes)",
+                size.bit_size(),
+                size.byte_size()
+            ),
             DekuError::Parse(ref err) => write!(f, "Parse error: {}", err),
             DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {}", err),
             DekuError::Unexpected(ref err) => write!(f, "Unexpected error: {}", err),

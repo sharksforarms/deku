@@ -18,7 +18,7 @@ use std::convert::{TryFrom, TryInto};
     #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
     case(&hex!("ef656b75")),
 
-    #[should_panic(expected = "Parse(\"not enough data: expected 8 bits got 0 bits\")")]
+    #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
     case(&hex!("64656b")),
 )]
 fn test_magic_struct(input: &[u8]) {
@@ -52,7 +52,7 @@ fn test_magic_struct(input: &[u8]) {
     #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
     case(&hex!("64656b00")),
 
-    #[should_panic(expected = "Parse(\"not enough data: expected 8 bits got 0 bits\")")]
+    #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
     case(&hex!("64656b")),
 )]
 fn test_magic_enum(input: &[u8]) {

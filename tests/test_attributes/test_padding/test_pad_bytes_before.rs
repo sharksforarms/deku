@@ -27,7 +27,7 @@ fn test_pad_bytes_before() {
 }
 
 #[test]
-#[should_panic(expected = "Parse(\"not enough data for padding: expected 16 bits got 0 bits\")")]
+#[should_panic(expected = "Incomplete(NeedSize { bits: 16 })")]
 fn test_pad_bytes_before_not_enough() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct TestStruct {

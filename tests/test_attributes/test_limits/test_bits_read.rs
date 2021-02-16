@@ -28,12 +28,12 @@ mod test_slice {
     }
 
     #[rstest(input_bits,
-        #[should_panic(expected = "Parse(\"not enough data: expected 8 bits got 0 bits\")")]
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
         case(15),
 
         case(16),
 
-        #[should_panic(expected = "Parse(\"not enough data: expected 8 bits got 0 bits\")")]
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
         case(17),
     )]
     fn test_bits_read_from_field(input_bits: u8) {
@@ -89,12 +89,12 @@ mod test_vec {
     }
 
     #[rstest(input_bits,
-        #[should_panic(expected = "Parse(\"not enough data: expected 16 bits got 0 bits\")")]
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 16 })")]
         case(15),
 
         case(16),
 
-        #[should_panic(expected = "Parse(\"not enough data: expected 16 bits got 0 bits\")")]
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 16 })")]
         case(17),
     )]
     fn test_bits_read_from_field(input_bits: u8) {

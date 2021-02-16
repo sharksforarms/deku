@@ -61,7 +61,7 @@ mod tests {
             [b'a'].view_bits::<Msb0>(),
         ),
 
-        #[should_panic(expected = "Parse(\"not enough data: expected 8 bits got 0 bits\")")]
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
         case(&[b't', b'e', b's', b't'], CString::new("test").unwrap(), bits![Msb0, u8;]),
     )]
     fn test_cstring(input: &[u8], expected: CString, expected_rest: &BitSlice<Msb0, u8>) {

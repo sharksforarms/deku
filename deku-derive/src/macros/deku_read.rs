@@ -128,7 +128,6 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
     }
 
-    // println!("{}", tokens.to_string());
     Ok(tokens)
 }
 
@@ -164,6 +163,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut has_default_match = false;
     let mut pre_match_tokens = vec![];
     let mut variant_matches = vec![];
+    let mut deku_ids = vec![];
 
     let has_discriminant = variants.iter().any(|v| v.discriminant.is_some());
 
@@ -219,6 +219,16 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             let internal_fields = gen_internal_field_idents(variant_is_named, field_idents);
             let initialize_enum =
                 super::gen_enum_init(variant_is_named, variant_ident, internal_fields);
+
+            if !has_discriminant && variant.id_pat.is_none() {
+                let variant_deku_id = variant.id.as_ref();
+                let deku_id = if let Id::LitByteStr(variant_deku_id) = variant_deku_id.unwrap() {
+                    quote! { Self :: #initialize_enum => *#variant_deku_id}
+                } else {
+                    quote! { Self :: #initialize_enum => #variant_deku_id}
+                };
+                deku_ids.push(deku_id);
+            }
 
             // if we're consuming an id, set the rest to new_rest before reading the variant
             let new_rest = if consume_id {
@@ -352,7 +362,36 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
     }
 
-    // println!("{}", tokens.to_string());
+    // create `deku_id` function for retrieving at runtime the id value
+    let deku_id_id_type = if id_type.is_some() || input.ctx.is_none() {
+        id_type.unwrap()
+    } else {
+        &ctx_types
+    };
+    let deku_id = if deku_ids.is_empty() {
+        quote! {
+            impl #ident {
+                fn deku_id(&self) -> #deku_id_id_type {
+                    match self {
+                        _ => panic!("deku id for variant not found")
+                    }
+                }
+            }
+        }
+    } else {
+        quote! {
+            impl #ident {
+                fn deku_id(&self) -> #deku_id_id_type {
+                    match self {
+                        #(#deku_ids),*,
+                        _ => panic!("deku id for variant not found"),
+                    }
+                }
+            }
+        }
+    };
+    tokens.extend(deku_id);
+
     Ok(tokens)
 }
 

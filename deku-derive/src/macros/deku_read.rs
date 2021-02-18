@@ -224,9 +224,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             if !has_discriminant && variant.id_pat.is_none() {
                 let variant_deku_id = variant.id.as_ref();
                 let deku_id = if let Id::LitByteStr(variant_deku_id) = variant_deku_id.unwrap() {
-                    quote! { Self :: #initialize_enum => *#variant_deku_id}
+                    quote! { Self :: #initialize_enum => Ok(*#variant_deku_id)}
                 } else {
-                    quote! { Self :: #initialize_enum => #variant_deku_id}
+                    quote! { Self :: #initialize_enum => Ok(#variant_deku_id)}
                 };
                 deku_ids.push(deku_id);
             }
@@ -363,7 +363,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
     }
 
-    // create `deku_id` function for retrieving at runtime the id value
+    // create `deku_id()` function for retrieving at runtime the id value
     let deku_id_id_type = if let Some(id_type) = id_type {
         id_type
     } else {
@@ -372,9 +372,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let deku_id = if deku_ids.is_empty() {
         quote! {
             impl #ident {
-                fn deku_id(&self) -> #deku_id_id_type {
+                fn deku_id(&self) -> Result<#deku_id_id_type, DekuError> {
                     match self {
-                        _ => panic!("deku id for variant not found")
+                        _ => Err(DekuError::IdVariantNotFound),
                     }
                 }
             }
@@ -382,10 +382,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     } else {
         quote! {
             impl #ident {
-                fn deku_id(&self) -> #deku_id_id_type {
+                fn deku_id(&self) -> Result<#deku_id_id_type, DekuError> {
                     match self {
                         #(#deku_ids),*,
-                        _ => panic!("deku id for variant not found"),
+                        _ => Err(DekuError::IdVariantNotFound),
                     }
                 }
             }

@@ -12,8 +12,8 @@ fn test_regular() {
         Dogs { ball: u8 },
     }
 
-    assert_eq!(0x01, Request1::Cats { toy: 0 }.deku_id());
-    assert_eq!(0x10, Request1::Dogs { ball: 0 }.deku_id());
+    assert_eq!(Ok(0x01), Request1::Cats { toy: 0 }.deku_id());
+    assert_eq!(Ok(0x10), Request1::Dogs { ball: 0 }.deku_id());
 }
 
 #[test]
@@ -38,8 +38,8 @@ fn test_custom_type() {
         Dogs,
     }
 
-    assert_eq!(Request2::Cats, Request3::Cats.deku_id());
-    assert_eq!(Request2::Dogs, Request3::Dogs.deku_id());
+    assert_eq!(Ok(Request2::Cats), Request3::Cats.deku_id());
+    assert_eq!(Ok(Request2::Dogs), Request3::Dogs.deku_id());
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn test_ctx() {
         VarB,
     }
 
-    assert_eq!(1, EnumId::VarA(0).deku_id());
+    assert_eq!(Ok(1), EnumId::VarA(0).deku_id());
 
     #[derive(Copy, Clone, PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(type = "u8")]
@@ -87,8 +87,8 @@ fn test_ctx() {
         VarB,
     }
 
-    assert_eq!(Nice::True, EnumId2::VarA(0).deku_id());
-    assert_eq!(Nice::False, EnumId2::VarB.deku_id());
+    assert_eq!(Ok(Nice::True), EnumId2::VarA(0).deku_id());
+    assert_eq!(Ok(Nice::False), EnumId2::VarB.deku_id());
 }
 
 #[test]
@@ -100,7 +100,7 @@ fn test_ctx_and_type() {
         VariantA(u8),
     }
 
-    assert_eq!(1, TopLevelCtxEnum::VariantA(0).deku_id());
+    assert_eq!(Ok(1), TopLevelCtxEnum::VariantA(0).deku_id());
 }
 
 #[test]
@@ -114,5 +114,5 @@ fn test_advanced() {
         VarB,
     }
 
-    assert_eq!(b"123", &TestEnumArray::VarA.deku_id());
+    assert_eq!(b"123", TestEnumArray::VarA.deku_id().unwrap().as_ref());
 }

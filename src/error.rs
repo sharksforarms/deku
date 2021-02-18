@@ -41,6 +41,8 @@ pub enum DekuError {
     Unexpected(String),
     /// Assertion error from `assert` or `assert_eq` attributes
     Assertion(String),
+    /// `id` attribute not found in `deku_id()`
+    IdVariantNotFound,
 }
 
 impl From<core::num::TryFromIntError> for DekuError {
@@ -74,6 +76,7 @@ impl core::fmt::Display for DekuError {
             DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {}", err),
             DekuError::Unexpected(ref err) => write!(f, "Unexpected error: {}", err),
             DekuError::Assertion(ref err) => write!(f, "Assertion error: {}", err),
+            DekuError::IdVariantNotFound => write!(f, "deku id for variant not found"),
         }
     }
 }

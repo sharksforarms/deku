@@ -370,24 +370,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     } else {
         &ctx_types
     };
-    let deku_id = if deku_ids.is_empty() {
-        quote! {
-            impl #ident {
-                fn deku_id(&self) -> Result<#deku_id_id_type, DekuError> {
-                    match self {
-                        _ => Err(DekuError::IdVariantNotFound),
-                    }
-                }
-            }
-        }
-    } else {
-        quote! {
-            impl #ident {
-                fn deku_id(&self) -> Result<#deku_id_id_type, DekuError> {
-                    match self {
-                        #(#deku_ids),*,
-                        _ => Err(DekuError::IdVariantNotFound),
-                    }
+    let deku_id = quote! {
+        impl #ident {
+            fn deku_id(&self) -> Result<#deku_id_id_type, DekuError> {
+                match self {
+                    #(#deku_ids ,)*
+                    _ => Err(DekuError::IdVariantNotFound),
                 }
             }
         }

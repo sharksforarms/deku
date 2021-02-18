@@ -1,6 +1,6 @@
 use crate::{
     macros::{
-        gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_struct_destruction,
+        gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_struct_destruction, pad_bits,
         token_contains_string, wrap_default_ctx,
     },
     Id,
@@ -536,19 +536,16 @@ fn emit_field_write(
         quote! { #object_prefix #field_ident.write(__deku_output, (#write_args)) }
     };
 
-    let pad_bits_before = match (f.pad_bits_before.as_ref(), f.pad_bytes_before.as_ref()) {
-        (Some(pad_bits), Some(pad_bytes)) => emit_padding(&quote! { #pad_bits + (#pad_bytes * 8) }),
-        (Some(pad_bits), None) => emit_padding(pad_bits),
-        (None, Some(pad_bytes)) => emit_padding(&quote! {(#pad_bytes * 8)}),
-        (None, None) => quote!(),
-    };
-
-    let pad_bits_after = match (f.pad_bits_after.as_ref(), f.pad_bytes_after.as_ref()) {
-        (Some(pad_bits), Some(pad_bytes)) => emit_padding(&quote! { #pad_bits + (#pad_bytes * 8) }),
-        (Some(pad_bits), None) => emit_padding(pad_bits),
-        (None, Some(pad_bytes)) => emit_padding(&quote! {(#pad_bytes * 8)}),
-        (None, None) => quote!(),
-    };
+    let pad_bits_before = pad_bits(
+        f.pad_bits_before.as_ref(),
+        f.pad_bytes_before.as_ref(),
+        emit_padding,
+    );
+    let pad_bits_after = pad_bits(
+        f.pad_bits_after.as_ref(),
+        f.pad_bytes_after.as_ref(),
+        emit_padding,
+    );
 
     let field_write_normal = quote! {
         #field_write_func ?;

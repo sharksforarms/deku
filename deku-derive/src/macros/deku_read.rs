@@ -1,18 +1,15 @@
-use crate::{
-    macros::{
-        gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_internal_field_ident,
-        gen_internal_field_idents, gen_type_from_ctx_id, pad_bits, token_contains_string,
-        wrap_default_ctx,
-    },
-    Id,
+use crate::macros::{
+    gen_ctx_types_and_arg, gen_field_args, gen_internal_field_ident, gen_internal_field_idents,
+    gen_type_from_ctx_id, pad_bits, token_contains_string, wrap_default_ctx,
 };
-use crate::{DekuData, FieldData};
+use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 use darling::{
     ast::{Data, Fields},
     ToTokens,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::convert::TryFrom;
 use syn::spanned::Spanned;
 
 pub(crate) fn emit_deku_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
@@ -32,13 +29,14 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         .next()
         .map_or(quote!('_), |v| quote!(#v));
 
-    let (imp, ty, wher) = input.generics.split_for_impl();
+    let DekuDataStruct {
+        imp,
+        wher,
+        ident,
+        fields,
+    } = DekuDataStruct::try_from(input)?;
 
-    let ident = &input.ident;
-    let ident = quote! { #ident #ty };
-
-    // checked in `emit_deku_read`
-    let fields = &input.data.as_ref().take_struct().unwrap();
+    let magic_read = emit_magic_read(input);
 
     // check if the first field has an ident, if not, it's a unnamed struct
     let is_named_struct = fields
@@ -46,8 +44,6 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         .get(0)
         .and_then(|v| v.ident.as_ref())
         .is_some();
-
-    let magic_read = emit_magic_read(input);
 
     let (field_idents, field_reads) = emit_field_reads(input, &fields)?;
 
@@ -140,29 +136,23 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
     let mut tokens = TokenStream::new();
 
+    let DekuDataEnum {
+        imp,
+        wher,
+        variants,
+        ident,
+        id,
+        id_type,
+        id_args,
+    } = DekuDataEnum::try_from(input)?;
+
     let lifetime = input
         .generics
         .lifetimes()
         .next()
         .map_or(quote!('_), |v| quote!(#v));
 
-    let (imp, ty, wher) = input.generics.split_for_impl();
-
-    // checked in `emit_deku_read`
-    let variants = input.data.as_ref().take_enum().unwrap();
-
-    let ident = &input.ident;
-    let ident = quote! { #ident #ty };
     let ident_as_string = ident.to_string();
-
-    let id = input.id.as_ref();
-    let id_type = input.id_type.as_ref();
-
-    let id_args = gen_id_args(
-        input.endian.as_ref(),
-        input.bits.as_ref(),
-        input.bytes.as_ref(),
-    )?;
 
     let magic_read = emit_magic_read(input);
 

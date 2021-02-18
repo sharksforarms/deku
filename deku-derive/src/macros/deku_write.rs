@@ -1,14 +1,12 @@
-use crate::{
-    macros::{
-        gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_struct_destruction, pad_bits,
-        token_contains_string, wrap_default_ctx,
-    },
-    Id,
+use crate::macros::{
+    gen_ctx_types_and_arg, gen_field_args, gen_struct_destruction, pad_bits, token_contains_string,
+    wrap_default_ctx,
 };
-use crate::{DekuData, FieldData};
+use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::convert::TryFrom;
 
 pub(crate) fn emit_deku_write(input: &DekuData) -> Result<TokenStream, syn::Error> {
     match &input.data {
@@ -21,15 +19,14 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
     let mut tokens = TokenStream::new();
 
-    let (imp, ty, wher) = input.generics.split_for_impl();
-
-    let ident = &input.ident;
-    let ident = quote! { #ident #ty };
+    let DekuDataStruct {
+        imp,
+        wher,
+        ident,
+        fields,
+    } = DekuDataStruct::try_from(input)?;
 
     let magic_write = emit_magic_write(input);
-
-    // Checked in `emit_deku_write`.
-    let fields = input.data.as_ref().take_struct().unwrap();
 
     let field_writes = emit_field_writes(input, &fields, None)?;
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }));
@@ -150,24 +147,17 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
     let mut tokens = TokenStream::new();
 
-    let (imp, ty, wher) = input.generics.split_for_impl();
+    let DekuDataEnum {
+        imp,
+        wher,
+        variants,
+        ident,
+        id,
+        id_type,
+        id_args,
+    } = DekuDataEnum::try_from(input)?;
 
     let magic_write = emit_magic_write(input);
-
-    // checked in emit_deku_write
-    let variants = input.data.as_ref().take_enum().unwrap();
-
-    let ident = &input.ident;
-    let ident = quote! { #ident #ty };
-
-    let id = input.id.as_ref();
-    let id_type = input.id_type.as_ref();
-
-    let id_args = gen_id_args(
-        input.endian.as_ref(),
-        input.bits.as_ref(),
-        input.bytes.as_ref(),
-    )?;
 
     let mut variant_writes = vec![];
     let mut variant_updates = vec![];

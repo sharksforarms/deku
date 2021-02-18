@@ -1,4 +1,5 @@
 use bitvec::bitvec;
+use deku::bitvec::{BitView, Msb0};
 use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
 

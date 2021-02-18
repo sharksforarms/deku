@@ -268,7 +268,10 @@ extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use bitvec::prelude::*;
+/// re-export of bitvec
+pub mod bitvec {
+    pub use bitvec::prelude::*;
+}
 
 pub use deku_derive::*;
 
@@ -287,9 +290,9 @@ pub trait DekuRead<'a, Ctx = ()> {
     /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.
     fn read(
-        input: &'a BitSlice<Msb0, u8>,
+        input: &'a bitvec::BitSlice<bitvec::Msb0, u8>,
         ctx: Ctx,
-    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&'a bitvec::BitSlice<bitvec::Msb0, u8>, Self), DekuError>
     where
         Self: Sized;
 }
@@ -312,7 +315,11 @@ pub trait DekuWrite<Ctx = ()> {
     /// * **output** - Sink to store resulting bits
     /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.
-    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError>;
+    fn write(
+        &self,
+        output: &mut bitvec::BitVec<bitvec::Msb0, u8>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError>;
 }
 
 /// "Writer" trait: implemented on DekuWrite struct and enum containers. A `container` is a type which
@@ -322,7 +329,7 @@ pub trait DekuContainerWrite: DekuWrite<()> {
     fn to_bytes(&self) -> Result<Vec<u8>, DekuError>;
 
     /// Write struct/enum to BitVec
-    fn to_bits(&self) -> Result<BitVec<Msb0, u8>, DekuError>;
+    fn to_bits(&self) -> Result<bitvec::BitVec<bitvec::Msb0, u8>, DekuError>;
 }
 
 /// "Updater" trait: apply mutations to a type

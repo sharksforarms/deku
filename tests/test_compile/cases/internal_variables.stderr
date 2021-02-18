@@ -1,5 +1,5 @@
 error: Unexpected meta-item format `attribute cannot contain `__deku_` these are internal variables. Please use the `deku::` instead.`
-  --> $DIR/internal_variables.rs:92:19
+  --> $DIR/internal_variables.rs:93:19
    |
-92 |     #[deku(cond = "__deku_bit_offset == *field_a as usize")]
+93 |     #[deku(cond = "__deku_bit_offset == *field_a as usize")]
    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

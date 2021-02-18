@@ -1,4 +1,5 @@
 use deku::prelude::*;
+use deku::bitvec::{BitVec, BitSlice, Msb0};
 
 #[derive(DekuRead, DekuWrite)]
 struct TestCount {

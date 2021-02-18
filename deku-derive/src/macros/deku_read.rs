@@ -177,20 +177,24 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .and_then(|v| v.ident.as_ref())
             .is_some();
 
-        let (consume_id, variant_id) = if let Some(variant_id) = &variant.id {
+        let (consume_id, variant_id, deku_id_deref) = if let Some(variant_id) = &variant.id {
             match variant_id {
-                Id::TokenStream(v) => (true, quote! {&#v}.into_token_stream()),
-                Id::LitByteStr(v) => (true, v.into_token_stream()),
+                Id::TokenStream(v) => (true, quote! {&#v}.into_token_stream(), Some(quote! {})),
+                Id::LitByteStr(v) => (true, v.into_token_stream(), Some(quote! {*})),
             }
         } else if let Some(variant_id_pat) = &variant.id_pat {
-            (false, variant_id_pat.clone())
+            (false, variant_id_pat.clone(), None)
         } else if has_discriminant {
             let ident = &variant.ident;
             let internal_ident = gen_internal_field_ident(&quote!(#ident));
             pre_match_tokens.push(quote! {
                 let #internal_ident = <#id_type>::try_from(Self::#ident as isize)?;
             });
-            (true, quote! { _ if __deku_variant_id == #internal_ident })
+            (
+                true,
+                quote! { _ if __deku_variant_id == #internal_ident },
+                None,
+            )
         } else {
             return Err(syn::Error::new(
                 variant.ident.span(),
@@ -221,13 +225,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             let initialize_enum =
                 super::gen_enum_init(variant_is_named, variant_ident, internal_fields);
 
-            if !has_discriminant && variant.id_pat.is_none() {
+            if let Some(deku_id_deref) = deku_id_deref {
                 let variant_deku_id = variant.id.as_ref();
-                let deku_id = if let Id::LitByteStr(variant_deku_id) = variant_deku_id.unwrap() {
-                    quote! { Self :: #initialize_enum => Ok(*#variant_deku_id)}
-                } else {
-                    quote! { Self :: #initialize_enum => Ok(#variant_deku_id)}
-                };
+                let deku_id =
+                    quote! { Self :: #initialize_enum => Ok(#deku_id_deref #variant_deku_id)};
                 deku_ids.push(deku_id);
             }
 

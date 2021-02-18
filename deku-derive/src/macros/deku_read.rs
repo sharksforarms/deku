@@ -128,6 +128,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
     }
 
+    // println!("{}", tokens.to_string());
     Ok(tokens)
 }
 
@@ -392,6 +393,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     };
     tokens.extend(deku_id);
 
+    // println!("{}", tokens.to_string());
     Ok(tokens)
 }
 

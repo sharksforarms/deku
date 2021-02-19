@@ -45,14 +45,6 @@ fn test_custom_type() {
 #[test]
 fn test_ctx() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    struct StructEnumId {
-        my_id: u8,
-        data: u8,
-        #[deku(ctx = "*my_id")]
-        enum_from_id: EnumId,
-    }
-
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(ctx = "my_id: u8", id = "my_id")]
     enum EnumId {
         #[deku(id = "1")]
@@ -68,14 +60,6 @@ fn test_ctx() {
     enum Nice {
         True = 0x00,
         False = 0x01,
-    }
-
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    struct StructEnumId2 {
-        my_id: Nice,
-        data: u8,
-        #[deku(ctx = "*my_id")]
-        enum_from_id: EnumId2,
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -104,7 +88,7 @@ fn test_ctx_and_type() {
 }
 
 #[test]
-fn test_advanced() {
+fn test_litbytestr() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(type = "[u8; 3]")]
     enum TestEnumArray {

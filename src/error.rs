@@ -41,7 +41,7 @@ pub enum DekuError {
     Unexpected(String),
     /// Assertion error from `assert` or `assert_eq` attributes
     Assertion(String),
-    /// `id` attribute not found in `deku_id()`
+    /// Could not resolve `id` for variant
     IdVariantNotFound,
 }
 
@@ -76,7 +76,7 @@ impl core::fmt::Display for DekuError {
             DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {}", err),
             DekuError::Unexpected(ref err) => write!(f, "Unexpected error: {}", err),
             DekuError::Assertion(ref err) => write!(f, "Assertion error: {}", err),
-            DekuError::IdVariantNotFound => write!(f, "deku id for variant not found"),
+            DekuError::IdVariantNotFound => write!(f, "Could not resolve `id` for variant"),
         }
     }
 }

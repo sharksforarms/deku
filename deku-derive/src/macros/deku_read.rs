@@ -371,7 +371,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         &ctx_types
     };
     let deku_id = quote! {
-        impl #ident {
+        impl #imp DekuEnumExt<#lifetime, #deku_id_id_type> for #ident #wher {
             fn deku_id(&self) -> Result<#deku_id_id_type, DekuError> {
                 match self {
                     #(#deku_ids ,)*

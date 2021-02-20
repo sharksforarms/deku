@@ -161,6 +161,8 @@ fn gen_ctx_types_and_arg(
 }
 
 /// Generate type from matching ident from `id` in `ctx`
+///
+/// Given #[deku(ctx = "test: u16, my_id: u8", id = "my_id")], will return `u8`
 fn gen_type_from_ctx_id(
     ctx: Option<&Punctuated<syn::FnArg, syn::token::Comma>>,
     id: Option<&crate::Id>,

@@ -63,7 +63,7 @@ fn test_ctx() {
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(ctx = "my_id: Nice, other_id: u8", id = "my_id")]
+    #[deku(ctx = "my_id: Nice, _other_id: u8", id = "my_id")]
     enum EnumId2 {
         #[deku(id = "Nice::True")]
         VarA(u8),

@@ -1,7 +1,8 @@
 use crate::{
     macros::{
         gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_internal_field_ident,
-        gen_internal_field_idents, pad_bits, gen_type_from_ctx_id, token_contains_string, wrap_default_ctx,
+        gen_internal_field_idents, gen_type_from_ctx_id, pad_bits, token_contains_string,
+        wrap_default_ctx,
     },
     Id,
 };

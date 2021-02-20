@@ -100,3 +100,15 @@ fn test_litbytestr() {
 
     assert_eq!(b"123", TestEnumArray::VarA.deku_id().unwrap().as_ref());
 }
+
+#[test]
+#[should_panic(expected = "called `Result::unwrap()` on an `Err` value: IdVariantNotFound")]
+fn test_no_id_discriminant() {
+    #[derive(Debug, DekuRead, PartialEq, DekuWrite)]
+    #[deku(type = "u8")]
+    enum Discriminant {
+        Cats = 0x01,
+        Dogs,
+    }
+    Discriminant::Dogs.deku_id().unwrap();
+}

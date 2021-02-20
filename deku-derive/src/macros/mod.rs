@@ -160,6 +160,30 @@ fn gen_ctx_types_and_arg(
     }
 }
 
+/// Generate type from matching ident from `id` in `ctx`
+fn gen_type_from_ctx_id(
+    ctx: Option<&Punctuated<syn::FnArg, syn::token::Comma>>,
+    id: Option<&crate::Id>,
+) -> syn::Result<TokenStream> {
+    let id = syn::parse_str::<syn::Ident>(&id.unwrap().to_string()).unwrap();
+    if let Some(ctx) = ctx {
+        for c in ctx {
+            match c {
+                syn::FnArg::Typed(pat_type) => {
+                    if let syn::Pat::Ident(ident) = &*pat_type.pat {
+                        if id == ident.ident {
+                            let t = &pat_type.ty;
+                            return Ok(quote! {#t});
+                        }
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+    unreachable!()
+}
+
 /// Generate argument for `id`:
 /// `#deku(endian = "big", bits = "1")` -> `Endian::Big, Size::Bits(1)`
 fn gen_id_args(

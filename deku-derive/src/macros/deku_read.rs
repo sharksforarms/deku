@@ -1,7 +1,7 @@
 use crate::{
     macros::{
         gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_internal_field_ident,
-        gen_internal_field_idents, pad_bits, token_contains_string, wrap_default_ctx,
+        gen_internal_field_idents, pad_bits, gen_type_from_ctx_id, token_contains_string, wrap_default_ctx,
     },
     Id,
 };
@@ -327,7 +327,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             from_bytes_body,
         ));
     }
-
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
 
     let read_body = quote! {
@@ -365,9 +364,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuEnumExt`
     let deku_id_id_type = if let Some(id_type) = id_type {
-        id_type
+        quote! {#id_type}
     } else {
-        &ctx_types
+        let r = gen_type_from_ctx_id(input.ctx.as_ref(), input.id.as_ref())?;
+        quote! {#r}
     };
     let deku_id = quote! {
         impl #imp DekuEnumExt<#lifetime, #deku_id_id_type> for #ident #wher {

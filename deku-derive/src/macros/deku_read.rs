@@ -363,7 +363,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
     }
 
-    // create `deku_id()` function for retrieving at runtime the id value
+    // Implement `DekuEnumExt`
     let deku_id_id_type = if let Some(id_type) = id_type {
         id_type
     } else {

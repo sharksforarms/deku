@@ -13,6 +13,7 @@ use darling::{
 };
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::spanned::Spanned;
 
 pub(crate) fn emit_deku_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
     match &input.data {
@@ -363,24 +364,29 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
     }
 
-    // Implement `DekuEnumExt`
-    let deku_id_id_type = if let Some(id_type) = id_type {
-        quote! {#id_type}
+    let deku_id_type = if let Some(id_type) = id_type {
+        Some(quote! {#id_type})
+    } else if let (Some(ctx), Some(id)) = (input.ctx.as_ref(), input.id.as_ref()) {
+        Some(gen_type_from_ctx_id(ctx, id).ok_or_else(|| {
+            syn::Error::new(id.span(), "DekuRead: cannot determine `id` type from `ctx`")
+        })?)
     } else {
-        let r = gen_type_from_ctx_id(input.ctx.as_ref(), input.id.as_ref())?;
-        quote! {#r}
+        None
     };
-    let deku_id = quote! {
-        impl #imp DekuEnumExt<#lifetime, #deku_id_id_type> for #ident #wher {
-            fn deku_id(&self) -> Result<#deku_id_id_type, DekuError> {
-                match self {
-                    #(#deku_ids ,)*
-                    _ => Err(DekuError::IdVariantNotFound),
+
+    // Implement `DekuEnumExt`
+    if let Some(deku_id_type) = deku_id_type {
+        tokens.extend(quote! {
+            impl #imp DekuEnumExt<#lifetime, #deku_id_type> for #ident #wher {
+                fn deku_id(&self) -> Result<#deku_id_type, DekuError> {
+                    match self {
+                        #(#deku_ids ,)*
+                        _ => Err(DekuError::IdVariantNotFound),
+                    }
                 }
             }
-        }
-    };
-    tokens.extend(deku_id);
+        });
+    }
 
     // println!("{}", tokens.to_string());
     Ok(tokens)

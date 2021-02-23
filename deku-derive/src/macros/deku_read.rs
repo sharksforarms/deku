@@ -1,7 +1,8 @@
 use crate::{
     macros::{
         gen_ctx_types_and_arg, gen_field_args, gen_id_args, gen_internal_field_ident,
-        gen_internal_field_idents, pad_bits, token_contains_string, wrap_default_ctx,
+        gen_internal_field_idents, gen_type_from_ctx_id, pad_bits, token_contains_string,
+        wrap_default_ctx,
     },
     Id,
 };
@@ -12,6 +13,7 @@ use darling::{
 };
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::spanned::Spanned;
 
 pub(crate) fn emit_deku_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
     match &input.data {
@@ -164,6 +166,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let mut has_default_match = false;
     let mut pre_match_tokens = vec![];
     let mut variant_matches = vec![];
+    let mut deku_ids = vec![];
 
     let has_discriminant = variants.iter().any(|v| v.discriminant.is_some());
 
@@ -219,6 +222,16 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             let internal_fields = gen_internal_field_idents(variant_is_named, field_idents);
             let initialize_enum =
                 super::gen_enum_init(variant_is_named, variant_ident, internal_fields);
+
+            if let Some(variant_id) = &variant.id {
+                let deref = match variant_id {
+                    Id::TokenStream(_) => quote! {},
+                    Id::LitByteStr(_) => quote! {*},
+                };
+
+                let deku_id = quote! { Self :: #initialize_enum => Ok(#deref #variant_id)};
+                deku_ids.push(deku_id);
+            }
 
             // if we're consuming an id, set the rest to new_rest before reading the variant
             let new_rest = if consume_id {
@@ -316,7 +329,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             from_bytes_body,
         ));
     }
-
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
 
     let read_body = quote! {
@@ -347,6 +359,30 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             impl #imp DekuRead<#lifetime> for #ident #wher {
                 fn read(__deku_input_bits: &#lifetime BitSlice<Msb0, u8>, _: ()) -> Result<(&#lifetime BitSlice<Msb0, u8>, Self), DekuError> {
                     #read_body
+                }
+            }
+        });
+    }
+
+    let deku_id_type = if let Some(id_type) = id_type {
+        Some(quote! {#id_type})
+    } else if let (Some(ctx), Some(id)) = (input.ctx.as_ref(), input.id.as_ref()) {
+        Some(gen_type_from_ctx_id(ctx, id).ok_or_else(|| {
+            syn::Error::new(id.span(), "DekuRead: cannot determine `id` type from `ctx`")
+        })?)
+    } else {
+        None
+    };
+
+    // Implement `DekuEnumExt`
+    if let Some(deku_id_type) = deku_id_type {
+        tokens.extend(quote! {
+            impl #imp DekuEnumExt<#lifetime, #deku_id_type> for #ident #wher {
+                fn deku_id(&self) -> Result<#deku_id_type, DekuError> {
+                    match self {
+                        #(#deku_ids ,)*
+                        _ => Err(DekuError::IdVariantNotFound),
+                    }
                 }
             }
         });

@@ -330,3 +330,9 @@ pub trait DekuUpdate {
     /// Apply updates
     fn update(&mut self) -> Result<(), DekuError>;
 }
+
+/// "Extended Enum" trait: obtain additional enum information
+pub trait DekuEnumExt<'a, T> {
+    /// Obtain `id` of a given enum variant
+    fn deku_id(&self) -> Result<T, DekuError>;
+}

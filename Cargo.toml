@@ -2,7 +2,7 @@
 authors = ["sharks <sharks@sharks>"]
 edition = "2018"
 name = "deku"
-version = "0.10.0"
+version = "0.11.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/sharksforarms/deku"
 keywords = ["deku", "bits", "serialization", "deserialization", "struct"]
@@ -24,7 +24,7 @@ std = ["deku_derive/std", "bitvec/std", "alloc"]
 alloc = ["bitvec/alloc"]
 
 [dependencies]
-deku_derive = { version = "^0.10.0", path = "deku-derive", default-features = false}
+deku_derive = { version = "^0.11.0", path = "deku-derive", default-features = false}
 bitvec = { version = "0.21.0", default-features = false }
 
 [dev-dependencies]

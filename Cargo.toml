@@ -19,12 +19,12 @@ members = [
 ]
 
 [features]
-default = ["std", "bitvec/std"]
-std = ["alloc"]
+default = ["std"]
+std = ["deku_derive/std", "bitvec/std", "alloc"]
 alloc = ["bitvec/alloc"]
 
 [dependencies]
-deku_derive = { version = "^0.10.0", path = "deku-derive" }
+deku_derive = { version = "^0.10.0", path = "deku-derive", default-features = false}
 bitvec = { version = "0.21.0", default-features = false }
 
 [dev-dependencies]

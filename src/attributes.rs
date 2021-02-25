@@ -733,8 +733,10 @@ Specify custom reader or writer tokens for reading a field or variant
 
 Example:
 ```rust
-# use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
+use std::convert::{TryInto, TryFrom};
+use deku::bitvec::{BitSlice, BitVec, Msb0};
+use deku::prelude::*;
+
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(

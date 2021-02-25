@@ -1,11 +1,27 @@
 use crate::Num;
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 
 pub(crate) mod deku_read;
 pub(crate) mod deku_write;
+
+#[cfg(feature = "proc-macro-crate")]
+fn get_crate_name() -> Ident {
+    let crate_name = ::proc_macro_crate::crate_name("deku").unwrap_or_else(|_err| {
+        // default if not found
+        String::from("deku")
+    });
+
+    Ident::new(&crate_name, Span::call_site())
+}
+
+// proc-macro-crate depends on std, for no_std, use default name. Sorry.
+#[cfg(not(feature = "proc-macro-crate"))]
+fn get_crate_name() -> Ident {
+    Ident::new("deku", Span::call_site())
+}
 
 /// Generate enum initialization TokenStream
 /// Cases:
@@ -190,9 +206,10 @@ fn gen_id_args(
     bits: Option<&Num>,
     bytes: Option<&Num>,
 ) -> syn::Result<TokenStream> {
+    let crate_ = get_crate_name();
     let endian = endian.map(gen_endian_from_str).transpose()?;
-    let bits = bits.map(|n| quote! {deku::ctx::Size::Bits(#n)});
-    let bytes = bytes.map(|n| quote! {deku::ctx::Size::Bytes(#n)});
+    let bits = bits.map(|n| quote! {::#crate_::ctx::Size::Bits(#n)});
+    let bytes = bytes.map(|n| quote! {::#crate_::ctx::Size::Bytes(#n)});
 
     // FIXME: Should be `into_iter` here, see https://github.com/rust-lang/rust/issues/66145.
     let id_args = [endian.as_ref(), bits.as_ref(), bytes.as_ref()]
@@ -215,9 +232,10 @@ fn gen_field_args(
     bytes: Option<&Num>,
     ctx: Option<&Punctuated<syn::Expr, syn::token::Comma>>,
 ) -> syn::Result<TokenStream> {
+    let crate_ = get_crate_name();
     let endian = endian.map(gen_endian_from_str).transpose()?;
-    let bits = bits.map(|n| quote! {deku::ctx::Size::Bits(#n)});
-    let bytes = bytes.map(|n| quote! {deku::ctx::Size::Bytes(#n)});
+    let bits = bits.map(|n| quote! {::#crate_::ctx::Size::Bits(#n)});
+    let bytes = bytes.map(|n| quote! {::#crate_::ctx::Size::Bytes(#n)});
     let ctx = ctx.map(|c| quote! {#c});
 
     // FIXME: Should be `into_iter` here, see https://github.com/rust-lang/rust/issues/66145.
@@ -235,9 +253,10 @@ fn gen_field_args(
 
 /// Generate endian tokens from string: `big` -> `Endian::Big`.
 fn gen_endian_from_str(s: &syn::LitStr) -> syn::Result<TokenStream> {
+    let crate_ = get_crate_name();
     match s.value().as_str() {
-        "little" => Ok(quote! {deku::ctx::Endian::Little}),
-        "big" => Ok(quote! {deku::ctx::Endian::Big}),
+        "little" => Ok(quote! {::#crate_::ctx::Endian::Little}),
+        "big" => Ok(quote! {::#crate_::ctx::Endian::Big}),
         _ => {
             // treat as variable, possibly from `ctx`
             let v: TokenStream = s.value().parse()?;

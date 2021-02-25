@@ -55,7 +55,7 @@ impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool>
     /// ```rust
     /// # use deku::ctx::*;
     /// # use deku::DekuRead;
-    /// # use bitvec::view::BitView;
+    /// # use deku::bitvec::BitView;
     /// let input = vec![1u8, 2, 3, 4];
     /// let (rest, v) = Vec::<u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
     /// assert!(rest.is_empty());
@@ -119,12 +119,12 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Vec<T> {
     /// * **inner_ctx** - The context required by `T`.
     /// # Examples
     /// ```rust
-    /// # use deku::{ctx::Endian, DekuWrite, prelude::{Lsb0, Msb0}};
-    /// # use bitvec::bitvec;
+    /// # use deku::{ctx::Endian, DekuWrite};
+    /// # use deku::bitvec::{Msb0, bitvec};
     /// let data = vec![1u8];
     /// let mut output = bitvec![Msb0, u8;];
     /// data.write(&mut output, Endian::Big).unwrap();
-    /// assert_eq!(output, bitvec![0, 0, 0, 0, 0, 0, 0, 1])
+    /// assert_eq!(output, bitvec![Msb0, u8; 0, 0, 0, 0, 0, 0, 0, 1])
     /// ```
     fn write(&self, output: &mut BitVec<Msb0, u8>, inner_ctx: Ctx) -> Result<(), DekuError> {
         for v in self {

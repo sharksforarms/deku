@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2020-02-25
+
+### Breaking
+- Removed `bitvec` from `deku::prelude` ([#181](https://github.com/sharksforarms/deku/pull/181))
+    - This will break custom `reader` and `writer` function definitions
+    - `bitvec` is re-exported via: `deku::bitvec::` (this contains `bitvec::prelude::*`)
+
+### Added
+- Added `DekuEnumExt` to provide extra utility functions to enums. ([#176](https://github.com/sharksforarms/deku/pull/176))
+    - This trait is implemented on enums derived with `#[derive(DekuRead)]`
+    - This trait currently contains 1 function: `deku_id()`
+    - `deku_id` can be called on an enum variant to get the deku `id` of the variant
+- Added `Incomplete(NeedSize)` variant on `DekuError` ([#177](https://github.com/sharksforarms/deku/pull/177))
+- Added `CODE_OF_CONDUCT.md`
+- Code improvements ([@wcampbell0x2a](https://github.com/wcampbell0x2a))
+
+## [0.10.1] - 2020-02-25
+
+- Update bitvec dependency to fix [build failures](https://github.com/bitvecto-rs/bitvec/issues/105)
+
 ## [0.10.0] - 2020-01-09
 ### Breaking
 - Enum's which don't specify an `id` attribute now default to their discriminant value
@@ -111,7 +131,11 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.10.0...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.11.0...HEAD
+
+[0.11.0]: https://github.com/sharksforarms/deku/compare/deku-v0.10.1...deku-v0.11.0
+
+[0.10.1]: https://github.com/sharksforarms/deku/compare/deku-v0.10.0...deku-v0.10.1
 
 [0.10.0]: https://github.com/sharksforarms/deku/compare/deku-v0.9.3...deku-v0.10.0
 

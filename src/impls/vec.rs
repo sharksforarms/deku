@@ -22,11 +22,7 @@ fn read_vec_with_predicate<
     ctx: Ctx,
     mut predicate: Predicate,
 ) -> Result<(&'a BitSlice<Msb0, u8>, Vec<T>), DekuError> {
-    let mut res = if let Some(capacity) = capacity {
-        Vec::with_capacity(capacity)
-    } else {
-        Vec::new()
-    };
+    let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
 
     let mut rest = input;
 

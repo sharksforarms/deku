@@ -7,6 +7,9 @@ mod unit;
 mod vec;
 
 #[cfg(feature = "std")]
+mod cow;
+
+#[cfg(feature = "std")]
 mod cstring;
 
 #[cfg(feature = "std")]

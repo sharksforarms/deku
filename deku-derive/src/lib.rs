@@ -8,6 +8,7 @@ use crate::macros::{deku_read::emit_deku_read, deku_write::emit_deku_write};
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::convert::TryFrom;
 use syn::{punctuated::Punctuated, spanned::Spanned, AttributeArgs};
 
 mod macros;
@@ -273,6 +274,83 @@ impl DekuData {
     /// Same as `emit_writer`, but won't auto convert error to compile error
     fn emit_writer_checked(&self) -> Result<TokenStream, syn::Error> {
         emit_deku_write(self)
+    }
+}
+
+/// Common variables from `DekuData` for `emit_enum` read/write functions
+#[derive(Debug)]
+struct DekuDataEnum<'a> {
+    imp: syn::ImplGenerics<'a>,
+    wher: Option<&'a syn::WhereClause>,
+    variants: Vec<&'a VariantData>,
+    ident: TokenStream,
+    id: Option<&'a Id>,
+    id_type: Option<&'a TokenStream>,
+    id_args: TokenStream,
+}
+
+impl<'a> TryFrom<&'a DekuData> for DekuDataEnum<'a> {
+    type Error = syn::Error;
+
+    /// Create common initializer variables for `emit_enum` read/write functions
+    fn try_from(deku_data: &'a DekuData) -> Result<Self, Self::Error> {
+        let (imp, ty, wher) = deku_data.generics.split_for_impl();
+
+        // checked in `emit_deku_{read/write}`
+        let variants = deku_data.data.as_ref().take_enum().unwrap();
+
+        let ident = &deku_data.ident;
+        let ident = quote! { #ident #ty };
+
+        let id = deku_data.id.as_ref();
+        let id_type = deku_data.id_type.as_ref();
+
+        let id_args = crate::macros::gen_id_args(
+            deku_data.endian.as_ref(),
+            deku_data.bits.as_ref(),
+            deku_data.bytes.as_ref(),
+        )?;
+
+        Ok(Self {
+            imp,
+            wher,
+            variants,
+            ident,
+            id,
+            id_type,
+            id_args,
+        })
+    }
+}
+
+/// Common variables from `DekuData` for `emit_struct` read/write functions
+#[derive(Debug)]
+struct DekuDataStruct<'a> {
+    imp: syn::ImplGenerics<'a>,
+    wher: Option<&'a syn::WhereClause>,
+    ident: TokenStream,
+    fields: darling::ast::Fields<&'a FieldData>,
+}
+
+impl<'a> TryFrom<&'a DekuData> for DekuDataStruct<'a> {
+    type Error = syn::Error;
+
+    /// Create common initializer variables for `emit_struct` read/write functions
+    fn try_from(deku_data: &'a DekuData) -> Result<Self, Self::Error> {
+        let (imp, ty, wher) = deku_data.generics.split_for_impl();
+
+        let ident = &deku_data.ident;
+        let ident = quote! { #ident #ty };
+
+        // Checked in `emit_deku_{read/write}`.
+        let fields = deku_data.data.as_ref().take_struct().unwrap();
+
+        Ok(Self {
+            imp,
+            wher,
+            ident,
+            fields,
+        })
     }
 }
 

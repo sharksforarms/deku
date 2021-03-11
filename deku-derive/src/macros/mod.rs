@@ -201,7 +201,7 @@ fn gen_type_from_ctx_id(
 
 /// Generate argument for `id`:
 /// `#deku(endian = "big", bits = "1")` -> `Endian::Big, Size::Bits(1)`
-fn gen_id_args(
+pub(crate) fn gen_id_args(
     endian: Option<&syn::LitStr>,
     bits: Option<&Num>,
     bytes: Option<&Num>,

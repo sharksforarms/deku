@@ -14,6 +14,12 @@ mod cow;
 mod cstring;
 
 #[cfg(feature = "std")]
+mod hashmap;
+
+#[cfg(feature = "std")]
+mod hashset;
+
+#[cfg(feature = "std")]
 mod ipaddr;
 
 #[cfg(feature = "alloc")]

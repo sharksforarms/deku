@@ -34,6 +34,7 @@ hexlit = "0.5.0"
 criterion = "0.3"
 alloc_counter = "0.0.4"
 trybuild = "1.0"
+rustc-hash = "1.0.0"
 
 [[bench]]
 name = "deku"

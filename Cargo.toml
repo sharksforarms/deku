@@ -22,6 +22,7 @@ members = [
 default = ["std"]
 std = ["deku_derive/std", "bitvec/std", "alloc"]
 alloc = ["bitvec/alloc"]
+const_generics = []
 
 [dependencies]
 deku_derive = { version = "^0.11.0", path = "deku-derive", default-features = false}

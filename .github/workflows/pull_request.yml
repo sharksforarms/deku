@@ -8,6 +8,11 @@ jobs:
       - uses: actions/checkout@master
         with:
           fetch-depth: 0
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
       - uses: jasonwilliams/criterion-compare-action@move_to_actions
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

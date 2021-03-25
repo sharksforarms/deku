@@ -24,4 +24,4 @@ darling = "0.11"
 proc-macro-crate = { version = "0.1.4", optional = true }
 
 [dev-dependencies]
-rstest = "0.6"
+rstest = "0.7"

@@ -44,11 +44,11 @@ mod tests {
 
     #[test]
     fn test_simple() {
-        let input = hex!("aabbbbcc0102ddffffffaa").as_ref();
+        let input = hex!("aabbbbcc0102ddffffffaa");
 
         assert_eq!(
             count_alloc(|| {
-                let _ = TestDeku::try_from(input).unwrap();
+                let _ = TestDeku::try_from(input.as_ref()).unwrap();
             })
             .0,
             (3, 0, 3)

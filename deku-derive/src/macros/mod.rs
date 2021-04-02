@@ -300,9 +300,11 @@ fn pad_bits(
     emit_padding: fn(&TokenStream) -> TokenStream,
 ) -> TokenStream {
     match (bits, bytes) {
-        (Some(pad_bits), Some(pad_bytes)) => emit_padding(&quote! { #pad_bits + (#pad_bytes * 8) }),
+        (Some(pad_bits), Some(pad_bytes)) => {
+            emit_padding(&quote! { (#pad_bits) + ((#pad_bytes) * 8) })
+        }
         (Some(pad_bits), None) => emit_padding(&pad_bits),
-        (None, Some(pad_bytes)) => emit_padding(&quote! {(#pad_bytes * 8)}),
+        (None, Some(pad_bytes)) => emit_padding(&quote! {((#pad_bytes) * 8)}),
         (None, None) => quote!(),
     }
 }

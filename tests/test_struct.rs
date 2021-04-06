@@ -100,6 +100,7 @@ fn test_named_struct() {
         pub field_c: u8,
         #[deku(bytes = "2")]
         pub field_d: u16,
+        #[deku(update = "1+self.field_d")]
         #[deku(endian = "big")]
         pub field_e: u16,
         pub field_f: NestedDeku,

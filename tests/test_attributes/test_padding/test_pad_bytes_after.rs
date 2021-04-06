@@ -32,7 +32,7 @@ fn test_pad_bytes_after_not_enough() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct TestStruct {
         field_a: u8,
-        #[deku(pad_bytes_after = "3")]
+        #[deku(pad_bytes_after = "2 + 1")]
         field_b: u8,
     }
 
@@ -43,7 +43,7 @@ fn test_pad_bytes_after_not_enough() {
 
 #[test]
 #[should_panic(
-    expected = r#"InvalidParam("Invalid padding param \"(- 2 * 8)\": cannot convert to usize")"#
+    expected = r#"InvalidParam("Invalid padding param \"(((- 2) * 8))\": cannot convert to usize")"#
 )]
 fn test_pad_bytes_after_read_err() {
     #[derive(PartialEq, Debug, DekuRead)]
@@ -60,7 +60,7 @@ fn test_pad_bytes_after_read_err() {
 
 #[test]
 #[should_panic(
-    expected = r#"InvalidParam("Invalid padding param \"(- 2 * 8)\": cannot convert to usize")"#
+    expected = r#"InvalidParam("Invalid padding param \"(((- 2) * 8))\": cannot convert to usize")"#
 )]
 fn test_pad_bytes_after_write_err() {
     #[derive(PartialEq, Debug, DekuWrite)]

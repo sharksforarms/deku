@@ -467,7 +467,7 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
             use core::convert::TryFrom;
             let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                 ::#crate_::DekuError::InvalidParam(format!(
-                    "Invalid padding param \"{}\": cannot convert to usize",
+                    "Invalid padding param \"({})\": cannot convert to usize",
                     stringify!(#bit_size)
                 ))
             )?;

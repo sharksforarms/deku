@@ -43,7 +43,7 @@ fn test_pad_bytes_before_not_enough() {
 
 #[test]
 #[should_panic(
-    expected = r#"InvalidParam("Invalid padding param \"(- 2 * 8)\": cannot convert to usize")"#
+    expected = r#"InvalidParam("Invalid padding param \"(((- 2) * 8))\": cannot convert to usize")"#
 )]
 fn test_pad_bytes_before_read_err() {
     #[derive(PartialEq, Debug, DekuRead)]
@@ -60,7 +60,7 @@ fn test_pad_bytes_before_read_err() {
 
 #[test]
 #[should_panic(
-    expected = r#"InvalidParam("Invalid padding param \"(- 2 * 8)\": cannot convert to usize")"#
+    expected = r#"InvalidParam("Invalid padding param \"(((- 2) * 8))\": cannot convert to usize")"#
 )]
 fn test_pad_bytes_before_write_err() {
     #[derive(PartialEq, Debug, DekuWrite)]

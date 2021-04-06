@@ -12,7 +12,7 @@ fn test_pad_bits_before_and_pad_bytes_before() {
     struct TestStruct {
         #[deku(bits = 2)]
         field_a: u8,
-        #[deku(pad_bits_before = "6", pad_bytes_before = "1")]
+        #[deku(pad_bits_before = "5 + 1", pad_bytes_before = "0 + 1")]
         field_b: u8,
     }
 

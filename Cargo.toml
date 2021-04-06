@@ -19,7 +19,7 @@ members = [
 ]
 
 [features]
-default = ["std"]
+default = ["std", "const_generics"]
 std = ["deku_derive/std", "bitvec/std", "alloc"]
 alloc = ["bitvec/alloc"]
 const_generics = []

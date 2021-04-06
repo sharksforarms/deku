@@ -285,7 +285,7 @@ pub use crate::error::DekuError;
 
 /// "Reader" trait: read bits and construct type
 pub trait DekuRead<'a, Ctx = ()> {
-    /// Read bits and construct type
+    /// Read bits and construct type. Returns the remaining bits after parsing in addition to Self.
     /// * **input** - Input as bits
     /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.

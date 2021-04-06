@@ -271,6 +271,7 @@ use alloc::vec::Vec;
 /// re-export of bitvec
 pub mod bitvec {
     pub use bitvec::prelude::*;
+    pub use bitvec::view::BitView;
 }
 
 pub use deku_derive::*;

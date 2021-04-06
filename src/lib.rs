@@ -290,6 +290,8 @@ pub trait DekuRead<'a, Ctx = ()> {
     /// * **input** - Input as bits
     /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.
+    ///
+    /// Returns the remaining bits after parsing in addition to Self.
     fn read(
         input: &'a bitvec::BitSlice<bitvec::Msb0, u8>,
         ctx: Ctx,
@@ -302,9 +304,9 @@ pub trait DekuRead<'a, Ctx = ()> {
 /// doesn't need any context information.
 pub trait DekuContainerRead<'a>: DekuRead<'a, ()> {
     /// Read bytes and construct type
-    /// * **input** - Input as a tuple of (bytes, bit_offset)
+    /// * **input** - Input given as data and bit offset
     ///
-    /// Returns a tuple of the remaining data as (bytes, bit_offset) and a constructed value
+    /// Returns the remaining bytes and bit offset after parsing in addition to Self.
     fn from_bytes(input: (&'a [u8], usize)) -> Result<((&'a [u8], usize), Self), DekuError>
     where
         Self: Sized;

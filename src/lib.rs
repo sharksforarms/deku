@@ -346,3 +346,20 @@ pub trait DekuEnumExt<'a, T> {
     /// Obtain `id` of a given enum variant
     fn deku_id(&self) -> Result<T, DekuError>;
 }
+
+/// Implements DekuWrite for references of types that implement DekuWrite
+impl<T, Ctx> DekuWrite<Ctx> for &T
+where
+    T: DekuWrite<Ctx>,
+    Ctx: Copy,
+{
+    /// Write value of type to bits
+    fn write(
+        &self,
+        output: &mut bitvec::BitVec<bitvec::Msb0, u8>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        <T>::write(self, output, ctx)?;
+        Ok(())
+    }
+}

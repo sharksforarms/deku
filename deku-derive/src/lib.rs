@@ -1022,9 +1022,9 @@ mod tests {
             field_a: u8,
             #[deku(bytes = 4)]
             field_b: u64,
-            #[deku(endian = little)]
+            #[deku(endian = "little")]
             field_c: u32,
-            #[deku(endian = big)]
+            #[deku(endian = "big")]
             field_d: u32,
             #[deku(skip, default = "5")]
             field_e: u32,

@@ -9,10 +9,12 @@ pub(crate) mod deku_write;
 
 #[cfg(feature = "proc-macro-crate")]
 fn get_crate_name() -> Ident {
-    let crate_name = ::proc_macro_crate::crate_name("deku").unwrap_or_else(|_err| {
-        // default if not found
-        String::from("deku")
-    });
+    let found_crate = proc_macro_crate::crate_name("deku").unwrap_or(proc_macro_crate::FoundCrate::Itself);
+
+    let crate_name = match found_crate {
+        proc_macro_crate::FoundCrate::Itself => "deku".to_string(),
+        proc_macro_crate::FoundCrate::Name(name) => name
+    };
 
     Ident::new(&crate_name, Span::call_site())
 }

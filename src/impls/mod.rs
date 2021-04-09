@@ -3,6 +3,7 @@ mod nonzero;
 mod option;
 mod primitive;
 mod slice;
+mod tuple;
 mod unit;
 mod vec;
 

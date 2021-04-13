@@ -13,7 +13,7 @@
 - DekuRead+DekuWrite implementations for Cow<T> ([@abungay](https://github.com/abungay)) ([#186](https://github.com/sharksforarms/deku/pull/186))
 - DekuRead+DekuWrite implementations for HashMap ([@abungay](https://github.com/abungay)) ([#199](https://github.com/sharksforarms/deku/pull/199))
 - DekuRead+DekuWrite implementations for HashSet ([@abungay](https://github.com/abungay)) ([#199](https://github.com/sharksforarms/deku/pull/199))
-- DekuRead+DekuWrite implementations for &T ([@abungay](https://github.com/abungay)) ([#199](https://github.com/sharksforarms/deku/pull/199))
+- DekuWrite implementations for &T ([@abungay](https://github.com/abungay)) ([#199](https://github.com/sharksforarms/deku/pull/199))
 - DekuRead+DekuWrite implementations for tuple ([@abungay](https://github.com/abungay)) ([#198](https://github.com/sharksforarms/deku/pull/198))
 
 ### Other

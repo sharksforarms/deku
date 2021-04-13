@@ -106,7 +106,7 @@ jobs:
     name: Coverage
     runs-on: ubuntu-latest
     container:
-      image: xd009642/tarpaulin:develop-nightly
+      image: xd009642/tarpaulin:develop
       options: --security-opt seccomp=unconfined
     steps:
       - name: Checkout repository
@@ -114,7 +114,7 @@ jobs:
 
       - name: Generate code coverage
         run: |
-          cargo +nightly tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml
+          cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v1

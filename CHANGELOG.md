@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2021-04-13
+
+### Breaking
+- `const_generics` feature enabled by default
+
+### Added
+- Add optional `const_generics` feature ([@soruh](https://github.com/soruh)) ([#187](https://github.com/sharksforarms/deku/pull/187))
+    - This allows for reading/writing arrays with >32 elements when enabled
+- DekuRead+DekuWrite implementations for Cow<T> ([@abungay](https://github.com/abungay)) ([#186](https://github.com/sharksforarms/deku/pull/186))
+- DekuRead+DekuWrite implementations for HashMap ([@abungay](https://github.com/abungay)) ([#199](https://github.com/sharksforarms/deku/pull/199))
+- DekuRead+DekuWrite implementations for HashSet ([@abungay](https://github.com/abungay)) ([#199](https://github.com/sharksforarms/deku/pull/199))
+- DekuRead+DekuWrite implementations for &T ([@abungay](https://github.com/abungay)) ([#199](https://github.com/sharksforarms/deku/pull/199))
+- DekuRead+DekuWrite implementations for tuple ([@abungay](https://github.com/abungay)) ([#198](https://github.com/sharksforarms/deku/pull/198))
+
+### Other
+- Updated dependencies
+- Updated wasm example
+- Fix: Parenthesize pad/update attributes ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#195](https://github.com/sharksforarms/deku/pull/195))
+- Fixed failing code coverage ([@abungay](https://github.com/abungay)) ([#200](https://github.com/sharksforarms/deku/pull/200))
+- Update DekuRead documentation ([@caass](https://github.com/caass)) ([fcfdc24](https://github.com/sharksforarms/deku/commit/fcfdc24eca1b8663f9a2cd2d0d8ad6534b08a862)/[#196](https://github.com/sharksforarms/deku/pull/196))
+- Updated hexlit dependency ([@inspier](https://github.com/inspier)) ([#189](https://github.com/sharksforarms/deku/pull/189))
+- Refactoring and code improvements ([@wcampbell0x2a](https://github.com/wcampbell0x2a))
+
 ## [0.11.0] - 2020-02-25
 
 ### Breaking
@@ -131,7 +154,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.11.0...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.12.0...HEAD
+
+[0.12.0]: https://github.com/sharksforarms/deku/compare/deku-v0.11.0...deku-v0.12.0
 
 [0.11.0]: https://github.com/sharksforarms/deku/compare/deku-v0.10.1...deku-v0.11.0
 

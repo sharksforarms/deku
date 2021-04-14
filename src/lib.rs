@@ -307,7 +307,7 @@ pub trait DekuContainerRead<'a>: DekuRead<'a, ()> {
     /// * **input** - Input given as data and bit offset
     ///
     /// Returns the remaining bytes and bit offset after parsing in addition to Self.
-    fn from_bytes(input: (&'a [u8], usize)) -> Result<((&'a [u8], usize), Self), DekuError>
+    fn from_bytes(input: (&'a (impl AsRef<[u8]> + ?Sized), usize)) -> Result<((&'a [u8], usize), Self), DekuError>
     where
         Self: Sized;
 }

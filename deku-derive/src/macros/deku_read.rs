@@ -688,7 +688,8 @@ pub fn emit_from_bytes(
     quote! {
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
-            fn from_bytes(__deku_input: (&#lifetime [u8], usize)) -> Result<((&#lifetime [u8], usize), Self), ::#crate_::DekuError> {
+            fn from_bytes(__deku_input: (&#lifetime (impl std::convert::AsRef<[u8]> + ?Sized), usize)) -> Result<((&#lifetime [u8], usize), Self), ::#crate_::DekuError> {
+                let __deku_input = (__deku_input.0.as_ref(), __deku_input.1);
                 #body
             }
         }

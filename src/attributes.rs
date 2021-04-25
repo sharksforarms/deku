@@ -1,6 +1,33 @@
 /*!
 A documentation-only module for #\[deku\] attributes
 
+# Scopes
+
+To understand the `Scope` column of the table below:
+
+```rust,ignore
+#[deku(/* top-level */)]
+struct DekuStruct {
+    #[deku( /* field */)]
+    field: u8,
+}
+
+#[deku(/* top-level */)]
+enum DekuEnum {
+    #[deku(/* variant */)]
+    VariantA,
+
+    #[deku(/* variant */)]
+    VariantB( #[deku(/* field */)] u8 ),
+
+    #[deku(/* variant */)]
+    VariantC {
+        #[deku( /* field */)]
+        field: u8,
+    }
+}
+```
+
 # List of attributes
 
 | Attribute | Scope | Description

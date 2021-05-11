@@ -33,6 +33,31 @@ jobs:
           command: test
           args: --all
 
+  test_miri:
+    name: Miri Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: miri
+      - run: cargo miri test
+
+  test_miri_big_endian:
+    name: Miri Test Big Endian
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: miri
+          target: mips64-unknown-linux-gnuabi64
+      - run: cargo miri test --target mips64-unknown-linux-gnuabi64
+
   examples:
     name: Examples
     runs-on: ubuntu-latest

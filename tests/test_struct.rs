@@ -1,6 +1,8 @@
 use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
 
+mod test_common;
+
 /// General smoke tests for structs
 /// TODO: These should be divided into smaller tests
 
@@ -71,12 +73,14 @@ fn test_unnamed_struct() {
             0xFF,
             0b0000_0010,
             0b0001_0110,
-            0xBBAA,
-            0xCCDD,
+            native_endian!(0xBBAAu16),
+            0xCCDDu16,
             NestedDeku {
                 nest_a: 0b00_100101,
                 nest_b: 0b10,
-                inner: DoubleNestedDeku { data: 0xDDCC }
+                inner: DoubleNestedDeku {
+                    data: native_endian!(0xDDCCu16)
+                }
             },
             0x02,
             vec![0xBE, 0xEF],
@@ -132,12 +136,14 @@ fn test_named_struct() {
             field_a: 0xFF,
             field_b: 0b0000_0010,
             field_c: 0b0001_0110,
-            field_d: 0xBBAA,
-            field_e: 0xCCDD,
+            field_d: native_endian!(0xBBAAu16),
+            field_e: 0xCCDDu16,
             field_f: NestedDeku {
                 nest_a: 0b00_100101,
                 nest_b: 0b10,
-                inner: DoubleNestedDeku { data: 0xDDCC }
+                inner: DoubleNestedDeku {
+                    data: native_endian!(0xDDCCu16)
+                }
             },
             vec_len: 0x02,
             vec_data: vec![0xBE, 0xEF]

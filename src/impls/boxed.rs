@@ -69,12 +69,13 @@ where
 mod tests {
     use super::*;
     use crate::ctx::*;
+    use crate::native_endian;
     use rstest::rstest;
 
     #[rstest(input, expected, expected_rest,
         case(
             &[0xEF, 0xBE],
-            Box::new(0xBEEF),
+            Box::new(native_endian!(0xBEEF_u16)),
             bits![Msb0, u8;]
         ),
     )]

@@ -363,3 +363,7 @@ where
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/test_common/mod.rs"]
+pub mod test_common;

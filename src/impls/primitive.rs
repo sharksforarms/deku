@@ -223,6 +223,7 @@ ImplDekuTraits!(f64);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::native_endian;
     use rstest::rstest;
 
     static ENDIAN: Endian = Endian::new();
@@ -244,13 +245,23 @@ mod tests {
     }
 
     TestPrimitive!(test_u8, u8, vec![0xAAu8], 0xAAu8);
-    TestPrimitive!(test_u16, u16, vec![0xABu8, 0xCD], 0xCDAB);
-    TestPrimitive!(test_u32, u32, vec![0xABu8, 0xCD, 0xEF, 0xBE], 0xBEEFCDAB);
+    TestPrimitive!(
+        test_u16,
+        u16,
+        vec![0xABu8, 0xCD],
+        native_endian!(0xCDAB_u16)
+    );
+    TestPrimitive!(
+        test_u32,
+        u32,
+        vec![0xABu8, 0xCD, 0xEF, 0xBE],
+        native_endian!(0xBEEFCDAB_u32)
+    );
     TestPrimitive!(
         test_u64,
         u64,
         vec![0xABu8, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD, 0xFE, 0xC0],
-        0xC0FECDABBEEFCDAB
+        native_endian!(0xC0FECDABBEEFCDAB_u64)
     );
     TestPrimitive!(
         test_u128,
@@ -259,26 +270,31 @@ mod tests {
             0xABu8, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD, 0xFE, 0xC0, 0xAB, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD,
             0xFE, 0xC0
         ],
-        0xC0FECDABBEEFCDABC0FECDABBEEFCDAB
+        native_endian!(0xC0FECDABBEEFCDABC0FECDABBEEFCDAB_u128)
     );
     TestPrimitive!(
         test_usize,
         usize,
         vec![0xABu8, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD, 0xFE, 0xC0],
         if core::mem::size_of::<usize>() == 8 {
-            0xC0FECDABBEEFCDAB
+            native_endian!(0xC0FECDABBEEFCDAB_usize)
         } else {
-            0xBEEFCDAB
+            native_endian!(0xBEEFCDAB_usize)
         }
     );
     TestPrimitive!(test_i8, i8, vec![0xFBu8], -5);
-    TestPrimitive!(test_i16, i16, vec![0xFDu8, 0xFE], -259);
-    TestPrimitive!(test_i32, i32, vec![0x02u8, 0x3F, 0x01, 0xEF], -0x10FEC0FE);
+    TestPrimitive!(test_i16, i16, vec![0xFDu8, 0xFE], native_endian!(-259_i16));
+    TestPrimitive!(
+        test_i32,
+        i32,
+        vec![0x02u8, 0x3F, 0x01, 0xEF],
+        native_endian!(-0x10FEC0FE_i32)
+    );
     TestPrimitive!(
         test_i64,
         i64,
         vec![0x02u8, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF],
-        -0x10FEC0FE10FEC0FE
+        native_endian!(-0x10FEC0FE10FEC0FE_i64)
     );
     TestPrimitive!(
         test_i128,
@@ -287,24 +303,29 @@ mod tests {
             0x02u8, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF, 0x01, 0x3F,
             0x01, 0xEF
         ],
-        -0x10FEC0FE10FEC0FE10FEC0FE10FEC0FE
+        native_endian!(-0x10FEC0FE10FEC0FE10FEC0FE10FEC0FE_i128)
     );
     TestPrimitive!(
         test_isize,
         isize,
         vec![0x02u8, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF],
         if core::mem::size_of::<isize>() == 8 {
-            -0x10FEC0FE10FEC0FE
+            native_endian!(-0x10FEC0FE10FEC0FE_isize)
         } else {
-            -0x10FEC0FE
+            native_endian!(-0x10FEC0FE_isize)
         }
     );
-    TestPrimitive!(test_f32, f32, vec![0xA6u8, 0x9B, 0xC4, 0xBB], -0.006);
+    TestPrimitive!(
+        test_f32,
+        f32,
+        vec![0xA6u8, 0x9B, 0xC4, 0xBB],
+        native_endian!(-0.006_f32)
+    );
     TestPrimitive!(
         test_f64,
         f64,
         vec![0xFAu8, 0x7E, 0x6A, 0xBC, 0x74, 0x93, 0x78, 0xBF],
-        -0.006
+        native_endian!(-0.006_f64)
     );
 
     #[rstest(input, endian, bit_size, expected, expected_rest,

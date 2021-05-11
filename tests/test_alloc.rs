@@ -43,6 +43,7 @@ mod tests {
     use std::convert::TryFrom;
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_simple() {
         let input = hex!("aabbbbcc0102ddffffffaa");
 

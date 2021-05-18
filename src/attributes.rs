@@ -187,7 +187,7 @@ let data: Vec<u8> = vec![0x00, 0x01, 0x02];
 let value = DekuTest::try_from(data.as_ref());
 
 assert_eq!(
-    Err(DekuError::Assertion("field 'data' failed assertion: * data >= 8".into())),
+    Err(DekuError::Assertion("field data failed assertion: * data >= 8".into())),
     value
 );
 ```
@@ -220,7 +220,7 @@ value.data = 0x02;
 let value: Result<Vec<u8>, DekuError> = value.try_into();
 
 assert_eq!(
-    Err(DekuError::Assertion("field 'data' failed assertion: data == 0x01".into())),
+    Err(DekuError::Assertion("field data failed assertion: data == 0x01".into())),
     value
 );
 ```

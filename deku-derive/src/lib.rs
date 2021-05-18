@@ -153,26 +153,14 @@ impl DekuData {
             ),
         };
 
-        let ctx = receiver
-            .ctx?
-            .map(|s| s.parse_with(syn::punctuated::Punctuated::parse_terminated))
-            .transpose()
-            .map_err(|e| e.to_compile_error())?;
-
-        let ctx_default = receiver
-            .ctx_default
-            .map(|s| s.parse_with(Punctuated::parse_terminated))
-            .transpose()
-            .map_err(|e| e.to_compile_error())?;
-
         let data = Self {
             vis: receiver.vis,
             ident: receiver.ident,
             generics: receiver.generics,
             data,
             endian: receiver.endian,
-            ctx,
-            ctx_default,
+            ctx: receiver.ctx,
+            ctx_default: receiver.ctx_default,
             magic: receiver.magic,
             id: receiver.id,
             id_type: receiver.id_type?,
@@ -606,18 +594,12 @@ struct DekuReceiver {
     endian: Option<syn::LitStr>,
 
     /// top-level context, argument list
-    // TODO: The type of it should be
-    //       `syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>`
-    //       https://github.com/TedDriggs/darling/pull/98
-    #[darling(default = "default_res_opt", map = "map_option_litstr")]
-    ctx: Result<Option<syn::LitStr>, ReplacementError>,
+    #[darling(default)]
+    ctx: Option<syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>>,
 
     /// default context passed to the field
-    // TODO: The type of it should be
-    //       `syn::punctuated::Punctuated<syn::Expr, syn::token::Comma>`
-    //       https://github.com/TedDriggs/darling/pull/98
     #[darling(default)]
-    ctx_default: Option<syn::LitStr>,
+    ctx_default: Option<syn::punctuated::Punctuated<syn::Expr, syn::token::Comma>>,
 
     /// A magic value that must appear at the start of this struct/enum's data
     #[darling(default)]

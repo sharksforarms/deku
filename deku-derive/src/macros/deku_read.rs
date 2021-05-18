@@ -528,7 +528,7 @@ fn emit_field_read(
             if (!(#v)) {
                 // assertion is false, raise error
                 return Err(::#crate_::DekuError::Assertion(format!(
-                            "field '{}' failed assertion: {}",
+                            "field {} failed assertion: {}",
                             #field_ident_str,
                             stringify!(#v)
                         )));
@@ -543,7 +543,7 @@ fn emit_field_read(
             if (!(#internal_field_ident == (#v))) {
                 // assertion is false, raise error
                 return Err(::#crate_::DekuError::Assertion(format!(
-                            "field '{}' failed assertion: {}",
+                            "field {} failed assertion: {}",
                             #field_ident_str,
                             stringify!(#field_ident == #v)
                         )));

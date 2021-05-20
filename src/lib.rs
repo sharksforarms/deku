@@ -214,7 +214,7 @@ assert_eq!(value.sub.b, 0x01 + 0x02)
 
 # Internal variables and previously read fields
 
-Along similar lines to [Context](#Context) variables, previously read variables
+Along similar lines to [Context](#context) variables, previously read variables
 are exposed and can be referenced:
 
 Example:

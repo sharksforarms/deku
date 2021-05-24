@@ -149,3 +149,30 @@ fn test_named_struct() {
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(test_data, ret_write);
 }
+
+#[test]
+fn test_raw_identifiers_struct() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    pub struct TestStruct {
+        pub r#type: u8,
+    }
+
+    let test_data: Vec<u8> = [
+        0xFF,
+    ]
+    .to_vec();
+
+    // Read
+    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    assert_eq!(
+        TestStruct {
+            r#type: 0xFF,
+        },
+        ret_read
+    );
+
+    // Write
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(test_data, ret_write);
+}
+

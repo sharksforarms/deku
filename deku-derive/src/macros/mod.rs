@@ -111,7 +111,8 @@ fn gen_internal_field_ident(ident: &TokenStream) -> TokenStream {
     let span = ident.span();
     let s = ident.to_string();
     let mut name = "__deku_".to_owned();
-    name.push_str(&s);
+    // If its a raw identifier, we must remove 'r#'
+    name.push_str(s.strip_prefix("r#").unwrap_or(&s));
 
     syn::Ident::new(&name, span).to_token_stream()
 }

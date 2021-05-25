@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.12.1] - 2021-05-25
+- Add support for raw indentifiers ([@Visse](https://github.com/visse)) ([#221](https://github.com/sharksforarms/deku/pull/221))
+- Dependency updates
+
 ## [0.12.0] - 2021-04-13
 
 ### Breaking
@@ -154,7 +158,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.12.0...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.12.1...HEAD
+
+[0.12.1]: https://github.com/sharksforarms/deku/compare/deku-v0.12.0...deku-v0.12.1
 
 [0.12.0]: https://github.com/sharksforarms/deku/compare/deku-v0.11.0...deku-v0.12.0
 

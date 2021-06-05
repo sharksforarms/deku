@@ -59,8 +59,8 @@ enum DekuEnum {
 | enum: [id](#id) | top-level, variant | enum or variant id value
 | enum: [id_pat](#id_pat) | variant | variant id match pattern
 | enum: [type](#type) | top-level | Set the type of the variant `id`
-| enum: [bits](#bits) | top-level | Set the bit-size of the variant `id`
-| enum: [bytes](#bytes) | top-level | Set the byte-size of the variant `id`
+| enum: [bits](#bits-1) | top-level | Set the bit-size of the variant `id`
+| enum: [bytes](#bytes-1) | top-level | Set the byte-size of the variant `id`
 
 # endian
 

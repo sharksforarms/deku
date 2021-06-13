@@ -384,6 +384,9 @@ struct FieldData {
     /// custom field writer code
     writer: Option<TokenStream>,
 
+    /// custom type to read/write "as"
+    as_: Option<syn::Type>,
+
     /// skip field reading/writing
     skip: bool,
 
@@ -438,6 +441,7 @@ impl FieldData {
             update: receiver.update?,
             reader: receiver.reader?,
             writer: receiver.writer?,
+            as_: receiver.as_?,
             skip: receiver.skip,
             pad_bits_before: receiver.pad_bits_before?,
             pad_bytes_before: receiver.pad_bytes_before?,
@@ -487,6 +491,15 @@ impl FieldData {
             return Err(cerror(
                 data.bits.span(),
                 "conflicting: both `bits` and `bytes` specified on field",
+            ));
+        }
+
+        // Validate either `reader`/`writer` or `as` is specified
+        if (data.reader.is_some() || data.writer.is_some()) && data.as_.is_some() {
+            // FIXME: Use `Span::join` once out of nightly
+            return Err(cerror(
+                data.as_.span(),
+                "conflicting: both `reader`/`writer` and `as` specified on field",
             ));
         }
 
@@ -665,9 +678,16 @@ fn map_litstr_as_tokenstream(
             let v = apply_replacements(&v)?;
             Some(
                 v.parse::<TokenStream>()
-                    .expect("could not parse token stream"),
+                    .map_err(|err| err.into_compile_error())?,
             )
         }
+        None => None,
+    })
+}
+
+fn map_litstr_as_type(input: Option<syn::LitStr>) -> Result<Option<syn::Type>, TokenStream> {
+    Ok(match input {
+        Some(v) => Some(v.parse().map_err(|err| err.into_compile_error())?),
         None => None,
     })
 }
@@ -753,6 +773,10 @@ struct DekuFieldReceiver {
     /// custom field writer code
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     writer: Result<Option<TokenStream>, ReplacementError>,
+
+    /// custom type to read/write "as"
+    #[darling(rename = "as", default = "default_res_opt", map = "map_litstr_as_type")]
+    as_: Result<Option<syn::Type>, ReplacementError>,
 
     /// skip field reading/writing
     #[darling(default)]

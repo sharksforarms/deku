@@ -493,6 +493,7 @@ fn emit_field_read(
     let field_endian = f.endian.as_ref().or_else(|| input.endian.as_ref());
 
     let field_reader = &f.reader;
+    let field_as = &f.as_;
 
     // fields to check usage of bit/byte offset
     let field_check_vars = [
@@ -563,6 +564,12 @@ fn emit_field_read(
             f.ctx.as_ref(),
         )?;
 
+        let read_func = if let Some(field_as) = field_as {
+            quote! { <#field_as as ::#crate_::DekuReadAs<#field_type, _>>::read_as }
+        } else {
+            quote! { ::#crate_::DekuRead::read }
+        };
+
         // The container limiting options are special, we need to generate `(limit, (other, ..))` for them.
         // These have a problem where when it isn't a copy type, the field will be moved.
         // e.g. struct FooBar {
@@ -574,29 +581,29 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    ::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
+                    #read_func(__deku_rest, (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
                 }
             }
         } else if let Some(field_bits) = &f.bits_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    ::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bits(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
+                    #read_func(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bits(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_bytes) = &f.bytes_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    ::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bytes(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
+                    #read_func(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bytes(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_until) = &f.until {
             // We wrap the input into another closure here to enforce that it is actually a callable
             // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
-            quote! {::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_until(#field_until), (#read_args)))}
+            quote! {#read_func(__deku_rest, (::#crate_::ctx::Limit::new_until(#field_until), (#read_args)))}
         } else {
-            quote! {::#crate_::DekuRead::read(__deku_rest, (#read_args))}
+            quote! {#read_func(__deku_rest, (#read_args))}
         }
     };
 

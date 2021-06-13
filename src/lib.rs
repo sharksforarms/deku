@@ -363,3 +363,47 @@ where
         Ok(())
     }
 }
+
+pub trait DekuReadAs<'a, T, Ctx = ()> {
+    fn read_as(
+        input: &'a bitvec::BitSlice<bitvec::Msb0, u8>,
+        ctx: Ctx,
+    ) -> Result<(&'a bitvec::BitSlice<bitvec::Msb0, u8>, T), DekuError>;
+}
+
+pub trait DekuWriteAs<T: ?Sized, Ctx = ()> {
+    fn write_as(
+        source: &T,
+        output: &mut bitvec::BitVec<bitvec::Msb0, u8>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError>;
+}
+
+pub struct Same {
+    _priv: (),
+}
+
+impl<'a, T, Ctx> DekuReadAs<'a, T, Ctx> for Same
+where
+    T: DekuRead<'a, Ctx>,
+{
+    fn read_as(
+        input: &'a bitvec::BitSlice<bitvec::Msb0, u8>,
+        ctx: Ctx,
+    ) -> Result<(&'a bitvec::BitSlice<bitvec::Msb0, u8>, T), DekuError> {
+        T::read(input, ctx)
+    }
+}
+
+impl<T, Ctx> DekuWriteAs<T, Ctx> for Same
+where
+    T: DekuWrite<Ctx> + ?Sized,
+{
+    fn write_as(
+        source: &T,
+        output: &mut bitvec::BitVec<bitvec::Msb0, u8>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        source.write(output, ctx)
+    }
+}

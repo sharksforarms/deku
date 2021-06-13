@@ -2,7 +2,7 @@
 
 #![cfg(feature = "alloc")]
 
-use alloc::{format, string::String, string::ToString};
+use alloc::{format, string::String};
 
 /// Number of bits needed to retry parsing
 #[derive(Debug, PartialEq)]
@@ -47,13 +47,13 @@ pub enum DekuError {
 
 impl From<core::num::TryFromIntError> for DekuError {
     fn from(e: core::num::TryFromIntError) -> DekuError {
-        DekuError::Parse(format!("error parsing int: {}", e.to_string()))
+        DekuError::Parse(format!("error parsing int: {}", e))
     }
 }
 
 impl From<core::array::TryFromSliceError> for DekuError {
     fn from(e: core::array::TryFromSliceError) -> DekuError {
-        DekuError::Parse(format!("error parsing from slice: {}", e.to_string()))
+        DekuError::Parse(format!("error parsing from slice: {}", e))
     }
 }
 

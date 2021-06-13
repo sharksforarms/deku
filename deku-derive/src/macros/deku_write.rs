@@ -484,6 +484,7 @@ fn emit_field_write(
     let (bit_offset, byte_offset) = emit_bit_byte_offsets(&field_check_vars);
 
     let field_writer = &f.writer;
+    let field_as = &f.as_;
     let field_ident = f.get_ident(i, object_prefix.is_none());
     let field_ident_str = field_ident.to_string();
 
@@ -527,7 +528,14 @@ fn emit_field_write(
             f.ctx.as_ref(),
         )?;
 
-        quote! { #object_prefix #field_ident.write(__deku_output, (#write_args)) }
+        let write_func = if let Some(field_as) = field_as {
+            let field_type = &f.ty;
+            quote! { <#field_as as ::#crate_::DekuWriteAs<#field_type, _>>::write_as }
+        } else {
+            quote! { ::#crate_::DekuWrite::write }
+        };
+
+        quote! { #write_func(#object_prefix #field_ident, __deku_output, (#write_args)) }
     };
 
     let pad_bits_before = pad_bits(

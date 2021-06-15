@@ -32,7 +32,7 @@ macro_rules! ImplDekuTraits {
 
                 let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
 
-                let value = if pad == 0 && bit_slice.len() == max_type_bits {
+                let value = if pad == 0 && bit_slice.len() == max_type_bits && bit_slice.as_raw_slice().len() * 8 == max_type_bits {
                     // if everything is aligned, just read the value
 
                     let bytes: &[u8] = bit_slice.as_raw_slice();

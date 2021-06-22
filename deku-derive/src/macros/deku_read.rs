@@ -561,6 +561,7 @@ fn emit_field_read(
             f.bits.as_ref(),
             f.bytes.as_ref(),
             f.ctx.as_ref(),
+            input.ctx_nested.as_ref(),
         )?;
 
         // The container limiting options are special, we need to generate `(limit, (other, ..))` for them.

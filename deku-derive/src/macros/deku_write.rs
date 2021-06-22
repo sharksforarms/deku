@@ -525,6 +525,7 @@ fn emit_field_write(
             f.bits.as_ref(),
             f.bytes.as_ref(),
             f.ctx.as_ref(),
+            input.ctx_nested.as_ref(),
         )?;
 
         quote! { #object_prefix #field_ident.write(__deku_output, (#write_args)) }

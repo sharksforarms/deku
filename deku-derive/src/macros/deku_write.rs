@@ -74,7 +74,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 type Error = ::#crate_::DekuError;
 
                 fn try_from(input: #ident) -> Result<Self, Self::Error> {
-                    input.to_bytes()
+                    ::#crate_::DekuContainerWrite::to_bytes(&input)
                 }
             }
 
@@ -286,7 +286,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 type Error = ::#crate_::DekuError;
 
                 fn try_from(input: #ident) -> Result<Self, Self::Error> {
-                    input.to_bytes()
+                    ::#crate_::DekuContainerWrite::to_bytes(&input)
                 }
             }
 

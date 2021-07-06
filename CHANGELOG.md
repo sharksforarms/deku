@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## [0.12.3] - 2021-07-06
+- Bug fix for structs/enums which also define a `to_bytes` function
+
 ## [0.12.2] - 2021-06-15
 - Bug fix for in primitive bitslice convertion ([issue](https://github.com/sharksforarms/deku/issues/224)/[commit](https://github.com/sharksforarms/deku/commit/8d58bc6c65a9f3305d22ebe1bb5a685c39295863)) 
 - Added Miri tests including testing on big endian target ([#211](https://github.com/sharksforarms/deku/pull/211))
@@ -163,6 +166,8 @@ Community:
 - Added `CHANGELOG.md` to track changes
 
 [Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.12.2...HEAD
+
+[0.12.3]: https://github.com/sharksforarms/deku/compare/deku-v0.12.2...deku-v0.12.3
 
 [0.12.2]: https://github.com/sharksforarms/deku/compare/deku-v0.12.1...deku-v0.12.2
 

@@ -54,12 +54,12 @@ fn issue_224() {
         pub j: u8,
     }
 
-    let mut packet = Packet {
+    let packet = Packet {
         data: Data {
             one: One::Start,
             two: Two::Load(Op2 { w: 1, j: 2 }),
         },
     };
     let bytes = packet.to_bytes().unwrap();
-    let packet = Packet::from_bytes((&bytes, 0)).unwrap();
+    let _packet = Packet::from_bytes((&bytes, 0)).unwrap();
 }

@@ -4,4 +4,4 @@ error[E0063]: missing field `field_a` in initializer of `Test1`
 4 | #[derive(DekuRead, DekuWrite)]
   |          ^^^^^^^^ missing `field_a`
   |
-  = note: this error originates in a derive macro (in Nightly builds, run with -Z macro-backtrace for more info)
+  = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)

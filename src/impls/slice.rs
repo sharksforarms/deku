@@ -167,61 +167,57 @@ mod pre_const_generics_impl {
 mod const_generics_impl {
     use super::*;
 
-    macro_rules! ImplDekuSliceTraits {
-        ($($typ:ty),+ $(,)?) => {
-            $(
-                impl<Ctx: Copy> DekuWrite<Ctx> for &[$typ]
-                where
-                    $typ: DekuWrite<Ctx>,
-                {
-                    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
-                        for v in *self {
-                            v.write(output, ctx)?;
-                        }
-                        Ok(())
-                    }
-                }
+    use std::mem::MaybeUninit;
 
+    impl<'a, Ctx: Copy, T, const N: usize> DekuRead<'a, Ctx> for [T; N]
+    where
+        T: DekuRead<'a, Ctx>,
+    {
+        fn read(
+            input: &'a BitSlice<Msb0, u8>,
+            ctx: Ctx,
+        ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
+        where
+            Self: Sized,
+        {
+            #[allow(clippy::uninit_assumed_init)]
+            // This is safe because we initialize the array immediately after,
+            // and never return it in case of error
+            let mut slice: [T; N] = unsafe { MaybeUninit::uninit().assume_init() };
+            let mut rest = input;
+            for item in slice.iter_mut() {
+                let (new_rest, value) = T::read(rest, ctx)?;
+                *item = value;
+                rest = new_rest;
+            }
 
-                impl<'a, Ctx: Copy, const N: usize> DekuRead<'a, Ctx> for [$typ; N]
-                where
-                    $typ: DekuRead<'a, Ctx>,
-                {
-                    fn read(
-                        input: &'a BitSlice<Msb0, u8>,
-                        ctx: Ctx,
-                    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
-                    where
-                        Self: Sized,
-                    {
-                        let mut slice: [$typ; N] = [<$typ>::default(); N];
-                        let mut rest = input;
-                        for i in 0..N {
-                            let (new_rest, value) = <$typ>::read(rest, ctx)?;
-                            slice[i] = value;
-                            rest = new_rest;
-                        }
-
-                        Ok((rest, slice))
-                    }
-                }
-
-                impl<Ctx: Copy, const N: usize> DekuWrite<Ctx> for [$typ; N]
-                where
-                    $typ: DekuWrite<Ctx>,
-                {
-                    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
-                        for v in self {
-                            v.write(output, ctx)?;
-                        }
-                        Ok(())
-                    }
-                }
-            )+
-        };
+            Ok((rest, slice))
+        }
     }
 
-    ImplDekuSliceTraits!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
+    impl<Ctx: Copy, T, const N: usize> DekuWrite<Ctx> for [T; N]
+    where
+        T: DekuWrite<Ctx>,
+    {
+        fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
+            for v in self {
+                v.write(output, ctx)?;
+            }
+            Ok(())
+        }
+    }
+
+    impl<Ctx: Copy, T> DekuWrite<Ctx> for &[T]
+    where
+        T: DekuWrite<Ctx>,
+    {
+        fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
+            for v in *self {
+                v.write(output, ctx)?;
+            }
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
@@ -253,6 +249,59 @@ mod tests {
         case::normal_be([0xDDCC, 0xBBAA], Endian::Big, vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
     fn test_bit_write(input: [u16; 2], endian: Endian, expected: Vec<u8>) {
+        let mut res_write = bitvec![Msb0, u8;];
+        input.write(&mut res_write, endian).unwrap();
+        assert_eq!(expected, res_write.into_vec());
+
+        // test &slice
+        let input = input.as_ref();
+        let mut res_write = bitvec![Msb0, u8;];
+        input.write(&mut res_write, endian).unwrap();
+        assert_eq!(expected, res_write.into_vec());
+    }
+
+    #[cfg(feature = "const_generics")]
+    #[rstest(input,endian,expected,expected_rest,
+        case::normal_le(
+            [0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66].as_ref(),
+            Endian::Little,
+            [[0xCCDD, 0xAABB], [0x8899, 0x6677]],
+            bits![Msb0, u8;],
+        ),
+        case::normal_le(
+            [0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66].as_ref(),
+            Endian::Big,
+            [[0xDDCC, 0xBBAA], [0x9988, 0x7766]],
+            bits![Msb0, u8;],
+        ),
+    )]
+    fn test_nested_array_bit_read(
+        input: &[u8],
+        endian: Endian,
+        expected: [[u16; 2]; 2],
+        expected_rest: &BitSlice<Msb0, u8>,
+    ) {
+        let bit_slice = input.view_bits::<Msb0>();
+
+        let (rest, res_read) = <[[u16; 2]; 2]>::read(bit_slice, endian).unwrap();
+        assert_eq!(expected, res_read);
+        assert_eq!(expected_rest, rest);
+    }
+
+    #[cfg(feature = "const_generics")]
+    #[rstest(input,endian,expected,
+        case::normal_le(
+            [[0xCCDD, 0xAABB], [0x8899, 0x6677]],
+            Endian::Little,
+            vec![0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66],
+        ),
+        case::normal_be(
+            [[0xDDCC, 0xBBAA], [0x9988, 0x7766]],
+            Endian::Big,
+            vec![0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66],
+        ),
+    )]
+    fn test_nested_array_bit_write(input: [[u16; 2]; 2], endian: Endian, expected: Vec<u8>) {
         let mut res_write = bitvec![Msb0, u8;];
         input.write(&mut res_write, endian).unwrap();
         assert_eq!(expected, res_write.into_vec());

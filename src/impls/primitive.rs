@@ -5,7 +5,7 @@ use core::convert::TryInto;
 #[cfg(feature = "alloc")]
 use alloc::format;
 
-macro_rules! ImplDekuTraits {
+macro_rules! ImplDekuRead {
     ($typ:ty) => {
         impl DekuRead<'_, (Endian, Size)> for $typ {
             fn read(
@@ -94,7 +94,11 @@ macro_rules! ImplDekuTraits {
                 Ok((rest, value))
             }
         }
+    };
+}
 
+macro_rules! ForwardDekuRead {
+    ($typ:ty) => {
         // Only have `endian`, set `bit_size` to `Size::of::<Type>()`
         impl DekuRead<'_, Endian> for $typ {
             fn read(
@@ -127,7 +131,11 @@ macro_rules! ImplDekuTraits {
                 <$typ>::read(input, Endian::default())
             }
         }
+    };
+}
 
+macro_rules! ImplDekuWrite {
+    ($typ:ty) => {
         impl DekuWrite<(Endian, Size)> for $typ {
             fn write(
                 &self,
@@ -188,7 +196,11 @@ macro_rules! ImplDekuTraits {
                 Ok(())
             }
         }
+    };
+}
 
+macro_rules! ForwardDekuWrite {
+    ($typ:ty) => {
         // Only have `bit_size`, set `endian` to `Endian::default`.
         impl DekuWrite<Size> for $typ {
             fn write(
@@ -205,6 +217,16 @@ macro_rules! ImplDekuTraits {
                 <$typ>::write(self, output, Endian::default())
             }
         }
+    };
+}
+
+macro_rules! ImplDekuTraits {
+    ($typ:ty) => {
+        ImplDekuRead!($typ);
+        ForwardDekuRead!($typ);
+
+        ImplDekuWrite!($typ);
+        ForwardDekuWrite!($typ);
     };
 }
 

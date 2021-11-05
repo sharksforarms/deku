@@ -45,7 +45,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         .and_then(|v| v.ident.as_ref())
         .is_some();
 
-    let (field_idents, field_reads) = emit_field_reads(input, &fields)?;
+    let (field_idents, field_reads) = emit_field_reads(input, &fields, &ident)?;
 
     // filter out temporary fields
     let field_idents: Vec<&TokenStream> = field_idents
@@ -203,7 +203,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let variant_read_func = if variant_reader.is_some() {
             quote! { #variant_reader; }
         } else {
-            let (field_idents, field_reads) = emit_field_reads(input, &variant.fields.as_ref())?;
+            let (field_idents, field_reads) =
+                emit_field_reads(input, &variant.fields.as_ref(), &ident)?;
 
             // filter out temporary fields
             let field_idents: Vec<&TokenStream> = field_idents
@@ -414,12 +415,13 @@ struct FieldIdent {
 fn emit_field_reads(
     input: &DekuData,
     fields: &Fields<&FieldData>,
+    ident: &TokenStream,
 ) -> Result<(Vec<FieldIdent>, Vec<TokenStream>), syn::Error> {
     let mut field_reads = vec![];
     let mut field_idents = vec![];
 
     for (i, f) in fields.iter().enumerate() {
-        let (field_ident, field_read) = emit_field_read(input, i, f)?;
+        let (field_ident, field_read) = emit_field_read(input, i, f, ident)?;
         field_idents.push(FieldIdent {
             field_ident,
             is_temp: f.temp,
@@ -486,6 +488,7 @@ fn emit_field_read(
     input: &DekuData,
     i: usize,
     f: &FieldData,
+    ident: &TokenStream,
 ) -> Result<(TokenStream, TokenStream), syn::Error> {
     let crate_ = super::get_crate_name();
     let field_type = &f.ty;
@@ -519,6 +522,7 @@ fn emit_field_read(
         })
         .or_else(|| Some(quote! { Result::<_, ::#crate_::DekuError>::Ok }));
 
+    let ident = ident.to_string();
     let field_ident = f.get_ident(i, true);
     let field_ident_str = field_ident.to_string();
     let internal_field_ident = gen_internal_field_ident(&field_ident);
@@ -528,7 +532,8 @@ fn emit_field_read(
             if (!(#v)) {
                 // assertion is false, raise error
                 return Err(::#crate_::DekuError::Assertion(format!(
-                            "field {} failed assertion: {}",
+                            "{}.{} field failed assertion: {}",
+                            #ident,
                             #field_ident_str,
                             stringify!(#v)
                         )));
@@ -543,7 +548,8 @@ fn emit_field_read(
             if (!(#internal_field_ident == (#v))) {
                 // assertion is false, raise error
                 return Err(::#crate_::DekuError::Assertion(format!(
-                            "field {} failed assertion: {}",
+                            "{}.{} field failed assertion: {}",
+                            #ident,
                             #field_ident_str,
                             stringify!(#field_ident == #v)
                         )));

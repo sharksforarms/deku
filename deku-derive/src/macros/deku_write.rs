@@ -28,7 +28,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let magic_write = emit_magic_write(input);
 
-    let field_writes = emit_field_writes(input, &fields, None)?;
+    let field_writes = emit_field_writes(input, &fields, None, &ident)?;
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }));
 
     let named = fields.style.is_struct();
@@ -229,7 +229,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let variant_write = if variant_writer.is_some() {
             quote! { #variant_writer ?; }
         } else {
-            let field_writes = emit_field_writes(input, &variant.fields.as_ref(), None)?;
+            let field_writes = emit_field_writes(input, &variant.fields.as_ref(), None, &ident)?;
 
             quote! {
                 {
@@ -371,11 +371,12 @@ fn emit_field_writes(
     input: &DekuData,
     fields: &Fields<&FieldData>,
     object_prefix: Option<TokenStream>,
+    ident: &TokenStream,
 ) -> Result<Vec<TokenStream>, syn::Error> {
     fields
         .iter()
         .enumerate()
-        .map(|(i, f)| emit_field_write(input, i, f, &object_prefix))
+        .map(|(i, f)| emit_field_write(input, i, f, &object_prefix, ident))
         .collect()
 }
 
@@ -468,6 +469,7 @@ fn emit_field_write(
     i: usize,
     f: &FieldData,
     object_prefix: &Option<TokenStream>,
+    ident: &TokenStream,
 ) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
     let field_endian = f.endian.as_ref().or_else(|| input.endian.as_ref());
@@ -483,6 +485,7 @@ fn emit_field_write(
 
     let (bit_offset, byte_offset) = emit_bit_byte_offsets(&field_check_vars);
 
+    let ident = &ident.to_string();
     let field_writer = &f.writer;
     let field_ident = f.get_ident(i, object_prefix.is_none());
     let field_ident_str = field_ident.to_string();
@@ -492,7 +495,8 @@ fn emit_field_write(
             if (!(#v)) {
                 // assertion is false, raise error
                 return Err(::#crate_::DekuError::Assertion(format!(
-                            "field {} failed assertion: {}",
+                            "{}.{} field failed assertion: {}",
+                            #ident,
                             #field_ident_str,
                             stringify!(#v)
                         )));
@@ -507,7 +511,8 @@ fn emit_field_write(
             if (!(*(#field_ident) == (#v))) {
                 // assertion is false, raise error
                 return Err(::#crate_::DekuError::Assertion(format!(
-                            "field {} failed assertion: {}",
+                            "{}.{} field failed assertion: {}",
+                            #ident,
                             #field_ident_str,
                             stringify!(#field_ident == #v)
                         )));

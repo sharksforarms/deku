@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## [0.12.5] - 2021-11-11
+- Show struct ident in assertion error message ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#239](https://github.com/sharksforarms/deku/pull/239))
+
 ## [0.12.4] - 2021-10-11
 - Add Read/Write impls for generic arrays ([@xlambein](https://github.com/xlambein)) ([#235](https://github.com/sharksforarms/deku/pull/235))
 
@@ -168,7 +171,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.12.4...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.12.5...HEAD
+
+[0.12.4]: https://github.com/sharksforarms/deku/compare/deku-v0.12.4...deku-v0.12.5
 
 [0.12.4]: https://github.com/sharksforarms/deku/compare/deku-v0.12.3...deku-v0.12.4
 

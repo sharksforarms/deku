@@ -52,8 +52,8 @@ struct TestMap {
 
 fn dummy_reader(
     offset: usize,
-    rest: &BitSlice<Msb0, u8>,
-) -> Result<(&BitSlice<Msb0, u8>, usize), DekuError> {
+    rest: &BitSlice<u8, Msb0>,
+) -> Result<(&BitSlice<u8, Msb0>, usize), DekuError> {
     Ok((rest, offset))
 }
 #[derive(DekuRead, DekuWrite)]
@@ -76,7 +76,7 @@ struct TestCtx {
 
 fn dummy_writer(
     _offset: usize,
-    _output: &mut BitVec<Msb0, u8>,
+    _output: &mut BitVec<u8, Msb0>,
 ) -> Result<(), DekuError> {
     Ok(())
 }

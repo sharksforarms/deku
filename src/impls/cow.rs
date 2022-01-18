@@ -9,9 +9,9 @@ where
 {
     /// Read a T from input and store as Cow<T>
     fn read(
-        input: &'a BitSlice<Msb0, u8>,
+        input: &'a BitSlice<u8, Msb0>,
         inner_ctx: Ctx,
-    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -26,7 +26,7 @@ where
     Ctx: Copy,
 {
     /// Write T from Cow<T>
-    fn write(&self, output: &mut BitVec<Msb0, u8>, inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn write(&self, output: &mut BitVec<u8, Msb0>, inner_ctx: Ctx) -> Result<(), DekuError> {
         (self.borrow() as &T).write(output, inner_ctx)
     }
 }
@@ -41,16 +41,16 @@ mod tests {
         case(
             &[0xEF, 0xBE],
             Cow::Owned(native_endian!(0xBEEF_u16)),
-            bits![Msb0, u8;]
+            bits![u8, Msb0;]
         ),
     )]
-    fn test_cow(input: &[u8], expected: Cow<u16>, expected_rest: &BitSlice<Msb0, u8>) {
+    fn test_cow(input: &[u8], expected: Cow<u16>, expected_rest: &BitSlice<u8, Msb0>) {
         let bit_slice = input.view_bits::<Msb0>();
         let (rest, res_read) = <Cow<u16>>::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let mut res_write = bitvec![Msb0, u8;];
+        let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();
         assert_eq!(input.to_vec(), res_write.into_vec());
     }

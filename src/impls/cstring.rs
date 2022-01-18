@@ -6,7 +6,7 @@ impl<Ctx: Copy> DekuWrite<Ctx> for CString
 where
     u8: DekuWrite<Ctx>,
 {
-    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
+    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
         let bytes = self.as_bytes_with_nul();
         bytes.write(output, ctx)
     }
@@ -17,9 +17,9 @@ where
     u8: DekuRead<'a, Ctx>,
 {
     fn read(
-        input: &'a BitSlice<Msb0, u8>,
+        input: &'a BitSlice<u8, Msb0>,
         ctx: Ctx,
-    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -49,7 +49,7 @@ mod tests {
         case(
             &[b't', b'e', b's', b't', b'\0'],
             CString::new("test").unwrap(),
-            bits![Msb0, u8;]
+            bits![u8, Msb0;]
         ),
         case(
             &[b't', b'e', b's', b't', b'\0', b'a'],
@@ -58,15 +58,15 @@ mod tests {
         ),
 
         #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case(&[b't', b'e', b's', b't'], CString::new("test").unwrap(), bits![Msb0, u8;]),
+        case(&[b't', b'e', b's', b't'], CString::new("test").unwrap(), bits![u8, Msb0;]),
     )]
-    fn test_cstring(input: &[u8], expected: CString, expected_rest: &BitSlice<Msb0, u8>) {
+    fn test_cstring(input: &[u8], expected: CString, expected_rest: &BitSlice<u8, Msb0>) {
         let bit_slice = input.view_bits::<Msb0>();
         let (rest, res_read) = CString::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let mut res_write = bitvec![Msb0, u8;];
+        let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();
         assert_eq!(vec![b't', b'e', b's', b't', b'\0'], res_write.into_vec());
     }

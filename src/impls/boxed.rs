@@ -9,9 +9,9 @@ where
 {
     /// Read a T from input and store as Box<T>
     fn read(
-        input: &'a BitSlice<Msb0, u8>,
+        input: &'a BitSlice<u8, Msb0>,
         inner_ctx: Ctx,
-    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -26,7 +26,7 @@ where
     Ctx: Copy,
 {
     /// Write T from box
-    fn write(&self, output: &mut BitVec<Msb0, u8>, inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn write(&self, output: &mut BitVec<u8, Msb0>, inner_ctx: Ctx) -> Result<(), DekuError> {
         self.as_ref().write(output, inner_ctx)
     }
 }
@@ -39,9 +39,9 @@ where
 {
     /// Read `T`s until the given limit
     fn read(
-        input: &'a BitSlice<Msb0, u8>,
+        input: &'a BitSlice<u8, Msb0>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
-    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -57,7 +57,7 @@ where
     Ctx: Copy,
 {
     /// Write all `T`s to bits
-    fn write(&self, output: &mut BitVec<Msb0, u8>, ctx: Ctx) -> Result<(), DekuError> {
+    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
         for v in self.as_ref() {
             v.write(output, ctx)?;
         }
@@ -76,28 +76,28 @@ mod tests {
         case(
             &[0xEF, 0xBE],
             Box::new(native_endian!(0xBEEF_u16)),
-            bits![Msb0, u8;]
+            bits![u8, Msb0;]
         ),
     )]
-    fn test_boxed(input: &[u8], expected: Box<u16>, expected_rest: &BitSlice<Msb0, u8>) {
+    fn test_boxed(input: &[u8], expected: Box<u16>, expected_rest: &BitSlice<u8, Msb0>) {
         let bit_slice = input.view_bits::<Msb0>();
         let (rest, res_read) = <Box<u16>>::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let mut res_write = bitvec![Msb0, u8;];
+        let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();
         assert_eq!(input.to_vec(), res_write.into_vec());
     }
 
     // Note: Copied tests from vec.rs impl
     #[rstest(input, endian, bit_size, limit, expected, expected_rest, expected_write,
-        case::normal_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), 2.into(), vec![0xBBAA, 0xDDCC].into_boxed_slice(), bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
-        case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), 2.into(), vec![0xAABB, 0xCCDD].into_boxed_slice(), bits![Msb0, u8;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
-        case::predicate_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), (|v: &u16| *v == 0xBBAA).into(), vec![0xBBAA].into_boxed_slice(), bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
-        case::predicate_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), (|v: &u16| *v == 0xAABB).into(), vec![0xAABB].into_boxed_slice(), bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
-        case::bytes_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), Size::Bits(16).into(), vec![0xBBAA].into_boxed_slice(), bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
-        case::bytes_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), Size::Bits(16).into(), vec![0xAABB].into_boxed_slice(), bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
+        case::normal_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), 2.into(), vec![0xBBAA, 0xDDCC].into_boxed_slice(), bits![u8, Msb0;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), 2.into(), vec![0xAABB, 0xCCDD].into_boxed_slice(), bits![u8, Msb0;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::predicate_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), (|v: &u16| *v == 0xBBAA).into(), vec![0xBBAA].into_boxed_slice(), bits![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
+        case::predicate_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), (|v: &u16| *v == 0xAABB).into(), vec![0xAABB].into_boxed_slice(), bits![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
+        case::bytes_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), Size::Bits(16).into(), vec![0xBBAA].into_boxed_slice(), bits![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
+        case::bytes_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), Size::Bits(16).into(), vec![0xAABB].into_boxed_slice(), bits![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
     )]
     fn test_boxed_slice<Predicate: FnMut(&u16) -> bool>(
         input: &[u8],
@@ -105,7 +105,7 @@ mod tests {
         bit_size: Option<usize>,
         limit: Limit<u16, Predicate>,
         expected: Box<[u16]>,
-        expected_rest: &BitSlice<Msb0, u8>,
+        expected_rest: &BitSlice<u8, Msb0>,
         expected_write: Vec<u8>,
     ) {
         let bit_slice = input.view_bits::<Msb0>();
@@ -118,7 +118,7 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, rest);
 
-        let mut res_write = bitvec![Msb0, u8;];
+        let mut res_write = bitvec![u8, Msb0;];
         res_read
             .write(&mut res_write, (endian, Size::Bits(bit_size)))
             .unwrap();

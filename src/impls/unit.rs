@@ -4,9 +4,9 @@ use bitvec::prelude::*;
 impl<Ctx: Copy> DekuRead<'_, Ctx> for () {
     /// NOP on read
     fn read(
-        input: &BitSlice<Msb0, u8>,
+        input: &BitSlice<u8, Msb0>,
         _inner_ctx: Ctx,
-    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError>
+    ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError>
     where
         Self: Sized,
     {
@@ -16,7 +16,7 @@ impl<Ctx: Copy> DekuRead<'_, Ctx> for () {
 
 impl<Ctx: Copy> DekuWrite<Ctx> for () {
     /// NOP on write
-    fn write(&self, _output: &mut BitVec<Msb0, u8>, _inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn write(&self, _output: &mut BitVec<u8, Msb0>, _inner_ctx: Ctx) -> Result<(), DekuError> {
         Ok(())
     }
 }
@@ -37,7 +37,7 @@ mod tests {
         assert_eq!((), res_read);
         assert_eq!(bit_slice, rest);
 
-        let mut res_write = bitvec![Msb0, u8;];
+        let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();
         assert_eq!(0, res_write.len());
     }

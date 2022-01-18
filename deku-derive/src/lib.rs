@@ -103,7 +103,7 @@ fn cerror(span: proc_macro2::Span, msg: &str) -> TokenStream {
 /// A post-processed version of `DekuReceiver`
 #[derive(Debug)]
 struct DekuData {
-    vis: syn::Visibility,
+    _vis: syn::Visibility,
     ident: syn::Ident,
     generics: syn::Generics,
     data: ast::Data<VariantData, FieldData>,
@@ -154,7 +154,7 @@ impl DekuData {
         };
 
         let data = Self {
-            vis: receiver.vis,
+            _vis: receiver.vis,
             ident: receiver.ident,
             generics: receiver.generics,
             data,

@@ -12,9 +12,9 @@ where
     /// wrapper around u8::read with consideration to context, such as bit size
     /// true if the result of the read is `1`, false if `0` and error otherwise
     fn read(
-        input: &'a BitSlice<Msb0, u8>,
+        input: &'a BitSlice<u8, Msb0>,
         inner_ctx: Ctx,
-    ) -> Result<(&'a BitSlice<Msb0, u8>, Self), DekuError> {
+    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError> {
         let (rest, val) = u8::read(input, inner_ctx)?;
 
         let ret = match val {
@@ -35,7 +35,7 @@ where
     u8: DekuWrite<Ctx>,
 {
     /// wrapper around u8::write with consideration to context, such as bit size
-    fn write(&self, output: &mut BitVec<Msb0, u8>, inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn write(&self, output: &mut BitVec<u8, Msb0>, inner_ctx: Ctx) -> Result<(), DekuError> {
         match self {
             true => (0x01u8).write(output, inner_ctx),
             false => (0x00u8).write(output, inner_ctx),
@@ -62,7 +62,7 @@ mod tests {
         assert_eq!(expected, res_read);
         assert!(rest.is_empty());
 
-        let mut res_write = bitvec![Msb0, u8;];
+        let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();
         assert_eq!(input.to_vec(), res_write.into_vec());
     }
@@ -76,7 +76,7 @@ mod tests {
         assert_eq!(true, res_read);
         assert_eq!(6, rest.len());
 
-        let mut res_write = bitvec![Msb0, u8;];
+        let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();
         assert_eq!(vec![0b01], res_write.into_vec());
     }

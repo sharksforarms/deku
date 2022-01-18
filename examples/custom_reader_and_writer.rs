@@ -5,9 +5,9 @@ use std::convert::TryInto;
 
 fn bit_flipper_read(
     field_a: u8,
-    rest: &BitSlice<Msb0, u8>,
+    rest: &BitSlice<u8, Msb0>,
     bit_size: Size,
-) -> Result<(&BitSlice<Msb0, u8>, u8), DekuError> {
+) -> Result<(&BitSlice<u8, Msb0>, u8), DekuError> {
     // Access to previously read fields
     println!("field_a = 0x{:X}", field_a);
 
@@ -29,7 +29,7 @@ fn bit_flipper_read(
 fn bit_flipper_write(
     field_a: u8,
     field_b: u8,
-    output: &mut BitVec<Msb0, u8>,
+    output: &mut BitVec<u8, Msb0>,
     bit_size: Size,
 ) -> Result<(), DekuError> {
     // Access to previously written fields

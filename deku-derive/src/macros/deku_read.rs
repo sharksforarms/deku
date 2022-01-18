@@ -77,7 +77,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 let __deku_pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
                 let __deku_read_idx = __deku_input_bits.len() - (__deku_rest.len() + __deku_pad);
 
-                Ok(((__deku_input_bits[__deku_read_idx..].as_raw_slice(), __deku_pad), __deku_value))
+                Ok(((__deku_input_bits[__deku_read_idx..].domain().region().unwrap().1, __deku_pad), __deku_value))
             },
             &input.ctx,
             &input.ctx_default,
@@ -110,7 +110,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
-            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<::#crate_::bitvec::Msb0, u8>, #ctx_arg) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<::#crate_::bitvec::Msb0, u8>, Self), ::#crate_::DekuError> {
+            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -121,7 +121,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
-                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<::#crate_::bitvec::Msb0, u8>, _: ()) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<::#crate_::bitvec::Msb0, u8>, Self), ::#crate_::DekuError> {
+                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, _: ()) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -308,7 +308,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 let __deku_pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
                 let __deku_read_idx = __deku_input_bits.len() - (__deku_rest.len() + __deku_pad);
 
-                Ok(((__deku_input_bits[__deku_read_idx..].as_raw_slice(), __deku_pad), __deku_value))
+                Ok(((__deku_input_bits[__deku_read_idx..].domain().region().unwrap().1, __deku_pad), __deku_value))
             },
             &input.ctx,
             &input.ctx_default,
@@ -340,7 +340,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     tokens.extend(quote! {
         #[allow(non_snake_case)]
         impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
-            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<::#crate_::bitvec::Msb0, u8>, #ctx_arg) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<::#crate_::bitvec::Msb0, u8>, Self), ::#crate_::DekuError> {
+            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -352,7 +352,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             #[allow(non_snake_case)]
             impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
-                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<::#crate_::bitvec::Msb0, u8>, _: ()) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<::#crate_::bitvec::Msb0, u8>, Self), ::#crate_::DekuError> {
+                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, _: ()) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -453,7 +453,7 @@ fn emit_bit_byte_offsets(
         || byte_offset.is_some()
     {
         Some(quote! {
-            let __deku_bit_offset = usize::try_from(__deku_input_bits.offset_from(__deku_rest))?;
+            let __deku_bit_offset = usize::try_from(unsafe { __deku_rest.as_bitptr().offset_from(__deku_input_bits.as_bitptr()) } )?;
         })
     } else {
         None

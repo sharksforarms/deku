@@ -64,7 +64,7 @@ fn test_top_level_ctx_enum() {
     assert!(rest.is_empty());
     assert_eq!(ret_read, TopLevelCtxEnum::VariantA(0x06));
 
-    let mut ret_write = bitvec![Msb0, u8;];
+    let mut ret_write = bitvec![u8, Msb0;];
     ret_read.write(&mut ret_write, (1, 2)).unwrap();
     assert_eq!(ret_write.into_vec(), &test_data[..]);
 }
@@ -97,7 +97,7 @@ fn test_top_level_ctx_enum_default() {
     let (rest, ret_read) = TopLevelCtxEnumDefault::read(test_data.view_bits(), (1, 2)).unwrap();
     assert!(rest.is_empty());
     assert_eq!(ret_read, TopLevelCtxEnumDefault::VariantA(0x06));
-    let mut ret_write = bitvec![Msb0, u8;];
+    let mut ret_write = bitvec![u8, Msb0;];
     ret_read.write(&mut ret_write, (1, 2)).unwrap();
     assert_eq!(test_data.to_vec(), ret_write.into_vec());
 }
@@ -165,7 +165,7 @@ fn test_ctx_default_struct() {
     let (rest, ret_read) = TopLevelCtxStructDefault::read(test_data.view_bits(), (1, 2)).unwrap();
     assert!(rest.is_empty());
     assert_eq!(expected, ret_read);
-    let mut ret_write = bitvec![Msb0, u8;];
+    let mut ret_write = bitvec![u8, Msb0;];
     ret_read.write(&mut ret_write, (1, 2)).unwrap();
     assert_eq!(test_data.to_vec(), ret_write.into_vec());
 }

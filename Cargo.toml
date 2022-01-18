@@ -27,7 +27,7 @@ const_generics = []
 
 [dependencies]
 deku_derive = { version = "^0.14.0", path = "deku-derive", default-features = false}
-bitvec = { version = "0.22.1", default-features = false }
+bitvec = { version = "1.0.0", default-features = false }
 log = { version = "0.4.17", optional = true }
 
 [dev-dependencies]

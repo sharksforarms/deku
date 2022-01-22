@@ -33,12 +33,8 @@ where
             return Err(DekuError::Unexpected("Expected nul byte".to_string()));
         }
 
-        let value = CString::new(bytes).map_err(|e| {
-            DekuError::Parse(format!(
-                "Failed to convert Vec to CString: {}",
-                e.to_string()
-            ))
-        })?;
+        let value = CString::new(bytes)
+            .map_err(|e| DekuError::Parse(format!("Failed to convert Vec to CString: {}", e)))?;
 
         Ok((rest, value))
     }

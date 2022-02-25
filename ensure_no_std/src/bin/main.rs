@@ -8,6 +8,10 @@
 extern crate alloc;
 extern crate wee_alloc;
 
+#[no_mangle]
+#[allow(non_snake_case)]
+fn _Unwind_Resume() {}
+
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
@@ -31,7 +35,7 @@ unsafe fn oom(_: ::core::alloc::Layout) -> ! {
 // Needed for non-wasm targets.
 #[lang = "eh_personality"]
 #[no_mangle]
-extern fn eh_personality() {}
+extern "C" fn eh_personality() {}
 
 use alloc::{format, vec, vec::Vec};
 use deku::prelude::*;
@@ -49,21 +53,21 @@ struct DekuTest {
 
 #[no_mangle]
 pub extern "C" fn main() -> () {
-        let test_data: Vec<u8> = vec![0b10101_101, 0x02, 0xBE, 0xEF];
+    let test_data: Vec<u8> = vec![0b10101_101, 0x02, 0xBE, 0xEF];
 
-        // Test reading
-        let (_rest, val) = DekuTest::from_bytes((&test_data, 0)).unwrap();
-        assert_eq!(
-            DekuTest {
-                field_a: 0b10101,
-                field_b: 0b101,
-                count: 0x02,
-                data: vec![0xBE, 0xEF]
-            },
-            val
-        );
+    // Test reading
+    let (_rest, val) = DekuTest::from_bytes((&test_data, 0)).unwrap();
+    assert_eq!(
+        DekuTest {
+            field_a: 0b10101,
+            field_b: 0b101,
+            count: 0x02,
+            data: vec![0xBE, 0xEF]
+        },
+        val
+    );
 
-        // Test writing
-        let val = val.to_bytes().unwrap();
-        assert_eq!(test_data, val);
+    // Test writing
+    let val = val.to_bytes().unwrap();
+    assert_eq!(test_data, val);
 }

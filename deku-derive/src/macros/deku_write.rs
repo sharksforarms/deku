@@ -472,7 +472,7 @@ fn emit_field_write(
     ident: &TokenStream,
 ) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
-    let field_endian = f.endian.as_ref().or_else(|| input.endian.as_ref());
+    let field_endian = f.endian.as_ref().or(input.endian.as_ref());
 
     // fields to check usage of bit/byte offset
     let field_check_vars = [

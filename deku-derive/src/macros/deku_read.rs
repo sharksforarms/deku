@@ -493,7 +493,7 @@ fn emit_field_read(
     let crate_ = super::get_crate_name();
     let field_type = &f.ty;
 
-    let field_endian = f.endian.as_ref().or_else(|| input.endian.as_ref());
+    let field_endian = f.endian.as_ref().or(input.endian.as_ref());
 
     let field_reader = &f.reader;
 

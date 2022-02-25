@@ -5,7 +5,7 @@ use core::convert::TryInto;
 #[cfg(feature = "alloc")]
 use alloc::format;
 
-macro_rules! ImplDekuTraits {
+macro_rules! ImplDekuRead {
     ($typ:ty) => {
         impl DekuRead<'_, (Endian, Size)> for $typ {
             fn read(
@@ -94,7 +94,31 @@ macro_rules! ImplDekuTraits {
                 Ok((rest, value))
             }
         }
+    };
+}
 
+macro_rules! ImplDekuReadSignExtend {
+    ($typ:ty, $inner:ty) => {
+        impl DekuRead<'_, (Endian, Size)> for $typ {
+            fn read(
+                input: &BitSlice<Msb0, u8>,
+                (endian, size): (Endian, Size),
+            ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
+                let (rest, value) =
+                    <$inner as DekuRead<'_, (Endian, Size)>>::read(input, (endian, size))?;
+
+                let max_type_bits = Size::of::<$typ>().bit_size();
+                let bit_size = size.bit_size();
+                let shift = max_type_bits - bit_size;
+                let value = (value as $typ) << shift >> shift;
+                Ok((rest, value))
+            }
+        }
+    };
+}
+
+macro_rules! ForwardDekuRead {
+    ($typ:ty) => {
         // Only have `endian`, set `bit_size` to `Size::of::<Type>()`
         impl DekuRead<'_, Endian> for $typ {
             fn read(
@@ -127,7 +151,11 @@ macro_rules! ImplDekuTraits {
                 <$typ>::read(input, Endian::default())
             }
         }
+    };
+}
 
+macro_rules! ImplDekuWrite {
+    ($typ:ty) => {
         impl DekuWrite<(Endian, Size)> for $typ {
             fn write(
                 &self,
@@ -188,7 +216,11 @@ macro_rules! ImplDekuTraits {
                 Ok(())
             }
         }
+    };
+}
 
+macro_rules! ForwardDekuWrite {
+    ($typ:ty) => {
         // Only have `bit_size`, set `endian` to `Endian::default`.
         impl DekuWrite<Size> for $typ {
             fn write(
@@ -208,18 +240,40 @@ macro_rules! ImplDekuTraits {
     };
 }
 
+macro_rules! ImplDekuTraits {
+    ($typ:ty) => {
+        ImplDekuRead!($typ);
+        ForwardDekuRead!($typ);
+
+        ImplDekuWrite!($typ);
+        ForwardDekuWrite!($typ);
+    };
+}
+
+macro_rules! ImplDekuTraitsSignExtend {
+    ($typ:ty, $inner:ty) => {
+        ImplDekuReadSignExtend!($typ, $inner);
+        ForwardDekuRead!($typ);
+
+        ImplDekuWrite!($typ);
+        ForwardDekuWrite!($typ);
+    };
+}
+
 ImplDekuTraits!(u8);
 ImplDekuTraits!(u16);
 ImplDekuTraits!(u32);
 ImplDekuTraits!(u64);
 ImplDekuTraits!(u128);
 ImplDekuTraits!(usize);
-ImplDekuTraits!(i8);
-ImplDekuTraits!(i16);
-ImplDekuTraits!(i32);
-ImplDekuTraits!(i64);
-ImplDekuTraits!(i128);
-ImplDekuTraits!(isize);
+
+ImplDekuTraitsSignExtend!(i8, u8);
+ImplDekuTraitsSignExtend!(i16, u16);
+ImplDekuTraitsSignExtend!(i32, u32);
+ImplDekuTraitsSignExtend!(i64, u64);
+ImplDekuTraitsSignExtend!(i128, u128);
+ImplDekuTraitsSignExtend!(isize, usize);
+
 ImplDekuTraits!(f32);
 ImplDekuTraits!(f64);
 
@@ -410,4 +464,25 @@ mod tests {
 
         assert_eq!(expected_write, res_write.into_vec());
     }
+
+    macro_rules! TestSignExtending {
+        ($test_name:ident, $typ:ty) => {
+            #[test]
+            fn $test_name() {
+                let bit_slice = [0b10101_000].view_bits::<Msb0>();
+
+                let (rest, res_read) = <$typ>::read(bit_slice, (Endian::Little, Size::Bits(5))).unwrap();
+
+                assert_eq!(-11, res_read);
+                assert_eq!(bits![Msb0, u8; 0, 0, 0], rest);
+            }
+        };
+    }
+
+    TestSignExtending!(test_sign_extend_i8, i8);
+    TestSignExtending!(test_sign_extend_i16, i16);
+    TestSignExtending!(test_sign_extend_i32, i32);
+    TestSignExtending!(test_sign_extend_i64, i64);
+    TestSignExtending!(test_sign_extend_i128, i128);
+    TestSignExtending!(test_sign_extend_isize, isize);
 }

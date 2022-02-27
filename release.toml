@@ -1,8 +1,9 @@
-disable-push=true
-disable-publish=true
-no-dev-version=true
+push=false
+publish=false
+dev-version=false
 consolidate-commits=true
 pre-release-commit-message="release: deku and deku-derive release"
-tag-prefix = "{{crate_name}}"
-tag-message = "release {{version}}"
-tag-name = "{{prefix}}-v{{version}}"
+tag=true
+tag-prefix="{{crate_name}}"
+tag-message="release {{version}}"
+tag-name="{{prefix}}-v{{version}}"

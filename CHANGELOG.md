@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2022-02-26
+
+- Fixed no_std example/tests ([@korrat](https://github.com/korrat)) ([#247](https://github.com/sharksforarms/deku/pull/247))
+
+### Breaking
+- Sign extend integers ([@korrat](https://github.com/korrat)) ([#238](https://github.com/sharksforarms/deku/pull/238))
+
 ## [0.12.5] - 2021-11-11
 - Show struct ident in assertion error message ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#239](https://github.com/sharksforarms/deku/pull/239))
 

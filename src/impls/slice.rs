@@ -183,15 +183,18 @@ mod const_generics_impl {
             #[allow(clippy::uninit_assumed_init)]
             // This is safe because we initialize the array immediately after,
             // and never return it in case of error
-            let mut slice: [T; N] = unsafe { MaybeUninit::uninit().assume_init() };
+            let mut slice: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
             let mut rest = input;
             for item in slice.iter_mut() {
                 let (new_rest, value) = T::read(rest, ctx)?;
-                *item = value;
+                item.write(value);
                 rest = new_rest;
             }
 
-            Ok((rest, slice))
+            Ok((rest, unsafe {
+                // TODO: array_assume_init: https://github.com/rust-lang/rust/issues/80908
+                (&slice as *const _ as *const [T; N]).read()
+            }))
         }
     }
 

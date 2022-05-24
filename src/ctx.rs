@@ -177,9 +177,6 @@ impl Size {
     }
 
     /// Returns the size in bytes of a Size
-    ///
-    /// # Panics
-    /// Panic if the bit size of Size::Bytes(n) is greater than `usize::MAX`
     pub fn byte_size(&self) -> Result<usize, DekuError> {
         match *self {
             Size::Bits(size) => {

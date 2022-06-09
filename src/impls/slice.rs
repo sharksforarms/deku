@@ -167,7 +167,7 @@ mod pre_const_generics_impl {
 mod const_generics_impl {
     use super::*;
 
-    use std::mem::MaybeUninit;
+    use core::mem::MaybeUninit;
 
     impl<'a, Ctx: Copy, T, const N: usize> DekuRead<'a, Ctx> for [T; N]
     where

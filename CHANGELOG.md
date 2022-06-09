@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## [0.12.6] - 2022-06-09
+- (Backport) Fixed undefined behavior in the use of `MaybeUninit` in slice implementation ([#254](https://github.com/sharksforarms/deku/pull/254))
+
 ## [0.12.5] - 2021-11-11
 - Show struct ident in assertion error message ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#239](https://github.com/sharksforarms/deku/pull/239))
 

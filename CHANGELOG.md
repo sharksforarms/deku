@@ -2,12 +2,25 @@
 
 ## [Unreleased]
 
+## [0.13.1] - 2022-06-09
+
+-  Documentation fix for `Size::byte_size` ([@korrat](https://github.com/korrat)) ([#261](https://github.com/sharksforarms/deku/pull/261))
+-  Derive `Clone` on `DekuError` ([@interruptinuse](https://github.com/interruptinuse)) ([#255](https://github.com/sharksforarms/deku/pull/255))
+
+# 🚨 NOTICE 🚨
+
+- Fixed undefined behavior in the use of `MaybeUninit` in slice implementation ([#254](https://github.com/sharksforarms/deku/pull/254))
+- Backported fix to 0.12 series as 0.12.6 and yanked affected versions (0.13.0, 0.12.5, 0.12.4)
+
 ## [0.13.0] - 2022-02-26
 
 - Fixed no_std example/tests ([@korrat](https://github.com/korrat)) ([#247](https://github.com/sharksforarms/deku/pull/247))
 
 ### Breaking
 - Sign extend integers ([@korrat](https://github.com/korrat)) ([#238](https://github.com/sharksforarms/deku/pull/238))
+
+## [0.12.6] - 2022-06-09
+- (Backport) Fixed undefined behavior in the use of `MaybeUninit` in slice implementation ([#254](https://github.com/sharksforarms/deku/pull/254))
 
 ## [0.12.5] - 2021-11-11
 - Show struct ident in assertion error message ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#239](https://github.com/sharksforarms/deku/pull/239))

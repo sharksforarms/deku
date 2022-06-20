@@ -29,7 +29,7 @@ deku_derive = { version = "^0.13.0", path = "deku-derive", default-features = fa
 bitvec = { version = "0.22.1", default-features = false }
 
 [dev-dependencies]
-rstest = "0.13.0"
+rstest = "0.14.0"
 hexlit = "0.5.3"
 criterion = "0.3.5"
 alloc_counter = "0.0.4"

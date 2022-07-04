@@ -559,6 +559,14 @@ fn emit_field_read(
         }
     });
 
+    let trace_field_log = if cfg!(feature = "log") {
+        quote! {
+            log::trace!("Reading: {}::{} from {}", #ident, #field_ident_str, __deku_rest);
+        }
+    } else {
+        quote! {}
+    };
+
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader }
     } else {
@@ -668,6 +676,7 @@ fn emit_field_read(
         #bit_offset
         #byte_offset
 
+        #trace_field_log
         let #internal_field_ident = {
             #field_read_tokens
         };

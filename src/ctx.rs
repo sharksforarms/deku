@@ -1,12 +1,8 @@
 //! Types for context representation
 //! See [ctx attribute](super::attributes#ctx) for more information.
 
-use crate::error::DekuError;
 use core::marker::PhantomData;
 use core::str::FromStr;
-
-#[cfg(feature = "alloc")]
-use alloc::format;
 
 /// An endian
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -85,8 +81,11 @@ pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
     /// Read until a given predicate holds true
     Until(Predicate, PhantomData<T>),
 
+    /// Read until a given quantity of bytes have been read
+    ByteSize(ByteSize),
+
     /// Read until a given quantity of bits have been read
-    Size(Size),
+    BitSize(BitSize),
 }
 
 impl<T> From<usize> for Limit<T, fn(&T) -> bool> {
@@ -101,9 +100,15 @@ impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> From<Predicate> for Limit<T, Pr
     }
 }
 
-impl<T> From<Size> for Limit<T, fn(&T) -> bool> {
-    fn from(size: Size) -> Self {
-        Limit::Size(size)
+impl<T> From<ByteSize> for Limit<T, fn(&T) -> bool> {
+    fn from(size: ByteSize) -> Self {
+        Limit::ByteSize(size)
+    }
+}
+
+impl<T> From<BitSize> for Limit<T, fn(&T) -> bool> {
+    fn from(size: BitSize) -> Self {
+        Limit::BitSize(size)
     }
 }
 
@@ -123,35 +128,39 @@ impl<T> Limit<T, fn(&T) -> bool> {
     }
 
     /// Constructs a new Limit that reads until the given size
-    pub fn new_size(size: Size) -> Self {
+    pub fn new_bit_size(size: BitSize) -> Self {
+        size.into()
+    }
+
+    /// Constructs a new Limit that reads until the given size
+    pub fn new_byte_size(size: ByteSize) -> Self {
         size.into()
     }
 }
 
-/// The size of a field
+/// The size of field in bytes
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub enum Size {
-    /// bit size
-    Bits(usize),
-    /// byte size
-    Bytes(usize),
-}
+pub struct ByteSize(pub usize);
 
-impl Size {
+/// The size of field in bits
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct BitSize(pub usize);
+
+impl BitSize {
     /// Convert the size in bytes to a bit size.
     ///
     /// # Panic
     /// Panic if `byte_size * 8` is greater than `usize::MAX`.
     fn bits_from_bytes(byte_size: usize) -> Self {
-        Self::Bits(byte_size.checked_mul(8).expect("bit size overflow"))
+        Self(byte_size.checked_mul(8).expect("bit size overflow"))
     }
 
     /// Returns the bit size of a type.
     /// # Examples
     /// ```rust
-    /// # use deku::ctx::Size;
+    /// # use deku::ctx::BitSize;
     ///
-    /// assert_eq!(Size::of::<i32>(), Size::Bits(4 * 8));
+    /// assert_eq!(BitSize::of::<i32>(), BitSize(4 * 8));
     /// ```
     ///
     /// # Panics
@@ -163,34 +172,5 @@ impl Size {
     /// Returns the bit size of the pointed-to value
     pub fn of_val<T: ?Sized>(val: &T) -> Self {
         Self::bits_from_bytes(core::mem::size_of_val(val))
-    }
-
-    /// Returns the size in bits of a Size
-    ///
-    /// # Panics
-    /// Panic if the bit size of Size::Bytes(n) is greater than `usize::MAX`
-    pub fn bit_size(&self) -> usize {
-        match *self {
-            Size::Bits(size) => size,
-            Size::Bytes(size) => size.checked_mul(8).expect("bit size overflow"),
-        }
-    }
-
-    /// Returns the size in bytes of a Size
-    pub fn byte_size(&self) -> Result<usize, DekuError> {
-        match *self {
-            Size::Bits(size) => {
-                if size % 8 == 0 {
-                    Ok(size / 8)
-                } else {
-                    Err(DekuError::InvalidParam(format!(
-                        "Bit size of {} is not a multiple of 8.
-                        Cannot be represented in bytes",
-                        size
-                    )))
-                }
-            }
-            Size::Bytes(size) => Ok(size),
-        }
     }
 }

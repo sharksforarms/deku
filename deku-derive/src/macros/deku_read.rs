@@ -597,27 +597,27 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
+                    #type_as_deku_read::::read(__deku_rest, (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
                 }
             }
         } else if let Some(field_bits) = &f.bits_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bits(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
+                    #type_as_deku_read::::read(__deku_rest, (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_bytes) = &f.bytes_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bytes(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
+                    #type_as_deku_read::::read(__deku_rest, (::#crate_::ctx::Limit::new_byte_size(::#crate_::ctx::ByteSize(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_until) = &f.until {
             // We wrap the input into another closure here to enforce that it is actually a callable
             // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
-            quote! {#type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_until(#field_until), (#read_args)))}
+            quote! {#type_as_deku_read::::read(__deku_rest, (::#crate_::ctx::Limit::new_until(#field_until), (#read_args)))}
         } else {
             quote! {#type_as_deku_read::read(__deku_rest, (#read_args))}
         }

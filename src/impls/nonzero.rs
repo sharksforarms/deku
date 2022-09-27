@@ -41,9 +41,9 @@ macro_rules! ImplDekuTraitsCtx {
 macro_rules! ImplDekuTraits {
     ($typ:ty, $readtype:ty) => {
         ImplDekuTraitsCtx!($typ, $readtype, (), ());
-        ImplDekuTraitsCtx!($typ, $readtype, (endian, size), (Endian, Size));
+        ImplDekuTraitsCtx!($typ, $readtype, (endian, bitsize), (Endian, BitSize));
+        ImplDekuTraitsCtx!($typ, $readtype, (endian, bytesize), (Endian, ByteSize));
         ImplDekuTraitsCtx!($typ, $readtype, endian, Endian);
-        ImplDekuTraitsCtx!($typ, $readtype, size, Size);
     };
 }
 

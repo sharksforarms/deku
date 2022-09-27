@@ -2,6 +2,14 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuBits {
+    #[deku(bits = "1")]
+    data_01: u8,
+    #[deku(bits = "7")]
+    data_02: u8,
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuByte {
     data: u8,
 }
@@ -18,6 +26,14 @@ struct DekuVec {
     count: u8,
     #[deku(count = "count")]
     data: Vec<u8>,
+}
+
+fn deku_read_bits(input: &[u8]) {
+    let (_rest, _v) = DekuBits::from_bytes((input, 0)).unwrap();
+}
+
+fn deku_write_bits(input: &DekuBits) {
+    let _v = input.to_bytes().unwrap();
 }
 
 fn deku_read_byte(input: &[u8]) {
@@ -50,6 +66,12 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     c.bench_function("deku_write_byte", |b| {
         b.iter(|| deku_write_byte(black_box(&DekuByte { data: 0x01 })))
+    });
+    c.bench_function("deku_read_bits", |b| {
+        b.iter(|| deku_read_bits(black_box([0xf1].as_ref())))
+    });
+    c.bench_function("deku_write_bits", |b| {
+        b.iter(|| deku_write_bits(black_box(&DekuBits { data_01: 0x0f, data_02: 0x01 })))
     });
 
     c.bench_function("deku_read_enum", |b| {

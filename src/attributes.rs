@@ -855,7 +855,7 @@ struct Type1 {
 // is equivalent to
 
 struct Type1 {
-    #[deku(ctx = "Endian::Big, Size::Bits(1)")]
+    #[deku(ctx = "Endian::Big, BitSize(1)")]
     field: u8,
 }
 ```
@@ -874,7 +874,7 @@ struct Type1 {
 struct Type1 {
     #[deku(ctx = "Endian::Big")]
     field_a: u16,
-    #[deku(ctx = "Endian::Big, Size::Bits(5), *field_a")] // endian is prepended
+    #[deku(ctx = "Endian::Big, BitSize(5), *field_a")] // endian is prepended
     field_b: SubType,
 }
 ```

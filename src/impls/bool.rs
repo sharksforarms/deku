@@ -72,7 +72,7 @@ mod tests {
         let input = &[0b01_000000];
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (rest, res_read) = bool::read(bit_slice, crate::ctx::Size::Bits(2)).unwrap();
+        let (rest, res_read) = bool::read(bit_slice, crate::ctx::BitSize(2)).unwrap();
         assert_eq!(true, res_read);
         assert_eq!(6, rest.len());
 

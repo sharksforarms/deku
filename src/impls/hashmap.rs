@@ -92,8 +92,16 @@ impl<
             }
 
             // Read until a given quantity of bits have been read
-            Limit::Size(size) => {
-                let bit_size = size.bit_size();
+            Limit::BitSize(size) => {
+                let bit_size = size.0;
+                read_hashmap_with_predicate(input, None, inner_ctx, move |read_bits, _| {
+                    read_bits == bit_size
+                })
+            }
+
+            // Read until a given quantity of bits have been read
+            Limit::ByteSize(size) => {
+                let bit_size = size.0 * 8;
                 read_hashmap_with_predicate(input, None, inner_ctx, move |read_bits, _| {
                     read_bits == bit_size
                 })
@@ -176,7 +184,7 @@ mod tests {
         case::count_1([0x01, 0xAA, 0x02, 0xBB].as_ref(), Endian::Little, Some(8), 1.into(), fxhashmap!{0x01 => 0xAA}, bits![Msb0, u8; 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1]),
         case::count_2([0x01, 0xAA, 0x02, 0xBB, 0xBB].as_ref(), Endian::Little, Some(8), 2.into(), fxhashmap!{0x01 => 0xAA, 0x02 => 0xBB}, bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
         case::until_null([0x01, 0xAA, 0, 0, 0xBB].as_ref(), Endian::Little, None, (|kv: &(u8, u8)| kv.0 == 0u8 && kv.1 == 0u8).into(), fxhashmap!{0x01 => 0xAA, 0 => 0}, bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
-        case::until_bits([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, Size::Bits(16).into(), fxhashmap!{0x01 => 0xAA}, bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
+        case::until_bits([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(16).into(), fxhashmap!{0x01 => 0xAA}, bits![Msb0, u8; 1, 0, 1, 1, 1, 0, 1, 1]),
         case::bits_6([0b0000_0100, 0b1111_0000, 0b1000_0000].as_ref(), Endian::Little, Some(6), 2.into(), fxhashmap!{0x01 => 0x0F, 0x02 => 0}, bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
         case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1.into(), FxHashMap::default(), bits![Msb0, u8;]),
@@ -187,7 +195,7 @@ mod tests {
         #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
         case::not_enough_data_until([0xAA].as_ref(), Endian::Little, Some(8), (|_: &(u8, u8)| false).into(), FxHashMap::default(), bits![Msb0, u8;]),
         #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case::not_enough_data_bits([0xAA].as_ref(), Endian::Little, Some(8), (Size::Bits(16)).into(), FxHashMap::default(), bits![Msb0, u8;]),
+        case::not_enough_data_bits([0xAA].as_ref(), Endian::Little, Some(8), (BitSize(16)).into(), FxHashMap::default(), bits![Msb0, u8;]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
         case::too_much_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(9), 1.into(), FxHashMap::default(), bits![Msb0, u8;]),
     )]
@@ -203,8 +211,7 @@ mod tests {
 
         let (rest, res_read) = match bit_size {
             Some(bit_size) => {
-                FxHashMap::<u8, u8>::read(bit_slice, (limit, (endian, Size::Bits(bit_size))))
-                    .unwrap()
+                FxHashMap::<u8, u8>::read(bit_slice, (limit, (endian, BitSize(bit_size)))).unwrap()
             }
             None => FxHashMap::<u8, u8>::read(bit_slice, (limit, (endian))).unwrap(),
         };
@@ -228,8 +235,8 @@ mod tests {
         case::normal_be([0xAA, 0xBB, 0, 0xCC, 0xDD, 0].as_ref(), Endian::Big, 2.into(), fxhashmap!{0xAABB => 0, 0xCCDD => 0}, bits![Msb0, u8;], vec![0xCC, 0xDD, 0, 0xAA, 0xBB, 0]),
         case::predicate_le([0xAA, 0xBB, 0, 0xCC, 0xDD, 0].as_ref(), Endian::Little, (|kv: &(u16, u8)| kv.0 == 0xBBAA && kv.1 == 0).into(), fxhashmap!{0xBBAA => 0}, bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0], vec![0xAA, 0xBB, 0]),
         case::predicate_be([0xAA, 0xBB, 0, 0xCC, 0xDD, 0].as_ref(), Endian::Big, (|kv: &(u16, u8)| kv.0 == 0xAABB && kv.1 == 0).into(), fxhashmap!{0xAABB => 0}, bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0], vec![0xAA, 0xBB, 0]),
-        case::bytes_le([0xAA, 0xBB, 0, 0xCC, 0xDD, 0].as_ref(), Endian::Little, Size::Bits(24).into(), fxhashmap!{0xBBAA => 0}, bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0], vec![0xAA, 0xBB, 0]),
-        case::bytes_be([0xAA, 0xBB, 0, 0xCC, 0xDD, 0].as_ref(), Endian::Big, Size::Bits(24).into(), fxhashmap!{0xAABB => 0}, bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0], vec![0xAA, 0xBB, 0]),
+        case::bytes_le([0xAA, 0xBB, 0, 0xCC, 0xDD, 0].as_ref(), Endian::Little, BitSize(24).into(), fxhashmap!{0xBBAA => 0}, bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0], vec![0xAA, 0xBB, 0]),
+        case::bytes_be([0xAA, 0xBB, 0, 0xCC, 0xDD, 0].as_ref(), Endian::Big, BitSize(24).into(), fxhashmap!{0xAABB => 0}, bits![Msb0, u8; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0], vec![0xAA, 0xBB, 0]),
     )]
     fn test_hashmap_read_write<Predicate: FnMut(&(u16, u8)) -> bool>(
         input: &[u8],

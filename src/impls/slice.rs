@@ -79,8 +79,16 @@ where
             }
 
             // Read until a given quantity of bits have been read
-            Limit::Size(size) => {
-                let bit_size = size.bit_size();
+            Limit::BitSize(size) => {
+                let bit_size = size.0;
+                read_slice_with_predicate(input, inner_ctx, move |read_bits, _| {
+                    read_bits == bit_size
+                })
+            }
+
+            // Read until a given quantity of bytes have been read
+            Limit::ByteSize(size) => {
+                let bit_size = size.0 * 8;
                 read_slice_with_predicate(input, inner_ctx, move |read_bits, _| {
                     read_bits == bit_size
                 })

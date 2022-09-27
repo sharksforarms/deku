@@ -595,14 +595,14 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    ::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bits(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
+                    ::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_bytes) = &f.bytes_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    ::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bytes(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
+                    ::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_byte_size(::#crate_::ctx::ByteSize(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_until) = &f.until {

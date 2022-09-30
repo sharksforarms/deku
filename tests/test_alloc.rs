@@ -21,6 +21,13 @@ enum NestedEnum {
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(type = "u32", bytes = "2", ctx = "_endian: Endian")]
+enum NestedEnum2 {
+    #[deku(id = "0x01")]
+    VarA(u8),
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
 struct TestDeku {
     field_a: u8,
@@ -34,6 +41,7 @@ struct TestDeku {
     field_g: u8, // 1 alloc (bits read)
     #[deku(bits = "5")]
     field_h: u8, // 1 alloc (bits read)
+    field_i: NestedEnum2,
 }
 
 mod tests {
@@ -45,7 +53,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_simple() {
-        let input = hex!("aabbbbcc0102ddffffffaa");
+        let input = hex!("aa_bbbb_cc_0102_dd_ffffff_aa_0100ff");
 
         assert_eq!(
             count_alloc(|| {

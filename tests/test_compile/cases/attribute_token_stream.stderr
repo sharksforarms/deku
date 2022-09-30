@@ -1,13 +1,23 @@
 error[E0308]: mismatched types
- --> $DIR/attribute_token_stream.rs:5:19
+ --> tests/test_compile/cases/attribute_token_stream.rs:5:19
   |
 5 |     #[deku(cond = "0 == true")]
   |                   ^^^^^^^^^^^ expected integer, found `bool`
 
 error[E0277]: can't compare `{integer}` with `bool`
- --> $DIR/attribute_token_stream.rs:5:19
+ --> tests/test_compile/cases/attribute_token_stream.rs:5:19
   |
 5 |     #[deku(cond = "0 == true")]
   |                   ^^^^^^^^^^^ no implementation for `{integer} == bool`
   |
   = help: the trait `PartialEq<bool>` is not implemented for `{integer}`
+  = help: the following other types implement trait `PartialEq<Rhs>`:
+            f32
+            f64
+            i128
+            i16
+            i32
+            i64
+            i8
+            isize
+          and 6 others

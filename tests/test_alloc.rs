@@ -52,7 +52,7 @@ mod tests {
                 let _ = TestDeku::try_from(input.as_ref()).unwrap();
             })
             .0,
-            (4, 3, 3) // TODO: why did this change..?
+            (3, 0, 3)
         );
     }
 }

@@ -318,9 +318,9 @@ macro_rules! ForwardDekuRead {
 
                 // Since we don't have a #[bits] or [bytes], check if we can use bytes for perf
                 if (bit_size.0 % 8) == 0 {
-                    <$typ>::read(input, (endian, bit_size))
-                } else {
                     <$typ>::read(input, (endian, ByteSize(bit_size.0 / 8)))
+                } else {
+                    <$typ>::read(input, (endian, bit_size))
                 }
             }
         }

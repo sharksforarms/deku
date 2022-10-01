@@ -232,7 +232,6 @@ macro_rules! ImplDekuRead {
 
                 let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
 
-                // TODO: mention that this is slow? a conditional should be fast...
                 let value = if pad == 0
                     && bit_slice.len() == max_type_bits
                     && bit_slice.as_raw_slice().len() * 8 == max_type_bits

@@ -5,94 +5,7 @@ use core::convert::TryInto;
 #[cfg(feature = "alloc")]
 use alloc::format;
 
-// TODO: duplicate code, separate macros for bits vs bytes? we only want to specialize reading a byte u8...
-impl DekuRead<'_, (Endian, BitSize)> for u8 {
-    fn read(
-        input: &BitSlice<Msb0, u8>,
-        (endian, size): (Endian, BitSize),
-    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-        let max_type_bits: usize = BitSize::of::<u8>().0;
-        let bit_size: usize = size.0;
-
-        let input_is_le = endian.is_le();
-
-        if bit_size > max_type_bits {
-            return Err(DekuError::Parse(format!(
-                "too much data: container of {} bits cannot hold {} bits",
-                max_type_bits, bit_size
-            )));
-        }
-
-        if input.len() < bit_size {
-            return Err(DekuError::Incomplete(crate::error::NeedSize::new(bit_size)));
-        }
-
-        let (bit_slice, rest) = input.split_at(bit_size);
-
-        let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
-
-        let value = if pad == 0
-            && bit_slice.len() == max_type_bits
-            && bit_slice.as_raw_slice().len() * 8 == max_type_bits
-        {
-            // if everything is aligned, just read the value
-            let bytes: &[u8] = bit_slice.as_raw_slice();
-
-            // Read value
-            if input_is_le {
-                <u8>::from_le_bytes(bytes.try_into()?)
-            } else {
-                <u8>::from_be_bytes(bytes.try_into()?)
-            }
-        } else {
-            // Create a new BitVec from the slice and pad un-aligned chunks
-            // i.e. [10010110, 1110] -> [10010110, 00001110]
-            let bits: BitVec<Msb0, u8> = {
-                let mut bits = BitVec::with_capacity(bit_slice.len() + pad);
-
-                // Copy bits to new BitVec
-                bits.extend_from_bitslice(bit_slice);
-
-                // Force align
-                //i.e. [1110, 10010110] -> [11101001, 0110]
-                bits.force_align();
-
-                // Some padding to next byte
-                let index = if input_is_le {
-                    bits.len() - (8 - pad)
-                } else {
-                    0
-                };
-                for _ in 0..pad {
-                    bits.insert(index, false);
-                }
-
-                // Pad up-to size of type
-                for _ in 0..(max_type_bits - bits.len()) {
-                    if input_is_le {
-                        bits.push(false);
-                    } else {
-                        bits.insert(0, false);
-                    }
-                }
-
-                bits
-            };
-
-            let bytes: &[u8] = bits.as_raw_slice();
-
-            // Read value
-            if input_is_le {
-                <u8>::from_le_bytes(bytes.try_into()?)
-            } else {
-                <u8>::from_be_bytes(bytes.try_into()?)
-            }
-        };
-        Ok((rest, value))
-    }
-}
-
-// specialize u8
+// specialize u8 for ByteSize
 impl DekuRead<'_, (Endian, ByteSize)> for u8 {
     fn read(
         input: &BitSlice<Msb0, u8>,
@@ -119,7 +32,7 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
     }
 }
 
-macro_rules! ImplDekuRead {
+macro_rules! ImplDekuReadBits {
     ($typ:ty, $inner:ty) => {
         impl DekuRead<'_, (Endian, BitSize)> for $typ {
             fn read(
@@ -206,7 +119,11 @@ macro_rules! ImplDekuRead {
                 Ok((rest, value))
             }
         }
+    };
+}
 
+macro_rules! ImplDekuReadBytes {
+    ($typ:ty, $inner:ty) => {
         impl DekuRead<'_, (Endian, ByteSize)> for $typ {
             fn read(
                 input: &BitSlice<Msb0, u8>,
@@ -505,17 +422,25 @@ macro_rules! ForwardDekuWrite {
         }
     };
 }
+macro_rules! ImplDekuTraitsBytes {
+    ($typ:ty) => {
+        ImplDekuReadBytes!($typ, $typ);
+    };
+    ($typ:ty, $inner:ty) => {
+        ImplDekuReadBytes!($typ, $inner);
+    };
+}
 
 macro_rules! ImplDekuTraits {
     ($typ:ty) => {
-        ImplDekuRead!($typ, $typ);
+        ImplDekuReadBits!($typ, $typ);
         ForwardDekuRead!($typ);
 
         ImplDekuWrite!($typ);
         ForwardDekuWrite!($typ);
     };
     ($typ:ty, $inner:ty) => {
-        ImplDekuRead!($typ, $inner);
+        ImplDekuReadBits!($typ, $inner);
         ForwardDekuRead!($typ);
 
         ImplDekuWrite!($typ);
@@ -533,17 +458,17 @@ macro_rules! ImplDekuTraitsSignExtend {
     };
 }
 
-// ImplDekuTraits!(u8);
-// TODO: separate macros for bits vs bytes? we only want to specialize reading a byte u8...
-ForwardDekuRead!(u8);
-ImplDekuWrite!(u8);
-ForwardDekuWrite!(u8);
-
+ImplDekuTraits!(u8);
 ImplDekuTraits!(u16);
+ImplDekuTraitsBytes!(u16);
 ImplDekuTraits!(u32);
+ImplDekuTraitsBytes!(u32);
 ImplDekuTraits!(u64);
+ImplDekuTraitsBytes!(u64);
 ImplDekuTraits!(u128);
+ImplDekuTraitsBytes!(u128);
 ImplDekuTraits!(usize);
+ImplDekuTraitsBytes!(usize);
 
 ImplDekuTraitsSignExtend!(i8, u8);
 ImplDekuTraitsSignExtend!(i16, u16);
@@ -553,7 +478,9 @@ ImplDekuTraitsSignExtend!(i128, u128);
 ImplDekuTraitsSignExtend!(isize, usize);
 
 ImplDekuTraits!(f32, u32);
+ImplDekuTraitsBytes!(f32, u32);
 ImplDekuTraits!(f64, u64);
+ImplDekuTraitsBytes!(f64, u64);
 
 #[cfg(test)]
 mod tests {

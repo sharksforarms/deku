@@ -5,7 +5,7 @@
 use alloc::{format, string::String};
 
 /// Number of bits needed to retry parsing
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NeedSize {
     bits: usize,
 }
@@ -28,7 +28,7 @@ impl NeedSize {
 }
 
 /// Deku errors
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum DekuError {
     /// Parsing error when reading

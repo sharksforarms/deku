@@ -344,7 +344,12 @@ macro_rules! ForwardDekuRead {
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
                 let endian = Endian::default();
 
-                <$typ>::read(input, (endian, bit_size))
+                // check if we can use ByteSize for performance
+                if (bit_size.0 % 8) == 0 {
+                    <$typ>::read(input, (endian, ByteSize(bit_size.0 / 8)))
+                } else {
+                    <$typ>::read(input, (endian, bit_size))
+                }
             }
         }
 

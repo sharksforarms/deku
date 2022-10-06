@@ -31,7 +31,7 @@ bitvec = { version = "0.22.1", default-features = false }
 log = { version = "0.4.17", optional = true }
 
 [dev-dependencies]
-rstest = "0.13.0"
+rstest = "0.15.0"
 hexlit = "0.5.3"
 criterion = "0.3.5"
 alloc_counter = "0.0.4"

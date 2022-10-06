@@ -22,12 +22,13 @@ members = [
 default = ["std", "const_generics"]
 std = ["deku_derive/std", "bitvec/std", "alloc"]
 alloc = ["bitvec/alloc"]
-logging = ["deku_derive/log"]
+logging = ["deku_derive/logging", "log"]
 const_generics = []
 
 [dependencies]
 deku_derive = { version = "^0.13.0", path = "deku-derive", default-features = false}
 bitvec = { version = "0.22.1", default-features = false }
+log = { version = "0.4.17", optional = true }
 
 [dev-dependencies]
 rstest = "0.13.0"
@@ -36,6 +37,7 @@ criterion = "0.3.5"
 alloc_counter = "0.0.4"
 trybuild = "1.0.54"
 rustc-hash = "1.1.0"
+env_logger = "0.9.1"
 
 [[bench]]
 name = "deku"

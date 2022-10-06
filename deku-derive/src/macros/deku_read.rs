@@ -584,33 +584,42 @@ fn emit_field_read(
         //   #[deku(count = "a") <-- Oops, use of moved value: `a`
         //   b: Vec<_>
         // }
+
+        let type_as_deku_read = if f.map.is_some() {
+            // with map, field_type cannot be used as the
+            // resulting type is within the function.
+            quote!(::#crate_::DekuRead)
+        } else {
+            // use type directly
+            quote!(<#field_type as ::#crate_::DekuRead<'_, _>>)
+        };
         if let Some(field_count) = &f.count {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    ::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
+                    #type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
                 }
             }
         } else if let Some(field_bits) = &f.bits_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    ::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bits(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
+                    #type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bits(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_bytes) = &f.bytes_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    ::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bytes(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
+                    #type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_size(::#crate_::ctx::Size::Bytes(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_until) = &f.until {
             // We wrap the input into another closure here to enforce that it is actually a callable
             // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
-            quote! {::#crate_::DekuRead::read(__deku_rest, (::#crate_::ctx::Limit::new_until(#field_until), (#read_args)))}
+            quote! {#type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_until(#field_until), (#read_args)))}
         } else {
-            quote! {::#crate_::DekuRead::read(__deku_rest, (#read_args))}
+            quote! {#type_as_deku_read::read(__deku_rest, (#read_args))}
         }
     };
 

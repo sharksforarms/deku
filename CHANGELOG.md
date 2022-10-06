@@ -4,8 +4,10 @@
 
 ## [0.14.0] - 2022-10-06
 
+This release introduces a performance specialization/optimization in the read path for bytes
+
 ### Breaking
-- `Size` enum removed in favor of `BitSize` and `ByteSize`, this is to allow a performance optimization in the bytes case
+- `Size` enum removed in favor of `BitSize` and `ByteSize`, this change is to allow a performance optimization in the byte reading
 - Byte specialization ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#278](https://github.com/sharksforarms/deku/pull/278))
 
 ### Added

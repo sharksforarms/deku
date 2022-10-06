@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.14.0] - 2022-10-06
+
+### Breaking
+- `Size` enum removed in favor of `BitSize` and `ByteSize`, this is to allow a performance optimization in the bytes case
+- Byte specialization ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#278](https://github.com/sharksforarms/deku/pull/278))
+
+### Added
+- Add logging feature ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#271](https://github.com/sharksforarms/deku/pull/271))
+
 ## [0.13.1] - 2022-06-09
 
 -  Documentation fix for `Size::byte_size` ([@korrat](https://github.com/korrat)) ([#261](https://github.com/sharksforarms/deku/pull/261))
@@ -191,9 +200,17 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.12.5...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.14.0...HEAD
 
-[0.12.4]: https://github.com/sharksforarms/deku/compare/deku-v0.12.4...deku-v0.12.5
+[0.14.0]: https://github.com/sharksforarms/deku/compare/deku-v0.13.1...deku-v0.14.0
+
+[0.13.1]: https://github.com/sharksforarms/deku/compare/deku-v0.13.0...deku-v0.13.1
+
+[0.13.0]: https://github.com/sharksforarms/deku/compare/deku-v0.12.6...deku-v0.13.0
+
+[0.12.6]: https://github.com/sharksforarms/deku/compare/deku-v0.12.5...deku-v0.12.6
+
+[0.12.5]: https://github.com/sharksforarms/deku/compare/deku-v0.12.4...deku-v0.12.5
 
 [0.12.4]: https://github.com/sharksforarms/deku/compare/deku-v0.12.3...deku-v0.12.4
 

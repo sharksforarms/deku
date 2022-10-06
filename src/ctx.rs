@@ -72,8 +72,11 @@ impl FromStr for Endian {
     }
 }
 
+#[allow(clippy::derive_partial_eq_without_eq)]
+// derive_partial_eq_without_eq false positive in struct using traits
+// For details: https://github.com/rust-lang/rust-clippy/issues/9413
 /// A limit placed on a container's elements
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
     /// Read a specific count of elements
     Count(usize),

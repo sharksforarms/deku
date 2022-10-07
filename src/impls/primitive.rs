@@ -11,13 +11,13 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
         input: &BitSlice<Msb0, u8>,
         (_, size): (Endian, ByteSize),
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-        let max_type_bits: usize = BitSize::of::<u8>().0;
+        const MAX_TYPE_BITS: usize = BitSize::of::<u8>().0;
         let bit_size: usize = size.0 * 8;
 
-        if bit_size > max_type_bits {
+        if bit_size > MAX_TYPE_BITS {
             return Err(DekuError::Parse(format!(
                 "too much data: container of {} bits cannot hold {} bits",
-                max_type_bits, bit_size
+                MAX_TYPE_BITS, bit_size
             )));
         }
 
@@ -39,15 +39,15 @@ macro_rules! ImplDekuReadBits {
                 input: &BitSlice<Msb0, u8>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-                let max_type_bits: usize = BitSize::of::<$typ>().0;
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 let bit_size: usize = size.0;
 
                 let input_is_le = endian.is_le();
 
-                if bit_size > max_type_bits {
+                if bit_size > MAX_TYPE_BITS {
                     return Err(DekuError::Parse(format!(
                         "too much data: container of {} bits cannot hold {} bits",
-                        max_type_bits, bit_size
+                        MAX_TYPE_BITS, bit_size
                     )));
                 }
 
@@ -60,8 +60,8 @@ macro_rules! ImplDekuReadBits {
                 let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
 
                 let value = if pad == 0
-                    && bit_slice.len() == max_type_bits
-                    && bit_slice.as_raw_slice().len() * 8 == max_type_bits
+                    && bit_slice.len() == MAX_TYPE_BITS
+                    && bit_slice.as_raw_slice().len() * 8 == MAX_TYPE_BITS
                 {
                     // if everything is aligned, just read the value
                     let bytes: &[u8] = bit_slice.as_raw_slice();
@@ -96,7 +96,7 @@ macro_rules! ImplDekuReadBits {
                         }
 
                         // Pad up-to size of type
-                        for _ in 0..(max_type_bits - bits.len()) {
+                        for _ in 0..(MAX_TYPE_BITS - bits.len()) {
                             if input_is_le {
                                 bits.push(false);
                             } else {
@@ -129,15 +129,15 @@ macro_rules! ImplDekuReadBytes {
                 input: &BitSlice<Msb0, u8>,
                 (endian, size): (Endian, ByteSize),
             ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-                let max_type_bits: usize = BitSize::of::<$typ>().0;
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 let bit_size: usize = size.0 * 8;
 
                 let input_is_le = endian.is_le();
 
-                if bit_size > max_type_bits {
+                if bit_size > MAX_TYPE_BITS {
                     return Err(DekuError::Parse(format!(
                         "too much data: container of {} bits cannot hold {} bits",
-                        max_type_bits, bit_size
+                        MAX_TYPE_BITS, bit_size
                     )));
                 }
 
@@ -150,8 +150,8 @@ macro_rules! ImplDekuReadBytes {
                 let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
 
                 let value = if pad == 0
-                    && bit_slice.len() == max_type_bits
-                    && bit_slice.as_raw_slice().len() * 8 == max_type_bits
+                    && bit_slice.len() == MAX_TYPE_BITS
+                    && bit_slice.as_raw_slice().len() * 8 == MAX_TYPE_BITS
                 {
                     // if everything is aligned, just read the value
                     let bytes: &[u8] = bit_slice.as_raw_slice();
@@ -199,9 +199,9 @@ macro_rules! ImplDekuReadSignExtend {
                 let (rest, value) =
                     <$inner as DekuRead<'_, (Endian, ByteSize)>>::read(input, (endian, size))?;
 
-                let max_type_bits = BitSize::of::<$typ>().0;
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 let bit_size = size.0 * 8;
-                let shift = max_type_bits - bit_size;
+                let shift = MAX_TYPE_BITS - bit_size;
                 let value = (value as $typ) << shift >> shift;
                 Ok((rest, value))
             }
@@ -214,9 +214,9 @@ macro_rules! ImplDekuReadSignExtend {
                 let (rest, value) =
                     <$inner as DekuRead<'_, (Endian, BitSize)>>::read(input, (endian, size))?;
 
-                let max_type_bits = BitSize::of::<$typ>().0;
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 let bit_size = size.0;
-                let shift = max_type_bits - bit_size;
+                let shift = MAX_TYPE_BITS - bit_size;
                 let value = (value as $typ) << shift >> shift;
                 Ok((rest, value))
             }

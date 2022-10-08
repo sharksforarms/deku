@@ -168,17 +168,19 @@ macro_rules! ImplDekuReadBytes {
                     // cannot use from_X_bytes as we don't have enough bytes for $typ
                     // read manually
                     let mut res: $inner = 0;
-                    for b in bytes.iter().rev() {
-                        res <<= 8 as $inner;
-                        res |= *b as $inner;
-                    }
-
                     if input_is_le {
-                        res as $typ
+                        for b in bytes.iter().rev() {
+                            res <<= 8 as $inner;
+                            res |= *b as $inner;
+                        }
                     } else {
-                        res = res.swap_bytes();
-                        res as $typ
-                    }
+                        for b in bytes.iter() {
+                            res <<= 8 as $inner;
+                            res |= *b as $inner;
+                        }
+                    };
+
+                    res as $typ
                 };
 
                 Ok((rest, value))

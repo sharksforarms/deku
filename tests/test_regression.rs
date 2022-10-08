@@ -67,27 +67,56 @@ fn issue_224() {
 // Extra zeroes added when reading fewer bytes than needed to fill a number
 //
 // https://github.com/sharksforarms/deku/issues/282
-#[test]
-fn issue_282() {
-    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-    #[deku(endian = "big")]
-    struct BitsBytes {
-        #[deku(bits = 24)]
-        bits: u32,
+mod issue_282 {
+    use super::*;
 
-        #[deku(bytes = 3)]
-        bytes: u32,
+    #[test]
+    fn be() {
+        #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+        #[deku(endian = "big")]
+        struct BitsBytes {
+            #[deku(bits = 24)]
+            bits: u32,
+
+            #[deku(bytes = 3)]
+            bytes: u32,
+        }
+
+        let expected: u32 = 11280317;
+        let [zero, a, b, c] = expected.to_be_bytes();
+
+        // the u32 is stored as three bytes in big-endian order
+        assert_eq!(zero, 0);
+
+        let data = &[a, b, c, a, b, c];
+        let (_, BitsBytes { bits, bytes }) = BitsBytes::from_bytes((data, 0)).unwrap();
+
+        assert_eq!(bits, expected);
+        assert_eq!(bytes, expected);
     }
 
-    let expected: u32 = 11280317;
-    let [zero, a, b, c] = expected.to_be_bytes();
+    #[test]
+    fn le() {
+        #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+        #[deku(endian = "little")]
+        struct BitsBytes {
+            #[deku(bits = 24)]
+            bits: u32,
 
-    // the u32 is stored as three bytes in big-endian order
-    assert_eq!(zero, 0);
+            #[deku(bytes = 3)]
+            bytes: u32,
+        }
 
-    let data = &[a, b, c, a, b, c];
-    let (_, BitsBytes { bits, bytes }) = BitsBytes::from_bytes((data, 0)).unwrap();
+        let expected: u32 = 11280317;
+        let [a, b, c, zero] = expected.to_le_bytes();
 
-    assert_eq!(bits, expected);
-    assert_eq!(bytes, expected);
+        // the u32 is stored as three bytes in little-endian order
+        assert_eq!(zero, 0);
+
+        let data = &[a, b, c, a, b, c];
+        let (_, BitsBytes { bits, bytes }) = BitsBytes::from_bytes((data, 0)).unwrap();
+
+        assert_eq!(bits, expected);
+        assert_eq!(bytes, expected);
+    }
 }

@@ -63,3 +63,31 @@ fn issue_224() {
     let bytes = packet.to_bytes().unwrap();
     let _packet = Packet::from_bytes((&bytes, 0)).unwrap();
 }
+
+// Extra zeroes added when reading fewer bytes than needed to fill a number
+//
+// https://github.com/sharksforarms/deku/issues/282
+#[test]
+fn issue_282() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(endian = "big")]
+    struct BitsBytes {
+        #[deku(bits = 24)]
+        bits: u32,
+
+        #[deku(bytes = 3)]
+        bytes: u32,
+    }
+
+    let expected: u32 = 11280317;
+    let [zero, a, b, c] = expected.to_be_bytes();
+
+    // the u32 is stored as three bytes in big-endian order
+    assert_eq!(zero, 0);
+
+    let data = &[a, b, c, a, b, c];
+    let (_, BitsBytes { bits, bytes }) = BitsBytes::from_bytes((data, 0)).unwrap();
+
+    assert_eq!(bits, expected);
+    assert_eq!(bytes, expected);
+}

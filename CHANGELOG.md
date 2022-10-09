@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.14.1] - 2022-10-09
+
+### Bug fix
+
+- Fix issue where endianness trickery wouldn't swap bytes correctly when reading less than the full amount into an integer ([@caass](https://github.com/caass)) ([#283](https://github.com/sharksforarms/deku/pull/283))
+
+### Changed
+
+- Constify primitive bit size of types ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#279](https://github.com/sharksforarms/deku/pull/279))
+
 ## [0.14.0] - 2022-10-06
 
 This release introduces a performance specialization/optimization in the read path for bytes
@@ -202,7 +212,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.14.0...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.14.1...HEAD
+
+[0.14.1]: https://github.com/sharksforarms/deku/compare/deku-v0.14.0...deku-v0.14.1
 
 [0.14.0]: https://github.com/sharksforarms/deku/compare/deku-v0.13.1...deku-v0.14.0
 

@@ -732,7 +732,7 @@ pub fn emit_try_from(
             type Error = ::#crate_::DekuError;
 
             fn try_from(input: &#lifetime [u8]) -> Result<Self, Self::Error> {
-                let (rest, res) = Self::from_bytes((input, 0))?;
+                let (rest, res) = <Self as ::#crate_::DekuContainerRead>::from_bytes((input, 0))?;
                 if !rest.0.is_empty() {
                     return Err(::#crate_::DekuError::Parse(format!("Too much data")));
                 }

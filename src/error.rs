@@ -87,3 +87,18 @@ impl std::error::Error for DekuError {
         Some(self)
     }
 }
+
+#[cfg(feature = "std")]
+impl From<DekuError> for std::io::Error {
+    fn from(error: DekuError) -> Self {
+        use std::io;
+        match error {
+            DekuError::Incomplete(_) => io::Error::new(io::ErrorKind::UnexpectedEof, error),
+            DekuError::Parse(_) => io::Error::new(io::ErrorKind::InvalidData, error),
+            DekuError::InvalidParam(_) => io::Error::new(io::ErrorKind::InvalidInput, error),
+            DekuError::Unexpected(_) => io::Error::new(io::ErrorKind::Other, error),
+            DekuError::Assertion(_) => io::Error::new(io::ErrorKind::InvalidData, error),
+            DekuError::IdVariantNotFound => io::Error::new(io::ErrorKind::NotFound, error),
+        }
+    }
+}

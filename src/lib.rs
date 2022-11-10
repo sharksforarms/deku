@@ -13,7 +13,7 @@ TLVs or network protocols.
 Under the hood, it makes use of the [bitvec](https://crates.io/crates/bitvec)
 crate as the "Reader" and “Writer”
 
-For documentation and examples on available `#deku[()]` attributes and features,
+For documentation and examples on available `#[deku]` attributes and features,
 see [attributes list](attributes)
 
 For more examples, see the

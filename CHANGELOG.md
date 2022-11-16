@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2022-11-16
+
+### Breaking/Performance
+
+- Upgrade to bitvec 1.0.0 may cause some breaking changes in some code bases.
+- Performance note: Upgrade to bitvec 1.0.0 has shown negative performance impacts.
+
+### Changes
+
+- Upgrade to bitvec 1.0.0 ([@JuanPotato](https://github.com/JuanPotato) & [@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#281](https://github.com/sharksforarms/deku/pull/281))
+- impl From<DekuError> for std::io::Error ([@caass](https://github.com/caass)) ([#285](https://github.com/sharksforarms/deku/pull/285))
+- Fix typo in docs ([@vidhanio](https://github.com/vidhanio)) ([#291](https://github.com/sharksforarms/deku/pull/291))
+
+### Bug fix
+
+- Fix regression with unaligned u8 ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#294](https://github.com/sharksforarms/deku/pull/294))
+
 ## [0.14.1] - 2022-10-09
 
 ### Bug fix
@@ -213,6 +230,8 @@ Community:
 - Added `CHANGELOG.md` to track changes
 
 [Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.14.1...HEAD
+
+[0.15.0]: https://github.com/sharksforarms/deku/compare/deku-v0.14.1...deku-v0.15.0
 
 [0.14.1]: https://github.com/sharksforarms/deku/compare/deku-v0.14.0...deku-v0.14.1
 

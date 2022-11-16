@@ -5,6 +5,34 @@ use core::convert::TryInto;
 #[cfg(feature = "alloc")]
 use alloc::format;
 
+// specialize u8 for ByteSize and Aligned
+impl DekuRead<'_, (Endian, ByteSize, Aligned)> for u8 {
+    fn read(
+        input: &BitSlice<u8, Msb0>,
+        (_, size, _): (Endian, ByteSize, Aligned),
+    ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+        const MAX_TYPE_BITS: usize = BitSize::of::<u8>().0;
+        let bit_size: usize = size.0 * 8;
+
+        if bit_size > MAX_TYPE_BITS {
+            return Err(DekuError::Parse(format!(
+                "too much data: container of {} bits cannot hold {} bits",
+                MAX_TYPE_BITS, bit_size
+            )));
+        }
+
+        if input.len() < bit_size {
+            return Err(DekuError::Incomplete(crate::error::NeedSize::new(bit_size)));
+        }
+
+        let (bit_slice, rest) = input.split_at(bit_size);
+        let bytes: &[u8] = bit_slice.domain().region().unwrap().1;
+        let value = u8::from_le_bytes(bytes.try_into()?);
+
+        Ok((rest, value))
+    }
+}
+
 // specialize u8 for ByteSize
 impl DekuRead<'_, (Endian, ByteSize)> for u8 {
     fn read(
@@ -46,7 +74,7 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
             //i.e. [1110, 10010110] -> [11101001, 0110]
             bits.force_align();
 
-            let bytes: &[u8] = bits.as_raw_slice();
+            let bytes: &[u8] = bits.domain().region().unwrap().1;
 
             // cannot use from_X_bytes as we don't have enough bytes for $typ
             // read manually
@@ -225,6 +253,43 @@ macro_rules! ImplDekuReadBytes {
                 Ok((rest, value))
             }
         }
+
+        impl DekuRead<'_, (Endian, ByteSize, Aligned)> for $typ {
+            fn read(
+                input: &BitSlice<u8, Msb0>,
+                (endian, size, _): (Endian, ByteSize, Aligned),
+            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                let bit_size: usize = size.0 * 8;
+
+                let input_is_le = endian.is_le();
+
+                if bit_size > MAX_TYPE_BITS {
+                    return Err(DekuError::Parse(format!(
+                        "too much data: container of {} bits cannot hold {} bits",
+                        MAX_TYPE_BITS, bit_size
+                    )));
+                }
+
+                if input.len() < bit_size {
+                    return Err(DekuError::Incomplete(crate::error::NeedSize::new(bit_size)));
+                }
+
+                let (bit_slice, rest) = input.split_at(bit_size);
+
+                // if everything is aligned, just read the value
+                let bytes: &[u8] = bit_slice.domain().region().unwrap().1;
+
+                // Read value
+                let value = if input_is_le {
+                    <$typ>::from_le_bytes(bytes.try_into()?)
+                } else {
+                    <$typ>::from_be_bytes(bytes.try_into()?)
+                };
+
+                Ok((rest, value))
+            }
+        }
     };
 }
 
@@ -245,6 +310,25 @@ macro_rules! ImplDekuReadSignExtend {
                 Ok((rest, value))
             }
         }
+
+        impl DekuRead<'_, (Endian, ByteSize, Aligned)> for $typ {
+            fn read(
+                input: &BitSlice<u8, Msb0>,
+                (endian, size, aligned): (Endian, ByteSize, Aligned),
+            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+                let (rest, value) = <$inner as DekuRead<'_, (Endian, ByteSize, Aligned)>>::read(
+                    input,
+                    (endian, size, aligned),
+                )?;
+
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                let bit_size = size.0 * 8;
+                let shift = MAX_TYPE_BITS - bit_size;
+                let value = (value as $typ) << shift >> shift;
+                Ok((rest, value))
+            }
+        }
+
         impl DekuRead<'_, (Endian, BitSize)> for $typ {
             fn read(
                 input: &BitSlice<u8, Msb0>,
@@ -282,7 +366,25 @@ macro_rules! ForwardDekuRead {
             }
         }
 
-        // Only have `bit_size`, set `endian` to `Endian::default`.
+        impl DekuRead<'_, (Endian, Aligned)> for $typ {
+            fn read(
+                input: &BitSlice<u8, Msb0>,
+                (endian, aligned): (Endian, Aligned),
+            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+                let bit_size = BitSize::of::<$typ>();
+
+                // Since we don't have a #[bits] or [bytes], check if we can use bytes for perf
+                if (bit_size.0 % 8) == 0 {
+                    // bytes
+                    <$typ>::read(input, (endian, ByteSize(bit_size.0 / 8), aligned))
+                } else {
+                    // TODO: This should be caught during field validation?
+                    panic!("Cannot use Aligned with bit sized field");
+                }
+            }
+        }
+
+        // Only have `byte_size`, set `endian` to `Endian::default`.
         impl DekuRead<'_, ByteSize> for $typ {
             fn read(
                 input: &BitSlice<u8, Msb0>,
@@ -291,6 +393,18 @@ macro_rules! ForwardDekuRead {
                 let endian = Endian::default();
 
                 <$typ>::read(input, (endian, byte_size))
+            }
+        }
+
+        // Only have `byte_size`, set `endian` to `Endian::default`.
+        impl DekuRead<'_, (ByteSize, Aligned)> for $typ {
+            fn read(
+                input: &BitSlice<u8, Msb0>,
+                (byte_size, _): (ByteSize, Aligned),
+            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+                let endian = Endian::default();
+
+                <$typ>::read(input, (endian, byte_size, Aligned))
             }
         }
 
@@ -308,6 +422,15 @@ macro_rules! ForwardDekuRead {
                 } else {
                     <$typ>::read(input, (endian, bit_size))
                 }
+            }
+        }
+
+        impl DekuRead<'_, Aligned> for $typ {
+            fn read(
+                input: &BitSlice<u8, Msb0>,
+                aligned: Aligned,
+            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+                <$typ>::read(input, (Endian::default(), aligned))
             }
         }
 

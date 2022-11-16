@@ -411,6 +411,9 @@ struct FieldData {
 
     // assert value of field
     assert_eq: Option<TokenStream>,
+
+    // aligned byte field
+    aligned: bool,
 }
 
 impl FieldData {
@@ -446,6 +449,7 @@ impl FieldData {
             cond: receiver.cond?,
             assert: receiver.assert?,
             assert_eq: receiver.assert_eq?,
+            aligned: receiver.aligned,
         };
 
         FieldData::validate(&data)?;
@@ -485,6 +489,15 @@ impl FieldData {
             return Err(cerror(
                 data.bits.span(),
                 "conflicting: both `bits` and `bytes` specified on field",
+            ));
+        }
+
+        // Validate that `bits`, `bytes`, and `aligned` aren't used together
+        if (data.bits.is_some() || data.bytes.is_some()) && data.aligned {
+            // FIXME: Use `Span::join` once out of nightly
+            return Err(cerror(
+                data.bits.span(),
+                "`aligned` can only be used for aligned and correctly sized reads",
             ));
         }
 
@@ -790,6 +803,10 @@ struct DekuFieldReceiver {
     // assert value of field
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     assert_eq: Result<Option<TokenStream>, ReplacementError>,
+
+    /// read aligned byte
+    #[darling(default)]
+    aligned: bool,
 }
 
 /// Receiver for the variant-level attributes inside a enum

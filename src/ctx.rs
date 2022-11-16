@@ -4,6 +4,10 @@
 use core::marker::PhantomData;
 use core::str::FromStr;
 
+/// Aligned and correctly padded bytes
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct Aligned;
+
 /// An endian
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Endian {

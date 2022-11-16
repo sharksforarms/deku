@@ -529,6 +529,7 @@ fn emit_field_write(
             field_endian,
             f.bits.as_ref(),
             f.bytes.as_ref(),
+            false, /* don't emit aligned */
             f.ctx.as_ref(),
         )?;
 

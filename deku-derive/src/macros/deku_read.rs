@@ -574,6 +574,7 @@ fn emit_field_read(
             field_endian,
             f.bits.as_ref(),
             f.bytes.as_ref(),
+            f.aligned,
             f.ctx.as_ref(),
         )?;
 

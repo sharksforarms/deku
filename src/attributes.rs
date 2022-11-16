@@ -32,6 +32,7 @@ enum DekuEnum {
 
 | Attribute | Scope | Description
 |-----------|------------------|------------
+| [aligned](#aligned) | field | Assert byte aligned field when reading
 | [endian](#endian) | top-level, field | Set the endianness
 | [magic](#magic) | top-level | A magic value that must be present at the start of this struct/enum
 | [assert](#assert) | field | Assert a condition
@@ -61,6 +62,70 @@ enum DekuEnum {
 | enum: [type](#type) | top-level | Set the type of the variant `id`
 | enum: [bits](#bits-1) | top-level | Set the bit-size of the variant `id`
 | enum: [bytes](#bytes-1) | top-level | Set the byte-size of the variant `id`
+
+# aligned
+
+For the following primitives, an `aligned` attribute can be used to allow performance gains when the field is byte aligned
+
+**Warning**: This type must be aligned as a byte in memory
+
+**Note**: Cannot be used in combination with [bytes](#bytes) or [bits](#bits)
+
+| Type   |
+|--------|
+| u8     |
+| u16    |
+| u32    |
+| u64    |
+| u128   |
+| usize  |
+| i8     |
+| i16    |
+| i32    |
+| i64    |
+| i128   |
+| isize  |
+| f32    |
+| f64    |
+
+### Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(aligned)]
+    field_a: u8,
+    #[deku(aligned)]
+    field_b: u16,
+}
+
+let data: Vec<u8> = vec![0xaa, 0xbb, 0xcc];
+
+let value = DekuTest::try_from(data.as_ref()).unwrap();
+
+assert_eq!(
+    DekuTest {
+       field_a: 0xaa,
+       field_b: 0xccbb,
+    },
+    value
+);
+```
+
+### Error:
+**Warning**: Example of un-aligned usage
+```ignore
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(bits = "4")]
+    field_a: u8,
+    #[deku(aligned)]
+    field_b: u16,
+}
+```
 
 # endian
 

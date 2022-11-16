@@ -1,3 +1,4 @@
+mod test_aligned;
 mod test_assert;
 mod test_assert_eq;
 mod test_cond;

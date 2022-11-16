@@ -1,6 +1,6 @@
 use deku::prelude::*;
 
-// Invalid allignment assumptions when converting
+// Invalid alignment assumptions when converting
 // BitSlice to type
 //
 // https://github.com/sharksforarms/deku/issues/224
@@ -119,4 +119,146 @@ mod issue_282 {
         assert_eq!(bits, expected);
         assert_eq!(bytes, expected);
     }
+}
+
+// Invalid alignment assumptions when converting doing Bits and Bytes optimizations
+//
+// https://github.com/sharksforarms/deku/issues/292
+#[test]
+fn test_regression_292() {
+    let test_data: &[u8] = [0x0F, 0xF0].as_ref();
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    #[deku(endian = "little")]
+    struct Container {
+        #[deku(bits = 4)]
+        field1: u8,
+        field2: u8,
+        #[deku(bits = 4)]
+        field3: u8,
+    }
+
+    assert_eq!(
+        Container::from_bytes((test_data, 0)).unwrap().1,
+        Container {
+            field1: 0,
+            field2: 0xff,
+            field3: 0,
+        }
+    );
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    #[deku(endian = "little")]
+    struct ContainerBits {
+        #[deku(bits = 4)]
+        field1: u8,
+        #[deku(bits = 8)]
+        field2: u8,
+        #[deku(bits = 4)]
+        field3: u8,
+    }
+
+    assert_eq!(
+        ContainerBits::from_bytes((test_data, 0)).unwrap().1,
+        ContainerBits {
+            field1: 0,
+            field2: 0xff,
+            field3: 0,
+        }
+    );
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    struct ContainerByteNoEndian {
+        #[deku(bits = 4)]
+        field1: u8,
+        field2: u8,
+        #[deku(bits = 4)]
+        field3: u8,
+    }
+
+    assert_eq!(
+        ContainerByteNoEndian::from_bytes((test_data, 0)).unwrap().1,
+        ContainerByteNoEndian {
+            field1: 0,
+            field2: 0xff,
+            field3: 0,
+        }
+    );
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    struct ContainerBitPadding {
+        #[deku(pad_bits_before = "4")]
+        field2: u8,
+        #[deku(bits = 4)]
+        field3: u8,
+    }
+
+    assert_eq!(
+        ContainerBitPadding::from_bytes((test_data, 0)).unwrap().1,
+        ContainerBitPadding {
+            field2: 0xff,
+            field3: 0,
+        }
+    );
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    struct ContainerBitPadding1 {
+        #[deku(bits = 2)]
+        field1: u8,
+        #[deku(pad_bits_before = "2")]
+        field2: u8,
+        #[deku(bits = 4)]
+        field3: u8,
+    }
+
+    assert_eq!(
+        ContainerBitPadding1::from_bytes((test_data, 0)).unwrap().1,
+        ContainerBitPadding1 {
+            field1: 0,
+            field2: 0xff,
+            field3: 0,
+        }
+    );
+
+    let test_data: &[u8] = [0b11000000, 0b00111111].as_ref();
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    #[deku(endian = "little")]
+    struct ContainerTwo {
+        #[deku(bits = 2)]
+        field1: u8,
+        field2: u8,
+        #[deku(bits = 6)]
+        field3: u8,
+    }
+
+    assert_eq!(
+        ContainerTwo::from_bytes((test_data, 0)).unwrap().1,
+        ContainerTwo {
+            field1: 0b11,
+            field2: 0,
+            field3: 0b111111,
+        }
+    );
+
+    let test_data: &[u8] = [0b11000000, 0b00000000, 0b00111111].as_ref();
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    #[deku(endian = "little")]
+    struct ContainerU16 {
+        #[deku(bits = 2)]
+        field1: u8,
+        field2: u16,
+        #[deku(bits = 6)]
+        field3: u8,
+    }
+
+    assert_eq!(
+        ContainerU16::from_bytes((test_data, 0)).unwrap().1,
+        ContainerU16 {
+            field1: 0b11,
+            field2: 0,
+            field3: 0b111111,
+        }
+    );
 }

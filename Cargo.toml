@@ -2,7 +2,7 @@
 authors = ["sharks <sharks@sharks>"]
 edition = "2018"
 name = "deku"
-version = "0.14.1"
+version = "0.15.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/sharksforarms/deku"
 keywords = ["deku", "bits", "serialization", "deserialization", "struct"]
@@ -26,7 +26,7 @@ logging = ["deku_derive/logging", "log"]
 const_generics = []
 
 [dependencies]
-deku_derive = { version = "^0.14.0", path = "deku-derive", default-features = false}
+deku_derive = { version = "^0.15.0", path = "deku-derive", default-features = false}
 bitvec = { version = "1.0.1", default-features = false }
 log = { version = "0.4.17", optional = true }
 

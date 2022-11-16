@@ -26,9 +26,40 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
         }
 
         let (bit_slice, rest) = input.split_at(bit_size);
-        let bytes: &[u8] = bit_slice.as_raw_slice();
 
-        Ok((rest, bytes[0]))
+        let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
+
+        let value = if pad == 0
+            && bit_slice.len() == MAX_TYPE_BITS
+            && bit_slice.as_raw_slice().len() * 8 == MAX_TYPE_BITS
+        {
+            // if everything is aligned, just read the value
+            let bytes: &[u8] = bit_slice.as_raw_slice();
+
+            u8::from_le_bytes(bytes.try_into()?)
+        } else {
+            let mut bits: BitVec<Msb0, u8> = BitVec::with_capacity(bit_slice.len() + pad);
+
+            // Copy bits to new BitVec
+            bits.extend_from_bitslice(bit_slice);
+
+            // Force align
+            //i.e. [1110, 10010110] -> [11101001, 0110]
+            bits.force_align();
+
+            let bytes: &[u8] = bits.as_raw_slice();
+
+            // cannot use from_X_bytes as we don't have enough bytes for $typ
+            // read manually
+            let mut res: u8 = 0;
+            for b in bytes.iter().rev() {
+                res |= *b as u8;
+            }
+
+            res as u8
+        };
+
+        Ok((rest, value))
     }
 }
 
@@ -163,7 +194,16 @@ macro_rules! ImplDekuReadBytes {
                         <$typ>::from_be_bytes(bytes.try_into()?)
                     }
                 } else {
-                    let bytes: &[u8] = bit_slice.as_raw_slice();
+                    let mut bits: BitVec<Msb0, u8> = BitVec::with_capacity(bit_slice.len() + pad);
+
+                    // Copy bits to new BitVec
+                    bits.extend_from_bitslice(bit_slice);
+
+                    // Force align
+                    //i.e. [1110, 10010110] -> [11101001, 0110]
+                    bits.force_align();
+
+                    let bytes: &[u8] = bits.as_raw_slice();
 
                     // cannot use from_X_bytes as we don't have enough bytes for $typ
                     // read manually

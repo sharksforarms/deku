@@ -37,7 +37,7 @@ criterion = "0.4.0"
 alloc_counter = "0.0.4"
 trybuild = "1.0.71"
 rustc-hash = "1.1.0"
-env_logger = "0.9.3"
+env_logger = "0.10.0"
 
 [[bench]]
 name = "deku"

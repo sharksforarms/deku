@@ -532,7 +532,7 @@ fn emit_field_write(
             f.ctx.as_ref(),
         )?;
 
-        quote! { #object_prefix #field_ident.write(__deku_output, (#write_args)) }
+        quote! { ::#crate_::DekuWrite::write(#object_prefix #field_ident, __deku_output, (#write_args)) }
     };
 
     let pad_bits_before = pad_bits(

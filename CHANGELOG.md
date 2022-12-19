@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.15.1] - 2022-12-19
+
+Small bug fix: Use fully qualified path when calling `write` as it may clash with other impls
+
 ## [0.15.0] - 2022-11-16
 
 ### Breaking/Performance
@@ -229,7 +233,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.14.1...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.15.1...HEAD
+
+[0.15.0]: https://github.com/sharksforarms/deku/compare/deku-v0.15.0...deku-v0.15.1
 
 [0.15.0]: https://github.com/sharksforarms/deku/compare/deku-v0.14.1...deku-v0.15.0
 

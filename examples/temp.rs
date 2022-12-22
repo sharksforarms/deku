@@ -1,4 +1,4 @@
-use deku::bitvec::{BitSlice, BitVec, Msb0};
+use deku::bitvec::{BitVec, Msb0};
 use deku::prelude::*;
 use std::convert::TryInto;
 
@@ -52,9 +52,7 @@ fn main() {
         DekuTest {
             a: 1,
             b: 2,
-            // sum1: 3,
             data: vec![1, 2],
-            // sum2: 9
         }
     );
 

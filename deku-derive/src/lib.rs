@@ -939,6 +939,12 @@ pub fn deku_derive(
         derives.push(derive);
     }
 
+    // Generate `DekuWrite` impl
+    if args.write {
+        let derive: TokenStream = proc_deku_write(item.clone()).into();
+        derives.push(derive);
+    }
+
     // Remove the temp fields
     let mut input = syn::parse_macro_input!(item as syn::DeriveInput);
 
@@ -950,13 +956,6 @@ pub fn deku_derive(
             }
         }
         _ => unimplemented!(),
-    }
-
-    // Generate `DekuWrite` impl
-    if args.write {
-        let input = input.clone();
-        let derive: TokenStream = proc_deku_write(input.into_token_stream().into()).into();
-        derives.push(derive);
     }
 
     // Remove attributes

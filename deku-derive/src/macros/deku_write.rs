@@ -28,16 +28,18 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let magic_write = emit_magic_write(input);
 
-    let field_writes = emit_field_writes(input, &fields, None, &ident)?;
+    let (field_idents, field_writes) = emit_field_writes(input, &fields, None, &ident)?;
+
+    // filter out temporary fields
+    let field_idents: Vec<&TokenStream> = field_idents
+        .iter()
+        .filter(|f| !f.is_temp)
+        .map(|f| &f.field_ident)
+        .collect();
+
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }));
 
     let named = fields.style.is_struct();
-
-    let field_idents = fields
-        .iter()
-        .enumerate()
-        .map(|(i, f)| f.get_ident(i, true))
-        .collect::<Vec<_>>();
 
     let destructured = gen_struct_destruction(named, &input.ident, &field_idents);
 
@@ -180,6 +182,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .fields
             .as_ref()
             .iter()
+            // filter out temporary fields
+            .filter(|f| !f.temp)
             .enumerate()
             .map(|(i, f)| f.get_ident(i, true))
             .collect::<Vec<_>>();
@@ -229,7 +233,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let variant_write = if variant_writer.is_some() {
             quote! { #variant_writer ?; }
         } else {
-            let field_writes = emit_field_writes(input, &variant.fields.as_ref(), None, &ident)?;
+            let (_field_idents, field_writes) =
+                emit_field_writes(input, &variant.fields.as_ref(), None, &ident)?;
 
             quote! {
                 {
@@ -367,17 +372,30 @@ fn emit_magic_write(input: &DekuData) -> TokenStream {
     }
 }
 
+struct FieldIdent {
+    field_ident: TokenStream,
+    is_temp: bool,
+}
+
 fn emit_field_writes(
     input: &DekuData,
     fields: &Fields<&FieldData>,
     object_prefix: Option<TokenStream>,
     ident: &TokenStream,
-) -> Result<Vec<TokenStream>, syn::Error> {
-    fields
-        .iter()
-        .enumerate()
-        .map(|(i, f)| emit_field_write(input, i, f, &object_prefix, ident))
-        .collect()
+) -> Result<(Vec<FieldIdent>, Vec<TokenStream>), syn::Error> {
+    let mut field_writes = vec![];
+    let mut field_idents = vec![];
+
+    for (i, f) in fields.iter().enumerate() {
+        let (field_ident, field_write) = emit_field_write(input, i, f, &object_prefix, ident)?;
+        field_idents.push(FieldIdent {
+            field_ident,
+            is_temp: f.temp,
+        });
+        field_writes.push(field_write);
+    }
+
+    Ok((field_idents, field_writes))
 }
 
 fn emit_field_updates(
@@ -470,7 +488,7 @@ fn emit_field_write(
     f: &FieldData,
     object_prefix: &Option<TokenStream>,
     ident: &TokenStream,
-) -> Result<TokenStream, syn::Error> {
+) -> Result<(TokenStream, TokenStream), syn::Error> {
     let crate_ = super::get_crate_name();
     let field_endian = f.endian.as_ref().or(input.endian.as_ref());
 
@@ -523,7 +541,9 @@ fn emit_field_write(
     });
 
     let field_write_func = if field_writer.is_some() {
-        quote! { #field_writer }
+        Some(quote! { #field_writer })
+    } else if f.temp {
+        None
     } else {
         let write_args = gen_field_args(
             field_endian,
@@ -532,7 +552,9 @@ fn emit_field_write(
             f.ctx.as_ref(),
         )?;
 
-        quote! { ::#crate_::DekuWrite::write(#object_prefix #field_ident, __deku_output, (#write_args)) }
+        Some(
+            quote! { ::#crate_::DekuWrite::write(#object_prefix #field_ident, __deku_output, (#write_args)) },
+        )
     };
 
     let pad_bits_before = pad_bits(
@@ -546,8 +568,12 @@ fn emit_field_write(
         emit_padding,
     );
 
-    let field_write_normal = quote! {
-        #field_write_func ?;
+    let field_write_normal = if let Some(field_write_func) = field_write_func {
+        quote! {
+            #field_write_func ?;
+        }
+    } else {
+        quote! {}
     };
 
     let field_write_tokens = match (f.skip, &f.cond) {
@@ -588,7 +614,7 @@ fn emit_field_write(
         #pad_bits_after
     };
 
-    Ok(field_write)
+    Ok((field_ident, field_write))
 }
 
 /// avoid outputing `use core::convert::TryInto` if update() function is generated with empty Vec

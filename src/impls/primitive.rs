@@ -52,10 +52,10 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
             // read manually
             let mut res: u8 = 0;
             for b in bytes.iter().rev() {
-                res |= *b as u8;
+                res |= *b;
             }
 
-            res as u8
+            res
         };
 
         Ok((rest, value))

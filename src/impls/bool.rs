@@ -73,7 +73,7 @@ mod tests {
         let bit_slice = input.view_bits::<Msb0>();
 
         let (rest, res_read) = bool::read(bit_slice, crate::ctx::BitSize(2)).unwrap();
-        assert_eq!(true, res_read);
+        assert!(res_read);
         assert_eq!(6, rest.len());
 
         let mut res_write = bitvec![u8, Msb0;];

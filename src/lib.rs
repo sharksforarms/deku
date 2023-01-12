@@ -261,6 +261,7 @@ pub struct EncodedString {
 */
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(clippy::unusual_byte_groupings)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

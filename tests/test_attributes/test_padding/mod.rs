@@ -7,6 +7,7 @@ mod test_pad_bytes_after;
 mod test_pad_bytes_before;
 
 #[test]
+#[allow(clippy::identity_op)]
 fn test_pad_bits_before_and_pad_bytes_before() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct TestStruct {

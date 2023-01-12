@@ -1,3 +1,5 @@
+#![allow(clippy::unusual_byte_groupings)]
+
 use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
 

@@ -2,6 +2,7 @@
 //! See [ctx attribute](super::attributes#ctx) for more information.
 
 use core::marker::PhantomData;
+use core::ops::Deref;
 use core::str::FromStr;
 
 /// An endian
@@ -145,6 +146,14 @@ impl<T> Limit<T, fn(&T) -> bool> {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ByteSize(pub usize);
 
+impl Deref for ByteSize {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// The size of field in bits
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct BitSize(pub usize);
@@ -171,5 +180,13 @@ impl BitSize {
     /// Returns the bit size of the pointed-to value
     pub fn of_val<T: ?Sized>(val: &T) -> Self {
         Self::bits_from_bytes(core::mem::size_of_val(val))
+    }
+}
+
+impl Deref for BitSize {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

@@ -198,3 +198,51 @@ fn test_enum_endian_ctx() {
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(ret_write, test_data)
 }
+
+#[test]
+fn test_bits_ctx() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(ctx = "bits: deku::ctx::BitSize")]
+    struct Bits {
+        #[deku(bits = "*bits")]
+        f1: u8,
+        #[deku(bits = "3")]
+        f2: u8,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(ctx = "bytes: deku::ctx::ByteSize")]
+    struct Bytes {
+        #[deku(bytes = "*bytes")]
+        f1: u32,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct Container {
+        bits_size: u8,
+        bytes_size: u8,
+        #[deku(bits = "*bits_size as usize")]
+        bits: Bits,
+        #[deku(bytes = "*bytes_size as usize")]
+        bytes: Bytes,
+    }
+
+    let test_data = [0x05, 0x02, 0b10010_101, 0xAB, 0xBA];
+    let ret_read = Container::try_from(test_data.as_ref()).unwrap();
+
+    assert_eq!(
+        Container {
+            bits_size: 0x05,
+            bytes_size: 0x02,
+            bits: Bits {
+                f1: 0b10010,
+                f2: 0b101,
+            },
+            bytes: Bytes { f1: 0xBAAB }
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(ret_write, test_data)
+}

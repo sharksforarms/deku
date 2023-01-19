@@ -1,8 +1,10 @@
 use crate::Num;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, ToTokens};
+use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
+use syn::token::Comma;
 
 pub(crate) mod deku_read;
 pub(crate) mod deku_write;
@@ -182,25 +184,43 @@ fn gen_ctx_types_and_arg(
 
 /// Generate type from matching ident from `id` in `ctx`
 ///
-/// Given #[deku(ctx = "test: u16, my_id: u8", id = "my_id")], will return `u8`
+/// - #[deku(ctx = "test: u16, my_id: u8", id = "my_id")], will return `u8`
+/// - #[deku(ctx = "test: u16, my_id: u8", id = "my_id, test")], will return `u8, u16`
 fn gen_type_from_ctx_id(
     ctx: &Punctuated<syn::FnArg, syn::token::Comma>,
     id: &crate::Id,
 ) -> Option<TokenStream> {
-    let id = syn::Ident::new(&id.to_string(), id.span());
+    let parser = Punctuated::<Ident, Comma>::parse_terminated;
+    let s = parser.parse(id.to_token_stream().into()).unwrap();
+    let mut matching_types = quote! {};
+    for s in s {
+        let id = syn::Ident::new(&s.to_string(), id.span());
 
-    ctx.iter().find_map(|arg| {
-        if let syn::FnArg::Typed(pat_type) = arg {
-            if let syn::Pat::Ident(ident) = &*pat_type.pat {
-                if id == ident.ident {
-                    let t = &pat_type.ty;
-                    return Some(quote! {#t});
+        let types = ctx.iter().find_map(|arg| {
+            let mut t = None;
+            if let syn::FnArg::Typed(pat_type) = arg {
+                if let syn::Pat::Ident(ident) = &*pat_type.pat {
+                    if id == ident.ident {
+                        let ty = &pat_type.ty;
+                        t = Some(quote! {#ty});
+                    }
                 }
             }
-        }
 
+            t
+        });
+        if matching_types.is_empty() {
+            matching_types = quote! {#matching_types #types};
+        } else {
+            matching_types = quote! {#matching_types, #types};
+        }
+    }
+
+    if matching_types.is_empty() {
         None
-    })
+    } else {
+        Some(matching_types)
+    }
 }
 
 /// Generate argument for `id`:

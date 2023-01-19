@@ -105,36 +105,72 @@ fn test_top_level_ctx_enum_default() {
 #[test]
 fn test_struct_enum_ctx_id() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(ctx = "my_id: u8", id = "my_id")]
+    #[deku(ctx = "my_id: u8, data: usize", id = "my_id, data")]
     enum EnumId {
-        #[deku(id = "1")]
+        #[deku(id = "(1, 1)")]
         VarA(u8),
-        #[deku(id = "2")]
+        #[deku(id = "(2, 2)")]
         VarB,
+        #[deku(id = "(2, 3)")]
+        VarC(u8),
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct StructEnumId {
         my_id: u8,
-        data: u8,
-        #[deku(ctx = "*my_id")]
+        #[deku(bytes = "1")]
+        data: usize,
+        #[deku(ctx = "*my_id, *data")]
         enum_from_id: EnumId,
     }
 
-    let test_data = [0x01_u8, 0xff, 0xab];
+    // VarA
+    let test_data = [0x01_u8, 0x01, 0xab];
     let ret_read = StructEnumId::try_from(test_data.as_ref()).unwrap();
 
     assert_eq!(
         StructEnumId {
             my_id: 0x01,
-            data: 0xff,
+            data: 0x01,
             enum_from_id: EnumId::VarA(0xab),
         },
         ret_read
     );
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(ret_write, test_data)
+    assert_eq!(ret_write, test_data);
+
+    // VarB
+    let test_data = [0x02_u8, 0x02];
+    let ret_read = StructEnumId::try_from(test_data.as_ref()).unwrap();
+
+    assert_eq!(
+        StructEnumId {
+            my_id: 0x02,
+            data: 0x02,
+            enum_from_id: EnumId::VarB,
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(ret_write, test_data);
+
+    // VarC
+    let test_data = [0x02_u8, 0x03, 0xcc];
+    let (_, ret_read) = StructEnumId::from_bytes((test_data.as_ref(), 0)).unwrap();
+
+    assert_eq!(
+        StructEnumId {
+            my_id: 0x02,
+            data: 0x03,
+            enum_from_id: EnumId::VarC(0xcc),
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(ret_write, test_data);
 }
 
 #[test]

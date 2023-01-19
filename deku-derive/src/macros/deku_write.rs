@@ -188,7 +188,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             quote! {
                 // if we don't do this we may get a "unused variable" error if passed via `ctx`
                 // i.e. #[deku(ctx = "my_id: u8", id = "my_id")]
-                let _ = #id;
+                let _ = (#id);
             }
         } else if id_type.is_some() {
             if let Some(variant_id) = &variant.id {

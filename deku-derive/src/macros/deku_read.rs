@@ -267,7 +267,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let variant_id_read = if id.is_some() {
         quote! {
-            let (__deku_new_rest, __deku_variant_id) = (__deku_rest, #id);
+            let (__deku_new_rest, __deku_variant_id) = (__deku_rest, (#id));
         }
     } else if id_type.is_some() {
         quote! {
@@ -370,8 +370,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     // Implement `DekuEnumExt`
     if let Some(deku_id_type) = deku_id_type {
         tokens.extend(quote! {
-            impl #imp DekuEnumExt<#lifetime, #deku_id_type> for #ident #wher {
-                fn deku_id(&self) -> Result<#deku_id_type, DekuError> {
+            impl #imp DekuEnumExt<#lifetime, (#deku_id_type)> for #ident #wher {
+                fn deku_id(&self) -> Result<(#deku_id_type), DekuError> {
                     match self {
                         #(#deku_ids ,)*
                         _ => Err(DekuError::IdVariantNotFound),

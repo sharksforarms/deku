@@ -20,10 +20,7 @@ where
         let ret = match val {
             0x01 => Ok(true),
             0x00 => Ok(false),
-            _ => Err(DekuError::Parse(format!(
-                "cannot parse bool value: {}",
-                val
-            ))),
+            _ => Err(DekuError::Parse(format!("cannot parse bool value: {val}",))),
         }?;
 
         Ok((rest, ret))

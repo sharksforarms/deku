@@ -18,8 +18,7 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
         // if they never give [bits] or [bytes] we don't need to check the size
         if bit_size > MAX_TYPE_BITS {
             return Err(DekuError::Parse(format!(
-                "too much data: container of {} bits cannot hold {} bits",
-                MAX_TYPE_BITS, bit_size
+                "too much data: container of {MAX_TYPE_BITS} bits cannot hold {bit_size} bits",
             )));
         }
 
@@ -76,8 +75,7 @@ macro_rules! ImplDekuReadBits {
 
                 if bit_size > MAX_TYPE_BITS {
                     return Err(DekuError::Parse(format!(
-                        "too much data: container of {} bits cannot hold {} bits",
-                        MAX_TYPE_BITS, bit_size
+                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {bit_size} bits",
                     )));
                 }
 
@@ -166,8 +164,7 @@ macro_rules! ImplDekuReadBytes {
 
                 if bit_size > MAX_TYPE_BITS {
                     return Err(DekuError::Parse(format!(
-                        "too much data: container of {} bits cannot hold {} bits",
-                        MAX_TYPE_BITS, bit_size
+                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {bit_size} bits",
                     )));
                 }
 

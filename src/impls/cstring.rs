@@ -34,7 +34,7 @@ where
         }
 
         let value = CString::new(bytes)
-            .map_err(|e| DekuError::Parse(format!("Failed to convert Vec to CString: {}", e)))?;
+            .map_err(|e| DekuError::Parse(format!("Failed to convert Vec to CString: {e}")))?;
 
         Ok((rest, value))
     }

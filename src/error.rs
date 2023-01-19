@@ -47,13 +47,13 @@ pub enum DekuError {
 
 impl From<core::num::TryFromIntError> for DekuError {
     fn from(e: core::num::TryFromIntError) -> DekuError {
-        DekuError::Parse(format!("error parsing int: {}", e))
+        DekuError::Parse(format!("error parsing int: {e}"))
     }
 }
 
 impl From<core::array::TryFromSliceError> for DekuError {
     fn from(e: core::array::TryFromSliceError) -> DekuError {
-        DekuError::Parse(format!("error parsing from slice: {}", e))
+        DekuError::Parse(format!("error parsing from slice: {e}"))
     }
 }
 
@@ -72,10 +72,10 @@ impl core::fmt::Display for DekuError {
                 size.bit_size(),
                 size.byte_size()
             ),
-            DekuError::Parse(ref err) => write!(f, "Parse error: {}", err),
-            DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {}", err),
-            DekuError::Unexpected(ref err) => write!(f, "Unexpected error: {}", err),
-            DekuError::Assertion(ref err) => write!(f, "Assertion error: {}", err),
+            DekuError::Parse(ref err) => write!(f, "Parse error: {err}"),
+            DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {err}"),
+            DekuError::Unexpected(ref err) => write!(f, "Unexpected error: {err}"),
+            DekuError::Assertion(ref err) => write!(f, "Assertion error: {err}"),
             DekuError::IdVariantNotFound => write!(f, "Could not resolve `id` for variant"),
         }
     }

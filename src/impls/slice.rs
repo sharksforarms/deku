@@ -193,8 +193,19 @@ mod const_generics_impl {
             // and never return it in case of error
             let mut slice: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
             let mut rest = input;
-            for item in slice.iter_mut() {
-                let (new_rest, value) = T::read(rest, ctx)?;
+            for (n, item) in slice.iter_mut().enumerate() {
+                let (new_rest, value) = match T::read(rest, ctx) {
+                    Ok(it) => it,
+                    Err(err) => {
+                        // For each item in the array, drop if we allocated it.
+                        for item in &mut slice[0..n] {
+                            unsafe {
+                                item.assume_init_drop();
+                            }
+                        }
+                        return Err(err);
+                    }
+                };
                 item.write(value);
                 rest = new_rest;
             }

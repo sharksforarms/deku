@@ -100,7 +100,7 @@ fn cerror(span: proc_macro2::Span, msg: &str) -> TokenStream {
     syn::Error::new(span, msg).to_compile_error()
 }
 
-/// A post-processed version of `DekuReceiver`
+/// A post-processed version of [DekuReceiver](self::DekuReceiver)
 #[derive(Debug)]
 struct DekuData {
     ident: syn::Ident,
@@ -115,6 +115,9 @@ struct DekuData {
 
     /// default context passed to the field
     ctx_default: Option<Punctuated<syn::Expr, syn::token::Comma>>,
+
+    /// additional context passed down to the fields
+    ctx_nested: Option<Punctuated<syn::Expr, syn::token::Comma>>,
 
     /// A magic value that must appear at the start of this struct/enum's data
     magic: Option<syn::LitByteStr>,
@@ -133,7 +136,7 @@ struct DekuData {
 }
 
 impl DekuData {
-    /// Map a `DekuReceiver` to `DekuData`
+    /// Map a [DekuReceiver](self::DekuReceiver) to [DekuData](self::DekuData)
     fn from_receiver(receiver: DekuReceiver) -> Result<Self, TokenStream> {
         let data = match receiver.data {
             ast::Data::Struct(fields) => ast::Data::Struct(ast::Fields::new(
@@ -159,6 +162,7 @@ impl DekuData {
             endian: receiver.endian,
             ctx: receiver.ctx,
             ctx_default: receiver.ctx_default,
+            ctx_nested: receiver.ctx_nested,
             magic: receiver.magic,
             id: receiver.id,
             id_type: receiver.id_type?,
@@ -263,7 +267,7 @@ impl DekuData {
     }
 }
 
-/// Common variables from `DekuData` for `emit_enum` read/write functions
+/// Common variables from [DekuData](self::DekuData) for `emit_enum` read/write functions
 #[derive(Debug)]
 struct DekuDataEnum<'a> {
     imp: syn::ImplGenerics<'a>,
@@ -309,7 +313,7 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataEnum<'a> {
     }
 }
 
-/// Common variables from `DekuData` for `emit_struct` read/write functions
+/// Common variables from [DekuData](self::DekuData) for `emit_struct` read/write functions
 #[derive(Debug)]
 struct DekuDataStruct<'a> {
     imp: syn::ImplGenerics<'a>,
@@ -340,7 +344,7 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataStruct<'a> {
     }
 }
 
-/// A post-processed version of `FieldReceiver`
+/// A post-processed version of [FieldReceiver](self::FieldReceiver)
 #[derive(Debug)]
 struct FieldData {
     ident: Option<syn::Ident>,
@@ -509,7 +513,7 @@ impl FieldData {
     }
 }
 
-/// A post-processed version of `VariantReceiver`
+/// A post-processed version of [VariantReceiver](self::VariantReceiver)
 #[derive(Debug)]
 struct VariantData {
     ident: syn::Ident,
@@ -597,6 +601,10 @@ struct DekuReceiver {
     /// default context passed to the field
     #[darling(default)]
     ctx_default: Option<syn::punctuated::Punctuated<syn::Expr, syn::token::Comma>>,
+
+    /// additional context passed down to the fields
+    #[darling(default)]
+    ctx_nested: Option<syn::punctuated::Punctuated<syn::Expr, syn::token::Comma>>,
 
     /// A magic value that must appear at the start of this struct/enum's data
     #[darling(default)]

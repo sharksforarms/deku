@@ -237,18 +237,26 @@ fn gen_field_args(
     bits: Option<&Num>,
     bytes: Option<&Num>,
     ctx: Option<&Punctuated<syn::Expr, syn::token::Comma>>,
+    ctx_nested: Option<&Punctuated<syn::Expr, syn::token::Comma>>,
 ) -> syn::Result<TokenStream> {
     let crate_ = get_crate_name();
     let endian = endian.map(gen_endian_from_str).transpose()?;
     let bits = bits.map(|n| quote! {::#crate_::ctx::BitSize(#n)});
     let bytes = bytes.map(|n| quote! {::#crate_::ctx::ByteSize(#n)});
     let ctx = ctx.map(|c| quote! {#c});
+    let ctx_nested = ctx_nested.map(|c| quote! {#c});
 
     // FIXME: Should be `into_iter` here, see https://github.com/rust-lang/rust/issues/66145.
-    let field_args = [endian.as_ref(), bits.as_ref(), bytes.as_ref(), ctx.as_ref()]
-        .iter()
-        .filter_map(|i| *i)
-        .collect::<Vec<_>>();
+    let field_args = [
+        endian.as_ref(),
+        bits.as_ref(),
+        bytes.as_ref(),
+        ctx.as_ref(),
+        ctx_nested.as_ref(),
+    ]
+    .iter()
+    .filter_map(|i| *i)
+    .collect::<Vec<_>>();
 
     // Because `impl DekuRead<'_, (T1, T2)>` but `impl DekuRead<'_, T1>`(not tuple)
     match &field_args[..] {

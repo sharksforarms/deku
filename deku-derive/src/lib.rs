@@ -8,6 +8,7 @@ use crate::macros::{deku_read::emit_deku_read, deku_write::emit_deku_write};
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use syn::{punctuated::Punctuated, spanned::Spanned, AttributeArgs};
 
@@ -625,15 +626,20 @@ struct DekuReceiver {
 
 type ReplacementError = TokenStream;
 
-fn apply_replacements(input: &syn::LitStr) -> Result<syn::LitStr, ReplacementError> {
-    if input.value().contains("__deku_") {
+fn apply_replacements(input: &syn::LitStr) -> Result<Cow<'_, syn::LitStr>, ReplacementError> {
+    let input_value = input.value();
+
+    if !input_value.contains("deku") {
+        return Ok(Cow::Borrowed(input));
+    }
+
+    if input_value.contains("__deku_") {
         return Err(darling::Error::unsupported_format(
             "attribute cannot contain `__deku_` these are internal variables. Please use the `deku::` instead."
         )) .map_err(|e| e.with_span(&input).write_errors());
     }
 
-    let input_str = input
-        .value()
+    let input_str = input_value
         .replace("deku::input", "__deku_input") // part of the public API `from_bytes`
         .replace("deku::input_bits", "__deku_input_bits") // part of the public API `read`
         .replace("deku::output", "__deku_output") // part of the public API `write`
@@ -641,13 +647,13 @@ fn apply_replacements(input: &syn::LitStr) -> Result<syn::LitStr, ReplacementErr
         .replace("deku::bit_offset", "__deku_bit_offset")
         .replace("deku::byte_offset", "__deku_byte_offset");
 
-    Ok(syn::LitStr::new(&input_str, input.span()))
+    Ok(Cow::Owned(syn::LitStr::new(&input_str, input.span())))
 }
 
 /// Calls apply replacements on Option<LitStr>
 fn map_option_litstr(input: Option<syn::LitStr>) -> Result<Option<syn::LitStr>, ReplacementError> {
     Ok(match input {
-        Some(v) => Some(apply_replacements(&v)?),
+        Some(v) => Some(apply_replacements(&v)?.into_owned()),
         None => None,
     })
 }

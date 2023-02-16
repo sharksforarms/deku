@@ -34,9 +34,10 @@ fn get_crate_name() -> Ident {
 fn gen_enum_init<V: ToTokens, I: ToTokens>(
     is_named: bool,
     enum_variant: V,
-    field_idents: Vec<I>,
+    field_idents: impl Iterator<Item = I>,
 ) -> TokenStream {
-    if field_idents.is_empty() {
+    let mut field_idents = field_idents.peekable();
+    if field_idents.peek().is_none() {
         return quote! { #enum_variant };
     }
 
@@ -60,8 +61,9 @@ fn gen_enum_init<V: ToTokens, I: ToTokens>(
 /// - No fields: `Self {}`
 /// - Named: `Self { field_idents }`
 /// - Unnamed:  `Self ( field_idents )`
-fn gen_struct_init<I: ToTokens>(is_named: bool, field_idents: Vec<I>) -> TokenStream {
-    if field_idents.is_empty() {
+fn gen_struct_init<I: ToTokens>(is_named: bool, field_idents: impl Iterator<Item = I>) -> TokenStream {
+    let mut field_idents = field_idents.peekable();
+    if field_idents.peek().is_none() {
         return quote! { Self {} };
     }
 
@@ -87,7 +89,7 @@ fn gen_struct_init<I: ToTokens>(is_named: bool, field_idents: Vec<I>) -> TokenSt
 fn gen_struct_destruction<I: ToTokens, F: ToTokens>(
     named: bool,
     ident: I,
-    field_idents: &[F],
+    field_idents: impl Iterator<Item = F>,
 ) -> TokenStream {
     if named {
         quote! {
@@ -121,16 +123,14 @@ fn gen_internal_field_ident(ident: &TokenStream) -> TokenStream {
 ///
 /// - Named: `{ a: __deku_a }`
 /// - Unnamed: `( __deku_a )`
-fn gen_internal_field_idents(named: bool, idents: Vec<&TokenStream>) -> Vec<TokenStream> {
-    if named {
-        idents
-            .into_iter()
-            .map(|i| (i.clone(), gen_internal_field_ident(i)))
-            .map(|(i, h)| quote! {#i: #h})
-            .collect()
-    } else {
-        idents.into_iter().map(gen_internal_field_ident).collect()
-    }
+fn gen_internal_field_idents<'a>(named: bool, idents: impl Iterator<Item = &'a TokenStream> + 'a) -> impl Iterator<Item = TokenStream> + 'a {
+    idents
+        .map(move |i| if named {
+            let h = gen_internal_field_ident(&i);
+            quote! {#i: #h}
+        } else {
+            gen_internal_field_ident(i)
+        })
 }
 
 fn split_ctx_to_pats_and_types(

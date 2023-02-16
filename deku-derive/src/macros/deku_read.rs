@@ -48,11 +48,10 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let (field_idents, field_reads) = emit_field_reads(input, &fields, &ident)?;
 
     // filter out temporary fields
-    let field_idents: Vec<&TokenStream> = field_idents
+    let field_idents = field_idents
         .iter()
         .filter(|f| !f.is_temp)
-        .map(|f| &f.field_ident)
-        .collect();
+        .map(|f| &f.field_ident);
 
     let internal_fields = gen_internal_field_idents(is_named_struct, field_idents);
 
@@ -207,11 +206,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 emit_field_reads(input, &variant.fields.as_ref(), &ident)?;
 
             // filter out temporary fields
-            let field_idents: Vec<&TokenStream> = field_idents
+            let field_idents = field_idents
                 .iter()
                 .filter(|f| !f.is_temp)
-                .map(|f| &f.field_ident)
-                .collect();
+                .map(|f| &f.field_ident);
 
             let internal_fields = gen_internal_field_idents(variant_is_named, field_idents);
             let initialize_enum =

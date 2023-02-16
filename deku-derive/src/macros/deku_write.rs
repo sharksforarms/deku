@@ -36,10 +36,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let field_idents = fields
         .iter()
         .enumerate()
-        .map(|(i, f)| f.get_ident(i, true))
-        .collect::<Vec<_>>();
+        .map(|(i, f)| f.get_ident(i, true));
 
-    let destructured = gen_struct_destruction(named, &input.ident, &field_idents);
+    let destructured = gen_struct_destruction(named, &input.ident, field_idents);
 
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
@@ -178,11 +177,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         let field_idents = variant
             .fields
-            .as_ref()
             .iter()
             .enumerate()
-            .map(|(i, f)| f.get_ident(i, true))
-            .collect::<Vec<_>>();
+            .map(|(i, f)| f.get_ident(i, true));
 
         let variant_id_write = if id.is_some() {
             quote! {

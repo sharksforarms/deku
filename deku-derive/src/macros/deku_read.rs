@@ -415,8 +415,8 @@ fn emit_field_reads(
     fields: &Fields<&FieldData>,
     ident: &TokenStream,
 ) -> Result<(Vec<FieldIdent>, Vec<TokenStream>), syn::Error> {
-    let mut field_reads = vec![];
-    let mut field_idents = vec![];
+    let mut field_reads = Vec::with_capacity(fields.len());
+    let mut field_idents = Vec::with_capacity(fields.len());
 
     for (i, f) in fields.iter().enumerate() {
         let (field_ident, field_read) = emit_field_read(input, i, f, ident)?;

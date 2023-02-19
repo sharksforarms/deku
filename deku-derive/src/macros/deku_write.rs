@@ -158,8 +158,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let magic_write = emit_magic_write(input);
 
-    let mut variant_writes = vec![];
-    let mut variant_updates = vec![];
+    let mut variant_writes = Vec::with_capacity(variants.len());
+    let mut variant_updates = Vec::with_capacity(variants.len());
 
     let has_discriminant = variants.iter().any(|v| v.discriminant.is_some());
 

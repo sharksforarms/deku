@@ -381,23 +381,18 @@ fn emit_field_updates(
     fields: &Fields<&FieldData>,
     object_prefix: Option<TokenStream>,
 ) -> Vec<TokenStream> {
-    let mut field_updates = vec![];
-
-    for (i, f) in fields.iter().enumerate() {
-        let new_field_updates = emit_field_update(i, f, &object_prefix);
-        field_updates.extend(new_field_updates);
-    }
-
-    field_updates
+    fields
+        .iter()
+        .enumerate()
+        .filter_map(|(i, f)| emit_field_update(i, f, &object_prefix))
+        .collect()
 }
 
 fn emit_field_update(
     i: usize,
     f: &FieldData,
     object_prefix: &Option<TokenStream>,
-) -> Vec<TokenStream> {
-    let mut field_updates = vec![];
-
+) -> Option<TokenStream> {
     let field_ident = f.get_ident(i, object_prefix.is_none());
     let deref = if object_prefix.is_none() {
         Some(quote! { * })
@@ -405,13 +400,11 @@ fn emit_field_update(
         None
     };
 
-    if let Some(field_update) = &f.update {
-        field_updates.push(quote! {
+    f.update.as_ref().map(|field_update| {
+        quote! {
             #deref #object_prefix #field_ident = (#field_update).try_into()?;
-        })
-    }
-
-    field_updates
+        }
+    })
 }
 
 fn emit_bit_byte_offsets(

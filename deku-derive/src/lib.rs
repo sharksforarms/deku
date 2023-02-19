@@ -134,6 +134,20 @@ struct DekuData {
 }
 
 impl DekuData {
+    fn from_input(input: proc_macro::TokenStream) -> Result<Self, proc_macro::TokenStream> {
+        let input = match syn::parse(input) {
+            Ok(input) => input,
+            Err(err) => return Err(err.to_compile_error().into()),
+        };
+
+        let receiver = match DekuReceiver::from_derive_input(&input) {
+            Ok(receiver) => receiver,
+            Err(err) => return Err(err.write_errors().into()),
+        };
+
+        Ok(DekuData::from_receiver(receiver)?)
+    }
+
     /// Map a `DekuReceiver` to `DekuData`
     fn from_receiver(receiver: DekuReceiver) -> Result<Self, TokenStream> {
         let data = match receiver.data {
@@ -826,43 +840,19 @@ struct DekuVariantReceiver {
 /// Entry function for `DekuRead` proc-macro
 #[proc_macro_derive(DekuRead, attributes(deku))]
 pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = match syn::parse(input) {
-        Ok(input) => input,
-        Err(err) => return err.to_compile_error().into(),
-    };
-
-    let receiver = match DekuReceiver::from_derive_input(&input) {
-        Ok(receiver) => receiver,
-        Err(err) => return err.write_errors().into(),
-    };
-
-    let data = match DekuData::from_receiver(receiver) {
-        Ok(data) => data,
-        Err(err) => return err.into(),
-    };
-
-    data.emit_reader().into()
+    match DekuData::from_input(input) {
+        Ok(data) => data.emit_reader().into(),
+        Err(err) => err.into(),
+    }
 }
 
 /// Entry function for `DekuWrite` proc-macro
 #[proc_macro_derive(DekuWrite, attributes(deku))]
 pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = match syn::parse(input) {
-        Ok(input) => input,
-        Err(err) => return err.to_compile_error().into(),
-    };
-
-    let receiver = match DekuReceiver::from_derive_input(&input) {
-        Ok(receiver) => receiver,
-        Err(err) => return err.write_errors().into(),
-    };
-
-    let data = match DekuData::from_receiver(receiver) {
-        Ok(data) => data,
-        Err(err) => return err.into(),
-    };
-
-    data.emit_writer().into()
+    match DekuData::from_input(input) {
+        Ok(data) => data.emit_writer().into(),
+        Err(err) => err.into(),
+    }
 }
 
 fn is_not_deku(attr: &syn::Attribute) -> bool {
@@ -928,8 +918,6 @@ pub fn deku_derive(
     attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let mut derives = vec![];
-
     // Parse `deku_derive` attribute
     let attr_args = syn::parse_macro_input!(attr as AttributeArgs);
     let args = match DekuDerive::from_list(&attr_args) {
@@ -939,11 +927,18 @@ pub fn deku_derive(
         }
     };
 
+    // Parse item
+    let mut data = match DekuData::from_input(item.clone()) {
+        Ok(data) => data,
+        Err(err) => return err.into(),
+    };
+
     // Generate `DekuRead` impl
-    if args.read {
-        let derive: TokenStream = proc_deku_read(item.clone()).into();
-        derives.push(derive);
-    }
+    let read_impl = if args.read {
+        data.emit_reader()
+    } else {
+        TokenStream::new()
+    };
 
     // Remove the temp fields
     let mut input = syn::parse_macro_input!(item as syn::DeriveInput);
@@ -958,12 +953,21 @@ pub fn deku_derive(
         _ => unimplemented!(),
     }
 
-    // Generate `DekuWrite` impl
-    if args.write {
-        let input = input.clone();
-        let derive: TokenStream = proc_deku_write(input.into_token_stream().into()).into();
-        derives.push(derive);
+    match data.data {
+        ast::Data::Struct(ref mut fields) => fields.fields.retain(|field| !field.temp),
+        ast::Data::Enum(ref mut variants) => {
+            for variant in variants.iter_mut() {
+                variant.fields.fields.retain(|field| !field.temp);
+            }
+        }
     }
+
+    // Generate `DekuWrite` impl
+    let write_impl = if args.write {
+        data.emit_writer()
+    } else {
+        TokenStream::new()
+    };
 
     // Remove attributes
     match input.data {
@@ -983,7 +987,9 @@ pub fn deku_derive(
     input.attrs.retain(is_not_deku);
 
     quote!(
-        #(#derives)*
+        #read_impl
+
+        #write_impl
 
         #input
     )

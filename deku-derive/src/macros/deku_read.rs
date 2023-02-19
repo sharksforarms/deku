@@ -156,9 +156,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let magic_read = emit_magic_read(input);
 
     let mut has_default_match = false;
-    let mut pre_match_tokens = vec![];
-    let mut variant_matches = vec![];
-    let mut deku_ids = vec![];
+    let mut pre_match_tokens = Vec::with_capacity(variants.len());
+    let mut variant_matches = Vec::with_capacity(variants.len());
+    let mut deku_ids = Vec::with_capacity(variants.len());
 
     let has_discriminant = variants.iter().any(|v| v.discriminant.is_some());
 

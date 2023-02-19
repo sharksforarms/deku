@@ -126,7 +126,7 @@ fn gen_internal_field_ident(ident: &TokenStream) -> TokenStream {
 fn gen_internal_field_idents<'a>(named: bool, idents: impl Iterator<Item = &'a TokenStream> + 'a) -> impl Iterator<Item = TokenStream> + 'a {
     idents
         .map(move |i| if named {
-            let h = gen_internal_field_ident(&i);
+            let h = gen_internal_field_ident(i);
             quote! {#i: #h}
         } else {
             gen_internal_field_ident(i)

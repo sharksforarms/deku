@@ -842,7 +842,7 @@ struct DekuVariantReceiver {
 pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     match DekuData::from_input(input) {
         Ok(data) => data.emit_reader().into(),
-        Err(err) => err.into(),
+        Err(err) => err,
     }
 }
 
@@ -851,7 +851,7 @@ pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     match DekuData::from_input(input) {
         Ok(data) => data.emit_writer().into(),
-        Err(err) => err.into(),
+        Err(err) => err,
     }
 }
 
@@ -930,7 +930,7 @@ pub fn deku_derive(
     // Parse item
     let mut data = match DekuData::from_input(item.clone()) {
         Ok(data) => data,
-        Err(err) => return err.into(),
+        Err(err) => return err,
     };
 
     // Generate `DekuRead` impl

@@ -1020,6 +1020,11 @@ mod tests {
             #[deku(skip, default = "5")]
             field_e: u32,
         }"#),
+        case::struct_internal_var(r#"
+        struct Test {
+            #[deku(bits_read = "deku::rest.len()")]
+            field: Vec<u8>,
+        }"#),
 
         // Valid Enum
         case::enum_empty(r#"#[deku(type = "u8")] enum Test {}"#),

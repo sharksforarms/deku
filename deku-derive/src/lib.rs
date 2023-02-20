@@ -137,15 +137,15 @@ impl DekuData {
     fn from_input(input: TokenStream) -> Result<Self, TokenStream> {
         let input = match syn::parse2(input) {
             Ok(input) => input,
-            Err(err) => return Err(err.to_compile_error().into()),
+            Err(err) => return Err(err.to_compile_error()),
         };
 
         let receiver = match DekuReceiver::from_derive_input(&input) {
             Ok(receiver) => receiver,
-            Err(err) => return Err(err.write_errors().into()),
+            Err(err) => return Err(err.write_errors()),
         };
 
-        Ok(DekuData::from_receiver(receiver)?)
+        DekuData::from_receiver(receiver)
     }
 
     /// Map a `DekuReceiver` to `DekuData`

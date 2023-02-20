@@ -33,10 +33,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let named = fields.style.is_struct();
 
-    let field_idents = fields
-        .iter()
-        .enumerate()
-        .map(|(i, f)| f.get_ident(i, true));
+    let field_idents = fields.iter().enumerate().map(|(i, f)| f.get_ident(i, true));
 
     let destructured = gen_struct_destruction(named, &input.ident, field_idents);
 

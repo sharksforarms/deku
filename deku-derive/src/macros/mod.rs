@@ -61,7 +61,10 @@ fn gen_enum_init<V: ToTokens, I: ToTokens>(
 /// - No fields: `Self {}`
 /// - Named: `Self { field_idents }`
 /// - Unnamed:  `Self ( field_idents )`
-fn gen_struct_init<I: ToTokens>(is_named: bool, field_idents: impl Iterator<Item = I>) -> TokenStream {
+fn gen_struct_init<I: ToTokens>(
+    is_named: bool,
+    field_idents: impl Iterator<Item = I>,
+) -> TokenStream {
     let mut field_idents = field_idents.peekable();
     if field_idents.peek().is_none() {
         return quote! { Self {} };
@@ -123,14 +126,18 @@ fn gen_internal_field_ident(ident: &TokenStream) -> TokenStream {
 ///
 /// - Named: `{ a: __deku_a }`
 /// - Unnamed: `( __deku_a )`
-fn gen_internal_field_idents<'a>(named: bool, idents: impl Iterator<Item = &'a TokenStream> + 'a) -> impl Iterator<Item = TokenStream> + 'a {
-    idents
-        .map(move |i| if named {
+fn gen_internal_field_idents<'a>(
+    named: bool,
+    idents: impl Iterator<Item = &'a TokenStream> + 'a,
+) -> impl Iterator<Item = TokenStream> + 'a {
+    idents.map(move |i| {
+        if named {
             let h = gen_internal_field_ident(i);
             quote! {#i: #h}
         } else {
             gen_internal_field_ident(i)
-        })
+        }
+    })
 }
 
 fn split_ctx_to_pats_and_types(

@@ -134,8 +134,8 @@ struct DekuData {
 }
 
 impl DekuData {
-    fn from_input(input: proc_macro::TokenStream) -> Result<Self, proc_macro::TokenStream> {
-        let input = match syn::parse(input) {
+    fn from_input(input: TokenStream) -> Result<Self, TokenStream> {
+        let input = match syn::parse2(input) {
             Ok(input) => input,
             Err(err) => return Err(err.to_compile_error().into()),
         };
@@ -840,18 +840,18 @@ struct DekuVariantReceiver {
 /// Entry function for `DekuRead` proc-macro
 #[proc_macro_derive(DekuRead, attributes(deku))]
 pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    match DekuData::from_input(input) {
+    match DekuData::from_input(input.into()) {
         Ok(data) => data.emit_reader().into(),
-        Err(err) => err,
+        Err(err) => err.into(),
     }
 }
 
 /// Entry function for `DekuWrite` proc-macro
 #[proc_macro_derive(DekuWrite, attributes(deku))]
 pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    match DekuData::from_input(input) {
+    match DekuData::from_input(input.into()) {
         Ok(data) => data.emit_writer().into(),
-        Err(err) => err,
+        Err(err) => err.into(),
     }
 }
 
@@ -928,9 +928,9 @@ pub fn deku_derive(
     };
 
     // Parse item
-    let mut data = match DekuData::from_input(item.clone()) {
+    let mut data = match DekuData::from_input(item.clone().into()) {
         Ok(data) => data,
-        Err(err) => return err,
+        Err(err) => return err.into(),
     };
 
     // Generate `DekuRead` impl
@@ -1043,8 +1043,7 @@ mod tests {
     fn test_macro(input: &str) {
         let parsed = parse_str(input).unwrap();
 
-        let receiver = DekuReceiver::from_derive_input(&parsed).unwrap();
-        let data = DekuData::from_receiver(receiver).unwrap();
+        let data = DekuData::from_input(parsed).unwrap();
         let res_reader = data.emit_reader_checked();
         let res_writer = data.emit_writer_checked();
 

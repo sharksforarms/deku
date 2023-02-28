@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2023-02-28
+
+### Changes
+- Faster build times: Optimize derive macros ([@dullbananas](https://github.com/dullbananas)) ([#320](https://github.com/sharksforarms/deku/pull/320))
+- Support for multiple arguments in enum `id` ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#315](https://github.com/sharksforarms/deku/pull/315))
+
+### Bug fix
+- Fixes [#264](https://github.com/sharksforarms/deku/issues/264) reported by [wildbook](https://github.com/wildbook): Drop MaybeUninit when failing to read entire slice ([@wcampbell0x2a](https://github.com/wcampbell0x2a)) ([#317](https://github.com/sharksforarms/deku/pull/317))
+
 ## [0.15.1] - 2022-12-19
 
 Small bug fix: Use fully qualified path when calling `write` as it may clash with other impls
@@ -233,9 +242,11 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.15.1...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.16.0...HEAD
 
-[0.15.0]: https://github.com/sharksforarms/deku/compare/deku-v0.15.0...deku-v0.15.1
+[0.16.0]: https://github.com/sharksforarms/deku/compare/deku-v0.15.1...deku-v0.16.0
+
+[0.15.1]: https://github.com/sharksforarms/deku/compare/deku-v0.15.0...deku-v0.15.1
 
 [0.15.0]: https://github.com/sharksforarms/deku/compare/deku-v0.14.1...deku-v0.15.0
 

@@ -116,16 +116,27 @@ fn test_struct_enum_ctx_id() {
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(ctx = "my_id: u8", id = "my_id")]
+    enum EnumJustId {
+        #[deku(id = "1")]
+        VarA(u8),
+        #[deku(id = "2")]
+        VarB,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct StructEnumId {
         my_id: u8,
         #[deku(bytes = "1")]
         data: usize,
         #[deku(ctx = "*my_id, *data")]
         enum_from_id: EnumId,
+        #[deku(ctx = "*my_id")]
+        enum_from_just_id: EnumJustId,
     }
 
     // VarA
-    let test_data = [0x01_u8, 0x01, 0xab];
+    let test_data = [0x01_u8, 0x01, 0xab, 0xab];
     let ret_read = StructEnumId::try_from(test_data.as_ref()).unwrap();
 
     assert_eq!(
@@ -133,6 +144,7 @@ fn test_struct_enum_ctx_id() {
             my_id: 0x01,
             data: 0x01,
             enum_from_id: EnumId::VarA(0xab),
+            enum_from_just_id: EnumJustId::VarA(0xab),
         },
         ret_read
     );
@@ -149,6 +161,7 @@ fn test_struct_enum_ctx_id() {
             my_id: 0x02,
             data: 0x02,
             enum_from_id: EnumId::VarB,
+            enum_from_just_id: EnumJustId::VarB,
         },
         ret_read
     );
@@ -165,6 +178,7 @@ fn test_struct_enum_ctx_id() {
             my_id: 0x02,
             data: 0x03,
             enum_from_id: EnumId::VarC(0xcc),
+            enum_from_just_id: EnumJustId::VarB,
         },
         ret_read
     );

@@ -44,6 +44,7 @@ enum DekuEnum {
 | [until](#until) | field | Set a predicate returning when to stop reading elements into a container
 | [update](#update) | field | Apply code over the field when `.update()` is called
 | [temp](#temp) | field | Read the field but exclude it from the struct/enum
+| [temp_value](#temp_value) | field | Write the field but exclude it from the struct/enum
 | [skip](#skip) | field | Skip the reading/writing of a field
 | [pad_bytes_before](#pad_bytes_before) | field | Skip bytes before reading, pad before writing
 | [pad_bits_before](#pad_bits_before) | field | Skip bits before reading, pad before writing
@@ -490,6 +491,38 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0xBE, 0xEF], value);
+```
+
+
+# temp_value
+
+Value for temporary field
+
+Will be written on corresponding offset of the struct/enum
+
+**Note**: Struct/enum must be derived with `#[deku_derive(...)]` to derive
+`DekuRead` and/or `DekuWrite`, not with `#[derive(...)]`. This is because the
+struct/enum needs to be modified at compile time.
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#[deku_derive(DekuRead, DekuWrite)]
+#[derive(Debug, PartialEq)]
+struct DekuTest {
+    #[deku(temp, temp_value = "items.len() as u8")]
+    num_items: u8,
+
+    #[deku(count = "num_items", endian = "big")]
+    items: Vec<u16>,
+}
+
+let value = DekuTest {
+    items: vec![0xDEAD, 0xBEEF]
+};
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(vec![0x02, 0xDE, 0xAD, 0xBE, 0xEF], value);
 ```
 
 # skip

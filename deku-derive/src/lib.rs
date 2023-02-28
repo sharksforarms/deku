@@ -1,6 +1,6 @@
 /*!
-    Procedural macros that implement `DekuRead` and `DekuWrite` traits
-*/
+Procedural macros that implement `DekuRead` and `DekuWrite` traits
+ */
 
 #![warn(missing_docs)]
 
@@ -415,6 +415,9 @@ struct FieldData {
     /// read field as temporary value, isn't stored
     temp: bool,
 
+    /// write given value of temp field
+    temp_value: Option<TokenStream>,
+
     /// default value code when used with skip or cond
     default: Option<TokenStream>,
 
@@ -457,6 +460,7 @@ impl FieldData {
             pad_bits_after: receiver.pad_bits_after?,
             pad_bytes_after: receiver.pad_bytes_after?,
             temp: receiver.temp,
+            temp_value: receiver.temp_value?,
             default: receiver.default?,
             cond: receiver.cond?,
             assert: receiver.assert?,
@@ -650,7 +654,7 @@ fn apply_replacements(input: &syn::LitStr) -> Result<Cow<'_, syn::LitStr>, Repla
     if input_value.contains("__deku_") {
         return Err(darling::Error::unsupported_format(
             "attribute cannot contain `__deku_` these are internal variables. Please use the `deku::` instead."
-        )) .map_err(|e| e.with_span(&input).write_errors());
+        )).map_err(|e| e.with_span(&input).write_errors());
     }
 
     let input_str = input_value
@@ -795,6 +799,10 @@ struct DekuFieldReceiver {
     #[darling(default)]
     temp: bool,
 
+    /// write given value of temp field
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    temp_value: Result<Option<TokenStream>, ReplacementError>,
+
     /// default value code when used with skip
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     default: Result<Option<TokenStream>, ReplacementError>,
@@ -875,6 +883,7 @@ fn remove_deku_temp_fields(fields: &mut syn::punctuated::Punctuated<syn::Field, 
         .filter(|x| !is_temp(x.value()))
         .collect()
 }
+
 fn remove_deku_field_attrs(fields: &mut syn::punctuated::Punctuated<syn::Field, syn::Token![,]>) {
     *fields = fields
         .clone()
@@ -928,7 +937,7 @@ pub fn deku_derive(
     };
 
     // Parse item
-    let mut data = match DekuData::from_input(item.clone().into()) {
+    let data = match DekuData::from_input(item.clone().into()) {
         Ok(data) => data,
         Err(err) => return err.into(),
     };
@@ -951,15 +960,6 @@ pub fn deku_derive(
             }
         }
         _ => unimplemented!(),
-    }
-
-    match data.data {
-        ast::Data::Struct(ref mut fields) => fields.fields.retain(|field| !field.temp),
-        ast::Data::Enum(ref mut variants) => {
-            for variant in variants.iter_mut() {
-                variant.fields.fields.retain(|field| !field.temp);
-            }
-        }
     }
 
     // Generate `DekuWrite` impl

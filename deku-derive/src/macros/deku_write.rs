@@ -33,7 +33,13 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let named = fields.style.is_struct();
 
-    let field_idents = fields.iter().enumerate().map(|(i, f)| f.get_ident(i, true));
+    let field_idents = fields.iter().enumerate().filter_map(|(i, f)| {
+        if !f.temp {
+            Some(f.get_ident(i, true))
+        } else {
+            None
+        }
+    });
 
     let destructured = gen_struct_destruction(named, &input.ident, field_idents);
 
@@ -172,11 +178,13 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let variant_ident = &variant.ident;
         let variant_writer = &variant.writer;
 
-        let field_idents = variant
-            .fields
-            .iter()
-            .enumerate()
-            .map(|(i, f)| f.get_ident(i, true));
+        let field_idents = variant.fields.iter().enumerate().filter_map(|(i, f)| {
+            if !f.temp {
+                Some(f.get_ident(i, true))
+            } else {
+                None
+            }
+        });
 
         let variant_id_write = if id.is_some() {
             quote! {
@@ -390,6 +398,9 @@ fn emit_field_update(
     f: &FieldData,
     object_prefix: &Option<TokenStream>,
 ) -> Option<TokenStream> {
+    if f.temp {
+        return None;
+    }
     let field_ident = f.get_ident(i, object_prefix.is_none());
     let deref = if object_prefix.is_none() {
         Some(quote! { * })
@@ -519,7 +530,19 @@ fn emit_field_write(
             f.ctx.as_ref(),
         )?;
 
-        quote! { ::#crate_::DekuWrite::write(#object_prefix #field_ident, __deku_output, (#write_args)) }
+        if f.temp {
+            if let Some(temp_value) = &f.temp_value {
+                let field_type = &f.ty;
+                quote! {
+                    let #field_ident: #field_type = #temp_value;
+                    ::#crate_::DekuWrite::write(#object_prefix &#field_ident, __deku_output, (#write_args))
+                }
+            } else {
+                quote! { Result::<(), ::#crate_::DekuError>::Ok(()) }
+            }
+        } else {
+            quote! { ::#crate_::DekuWrite::write(#object_prefix #field_ident, __deku_output, (#write_args)) }
+        }
     };
 
     let pad_bits_before = pad_bits(

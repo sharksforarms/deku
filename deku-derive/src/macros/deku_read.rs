@@ -109,7 +109,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
-            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
+            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> core::result::Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -120,7 +120,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
-                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, _: ()) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
+                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, _: ()) -> core::result::Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -338,7 +338,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     tokens.extend(quote! {
         #[allow(non_snake_case)]
         impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
-            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
+            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> core::result::Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -350,7 +350,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             #[allow(non_snake_case)]
             impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
-                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, _: ()) -> Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
+                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, _: ()) -> core::result::Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -371,7 +371,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if let Some(deku_id_type) = deku_id_type {
         tokens.extend(quote! {
             impl #imp DekuEnumExt<#lifetime, (#deku_id_type)> for #ident #wher {
-                fn deku_id(&self) -> Result<(#deku_id_type), DekuError> {
+                fn deku_id(&self) -> core::result::Result<(#deku_id_type), DekuError> {
                     match self {
                         #(#deku_ids ,)*
                         _ => Err(DekuError::IdVariantNotFound),
@@ -518,7 +518,7 @@ fn emit_field_read(
         .map(|v| {
             quote! { (#v) }
         })
-        .or_else(|| Some(quote! { Result::<_, ::#crate_::DekuError>::Ok }));
+        .or_else(|| Some(quote! { core::result::Result::<_, ::#crate_::DekuError>::Ok }));
 
     let ident = ident.to_string();
     let field_ident = f.get_ident(i, true);
@@ -710,7 +710,7 @@ pub fn emit_from_bytes(
     quote! {
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
-            fn from_bytes(__deku_input: (&#lifetime [u8], usize)) -> Result<((&#lifetime [u8], usize), Self), ::#crate_::DekuError> {
+            fn from_bytes(__deku_input: (&#lifetime [u8], usize)) -> core::result::Result<((&#lifetime [u8], usize), Self), ::#crate_::DekuError> {
                 #body
             }
         }
@@ -729,7 +729,7 @@ pub fn emit_try_from(
         impl #imp core::convert::TryFrom<&#lifetime [u8]> for #ident #wher {
             type Error = ::#crate_::DekuError;
 
-            fn try_from(input: &#lifetime [u8]) -> Result<Self, Self::Error> {
+            fn try_from(input: &#lifetime [u8]) -> core::result::Result<Self, Self::Error> {
                 let (rest, res) = <Self as ::#crate_::DekuContainerRead>::from_bytes((input, 0))?;
                 if !rest.0.is_empty() {
                     return Err(::#crate_::DekuError::Parse(format!("Too much data")));

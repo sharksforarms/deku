@@ -262,3 +262,14 @@ fn test_regression_292() {
         }
     );
 }
+
+#[test]
+fn issue_310() {
+    use deku::prelude::*;
+
+    #[allow(dead_code)]
+    struct Result {}
+
+    #[derive(DekuRead, DekuWrite)]
+    struct Test {}
+}

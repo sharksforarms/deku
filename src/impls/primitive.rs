@@ -87,20 +87,21 @@ macro_rules! ImplDekuReadBits {
 
                 let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
 
-                let value = if pad == 0
-                    && bit_slice.len() == MAX_TYPE_BITS
-                    && bit_slice.domain().region().unwrap().1.len() * 8 == MAX_TYPE_BITS
-                {
-                    // if everything is aligned, just read the value
-                    let bytes: &[u8] = bit_slice.domain().region().unwrap().1;
+                // if everything is aligned, just read the value
+                if pad == 0 && bit_slice.len() == MAX_TYPE_BITS {
+                    let bytes = bit_slice.domain().region().unwrap().1;
 
-                    // Read value
-                    if input_is_le {
-                        <$typ>::from_le_bytes(bytes.try_into()?)
-                    } else {
-                        <$typ>::from_be_bytes(bytes.try_into()?)
+                    if bytes.len() * 8 == MAX_TYPE_BITS {
+                        // Read value
+                        let value = if input_is_le {
+                            <$typ>::from_le_bytes(bytes.try_into()?)
+                        } else {
+                            <$typ>::from_be_bytes(bytes.try_into()?)
+                        };
+                        return Ok((rest, value));
                     }
-                } else {
+                }
+
                     // Create a new BitVec from the slice and pad un-aligned chunks
                     // i.e. [10010110, 1110] -> [10010110, 00001110]
                     let bits: BitVec<u8, Msb0> = {
@@ -138,13 +139,12 @@ macro_rules! ImplDekuReadBits {
                     let bytes: &[u8] = bits.domain().region().unwrap().1;
 
                     // Read value
-                    if input_is_le {
+                    let value = if input_is_le {
                         <$typ>::from_le_bytes(bytes.try_into()?)
                     } else {
                         <$typ>::from_be_bytes(bytes.try_into()?)
-                    }
-                };
-                Ok((rest, value))
+                    };
+                    Ok((rest, value))
             }
         }
     };
@@ -176,14 +176,12 @@ macro_rules! ImplDekuReadBytes {
 
                 let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
 
+                let bytes = bit_slice.domain().region().unwrap().1;
                 let value = if pad == 0
                     && bit_slice.len() == MAX_TYPE_BITS
-                    && bit_slice.domain().region().unwrap().1.len() * 8 == MAX_TYPE_BITS
+                    && bytes.len() * 8 == MAX_TYPE_BITS
                 {
                     // if everything is aligned, just read the value
-                    let bytes: &[u8] = bit_slice.domain().region().unwrap().1;
-
-                    // Read value
                     if input_is_le {
                         <$typ>::from_le_bytes(bytes.try_into()?)
                     } else {
@@ -198,8 +196,6 @@ macro_rules! ImplDekuReadBytes {
                     // Force align
                     //i.e. [1110, 10010110] -> [11101001, 0110]
                     bits.force_align();
-
-                    let bytes: &[u8] = bit_slice.domain().region().unwrap().1;
 
                     // cannot use from_X_bytes as we don't have enough bytes for $typ
                     // read manually

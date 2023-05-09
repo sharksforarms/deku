@@ -149,13 +149,16 @@ First the "type" is read using the `type`, then is matched against the
 variants given `id`. What happens after is the same as structs!
 
 This is implemented with the [id](/attributes/index.html#id),
-[id_pat](/attributes/index.html#id_pat) and
+[id_pat](/attributes/index.html#id_pat), [catch_all](/attributes/index.html#catch_all) and
 [type](attributes#type) attributes. See these for more examples.
 
 If no `id` is specified, the variant will default to it's discriminant value.
 
-If no variant can be matched, a [DekuError::Parse](crate::error::DekuError)
+If no variant can be matched and the `catch_all` is not provided, a [DekuError::Parse](crate::error::DekuError)
 error will be returned.
+
+If no variant can be matched and the `catch_all` is provided, a variant will be returned
+based on the field marked with `catch_all`.
 
 Example:
 

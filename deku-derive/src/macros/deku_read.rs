@@ -156,6 +156,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let magic_read = emit_magic_read(input);
 
     let mut has_default_match = false;
+    let mut catch_all_reader = None;
     let mut pre_match_tokens = Vec::with_capacity(variants.len());
     let mut variant_matches = Vec::with_capacity(variants.len());
     let mut deku_ids = Vec::with_capacity(variants.len());
@@ -198,6 +199,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         let variant_ident = &variant.ident;
         let variant_reader = &variant.reader;
+        let variant_has_catch_all = variant.catch_all.unwrap_or(false);
 
         let variant_read_func = if variant_reader.is_some() {
             quote! { #variant_reader; }
@@ -210,7 +212,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 .iter()
                 .filter(|f| !f.is_temp)
                 .map(|f| &f.field_ident);
-
             let internal_fields = gen_internal_field_idents(variant_is_named, field_idents);
             let initialize_enum =
                 super::gen_enum_init(variant_is_named, variant_ident, internal_fields);
@@ -243,6 +244,16 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         };
 
+        // register `catch_all`
+        if catch_all_reader.is_some() && variant_has_catch_all {
+            return Err(syn::Error::new(
+                variant.ident.span(),
+                "DekuRead: `catch_all` must be specified only one time",
+            ));
+        } else if catch_all_reader.is_none() && variant_has_catch_all {
+            catch_all_reader = Some(variant_read_func.clone())
+        }
+
         variant_matches.push(quote! {
             #variant_id => {
                 #variant_read_func
@@ -251,7 +262,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     }
 
     // if no default match, return error
-    if !has_default_match {
+    if !has_default_match && catch_all_reader.is_none() {
         variant_matches.push(quote! {
             _ => {
                 return Err(::#crate_::DekuError::Parse(
@@ -263,6 +274,17 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                         ));
             }
         });
+    }
+
+    // if catch_all
+    if !has_default_match {
+        if let Some(variant_read_func) = catch_all_reader {
+            variant_matches.push(quote! {
+                _ => {
+                    #variant_read_func
+                }
+            });
+        }
     }
 
     let variant_id_read = if id.is_some() {

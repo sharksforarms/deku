@@ -1,0 +1,5 @@
+error: DekuRead: `catch_all` must be specified only one time
+ --> tests/test_compile/cases/catch_all_multiple.rs:9:5
+  |
+9 |     B = 2,
+  |     ^

@@ -1,4 +1,4 @@
-error: DekuRead: `catch_all` must be specified only one time
+error: DekuRead: `default` must be specified only once
  --> tests/test_compile/cases/catch_all_multiple.rs:9:5
   |
 9 |     B = 2,

@@ -547,8 +547,8 @@ struct VariantData {
     /// variant `id_pat` value
     id_pat: Option<TokenStream>,
 
-    /// variant `catch_all` option
-    catch_all: Option<bool>,
+    /// variant `default` option
+    default: Option<bool>,
 }
 
 impl VariantData {
@@ -571,7 +571,7 @@ impl VariantData {
             writer: receiver.writer?,
             id: receiver.id,
             id_pat: receiver.id_pat?,
-            catch_all: receiver.catch_all,
+            default: receiver.default,
         };
 
         VariantData::validate(&ret)?;
@@ -850,7 +850,7 @@ struct DekuVariantReceiver {
 
     /// variant `id` value
     #[darling(default)]
-    catch_all: Option<bool>,
+    default: Option<bool>,
 }
 
 /// Entry function for `DekuRead` proc-macro

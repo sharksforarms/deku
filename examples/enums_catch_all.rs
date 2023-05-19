@@ -15,7 +15,7 @@ pub enum DekuTest {
     #[deku(id = "2")]
     B = 1,
     /// C
-    #[deku(id = "3", catch_all)]
+    #[deku(id = "3", default)]
     C = 2,
 }
 

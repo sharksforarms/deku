@@ -15,7 +15,7 @@ mod test {
         /// B
         B = 1,
         /// C
-        #[deku(catch_all)]
+        #[deku(default)]
         C = 2,
     }
 
@@ -32,7 +32,7 @@ mod test {
         #[deku(id = "2")]
         B = 1,
         /// C
-        #[deku(id = "3", catch_all)]
+        #[deku(id = "3", default)]
         C = 2,
     }
 
@@ -75,7 +75,7 @@ mod test {
     }
 
     #[test]
-    fn test_advanced_remapping_catch_all_field() {
+    fn test_advanced_remapping_default_field() {
         let input = [10u8];
         let output = [3u8];
         let ret_read = AdvancedRemapping::try_from(input.as_slice()).unwrap();

@@ -152,3 +152,27 @@ fn test_id_pat_with_id() {
     );
     assert_eq!(input, &*v.to_bytes().unwrap());
 }
+
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(type = "u16", id_endian = "big", endian = "little")]
+enum VariableEndian {
+    #[deku(id = "0x01")]
+    Little(u16),
+    #[deku(id = "0x02")]
+    Big {
+        #[deku(endian = "big")]
+        x: u16,
+    },
+}
+
+#[rstest(input, expected,
+case(&hex!("00010100"), VariableEndian::Little(1)),
+case(&hex!("00020100"), VariableEndian::Big{x: 256})
+)]
+fn test_variable_endian_enum(input: &[u8], expected: VariableEndian) {
+    let ret_read = VariableEndian::try_from(input).unwrap();
+    assert_eq!(expected, ret_read);
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(input.to_vec(), ret_write);
+}

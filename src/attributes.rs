@@ -63,6 +63,7 @@ enum DekuEnum {
 | [ctx](#ctx) | top-level, field| Context list for context sensitive parsing
 | [ctx_default](#ctx_default) | top-level, field| Default context values
 | enum: [id](#id) | top-level, variant | enum or variant id value
+| enum: [id_endian](#id_endian) | top-level | Endianness of *just* the enum `id`
 | enum: [id_pat](#id_pat) | variant | variant id match pattern
 | enum: [type](#type) | top-level | Set the type of the variant `id`
 | enum: [bits](#bits-1) | top-level | Set the bit-size of the variant `id`
@@ -1377,6 +1378,48 @@ assert_eq!(
 
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x02], variant_bytes);
+```
+
+# id_endian
+
+Specify the endianness of the variant `id`, without mandating the same endianness for the fields.
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(id_type = "u16", id_endian = "big", endian = "little")]
+enum DekuTest {
+    // Takes its endianness from the enum spec
+    #[deku(id = "0x01")]
+    VariantLittle(u16),
+    // Force the endianness on the field
+    #[deku(id = "0x02")]
+    VariantBig {
+        #[deku(endian = "big")]
+        x: u16,
+    },
+}
+
+let data: Vec<u8> = vec![0x00, 0x01, 0x01, 0x00];
+
+let (_, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+
+assert_eq!(
+    DekuTest::VariantLittle(1),
+    value
+);
+
+// ID changes, data bytes the same
+let data: Vec<u8> = vec![0x00, 0x02, 0x01, 0x00];
+
+let (_, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+
+assert_eq!(
+    DekuTest::VariantBig { x: 256 },
+    value
+);
 ```
 
 # id_pat

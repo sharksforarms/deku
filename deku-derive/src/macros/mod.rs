@@ -240,7 +240,10 @@ pub(crate) fn gen_id_args(
     bytes: Option<&Num>,
 ) -> syn::Result<TokenStream> {
     let crate_ = get_crate_name();
-    let endian = id_endian.map(gen_endian_from_str).or_else(|| endian.map(gen_endian_from_str)).transpose()?;
+    let endian = id_endian
+        .map(gen_endian_from_str)
+        .or_else(|| endian.map(gen_endian_from_str))
+        .transpose()?;
     let bits = bits.map(|n| quote! {::#crate_::ctx::BitSize(#n)});
     let bytes = bytes.map(|n| quote! {::#crate_::ctx::ByteSize(#n)});
 

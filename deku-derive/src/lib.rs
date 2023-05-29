@@ -208,7 +208,7 @@ impl DekuData {
                 } else if data.id.is_some() {
                     Err(cerror(data.id.span(), "`id` only supported on enum"))
                 } else if data.id_endian.is_some() {
-                    Err(cerror(data.id.span(), "`endian_id` only supported on enum"))
+                    Err(cerror(data.id.span(), "`id_endian` only supported on enum"))
                 } else if data.bytes.is_some() {
                     Err(cerror(data.bytes.span(), "`bytes` only supported on enum"))
                 } else if data.bits.is_some() {

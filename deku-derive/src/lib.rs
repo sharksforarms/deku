@@ -120,6 +120,9 @@ struct DekuData {
     /// A magic value that must appear at the start of this struct/enum's data
     magic: Option<syn::LitByteStr>,
 
+    /// extra where-clause items for derived impls
+    bound: Option<syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>>,
+
     /// enum only: `id` value
     id: Option<Id>,
 
@@ -175,6 +178,7 @@ impl DekuData {
             ctx: receiver.ctx,
             ctx_default: receiver.ctx_default,
             magic: receiver.magic,
+            bound: receiver.bound,
             id: receiver.id,
             id_type: receiver.id_type?,
             bits: receiver.bits,
@@ -328,7 +332,7 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataEnum<'a> {
 #[derive(Debug)]
 struct DekuDataStruct<'a> {
     imp: syn::ImplGenerics<'a>,
-    wher: Option<&'a syn::WhereClause>,
+    wher: Option<Cow<'a, syn::WhereClause>>,
     ident: TokenStream,
     fields: darling::ast::Fields<&'a FieldData>,
 }
@@ -345,6 +349,23 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataStruct<'a> {
 
         // Checked in `emit_deku_{read/write}`.
         let fields = deku_data.data.as_ref().take_struct().unwrap();
+
+        let wher = wher.map(Cow::Borrowed);
+        let wher = match &deku_data.bound {
+            Some(bound) => {
+                let mut wher = wher.unwrap_or_else(|| {
+                    Cow::Owned(syn::WhereClause {
+                        where_token: <syn::Token![where]>::default(),
+                        predicates: syn::punctuated::Punctuated::new(),
+                    })
+                });
+                wher.to_mut()
+                    .predicates
+                    .extend(bound.iter().map(Clone::clone));
+                Some(wher)
+            }
+            None => wher,
+        };
 
         Ok(Self {
             imp,
@@ -624,6 +645,10 @@ struct DekuReceiver {
     /// A magic value that must appear at the start of this struct/enum's data
     #[darling(default)]
     magic: Option<syn::LitByteStr>,
+
+    /// extra where-clause items for derived impls
+    #[darling(default)]
+    bound: Option<syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>>,
 
     /// enum only: `id` value
     #[darling(default)]

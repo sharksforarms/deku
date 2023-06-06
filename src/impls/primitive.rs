@@ -9,54 +9,19 @@ use alloc::format;
 impl DekuRead<'_, (Endian, ByteSize)> for u8 {
     fn read(
         input: &BitSlice<u8, Msb0>,
-        (_, size): (Endian, ByteSize),
+        (_, _): (Endian, ByteSize),
     ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
         const MAX_TYPE_BITS: usize = BitSize::of::<u8>().0;
-        let bit_size: usize = size.0 * 8;
-
-        // TODO
-        // if they never give [bits] or [bytes] we don't need to check the size
-        if bit_size > MAX_TYPE_BITS {
-            return Err(DekuError::Parse(format!(
-                "too much data: container of {MAX_TYPE_BITS} bits cannot hold {bit_size} bits",
+        if input.len() < MAX_TYPE_BITS {
+            return Err(DekuError::Incomplete(crate::error::NeedSize::new(
+                MAX_TYPE_BITS,
             )));
         }
 
-        if input.len() < bit_size {
-            return Err(DekuError::Incomplete(crate::error::NeedSize::new(bit_size)));
-        }
+        // SAFETY: We already check that input.len() < bit_size above
+        let (bit_slice, rest) = unsafe { input.split_at_unchecked(MAX_TYPE_BITS) };
 
-        let (bit_slice, rest) = input.split_at(bit_size);
-        let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
-
-        let value = if pad == 0
-            && bit_slice.len() == MAX_TYPE_BITS
-            && bit_slice.domain().region().unwrap().1.len() * 8 == MAX_TYPE_BITS
-        {
-            // if everything is aligned, just read the value
-            bit_slice.load::<u8>()
-        } else {
-            let mut bits: BitVec<u8, Msb0> = BitVec::with_capacity(bit_slice.len() + pad);
-
-            // Copy bits to new BitVec
-            bits.extend_from_bitslice(bit_slice);
-
-            // Force align
-            //i.e. [1110, 10010110] -> [11101001, 0110]
-            bits.force_align();
-
-            let bytes: &[u8] = bits.as_raw_slice();
-
-            // cannot use from_X_bytes as we don't have enough bytes for $typ
-            // read manually
-            let mut res: u8 = 0;
-            for b in bytes.iter().rev() {
-                res |= *b;
-            }
-
-            res
-        };
-
+        let value = bit_slice.load::<u8>();
         Ok((rest, value))
     }
 }

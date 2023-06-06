@@ -1,28 +1,15 @@
-use crate::{DekuError, DekuRead, DekuWrite};
 use bitvec::prelude::*;
+use no_std_io::io::Read;
 
-impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy> DekuRead<'a, Ctx> for Option<T> {
-    /// Read a T from input and store as Some(T)
-    /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s when constructing.
-    /// # Examples
-    /// ```rust
-    /// # use deku::ctx::*;
-    /// # use deku::DekuRead;
-    /// # use deku::bitvec::BitView;
-    /// let input = vec![1u8, 2, 3, 4];
-    /// let (rest, v) = Option::<u32>::read(input.view_bits(), Endian::Little).unwrap();
-    /// assert!(rest.is_empty());
-    /// assert_eq!(v, Some(0x04030201))
-    /// ```
-    fn read(
-        input: &'a BitSlice<u8, Msb0>,
+use crate::{DekuError, DekuReader, DekuWrite};
+
+impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
+    fn from_reader_with_ctx<R: Read>(
+        reader: &mut crate::reader::Reader<R>,
         inner_ctx: Ctx,
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
-    where
-        Self: Sized,
-    {
-        let (rest, val) = <T>::read(input, inner_ctx)?;
-        Ok((rest, Some(val)))
+    ) -> Result<Self, DekuError> {
+        let val = <T>::from_reader_with_ctx(reader, inner_ctx)?;
+        Ok(Some(val))
     }
 }
 
@@ -40,5 +27,23 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Option<T> {
     /// ```
     fn write(&self, output: &mut BitVec<u8, Msb0>, inner_ctx: Ctx) -> Result<(), DekuError> {
         self.as_ref().map_or(Ok(()), |v| v.write(output, inner_ctx))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use no_std_io::io::Cursor;
+
+    use crate::reader::Reader;
+
+    #[test]
+    fn test_option() {
+        use crate::ctx::*;
+        let input = &[1u8, 2, 3, 4];
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let v = Option::<u32>::from_reader_with_ctx(&mut reader, Endian::Little).unwrap();
+        assert_eq!(v, Some(0x04030201))
     }
 }

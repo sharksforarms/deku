@@ -1,12 +1,14 @@
+use std::convert::TryFrom;
+
+use darling::ast::{Data, Fields};
+use proc_macro2::TokenStream;
+use quote::quote;
+
 use crate::macros::{
     gen_ctx_types_and_arg, gen_field_args, gen_struct_destruction, pad_bits, token_contains_string,
     wrap_default_ctx,
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
-use darling::ast::{Data, Fields};
-use proc_macro2::TokenStream;
-use quote::quote;
-use std::convert::TryFrom;
 
 pub(crate) fn emit_deku_write(input: &DekuData) -> Result<TokenStream, syn::Error> {
     match &input.data {

@@ -1,7 +1,8 @@
+use std::convert::{TryFrom, TryInto};
+
 use deku::prelude::*;
 use hexlit::hex;
 use rstest::rstest;
-use std::convert::{TryFrom, TryInto};
 
 #[rstest(input,
     case(&hex!("64656b75")),
@@ -25,8 +26,8 @@ fn test_magic_struct(input: &[u8]) {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(magic = b"deku")]
     struct TestStruct {}
-
-    let ret_read = TestStruct::try_from(input).unwrap();
+    let input = input.to_vec();
+    let ret_read = TestStruct::try_from(input.as_slice()).unwrap();
 
     assert_eq!(TestStruct {}, ret_read);
 
@@ -62,8 +63,9 @@ fn test_magic_enum(input: &[u8]) {
         #[deku(id = "0")]
         Variant,
     }
+    let input = input.to_vec();
 
-    let ret_read = TestEnum::try_from(input).unwrap();
+    let ret_read = TestEnum::try_from(input.as_slice()).unwrap();
 
     assert_eq!(TestEnum::Variant, ret_read);
 

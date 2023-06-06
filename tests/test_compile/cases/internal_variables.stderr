@@ -1,5 +1,5 @@
 error: Unexpected meta-item format `attribute cannot contain `__deku_` these are internal variables. Please use the `deku::` instead.`
-  --> $DIR/internal_variables.rs:93:19
+  --> tests/test_compile/cases/internal_variables.rs:89:19
    |
-93 |     #[deku(cond = "__deku_bit_offset == *field_a as usize")]
+89 |     #[deku(cond = "__deku_bit_offset == *field_a as usize")]
    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

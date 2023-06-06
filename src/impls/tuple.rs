@@ -1,7 +1,9 @@
 //! Implementations of DekuRead and DekuWrite for tuples of length 1 to 11
 
-use crate::{DekuError, DekuRead, DekuWrite};
 use bitvec::prelude::*;
+use no_std_io::io::Read;
+
+use crate::{DekuError, DekuReader, DekuWrite};
 
 // Trait to help us build intermediate tuples while DekuRead'ing each element
 // from the tuple
@@ -34,23 +36,21 @@ macro_rules! ImplDekuTupleTraits {
             }
         }
 
-        impl<'a, Ctx: Copy, $($T:DekuRead<'a, Ctx>+Sized),+> DekuRead<'a, Ctx> for ($($T,)+)
+        impl<'a, Ctx: Copy, $($T:DekuReader<'a, Ctx>+Sized),+> DekuReader<'a, Ctx> for ($($T,)+)
         {
-            fn read(
-                input: &'a BitSlice<u8, Msb0>,
+            fn from_reader_with_ctx<R: Read>(
+                reader: &mut crate::reader::Reader<R>,
                 ctx: Ctx,
-            ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+            ) -> Result<Self, DekuError>
             where
                 Self: Sized,
             {
                 let tuple = ();
-                let mut rest = input;
                 $(
-                    let read = <$T>::read(rest, ctx)?;
-                    rest = read.0;
-                    let tuple = tuple.append(read.1);
+                    let val = <$T>::from_reader_with_ctx(reader, ctx)?;
+                    let tuple = tuple.append(val);
                 )+
-                Ok((rest, tuple))
+                Ok(tuple)
             }
         }
 
@@ -82,27 +82,10 @@ ImplDekuTupleTraits! { A, B, C, D, E, F, G, H, I, J, K, }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::native_endian;
-    use core::fmt::Debug;
-
     use rstest::rstest;
 
-    #[rstest(input, expected, expected_rest,
-        case::length_1([0xef, 0xbe, 0xad, 0xde].as_ref(), (native_endian!(0xdeadbeef_u32),), bits![u8, Msb0;]),
-        case::length_2([1, 0x24, 0x98, 0x82, 0].as_ref(), (true, native_endian!(0x829824_u32)), bits![u8, Msb0;]),
-        case::length_11([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].as_ref(), (0u8, 1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8, 9u8, 10u8), bits![u8, Msb0;]),
-        case::extra_rest([1, 0x24, 0x98, 0x82, 0, 0].as_ref(), (true, native_endian!(0x829824_u32)), bits![u8, Msb0; 0, 0, 0, 0, 0, 0, 0, 0]),
-    )]
-    fn test_tuple_read<'a, T>(input: &'a [u8], expected: T, expected_rest: &BitSlice<u8, Msb0>)
-    where
-        T: DekuRead<'a> + Sized + PartialEq + Debug,
-    {
-        let bit_slice = input.view_bits::<Msb0>();
-        let (rest, res_read) = <T>::read(bit_slice, ()).unwrap();
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
-    }
+    use super::*;
+    use crate::native_endian;
 
     #[rstest(input, expected,
         case::length_1((native_endian!(0xdeadbeef_u32),), vec![0xef, 0xbe, 0xad, 0xde]),

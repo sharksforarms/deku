@@ -75,6 +75,7 @@ Example:
 ```rust
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
+# use std::io::Cursor;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 // #[deku(endian = "little")] // top-level, defaults to system endianness
 struct DekuTest {
@@ -83,9 +84,10 @@ struct DekuTest {
     field_default: u16, // defaults to top-level
 }
 
-let data: Vec<u8> = vec![0xAB, 0xCD, 0xAB, 0xCD];
+let data: &[u8] = &[0xAB, 0xCD, 0xAB, 0xCD];
+let mut cursor = Cursor::new(data);
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -96,7 +98,7 @@ assert_eq!(
 );
 
 let value: Vec<u8> = value.try_into().unwrap();
-assert_eq!(data, value);
+assert_eq!(data, &*value);
 ```
 
 **Note**: The `endian` is passed as a context argument to sub-types
@@ -123,9 +125,9 @@ struct DekuTest {
     field_child: Child,
 }
 
-let data: Vec<u8> = vec![0xAB, 0xCD, 0xAB, 0xCD, 0xEF, 0xBE];
+let data: &[u8] = &[0xAB, 0xCD, 0xAB, 0xCD, 0xEF, 0xBE];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -137,7 +139,7 @@ assert_eq!(
 );
 
 let value: Vec<u8> = value.try_into().unwrap();
-assert_eq!(data, value);
+assert_eq!(&*data, value);
 ```
 
 # magic
@@ -156,9 +158,9 @@ struct DekuTest {
     data: u8
 }
 
-let data: Vec<u8> = vec![b'd', b'e', b'k', b'u', 50];
+let data: &[u8] = &[b'd', b'e', b'k', b'u', 50];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest { data: 50 },
@@ -183,9 +185,9 @@ struct DekuTest {
     data: u8
 }
 
-let data: Vec<u8> = vec![0x00, 0x01, 0x02];
+let data: &[u8] = &[0x00, 0x01, 0x02];
 
-let value = DekuTest::try_from(data.as_ref());
+let value = DekuTest::try_from(data);
 
 assert_eq!(
     Err(DekuError::Assertion("DekuTest.data field failed assertion: * data >= 8".into())),
@@ -207,9 +209,9 @@ struct DekuTest {
     data: u8,
 }
 
-let data: Vec<u8> = vec![0x01];
+let data: &[u8] = &[0x01];
 
-let mut value = DekuTest::try_from(data.as_ref()).unwrap();
+let mut value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest { data: 0x01 },
@@ -245,9 +247,9 @@ struct DekuTest {
     field_c: u8, // defaults to size_of<u8>*8
 }
 
-let data: Vec<u8> = vec![0b11_101010, 0xFF];
+let data: &[u8] = &[0b11_101010, 0xFF];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -259,7 +261,7 @@ assert_eq!(
 );
 
 let value: Vec<u8> = value.try_into().unwrap();
-assert_eq!(data, value);
+assert_eq!(&*data, value);
 ```
 
 # bytes
@@ -279,9 +281,9 @@ struct DekuTest {
     field_b: u8, // defaults to size_of<u8>
 }
 
-let data: Vec<u8> = vec![0xAB, 0xCD, 0xFF];
+let data: &[u8] = &[0xAB, 0xCD, 0xFF];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -311,9 +313,9 @@ struct DekuTest {
     items: Vec<u8>,
 }
 
-let data: Vec<u8> = vec![0x02, 0xAB, 0xCD];
+let data: &[u8] = &[0x02, 0xAB, 0xCD];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -354,9 +356,9 @@ struct DekuTest {
     items: Vec<InnerDekuTest>,
 }
 
-let data: Vec<u8> = vec![0x04, 0xAB, 0xBC, 0xDE, 0xEF];
+let data: &[u8] = &[0x04, 0xAB, 0xBC, 0xDE, 0xEF];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -369,7 +371,7 @@ assert_eq!(
 );
 
 let value: Vec<u8> = value.try_into().unwrap();
-assert_eq!(data, value);
+assert_eq!(&*data, value);
 ```
 
 **Note**: See [update](#update) for more information on the attribute!
@@ -401,8 +403,8 @@ struct DekuTest {
     string: Vec<u8>
 }
 
-let data: Vec<u8> = vec![b'H', b'e', b'l', b'l', b'o', 0];
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let data: &[u8] = &[b'H', b'e', b'l', b'l', b'o', 0];
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -429,10 +431,10 @@ struct DekuTest {
     items: Vec<u8>,
 }
 
-let data: Vec<u8> = vec![0x02, 0xAB, 0xCD];
+let data: &[u8] = &[0x02, 0xAB, 0xCD];
 
 // `mut` so it can be updated
-let mut value = DekuTest::try_from(data.as_ref()).unwrap();
+let mut value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest { count: 0x02, items: vec![0xAB, 0xCD] },
@@ -478,9 +480,9 @@ struct DekuTest {
     items: Vec<u16>,
 }
 
-let data: Vec<u8> = vec![0x01, 0xBE, 0xEF];
+let data: &[u8] = &[0x01, 0xBE, 0xEF];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -546,9 +548,9 @@ struct DekuTest {
     field_c: u8,
 }
 
-let data: Vec<u8> = vec![0x01, 0x02];
+let data: &[u8] = &[0x01, 0x02];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest { field_a: 0x01, field_b: None, field_c: 0x02 },
@@ -572,9 +574,9 @@ pub struct DekuTest {
     pub field_b: u8,
 }
 
-let data: Vec<u8> = vec![0xAA, 0xBB, 0xCC, 0xDD];
+let data: &[u8] = &[0xAA, 0xBB, 0xCC, 0xDD];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -605,9 +607,9 @@ struct DekuTest {
     field_b: u8,
 }
 
-let data: Vec<u8> = vec![0b10_01_1001];
+let data: &[u8] = &[0b10_01_1001];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -637,9 +639,9 @@ pub struct DekuTest {
     pub field_b: u8,
 }
 
-let data: Vec<u8> = vec![0xAA, 0xBB, 0xCC, 0xDD];
+let data: &[u8] = &[0xAA, 0xBB, 0xCC, 0xDD];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -670,9 +672,9 @@ struct DekuTest {
     field_b: u8,
 }
 
-let data: Vec<u8> = vec![0b10_01_1001];
+let data: &[u8] = &[0b10_01_1001];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -708,9 +710,9 @@ struct DekuTest {
     field_d: Option<u8>,
 }
 
-let data: Vec<u8> = vec![0x01, 0x02];
+let data: &[u8] = &[0x01, 0x02];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest { field_a: 0x01, field_b: Some(0x02), field_c: Some(0x05), field_d: Some(0x06)},
@@ -742,9 +744,9 @@ struct DekuTest {
     field_c: u8,
 }
 
-let data: Vec<u8> = vec![0x01, 0x02];
+let data: &[u8] = &[0x01, 0x02];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest { field_a: 0x01, field_b: Some(0x01), field_c: 0x02 },
@@ -777,9 +779,9 @@ impl DekuTest {
     }
 }
 
-let data: Vec<u8> = vec![0x01, 0x02];
+let data: &[u8] = &[0x01, 0x02];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest { field_a: "1".to_string(), field_b: "2".to_string() },
@@ -800,7 +802,7 @@ use deku::prelude::*;
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(
-        reader = "DekuTest::read(deku::rest)",
+        reader = "DekuTest::read(deku::reader)",
         writer = "DekuTest::write(deku::output, &self.field_a)"
     )]
     field_a: String,
@@ -808,11 +810,11 @@ struct DekuTest {
 
 impl DekuTest {
     /// Read and convert to String
-    fn read(
-        rest: &BitSlice<u8, Msb0>,
-    ) -> Result<(&BitSlice<u8, Msb0>, String), DekuError> {
-        let (rest, value) = u8::read(rest, ())?;
-        Ok((rest, value.to_string()))
+    fn read<R: std::io::Read>(
+        reader: &mut deku::reader::Reader<R>,
+    ) -> Result<String, DekuError> {
+        let value = u8::from_reader_with_ctx(reader, ())?;
+        Ok(value.to_string())
     }
 
     /// Parse from String to u8 and write
@@ -822,9 +824,9 @@ impl DekuTest {
     }
 }
 
-let data: Vec<u8> = vec![0x01];
+let data: &[u8] = &[0x01];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest { field_a: "1".to_string() },
@@ -832,7 +834,7 @@ assert_eq!(
 );
 
 let value: Vec<u8> = value.try_into().unwrap();
-assert_eq!(data, value);
+assert_eq!(data, &*value);
 ```
 
 # ctx
@@ -852,9 +854,12 @@ for example `#[deku("a, b")]`
 2. `endian`, `bytes`, `bits` attributes declared on the top-level
     - These are prepended to the list of ctx variables
 
+**Note**: The `enum` or `struct` that uses `ctx` will not implement [DekuContainerRead](crate::DekuContainerRead) or [DekuContainerWrite](crate::DekuContainerWrite) unless [ctx_default](#ctx_default) is also used.
+
 Example
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 #[derive(DekuRead, DekuWrite)]
 #[deku(ctx = "a: u8")]
 struct Subtype {
@@ -869,9 +874,10 @@ struct Test {
     sub: Subtype
 }
 
-let data: Vec<u8> = vec![0x01, 0x02];
+let data: &[u8] = &[0x01, 0x02];
+let mut cursor = Cursor::new(data);
 
-let (rest, value) = Test::from_bytes((&data[..], 0)).unwrap();
+let (amt_read, value) = Test::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
@@ -920,6 +926,7 @@ values for the context
 Example:
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 #[derive(DekuRead, DekuWrite)]
 #[deku(ctx = "a: u8", ctx_default = "1")] // Defaults `a` to 1
 struct Subtype {
@@ -934,18 +941,20 @@ struct Test {
     sub: Subtype
 }
 
-let data: Vec<u8> = vec![0x01, 0x02];
+let data: &[u8] = &[0x01, 0x02];
+let mut cursor = Cursor::new(data);
 
 // Use with context from `Test`
-let (rest, value) = Test::from_bytes((&data[..], 0)).unwrap();
+let (amt_read, value) = Test::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02);
 
 // Use as a stand-alone container, using defaults
-// Note: `from_bytes` is now available on `SubType`
-let data: Vec<u8> = vec![0x02];
+// Note: `from_reader` is now available on `SubType`
+let data: &[u8] = &[0x02];
+let mut cursor = Cursor::new(data);
 
-let (rest, value) = Subtype::from_bytes((&data[..], 0)).unwrap();
+let (amt_read, value) = Subtype::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(value.b, 0x01 + 0x02)
 ```
 
@@ -979,8 +988,8 @@ enum MyEnum {
     VariantB,
 }
 
-let data: Vec<u8> = vec![0x01_u8, 0xff, 0xab];
-let ret_read = DekuTest::try_from(data.as_ref()).unwrap();
+let data: &[u8] = &[0x01_u8, 0xff, 0xab];
+let ret_read = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest {
@@ -992,7 +1001,7 @@ assert_eq!(
 );
 
 let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-assert_eq!(ret_write, data)
+assert_eq!(&*ret_write, data)
 ```
 
 ## id (variant)
@@ -1007,6 +1016,7 @@ or [id (top-level)](#id-top-level)
 Example:
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
@@ -1017,9 +1027,10 @@ enum DekuTest {
     VariantB(u8, u16),
 }
 
-let data: Vec<u8> = vec![0x01, 0xFF, 0x02, 0xAB, 0xEF, 0xBE];
+let data: &[u8] = &[0x01, 0xFF, 0x02, 0xAB, 0xEF, 0xBE];
+let mut cursor = Cursor::new(data);
 
-let (rest, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantA(0xFF),
@@ -1029,7 +1040,7 @@ assert_eq!(
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x01, 0xFF], variant_bytes);
 
-let (rest, value) = DekuTest::from_bytes(rest).unwrap();
+let (amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantB(0xAB, 0xBEEF),
@@ -1043,6 +1054,7 @@ assert_eq!(vec![0x02, 0xAB, 0xEF, 0xBE], variant_bytes);
 Example discriminant
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
@@ -1051,9 +1063,10 @@ enum DekuTest {
     VariantB,
 }
 
-let data: Vec<u8> = vec![0x01, 0x02];
+let data: &[u8] = &[0x01, 0x02];
+let mut cursor = Cursor::new(data);
 
-let (rest, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantA,
@@ -1063,7 +1076,7 @@ assert_eq!(
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x01], variant_bytes);
 
-let (rest, value) = DekuTest::from_bytes(rest).unwrap();
+let (rest, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantB,
@@ -1083,6 +1096,7 @@ The enum variant must have space to store the identifier for proper writing.
 Example:
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
@@ -1097,9 +1111,10 @@ enum DekuTest {
     VariantC(u8),
 }
 
-let data: Vec<u8> = vec![0x03, 0xFF];
+let data: &[u8] = &[0x03, 0xFF];
+let mut cursor = Cursor::new(data);
 
-let (rest, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantB { id: 0x03 },
@@ -1109,7 +1124,7 @@ assert_eq!(
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x03], variant_bytes);
 
-let (rest, value) = DekuTest::from_bytes(rest).unwrap();
+let (rest, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantC(0xFF),
@@ -1133,6 +1148,7 @@ Set the bit size of the enum variant `id`
 Example:
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8", bits = "4")]
@@ -1141,9 +1157,10 @@ enum DekuTest {
     VariantA( #[deku(bits = "4")] u8, u8),
 }
 
-let data: Vec<u8> = vec![0b1001_0110, 0xFF];
+let data: &[u8] = &[0b1001_0110, 0xFF];
+let mut cursor = Cursor::new(data);
 
-let (rest, value) = DekuTest::from_bytes((&data, 0)).unwrap();
+let (amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantA(0b0110, 0xFF),
@@ -1171,9 +1188,9 @@ enum DekuTest {
     VariantA(u8),
 }
 
-let data: Vec<u8> = vec![0xEF, 0xBE, 0xFF];
+let data: &[u8] = &[0xEF, 0xBE, 0xFF];
 
-let value = DekuTest::try_from(data.as_ref()).unwrap();
+let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest::VariantA(0xFF),

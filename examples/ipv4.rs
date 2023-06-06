@@ -1,7 +1,8 @@
+use std::convert::TryInto;
+use std::net::Ipv4Addr;
+
 use deku::prelude::*;
 use hexlit::hex;
-use std::convert::{TryFrom, TryInto};
-use std::net::Ipv4Addr;
 
 /// Ipv4 Header
 /// ```text
@@ -42,15 +43,17 @@ pub struct Ipv4Header {
     pub protocol: u8,        // Protocol
     pub checksum: u16,       // Header checksum
     pub src: Ipv4Addr,       // Source IP Address
-    pub dst: Ipv4Addr,       // Destination IP Address
-                             // options
-                             // padding
+    pub dst: Ipv4Addr,       /* Destination IP Address
+                              * options
+                              * padding */
 }
 
 fn main() {
     let test_data = hex!("4500004b0f490000801163a591fea0ed91fd02cb").to_vec();
 
-    let ip_header = Ipv4Header::try_from(test_data.as_ref()).unwrap();
+    let mut cursor = std::io::Cursor::new(test_data.clone());
+    let mut reader = deku::reader::Reader::new(&mut cursor);
+    let ip_header = Ipv4Header::from_reader_with_ctx(&mut reader, ()).unwrap();
 
     assert_eq!(
         Ipv4Header {

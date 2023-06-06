@@ -1,11 +1,18 @@
+//! To test out the "logging" feature:
+//! ```
+//! $ RUST_LOG=trace cargo run --example example --features logging
+//! ```
+
 #![allow(clippy::unusual_byte_groupings)]
 
-use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
+
+use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct FieldF {
     #[deku(bits = "6")]
+    #[deku(assert_eq = "6")]
     data: u8,
 }
 
@@ -15,7 +22,6 @@ struct FieldF {
 //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //  |    field_a    |   field_b   |c|            field_d              | e |     f     |
 //  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 // #[deku(endian = "little")] // By default it uses the system endianness, but can be overwritten
 struct DekuTest {
@@ -35,32 +41,33 @@ struct DekuTest {
 }
 
 fn main() {
-    let test_data: &[u8] = [
-        0xAB,
+    env_logger::init();
+    let test_data: &[u8] = &[
+        0xab,
         0b1010010_1,
-        0xAB,
-        0xCD,
+        0xab,
+        0xcd,
         0b1100_0110,
         0x02,
-        0xBE,
-        0xEF,
-        0xC0,
-        0xFE,
-    ]
-    .as_ref();
+        0xbe,
+        0xef,
+        0xc0,
+        0xfe,
+    ];
 
     let test_deku = DekuTest::try_from(test_data).unwrap();
 
+    println!("{test_deku:02x?}");
     assert_eq!(
         DekuTest {
-            field_a: 0xAB,
+            field_a: 0xab,
             field_b: 0b0_1010010,
             field_c: 0b0000000_1,
-            field_d: 0xABCD,
+            field_d: 0xabcd,
             field_e: 0b0000_0011,
             field_f: FieldF { data: 0b00_000110 },
             num_items: 2,
-            items: vec![0xBEEF, 0xC0FE],
+            items: vec![0xbeef, 0xc0fe],
         },
         test_deku
     );

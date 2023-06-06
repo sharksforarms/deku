@@ -1,7 +1,8 @@
+use std::convert::{TryFrom, TryInto};
+
 use deku::prelude::*;
 use hexlit::hex;
 use rstest::*;
-use std::convert::{TryFrom, TryInto};
 
 /// General smoke tests for enums
 /// TODO: These should be divided into smaller tests
@@ -41,11 +42,12 @@ enum TestEnum {
     case(&hex!("FFFFFF"), TestEnum::VarA(0xFF)),
 )]
 fn test_enum(input: &[u8], expected: TestEnum) {
-    let ret_read = TestEnum::try_from(input).unwrap();
+    let input = input.to_vec();
+    let ret_read = TestEnum::try_from(input.as_slice()).unwrap();
     assert_eq!(expected, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(input.to_vec(), ret_write);
+    assert_eq!(input, ret_write);
 }
 
 #[test]
@@ -58,8 +60,8 @@ fn test_enum_error() {
         VarA(u8),
     }
 
-    let test_data: Vec<u8> = [0x02, 0x02].to_vec();
-    let _ret_read = TestEnum::try_from(test_data.as_ref()).unwrap();
+    let test_data = &mut [0x02, 0x02];
+    let _ret_read = TestEnum::try_from(test_data.as_slice()).unwrap();
 }
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -79,11 +81,12 @@ enum TestEnumDiscriminant {
     case(&hex!("03"), TestEnumDiscriminant::VarA),
 )]
 fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
-    let ret_read = TestEnumDiscriminant::try_from(input).unwrap();
+    let input = input.to_vec();
+    let ret_read = TestEnumDiscriminant::try_from(input.as_slice()).unwrap();
     assert_eq!(expected, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(input.to_vec(), ret_write);
+    assert_eq!(input, ret_write);
 }
 
 #[test]
@@ -97,11 +100,55 @@ fn test_enum_array_type() {
         VarB,
     }
 
-    let input = b"123".as_ref();
+    let input = b"123".to_vec();
 
-    let ret_read = TestEnumArray::try_from(input).unwrap();
+    let ret_read = TestEnumArray::try_from(input.as_slice()).unwrap();
     assert_eq!(TestEnumArray::VarA, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(input.to_vec(), ret_write);
+}
+
+#[test]
+fn test_id_pat_with_id() {
+    // In these tests, the id_pat is already stored in the previous read to `my_id`, so we don't
+    // use that for the next reading...
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    pub struct DekuTest {
+        my_id: u8,
+        #[deku(ctx = "*my_id")]
+        enum_from_id: MyEnum,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(ctx = "my_id: u8", id = "my_id")]
+    pub enum MyEnum {
+        #[deku(id_pat = "1..=2")]
+        VariantA(u8),
+        #[deku(id_pat = "_")]
+        VariantB,
+    }
+
+    let input = [0x01, 0x02];
+    let (_, v) = DekuTest::from_reader((&mut input.as_slice(), 0)).unwrap();
+    assert_eq!(
+        v,
+        DekuTest {
+            my_id: 0x01,
+            enum_from_id: MyEnum::VariantA(2)
+        }
+    );
+    assert_eq!(input, &*v.to_bytes().unwrap());
+
+    let input = [0x05];
+    let (_, v) = DekuTest::from_reader((&mut input.as_slice(), 0)).unwrap();
+    assert_eq!(
+        v,
+        DekuTest {
+            my_id: 0x05,
+            enum_from_id: MyEnum::VariantB
+        }
+    );
+    assert_eq!(input, &*v.to_bytes().unwrap());
 }

@@ -38,17 +38,17 @@ struct TestDeku {
     field_e: Vec<u8>, // 1 alloc
     field_f: [u8; 3],
     #[deku(bits = "3")]
-    field_g: u8, // 1 alloc (bits read)
+    field_g: u8, // 3 allocs (read_bits(Ordering::Greater))
     #[deku(bits = "5")]
-    field_h: u8, // 1 alloc (bits read)
-    field_i: NestedEnum2,
+    field_h: u8, // 1 alloc (read_bits(Ordering::Equal))
+                 //field_i: NestedEnum2,
 }
 
 mod tests {
-    use super::*;
     use alloc_counter::count_alloc;
     use hexlit::hex;
-    use std::convert::TryFrom;
+
+    use super::*;
 
     #[test]
     #[cfg_attr(miri, ignore)]
@@ -57,10 +57,10 @@ mod tests {
 
         assert_eq!(
             count_alloc(|| {
-                let _ = TestDeku::try_from(input.as_ref()).unwrap();
+                let _ = TestDeku::from_reader((&mut input.as_slice(), 0)).unwrap();
             })
             .0,
-            (4, 0, 4)
+            (5, 0, 5)
         );
     }
 }

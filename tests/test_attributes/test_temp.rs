@@ -1,5 +1,6 @@
-use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
+
+use deku::prelude::*;
 
 #[test]
 fn test_temp_field_write() {
@@ -34,7 +35,7 @@ fn test_temp_field_value_ignore_on_read() {
 
     let test_data: Vec<u8> = [0x02, 0x02, 0x03].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_b: vec![0x02, 0x03]
@@ -56,7 +57,7 @@ fn test_temp_field() {
 
     let test_data: Vec<u8> = [0x01, 0x02].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_b: vec![0x02]
@@ -76,7 +77,7 @@ fn test_temp_field_unnamed() {
 
     let test_data: Vec<u8> = [0x01, 0x02].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(TestStruct(vec![0x02]), ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
@@ -114,9 +115,9 @@ fn test_temp_enum_field() {
         },
     }
 
-    let test_data: Vec<u8> = [0xAB, 0x01, 0x02].to_vec();
+    let test_data: Vec<u8> = [0xab, 0x01, 0x02].to_vec();
 
-    let ret_read = TestEnum::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestEnum::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestEnum::VarA {
             field_b: vec![0x02]
@@ -125,7 +126,7 @@ fn test_temp_enum_field() {
     );
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(vec![0xAB, 0x02], ret_write);
+    assert_eq!(vec![0xab, 0x02], ret_write);
 }
 
 #[test]
@@ -148,7 +149,7 @@ fn test_temp_enum_field_write() {
         VarB(u8),
     }
 
-    let test_data: Vec<u8> = [0xAB, 0x01, 0x02].to_vec();
+    let test_data: Vec<u8> = [0xab, 0x01, 0x02].to_vec();
     let ret_write: Vec<u8> = TestEnum::VarA {
         field_b: vec![0x02],
     }
@@ -156,7 +157,7 @@ fn test_temp_enum_field_write() {
     .unwrap();
     assert_eq!(test_data, ret_write);
 
-    let test_data: Vec<u8> = [0xBA, 0x10].to_vec();
+    let test_data: Vec<u8> = [0xba, 0x10].to_vec();
     let ret_write: Vec<u8> = TestEnum::VarB(0x10).to_bytes().unwrap();
     assert_eq!(test_data, ret_write);
 }

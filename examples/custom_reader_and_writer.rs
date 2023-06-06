@@ -1,29 +1,27 @@
-use deku::bitvec::{BitSlice, BitVec, Msb0};
-use deku::ctx::BitSize;
-use deku::prelude::*;
 use std::convert::TryInto;
 
-fn bit_flipper_read(
+use deku::bitvec::{BitVec, Msb0};
+use deku::ctx::BitSize;
+use deku::prelude::*;
+
+fn bit_flipper_read<R: std::io::Read>(
     field_a: u8,
-    rest: &BitSlice<u8, Msb0>,
+    reader: &mut Reader<R>,
     bit_size: BitSize,
-) -> Result<(&BitSlice<u8, Msb0>, u8), DekuError> {
+) -> Result<u8, DekuError> {
     // Access to previously read fields
     println!("field_a = 0x{:X}", field_a);
-
-    // The current rest
-    println!("rest = {:?}", rest);
 
     // Size of the current field
     println!("bit_size: {:?}", bit_size);
 
     // read field_b, calling original func
-    let (rest, value) = u8::read(rest, bit_size)?;
+    let value = u8::from_reader_with_ctx(reader, bit_size)?;
 
     // flip the bits on value if field_a is 0x01
     let value = if field_a == 0x01 { !value } else { value };
 
-    Ok((rest, value))
+    Ok(value)
 }
 
 fn bit_flipper_write(
@@ -52,16 +50,16 @@ struct DekuTest {
     field_a: u8,
 
     #[deku(
-        reader = "bit_flipper_read(*field_a, deku::rest, BitSize(8))",
+        reader = "bit_flipper_read(*field_a, deku::reader, BitSize(8))",
         writer = "bit_flipper_write(*field_a, *field_b, deku::output, BitSize(8))"
     )]
     field_b: u8,
 }
 
 fn main() {
-    let test_data: &[u8] = [0x01, 0b1001_0110].as_ref();
+    let test_data = [0x01, 0b1001_0110];
 
-    let (_rest, ret_read) = DekuTest::from_bytes((test_data, 0)).unwrap();
+    let (_read_amt, ret_read) = DekuTest::from_reader((&mut test_data.as_slice(), 0)).unwrap();
 
     assert_eq!(
         ret_read,

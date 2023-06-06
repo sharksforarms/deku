@@ -1,5 +1,6 @@
-use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
+
+use deku::prelude::*;
 
 /// Skip
 #[test]
@@ -15,7 +16,7 @@ fn test_skip() {
     // Skip `field_b`
     let test_data: Vec<u8> = [0x01, 0x02].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: 0x01,
@@ -43,7 +44,7 @@ fn test_skip_default() {
     // Skip `field_b` and default it's value to 5
     let test_data: Vec<u8> = [0x01, 0x02].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: 0x01,
@@ -70,7 +71,7 @@ fn test_skip_cond() {
     // if `cond` is true, skip and default `field_b` to 5
     let test_data: Vec<u8> = [0x01].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: 0x01,
@@ -85,7 +86,7 @@ fn test_skip_cond() {
     // if `cond` is false, read `field_b` from input
     let test_data: Vec<u8> = [0x02, 0x03].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: 0x02,

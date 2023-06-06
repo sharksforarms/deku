@@ -1,5 +1,6 @@
-use deku::prelude::*;
 use std::convert::TryFrom;
+
+use deku::prelude::*;
 
 #[test]
 fn test_map() {
@@ -19,7 +20,7 @@ fn test_map() {
 
     let test_data: Vec<u8> = [0x01, 0x02].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: "1".to_string(),

@@ -1,10 +1,11 @@
-use crate::Num;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
+
+use crate::Num;
 
 pub(crate) mod deku_read;
 pub(crate) mod deku_write;

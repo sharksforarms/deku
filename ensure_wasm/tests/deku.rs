@@ -15,7 +15,7 @@ fn test_read() {
             field_b: 0b101,
             field_c: 0xBE
         },
-        deku_read([0b10101_101, 0xBE].as_ref())
+        deku_read(&mut [0b10101_101, 0xBE])
     )
 }
 

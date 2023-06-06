@@ -1,4 +1,5 @@
 /*!
+
 # Deku: Declarative binary reading and writing
 
 Deriving a struct or enum with `DekuRead` and `DekuWrite` provides bit-level,
@@ -6,12 +7,15 @@ symmetric, serialization/deserialization implementations.
 
 This allows the developer to focus on building and maintaining how the data is
 represented and manipulated and not on redundant, error-prone, parsing/writing code.
-
 This approach is especially useful when dealing with binary structures such as
-TLVs or network protocols.
+TLVs or network protocols. This allows the internal rustc compiler to choose
+the in-memory representation of the struct, while reading and writing can
+understand the struct in a "packed" C way.
 
-Under the hood, it makes use of the [bitvec](https://crates.io/crates/bitvec)
-crate as the "Reader" and “Writer”
+Under the hood, many specializations are done in order to achieve performant code.
+For reading and writing bytes, the std library is used.
+When bit-level control is required, it makes use of the [bitvec](https://crates.io/crates/bitvec)
+crate as the "Reader" and “Writer”.
 
 For documentation and examples on available `#[deku]` attributes and features,
 see [attributes list](attributes)
@@ -26,8 +30,8 @@ For use in `no_std` environments, `alloc` is the single feature which is require
 # Example
 
 Let's read big-endian data into a struct, with fields containing different sizes,
-modify a value, and write it back
-
+modify a value, and write it back. In this example we use [from_bytes](DekuContainerRead::from_bytes),
+but we could also use [from_reader](DekuContainerRead::from_reader).
 ```rust
 use deku::prelude::*;
 
@@ -57,9 +61,11 @@ assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 
 # Composing
 
-Deku structs/enums can be composed as long as they implement DekuRead / DekuWrite traits
+Deku structs/enums can be composed as long as they implement [DekuReader] / [DekuWrite] traits which
+can be derived by using the `DekuRead` and `DekuWrite` Derive macros.
 
 ```rust
+# use std::io::Cursor;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -98,6 +104,7 @@ If the length of Vec changes, the original field specified in `count` will not g
 Calling `.update()` can be used to "update" the field!
 
 ```rust
+# use std::io::Cursor;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -163,6 +170,7 @@ based on the field marked with `default`.
 Example:
 
 ```rust
+# use std::io::Cursor;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -174,12 +182,14 @@ enum DekuTest {
     VariantB(u16),
 }
 
-let data: Vec<u8> = vec![0x01, 0x02, 0xEF, 0xBE];
+let data: &[u8] = &[0x01, 0x02, 0xEF, 0xBE];
+let mut cursor = Cursor::new(data);
 
-let (rest, val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (_, val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(DekuTest::VariantA , val);
 
-let (rest, val) = DekuTest::from_bytes(rest).unwrap();
+// cursor now points at 0x02
+let (_, val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 ```
 
@@ -192,6 +202,7 @@ For more information see [ctx attribute](attributes#ctx)
 Example:
 
 ```rust
+# use std::io::Cursor;
 use deku::prelude::*;
 
 #[derive(DekuRead, DekuWrite)]
@@ -208,11 +219,35 @@ struct Root {
     sub: Subtype
 }
 
-let data: Vec<u8> = vec![0x01, 0x02];
+let data: &[u8] = &[0x01, 0x02];
+let mut cursor = Cursor::new(data);
 
-let (rest, value) = Root::from_bytes((&data[..], 0)).unwrap();
+let (amt_read, value) = Root::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
+```
+
+# `Read` enabled
+Parsers can be created that directly read from a source implementing [Read](crate::no_std_io::Read).
+
+The crate [no_std_io] is re-exported for use in `no_std` environments.
+This functions as an alias for [std::io](https://doc.rust-lang.org/stable/std/io/) when not
+using `no_std`.
+
+```rust, no_run
+# use std::io::{Seek, SeekFrom, Read};
+# use std::fs::File;
+# use deku::prelude::*;
+#[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+#[deku(endian = "big")]
+struct EcHdr {
+    magic: [u8; 4],
+    version: u8,
+    padding1: [u8; 3],
+}
+
+let mut file = File::options().read(true).open("file").unwrap();
+let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
 ```
 
 # Internal variables and previously read fields
@@ -238,10 +273,7 @@ tokens such as `reader`, `writer`, `map`, `count`, etc.
 These are provided as a convenience to the user.
 
 Always included:
-- `deku::input: (&[u8], usize)` - The initial input byte slice and bit offset
-(available when using [from_bytes](crate::DekuContainerRead::from_bytes))
-- `deku::input_bits: &BitSlice<u8, Msb0>` - The initial input in bits
-- `deku::rest: &BitSlice<u8, Msb0>` - Remaining bits to read
+- `deku::reader: &mut Reader` - Current [Reader](crate::reader::Reader)
 - `deku::output: &mut BitSlice<u8, Msb0>` - The output bit stream
 
 Conditionally included if referenced:
@@ -294,6 +326,13 @@ extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
+/// re-export of no_std_io
+pub mod no_std_io {
+    pub use no_std_io::io::Cursor;
+    pub use no_std_io::io::Read;
+    pub use no_std_io::io::Result;
+}
+
 /// re-export of bitvec
 pub mod bitvec {
     pub use bitvec::prelude::*;
@@ -307,28 +346,73 @@ pub mod ctx;
 pub mod error;
 mod impls;
 pub mod prelude;
+pub mod reader;
 
 pub use crate::error::DekuError;
 
-/// "Reader" trait: read bits and construct type
-pub trait DekuRead<'a, Ctx = ()> {
-    /// Read bits and construct type
-    /// * **input** - Input as bits
-    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
-    /// needed.
+/// "Reader" trait: read bytes and bits from [`no_std_io::Read`]er
+pub trait DekuReader<'a, Ctx = ()> {
+    /// Construct type from `reader` implementing [`no_std_io::Read`], with ctx.
     ///
-    /// Returns the remaining bits after parsing in addition to Self.
-    fn read(
-        input: &'a bitvec::BitSlice<u8, bitvec::Msb0>,
+    /// # Example
+    /// ```rust, no_run
+    /// # use std::io::{Seek, SeekFrom, Read};
+    /// # use std::fs::File;
+    /// # use deku::prelude::*;
+    /// # use deku::ctx::Endian;
+    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+    /// #[deku(endian = "ctx_endian", ctx = "ctx_endian: Endian")]
+    /// struct EcHdr {
+    ///     magic: [u8; 4],
+    ///     version: u8,
+    /// }
+    ///
+    /// let mut file = File::options().read(true).open("file").unwrap();
+    /// file.seek(SeekFrom::Start(0)).unwrap();
+    /// let mut reader = Reader::new(&mut file);
+    /// let ec = EcHdr::from_reader_with_ctx(&mut reader, Endian::Big).unwrap();
+    /// ```
+    fn from_reader_with_ctx<R: no_std_io::Read>(
+        reader: &mut crate::reader::Reader<R>,
         ctx: Ctx,
-    ) -> Result<(&'a bitvec::BitSlice<u8, bitvec::Msb0>, Self), DekuError>
+    ) -> Result<Self, DekuError>
     where
         Self: Sized;
 }
 
 /// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which
 /// doesn't need any context information.
-pub trait DekuContainerRead<'a>: DekuRead<'a, ()> {
+pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
+    /// Construct type from Reader implementing [`no_std_io::Read`].
+    /// * **input** - Input given as "Reader" and bit offset
+    ///
+    /// # Returns
+    /// (amount of total bits read, Self)
+    ///
+    /// [BufRead]: std::io::BufRead
+    ///
+    /// # Example
+    /// ```rust, no_run
+    /// # use std::io::{Seek, SeekFrom, Read};
+    /// # use std::fs::File;
+    /// # use deku::prelude::*;
+    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+    /// #[deku(endian = "big")]
+    /// struct EcHdr {
+    ///     magic: [u8; 4],
+    ///     version: u8,
+    /// }
+    ///
+    /// let mut file = File::options().read(true).open("file").unwrap();
+    /// file.seek(SeekFrom::Start(0)).unwrap();
+    /// let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
+    /// ```
+    fn from_reader<R: no_std_io::Read>(
+        input: (&'a mut R, usize),
+    ) -> Result<(usize, Self), DekuError>
+    where
+        Self: Sized;
+
     /// Read bytes and construct type
     /// * **input** - Input given as data and bit offset
     ///

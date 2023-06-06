@@ -1,5 +1,6 @@
-use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
+
+use deku::prelude::*;
 
 /// Update field value
 #[test]
@@ -13,7 +14,7 @@ fn test_update() {
     // Update `field_a` to 5
     let test_data: Vec<u8> = [0x01].to_vec();
 
-    let mut ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let mut ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(TestStruct { field_a: 0x01 }, ret_read);
 
     // `field_a` field should now be increased
@@ -36,20 +37,20 @@ fn test_update_from_field() {
     }
 
     // Update the value of `count` to the length of `data`
-    let test_data: Vec<u8> = [0x02, 0xAA, 0xBB].to_vec();
+    let test_data: Vec<u8> = [0x02, 0xaa, 0xbb].to_vec();
 
     // Read
-    let mut ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let mut ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             count: 0x02,
-            data: vec![0xAA, 0xBB]
+            data: vec![0xaa, 0xbb]
         },
         ret_read
     );
 
     // Add an item to the vec
-    ret_read.data.push(0xFF);
+    ret_read.data.push(0xff);
 
     // `count` field should now be increased
     ret_read.update().unwrap();
@@ -57,7 +58,7 @@ fn test_update_from_field() {
 
     // Write
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!([0x03, 0xAA, 0xBB, 0xFF].to_vec(), ret_write);
+    assert_eq!([0x03, 0xaa, 0xbb, 0xff].to_vec(), ret_write);
 }
 
 /// Update error

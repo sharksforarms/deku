@@ -1,16 +1,14 @@
-use crate::{DekuError, DekuRead, DekuWrite};
 use bitvec::prelude::*;
+use no_std_io::io::Read;
 
-impl<Ctx: Copy> DekuRead<'_, Ctx> for () {
-    /// NOP on read
-    fn read(
-        input: &BitSlice<u8, Msb0>,
+use crate::{DekuError, DekuReader, DekuWrite};
+
+impl<Ctx: Copy> DekuReader<'_, Ctx> for () {
+    fn from_reader_with_ctx<R: Read>(
+        _reader: &mut crate::reader::Reader<R>,
         _inner_ctx: Ctx,
-    ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError>
-    where
-        Self: Sized,
-    {
-        Ok((input, ()))
+    ) -> Result<Self, DekuError> {
+        Ok(())
     }
 }
 
@@ -23,19 +21,21 @@ impl<Ctx: Copy> DekuWrite<Ctx> for () {
 
 #[cfg(test)]
 mod tests {
+    use crate::reader::Reader;
+    use std::io::Cursor;
+
     use super::*;
-    use hexlit::hex;
 
     #[test]
     #[allow(clippy::unit_arg)]
     #[allow(clippy::unit_cmp)]
     fn test_unit() {
-        let input = &hex!("FF");
+        let input = &[0xff];
 
-        let bit_slice = input.view_bits::<Msb0>();
-        let (rest, res_read) = <()>::read(bit_slice, ()).unwrap();
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = <()>::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!((), res_read);
-        assert_eq!(bit_slice, rest);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();

@@ -1,5 +1,6 @@
-use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
+
+use deku::prelude::*;
 
 #[test]
 fn test_pad_bits_before() {
@@ -13,7 +14,7 @@ fn test_pad_bits_before() {
 
     let data: Vec<u8> = vec![0b10_01_1001];
 
-    let ret_read = TestStruct::try_from(data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 
     assert_eq!(
         TestStruct {
@@ -40,7 +41,7 @@ fn test_pad_bits_before_not_enough() {
 
     let data: Vec<u8> = vec![0b10_01_1001];
 
-    let _ret_read = TestStruct::try_from(data.as_ref()).unwrap();
+    let _ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 }
 
 #[test]
@@ -58,7 +59,7 @@ fn test_pad_bits_before_read_err() {
 
     let data: Vec<u8> = vec![0b10_01_1001];
 
-    let _ret_read = TestStruct::try_from(data.as_ref()).unwrap();
+    let _ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 }
 
 #[test]

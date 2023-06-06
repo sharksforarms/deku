@@ -1,7 +1,8 @@
 #![allow(clippy::unusual_byte_groupings)]
 
-use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
+
+use deku::prelude::*;
 
 mod test_common;
 
@@ -34,7 +35,7 @@ fn test_read_too_much_data() {
         pub field_a: u8,
     }
 
-    let test_data = [0u8; 100].as_ref();
+    let test_data: &[u8] = &[0u8; 100];
     TestStruct::try_from(test_data).unwrap();
 }
 
@@ -53,39 +54,39 @@ fn test_unnamed_struct() {
     );
 
     let test_data: Vec<u8> = [
-        0xFF,
+        0xff,
         0b1001_0110,
-        0xAA,
-        0xBB,
-        0xCC,
-        0xDD,
+        0xaa,
+        0xbb,
+        0xcc,
+        0xdd,
         0b1001_0110,
-        0xCC,
-        0xDD,
+        0xcc,
+        0xdd,
         0x02,
-        0xBE,
-        0xEF,
+        0xbe,
+        0xef,
     ]
     .to_vec();
 
     // Read
-    let ret_read = TestUnamedStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestUnamedStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestUnamedStruct(
-            0xFF,
+            0xff,
             0b0000_0010,
             0b0001_0110,
-            native_endian!(0xBBAAu16),
-            0xCCDDu16,
+            native_endian!(0xbbaau16),
+            0xccddu16,
             NestedDeku {
                 nest_a: 0b00_100101,
                 nest_b: 0b10,
                 inner: DoubleNestedDeku {
-                    data: native_endian!(0xDDCCu16)
+                    data: native_endian!(0xddccu16)
                 }
             },
             0x02,
-            vec![0xBE, 0xEF],
+            vec![0xbe, 0xef],
         ),
         ret_read
     );
@@ -117,41 +118,41 @@ fn test_named_struct() {
     }
 
     let test_data: Vec<u8> = [
-        0xFF,
+        0xff,
         0b1001_0110,
-        0xAA,
-        0xBB,
-        0xCC,
-        0xDD,
+        0xaa,
+        0xbb,
+        0xcc,
+        0xdd,
         0b1001_0110,
-        0xCC,
-        0xDD,
+        0xcc,
+        0xdd,
         0x02,
-        0xBE,
-        0xEF,
-        0xFF,
+        0xbe,
+        0xef,
+        0xff,
     ]
     .to_vec();
 
     // Read
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
-            field_a: 0xFF,
+            field_a: 0xff,
             field_b: 0b0000_0010,
             field_c: 0b0001_0110,
-            field_d: native_endian!(0xBBAAu16),
-            field_e: 0xCCDDu16,
+            field_d: native_endian!(0xbbaau16),
+            field_e: 0xccddu16,
             field_f: NestedDeku {
                 nest_a: 0b00_100101,
                 nest_b: 0b10,
                 inner: DoubleNestedDeku {
-                    data: native_endian!(0xDDCCu16)
+                    data: native_endian!(0xddccu16)
                 }
             },
             vec_len: 0x02,
-            vec_data: vec![0xBE, 0xEF],
-            rest: 0xFF
+            vec_data: vec![0xbe, 0xef],
+            rest: 0xff
         },
         ret_read
     );
@@ -168,11 +169,11 @@ fn test_raw_identifiers_struct() {
         pub r#type: u8,
     }
 
-    let test_data: Vec<u8> = [0xFF].to_vec();
+    let test_data: Vec<u8> = [0xff].to_vec();
 
     // Read
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
-    assert_eq!(TestStruct { r#type: 0xFF }, ret_read);
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
+    assert_eq!(TestStruct { r#type: 0xff }, ret_read);
 
     // Write
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();

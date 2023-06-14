@@ -1,7 +1,10 @@
-use crate::{ctx::*, DekuError, DekuRead, DekuWrite};
-use bitvec::prelude::*;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
+
+use bitvec::prelude::*;
+
+use crate::ctx::*;
+use crate::{DekuError, DekuRead, DekuWrite};
 
 /// Read `K, V`s into a hashmap until a given predicate returns true
 /// * `capacity` - an optional capacity to pre-allocate the hashmap with
@@ -11,45 +14,47 @@ use std::hash::{BuildHasher, Hash};
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
 #[allow(clippy::type_complexity)]
-fn read_hashmap_with_predicate<
-    'a,
+fn read_hashmap_with_predicate<'a, K, V, S, Ctx, Predicate>(
+    input: &'a BitSlice<u8, Msb0>,
+    capacity: Option<usize>,
+    ctx: Ctx,
+    mut predicate: Predicate,
+) -> Result<(usize, HashMap<K, V, S>), DekuError>
+where
     K: DekuRead<'a, Ctx> + Eq + Hash,
     V: DekuRead<'a, Ctx>,
     S: BuildHasher + Default,
     Ctx: Copy,
     Predicate: FnMut(usize, &(K, V)) -> bool,
->(
-    input: &'a BitSlice<u8, Msb0>,
-    capacity: Option<usize>,
-    ctx: Ctx,
-    mut predicate: Predicate,
-) -> Result<(&'a BitSlice<u8, Msb0>, HashMap<K, V, S>), DekuError> {
+{
     let mut res = HashMap::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
 
     let mut rest = input;
     let mut found_predicate = false;
 
+    let mut total_read = 0;
+
     while !found_predicate {
-        let (new_rest, kv) = <(K, V)>::read(rest, ctx)?;
+        let (amt_read, kv) = <(K, V)>::read(rest, ctx)?;
+        rest = &rest[amt_read..];
         found_predicate = predicate(
-            unsafe { new_rest.as_bitptr().offset_from(input.as_bitptr()) } as usize,
+            unsafe { rest.as_bitptr().offset_from(input.as_bitptr()) } as usize,
             &kv,
         );
         res.insert(kv.0, kv.1);
-        rest = new_rest;
+        total_read += amt_read;
     }
 
-    Ok((rest, res))
+    Ok((total_read, res))
 }
 
-impl<
-        'a,
-        K: DekuRead<'a, Ctx> + Eq + Hash,
-        V: DekuRead<'a, Ctx>,
-        S: BuildHasher + Default,
-        Ctx: Copy,
-        Predicate: FnMut(&(K, V)) -> bool,
-    > DekuRead<'a, (Limit<(K, V), Predicate>, Ctx)> for HashMap<K, V, S>
+impl<'a, K, V, S, Ctx, Predicate> DekuRead<'a, (Limit<(K, V), Predicate>, Ctx)> for HashMap<K, V, S>
+where
+    K: DekuRead<'a, Ctx> + Eq + Hash,
+    V: DekuRead<'a, Ctx>,
+    S: BuildHasher + Default,
+    Ctx: Copy,
+    Predicate: FnMut(&(K, V)) -> bool,
 {
     /// Read `K, V`s until the given limit
     /// * `limit` - the limiting factor on the amount of `K, V`s to read
@@ -61,8 +66,9 @@ impl<
     /// # use deku::bitvec::BitView;
     /// # use std::collections::HashMap;
     /// let input: Vec<u8> = vec![100, 1, 2, 3, 4];
-    /// let (rest, map) = HashMap::<u8, u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
-    /// assert!(rest.is_empty());
+    /// let (amt_read, map) =
+    ///     HashMap::<u8, u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
+    /// assert_eq!((amt_read / 8), 5);
     /// let mut expected = HashMap::<u8, u32>::default();
     /// expected.insert(100, 0x04030201);
     /// assert_eq!(expected, map)
@@ -70,7 +76,7 @@ impl<
     fn read(
         input: &'a BitSlice<u8, Msb0>,
         (limit, inner_ctx): (Limit<(K, V), Predicate>, Ctx),
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+    ) -> Result<(usize, Self), DekuError>
     where
         Self: Sized,
     {
@@ -79,7 +85,7 @@ impl<
             Limit::Count(mut count) => {
                 // Handle the trivial case of reading an empty hashmap
                 if count == 0 {
-                    return Ok((input, HashMap::<K, V, S>::default()));
+                    return Ok((0, HashMap::<K, V, S>::default()));
                 }
 
                 // Otherwise, read until we have read `count` elements
@@ -108,7 +114,7 @@ impl<
                 })
             }
 
-            // Read until a given quantity of bits have been read
+            // Read until a given quantity of byte bits have been read
             Limit::ByteSize(size) => {
                 let bit_size = size.0 * 8;
 
@@ -125,19 +131,18 @@ impl<
     }
 }
 
-impl<
-        'a,
-        K: DekuRead<'a> + Eq + Hash,
-        V: DekuRead<'a>,
-        S: BuildHasher + Default,
-        Predicate: FnMut(&(K, V)) -> bool,
-    > DekuRead<'a, Limit<(K, V), Predicate>> for HashMap<K, V, S>
+impl<'a, K, V, S, Predicate> DekuRead<'a, Limit<(K, V), Predicate>> for HashMap<K, V, S>
+where
+    K: DekuRead<'a> + Eq + Hash,
+    V: DekuRead<'a>,
+    S: BuildHasher + Default,
+    Predicate: FnMut(&(K, V)) -> bool,
 {
     /// Read `K, V`s until the given limit from input for types which don't require context.
     fn read(
         input: &'a BitSlice<u8, Msb0>,
         limit: Limit<(K, V), Predicate>,
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+    ) -> Result<(usize, Self), DekuError>
     where
         Self: Sized,
     {
@@ -173,9 +178,10 @@ impl<K: DekuWrite<Ctx>, V: DekuWrite<Ctx>, S, Ctx: Copy> DekuWrite<Ctx> for Hash
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rstest::rstest;
     use rustc_hash::FxHashMap;
+
+    use super::*;
 
     // Macro to create a deterministic HashMap for tests
     // This is needed for tests since the default HashMap Hasher
@@ -224,7 +230,7 @@ mod tests {
     ) {
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (rest, res_read) = match bit_size {
+        let (amt_read, res_read) = match bit_size {
             Some(bit_size) => {
                 FxHashMap::<u8, u8>::read(bit_slice, (limit, (endian, BitSize(bit_size)))).unwrap()
             }
@@ -232,7 +238,7 @@ mod tests {
         };
 
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
     }
 
     #[rstest(input, endian, expected,
@@ -263,9 +269,9 @@ mod tests {
     ) {
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (rest, res_read) = FxHashMap::<u16, u8>::read(bit_slice, (limit, endian)).unwrap();
+        let (amt_read, res_read) = FxHashMap::<u16, u8>::read(bit_slice, (limit, endian)).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, endian).unwrap();

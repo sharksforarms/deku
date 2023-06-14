@@ -1,5 +1,6 @@
-use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
+
+use deku::prelude::*;
 
 mod test_pad_bits_after;
 mod test_pad_bits_before;
@@ -17,20 +18,20 @@ fn test_pad_bits_before_and_pad_bytes_before() {
         field_b: u8,
     }
 
-    let data: Vec<u8> = vec![0b10_000000, 0xAA, 0xBB];
+    let data: Vec<u8> = vec![0b10_000000, 0xaa, 0xbb];
 
     let ret_read = TestStruct::try_from(data.as_ref()).unwrap();
 
     assert_eq!(
         TestStruct {
             field_a: 0b10,
-            field_b: 0xBB,
+            field_b: 0xbb,
         },
         ret_read
     );
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(vec![0b10_000000, 0x00, 0xBB], ret_write);
+    assert_eq!(vec![0b10_000000, 0x00, 0xbb], ret_write);
 }
 
 #[test]
@@ -42,18 +43,18 @@ fn test_pad_bits_after_and_pad_bytes_after() {
         field_b: u8,
     }
 
-    let data: Vec<u8> = vec![0b10_000000, 0xAA, 0xBB];
+    let data: Vec<u8> = vec![0b10_000000, 0xaa, 0xbb];
 
     let ret_read = TestStruct::try_from(data.as_ref()).unwrap();
 
     assert_eq!(
         TestStruct {
             field_a: 0b10,
-            field_b: 0xBB,
+            field_b: 0xbb,
         },
         ret_read
     );
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(vec![0b10_000000, 0x00, 0xBB], ret_write);
+    assert_eq!(vec![0b10_000000, 0x00, 0xbb], ret_write);
 }

@@ -1,7 +1,8 @@
-use deku::prelude::*;
-use hexlit::hex;
 use std::convert::{TryFrom, TryInto};
 use std::net::Ipv4Addr;
+
+use deku::prelude::*;
+use hexlit::hex;
 
 /// Ipv4 Header
 /// ```text
@@ -42,9 +43,9 @@ pub struct Ipv4Header {
     pub protocol: u8,        // Protocol
     pub checksum: u16,       // Header checksum
     pub src: Ipv4Addr,       // Source IP Address
-    pub dst: Ipv4Addr,       // Destination IP Address
-                             // options
-                             // padding
+    pub dst: Ipv4Addr,       /* Destination IP Address
+                              * options
+                              * padding */
 }
 
 fn main() {

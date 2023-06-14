@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod test {
+    use std::convert::{TryFrom, TryInto};
+
     use deku::prelude::*;
-    use std::convert::TryFrom;
-    use std::convert::TryInto;
 
     /// Basic test struct
     #[derive(Clone, Copy, PartialEq, Eq, Debug, DekuWrite, DekuRead)]

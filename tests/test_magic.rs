@@ -1,7 +1,8 @@
+use std::convert::{TryFrom, TryInto};
+
 use deku::prelude::*;
 use hexlit::hex;
 use rstest::rstest;
-use std::convert::{TryFrom, TryInto};
 
 #[rstest(input,
     case(&hex!("64656b75")),

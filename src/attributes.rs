@@ -810,9 +810,9 @@ impl DekuTest {
     /// Read and convert to String
     fn read(
         rest: &BitSlice<u8, Msb0>,
-    ) -> Result<(&BitSlice<u8, Msb0>, String), DekuError> {
-        let (rest, value) = u8::read(rest, ())?;
-        Ok((rest, value.to_string()))
+    ) -> Result<(usize, String), DekuError> {
+        let (amt_read, value) = u8::read(rest, ())?;
+        Ok((amt_read, value.to_string()))
     }
 
     /// Parse from String to u8 and write
@@ -871,7 +871,7 @@ struct Test {
 
 let data: Vec<u8> = vec![0x01, 0x02];
 
-let (rest, value) = Test::from_bytes((&data[..], 0)).unwrap();
+let (amt_read, value) = Test::from_bytes((&data[..], 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
@@ -937,7 +937,7 @@ struct Test {
 let data: Vec<u8> = vec![0x01, 0x02];
 
 // Use with context from `Test`
-let (rest, value) = Test::from_bytes((&data[..], 0)).unwrap();
+let (amt_Read, value) = Test::from_bytes((&data[..], 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02);
 
@@ -945,7 +945,7 @@ assert_eq!(value.sub.b, 0x01 + 0x02);
 // Note: `from_bytes` is now available on `SubType`
 let data: Vec<u8> = vec![0x02];
 
-let (rest, value) = Subtype::from_bytes((&data[..], 0)).unwrap();
+let (amt_read, value) = Subtype::from_bytes((&data[..], 0)).unwrap();
 assert_eq!(value.b, 0x01 + 0x02)
 ```
 
@@ -1019,7 +1019,7 @@ enum DekuTest {
 
 let data: Vec<u8> = vec![0x01, 0xFF, 0x02, 0xAB, 0xEF, 0xBE];
 
-let (rest, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (amt_read, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantA(0xFF),
@@ -1029,7 +1029,7 @@ assert_eq!(
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x01, 0xFF], variant_bytes);
 
-let (rest, value) = DekuTest::from_bytes(rest).unwrap();
+let (amt_read, value) = DekuTest::from_bytes((data.as_ref(), amt_read)).unwrap();
 
 assert_eq!(
     DekuTest::VariantB(0xAB, 0xBEEF),
@@ -1053,7 +1053,7 @@ enum DekuTest {
 
 let data: Vec<u8> = vec![0x01, 0x02];
 
-let (rest, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (amt_read, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantA,
@@ -1063,7 +1063,7 @@ assert_eq!(
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x01], variant_bytes);
 
-let (rest, value) = DekuTest::from_bytes(rest).unwrap();
+let (rest, value) = DekuTest::from_bytes((data.as_ref(), amt_read)).unwrap();
 
 assert_eq!(
     DekuTest::VariantB,
@@ -1099,7 +1099,7 @@ enum DekuTest {
 
 let data: Vec<u8> = vec![0x03, 0xFF];
 
-let (rest, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (amt_read, value) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantB { id: 0x03 },
@@ -1109,7 +1109,7 @@ assert_eq!(
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x03], variant_bytes);
 
-let (rest, value) = DekuTest::from_bytes(rest).unwrap();
+let (rest, value) = DekuTest::from_bytes((data.as_ref(), amt_read)).unwrap();
 
 assert_eq!(
     DekuTest::VariantC(0xFF),
@@ -1143,7 +1143,7 @@ enum DekuTest {
 
 let data: Vec<u8> = vec![0b1001_0110, 0xFF];
 
-let (rest, value) = DekuTest::from_bytes((&data, 0)).unwrap();
+let (amt_read, value) = DekuTest::from_bytes((&data, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantA(0b0110, 0xFF),

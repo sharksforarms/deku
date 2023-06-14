@@ -1,5 +1,6 @@
-use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
+
+use deku::prelude::*;
 
 #[test]
 fn test_pad_bytes_before() {
@@ -10,20 +11,20 @@ fn test_pad_bytes_before() {
         field_b: u8,
     }
 
-    let data: Vec<u8> = vec![0xAA, 0xBB, 0xCC, 0xDD];
+    let data: Vec<u8> = vec![0xaa, 0xbb, 0xcc, 0xdd];
 
     let ret_read = TestStruct::try_from(data.as_ref()).unwrap();
 
     assert_eq!(
         TestStruct {
-            field_a: 0xAA,
-            field_b: 0xDD,
+            field_a: 0xaa,
+            field_b: 0xdd,
         },
         ret_read
     );
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(vec![0xAA, 0x00, 0x00, 0xDD], ret_write);
+    assert_eq!(vec![0xaa, 0x00, 0x00, 0xdd], ret_write);
 }
 
 #[test]
@@ -36,7 +37,7 @@ fn test_pad_bytes_before_not_enough() {
         field_b: u8,
     }
 
-    let data: Vec<u8> = vec![0xAA];
+    let data: Vec<u8> = vec![0xaa];
 
     let _ret_read = TestStruct::try_from(data.as_ref()).unwrap();
 }
@@ -53,7 +54,7 @@ fn test_pad_bytes_before_read_err() {
         field_b: u8,
     }
 
-    let data: Vec<u8> = vec![0xAA, 0xBB, 0xCC, 0xDD];
+    let data: Vec<u8> = vec![0xaa, 0xbb, 0xcc, 0xdd];
 
     let _ret_read = TestStruct::try_from(data.as_ref()).unwrap();
 }
@@ -71,8 +72,8 @@ fn test_pad_bytes_before_write_err() {
     }
 
     let data = TestStruct {
-        field_a: 0xAA,
-        field_b: 0xDD,
+        field_a: 0xaa,
+        field_b: 0xdd,
     };
 
     let _ret_write: Vec<u8> = data.try_into().unwrap();

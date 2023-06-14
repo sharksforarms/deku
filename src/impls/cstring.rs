@@ -1,6 +1,9 @@
-use crate::{ctx::*, DekuError, DekuRead, DekuWrite};
-use bitvec::prelude::*;
 use std::ffi::CString;
+
+use bitvec::prelude::*;
+
+use crate::ctx::*;
+use crate::{DekuError, DekuRead, DekuWrite};
 
 impl<Ctx: Copy> DekuWrite<Ctx> for CString
 where
@@ -16,14 +19,11 @@ impl<'a, Ctx: Copy> DekuRead<'a, Ctx> for CString
 where
     u8: DekuRead<'a, Ctx>,
 {
-    fn read(
-        input: &'a BitSlice<u8, Msb0>,
-        ctx: Ctx,
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+    fn read(input: &'a BitSlice<u8, Msb0>, ctx: Ctx) -> Result<(usize, Self), DekuError>
     where
         Self: Sized,
     {
-        let (rest, mut bytes) = Vec::read(input, (Limit::from(|b: &u8| *b == 0x00), ctx))?;
+        let (amt_read, mut bytes) = Vec::read(input, (Limit::from(|b: &u8| *b == 0x00), ctx))?;
 
         // TODO: use from_vec_with_nul instead once stable
 
@@ -36,14 +36,15 @@ where
         let value = CString::new(bytes)
             .map_err(|e| DekuError::Parse(format!("Failed to convert Vec to CString: {e}")))?;
 
-        Ok((rest, value))
+        Ok((amt_read, value))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rstest::rstest;
+
+    use super::*;
 
     #[rstest(input, expected, expected_rest,
         case(
@@ -62,9 +63,9 @@ mod tests {
     )]
     fn test_cstring(input: &[u8], expected: CString, expected_rest: &BitSlice<u8, Msb0>) {
         let bit_slice = input.view_bits::<Msb0>();
-        let (rest, res_read) = CString::read(bit_slice, ()).unwrap();
+        let (amt_read, res_read) = CString::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();

@@ -1,5 +1,6 @@
-use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
+
+use deku::prelude::*;
 
 mod test_slice {
     use super::*;
@@ -12,7 +13,7 @@ mod test_slice {
             data: &'a [u8],
         }
 
-        let test_data: Vec<u8> = [0xAA, 0xBB].to_vec();
+        let test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
@@ -36,12 +37,12 @@ mod test_slice {
             data: &'a [u8],
         }
 
-        let test_data: Vec<u8> = [0xBB, 0xAA, 0xBB].to_vec();
+        let test_data: Vec<u8> = [0xbb, 0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
             TestStruct {
-                until: 0xBB,
+                until: 0xbb,
                 data: &test_data[1..]
             },
             ret_read
@@ -62,7 +63,7 @@ mod test_slice {
             data: &'a [u8],
         }
 
-        let test_data: Vec<u8> = [0xCC, 0xAA, 0xBB].to_vec();
+        let test_data: Vec<u8> = [0xcc, 0xaa, 0xbb].to_vec();
 
         let _ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
     }
@@ -79,12 +80,12 @@ mod test_vec {
             data: Vec<u8>,
         }
 
-        let test_data: Vec<u8> = [0xAA, 0xBB].to_vec();
+        let test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
             TestStruct {
-                data: vec![0xAA, 0xBB]
+                data: vec![0xaa, 0xbb]
             },
             ret_read
         );
@@ -103,13 +104,13 @@ mod test_vec {
             data: Vec<u8>,
         }
 
-        let test_data: Vec<u8> = [0xBB, 0xAA, 0xBB].to_vec();
+        let test_data: Vec<u8> = [0xbb, 0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
             TestStruct {
-                until: 0xBB,
-                data: vec![0xAA, 0xBB]
+                until: 0xbb,
+                data: vec![0xaa, 0xbb]
             },
             ret_read
         );
@@ -129,7 +130,7 @@ mod test_vec {
             data: Vec<u8>,
         }
 
-        let test_data: Vec<u8> = [0xCC, 0xAA, 0xBB].to_vec();
+        let test_data: Vec<u8> = [0xcc, 0xaa, 0xbb].to_vec();
 
         let _ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
     }

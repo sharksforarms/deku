@@ -105,13 +105,13 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
 
     let deku_read_vec_input = {
-        let mut v = [0xFFu8; 101].to_vec();
+        let mut v = [0xffu8; 101].to_vec();
         v[0] = 100u8;
         v
     };
     let deku_write_vec_input = DekuVec {
         count: 100,
-        data: vec![0xFF; 100],
+        data: vec![0xff; 100],
     };
     c.bench_function("deku_read_vec", |b| {
         b.iter(|| deku_read_vec(black_box(&deku_read_vec_input)))
@@ -122,7 +122,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let deku_write_vec_input = DekuVecPerf {
         count: 100,
-        data: vec![0xFF; 100],
+        data: vec![0xff; 100],
     };
     c.bench_function("deku_read_vec_perf", |b| {
         b.iter(|| deku_read_vec_perf(black_box(&deku_read_vec_input)))

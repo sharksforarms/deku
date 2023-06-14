@@ -1,7 +1,8 @@
+use std::convert::{TryFrom, TryInto};
+
 use deku::prelude::*;
 use hexlit::hex;
 use rstest::*;
-use std::convert::{TryFrom, TryInto};
 
 /// General smoke tests for enums
 /// TODO: These should be divided into smaller tests

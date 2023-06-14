@@ -1,7 +1,7 @@
+use std::convert::{TryFrom, TryInto};
+
 use deku::prelude::*;
 use hexlit::hex;
-use std::convert::TryFrom;
-use std::convert::TryInto;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, DekuWrite, DekuRead)]
 #[deku(type = "u8")]

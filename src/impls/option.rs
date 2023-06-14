@@ -1,5 +1,6 @@
-use crate::{DekuError, DekuRead, DekuWrite};
 use bitvec::prelude::*;
+
+use crate::{DekuError, DekuRead, DekuWrite};
 
 impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy> DekuRead<'a, Ctx> for Option<T> {
     /// Read a T from input and store as Some(T)
@@ -10,19 +11,16 @@ impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy> DekuRead<'a, Ctx> for Option<T> {
     /// # use deku::DekuRead;
     /// # use deku::bitvec::BitView;
     /// let input = vec![1u8, 2, 3, 4];
-    /// let (rest, v) = Option::<u32>::read(input.view_bits(), Endian::Little).unwrap();
-    /// assert!(rest.is_empty());
+    /// let (amt_read, v) = Option::<u32>::read(input.view_bits(), Endian::Little).unwrap();
+    /// assert_eq!(amt_read, 32);
     /// assert_eq!(v, Some(0x04030201))
     /// ```
-    fn read(
-        input: &'a BitSlice<u8, Msb0>,
-        inner_ctx: Ctx,
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+    fn read(input: &'a BitSlice<u8, Msb0>, inner_ctx: Ctx) -> Result<(usize, Self), DekuError>
     where
         Self: Sized,
     {
-        let (rest, val) = <T>::read(input, inner_ctx)?;
-        Ok((rest, Some(val)))
+        let (amt_read, val) = <T>::read(input, inner_ctx)?;
+        Ok((amt_read, Some(val)))
     }
 }
 

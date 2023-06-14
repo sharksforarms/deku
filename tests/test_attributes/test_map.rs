@@ -1,5 +1,6 @@
-use deku::prelude::*;
 use std::convert::TryFrom;
+
+use deku::prelude::*;
 
 #[test]
 fn test_map() {

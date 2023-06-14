@@ -1,7 +1,8 @@
 //! Implementations of DekuRead and DekuWrite for tuples of length 1 to 11
 
-use crate::{DekuError, DekuRead, DekuWrite};
 use bitvec::prelude::*;
+
+use crate::{DekuError, DekuRead, DekuWrite};
 
 // Trait to help us build intermediate tuples while DekuRead'ing each element
 // from the tuple
@@ -39,18 +40,21 @@ macro_rules! ImplDekuTupleTraits {
             fn read(
                 input: &'a BitSlice<u8, Msb0>,
                 ctx: Ctx,
-            ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+            ) -> Result<(usize, Self), DekuError>
             where
                 Self: Sized,
             {
                 let tuple = ();
-                let mut rest = input;
+                let mut _rest = input;
+                let mut total_read = 0;
                 $(
-                    let read = <$T>::read(rest, ctx)?;
-                    rest = read.0;
-                    let tuple = tuple.append(read.1);
+                    let (amt_read, val) = <$T>::read(_rest, ctx)?;
+                    let tuple = tuple.append(val);
+
+                    total_read += amt_read;
+                    _rest = &_rest[amt_read..];
                 )+
-                Ok((rest, tuple))
+                Ok((total_read, tuple))
             }
         }
 
@@ -82,11 +86,12 @@ ImplDekuTupleTraits! { A, B, C, D, E, F, G, H, I, J, K, }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::native_endian;
     use core::fmt::Debug;
 
     use rstest::rstest;
+
+    use super::*;
+    use crate::native_endian;
 
     #[rstest(input, expected, expected_rest,
         case::length_1([0xef, 0xbe, 0xad, 0xde].as_ref(), (native_endian!(0xdeadbeef_u32),), bits![u8, Msb0;]),
@@ -99,9 +104,9 @@ mod tests {
         T: DekuRead<'a> + Sized + PartialEq + Debug,
     {
         let bit_slice = input.view_bits::<Msb0>();
-        let (rest, res_read) = <T>::read(bit_slice, ()).unwrap();
+        let (amt_read, res_read) = <T>::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
     }
 
     #[rstest(input, expected,

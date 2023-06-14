@@ -1,28 +1,27 @@
-use crate::{ctx::*, DekuError, DekuRead, DekuWrite};
-use bitvec::prelude::*;
-use core::convert::TryInto;
-
 #[cfg(feature = "alloc")]
 use alloc::format;
+use core::convert::TryInto;
+
+use bitvec::prelude::*;
+
+use crate::ctx::*;
+use crate::prelude::NeedSize;
+use crate::{DekuError, DekuRead, DekuWrite};
 
 // specialize u8 for ByteSize
 impl DekuRead<'_, (Endian, ByteSize)> for u8 {
     fn read(
         input: &BitSlice<u8, Msb0>,
         (_, _): (Endian, ByteSize),
-    ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+    ) -> Result<(usize, Self), DekuError> {
         const MAX_TYPE_BITS: usize = BitSize::of::<u8>().0;
         if input.len() < MAX_TYPE_BITS {
-            return Err(DekuError::Incomplete(crate::error::NeedSize::new(
-                MAX_TYPE_BITS,
-            )));
+            return Err(DekuError::Incomplete(NeedSize::new(MAX_TYPE_BITS)));
         }
 
-        // SAFETY: We already check that input.len() < bit_size above
-        let (bit_slice, rest) = unsafe { input.split_at_unchecked(MAX_TYPE_BITS) };
-
-        let value = bit_slice.load::<u8>();
-        Ok((rest, value))
+        // PANIC: We already check that input.len() < bit_size above, so no panic will happen
+        let value = input[..MAX_TYPE_BITS].load::<u8>();
+        Ok((MAX_TYPE_BITS, value))
     }
 }
 
@@ -32,7 +31,7 @@ macro_rules! ImplDekuReadBits {
             fn read(
                 input: &BitSlice<u8, Msb0>,
                 (endian, size): (Endian, BitSize),
-            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+            ) -> Result<(usize, Self), DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 let bit_size: usize = size.0;
 
@@ -48,7 +47,8 @@ macro_rules! ImplDekuReadBits {
                     return Err(DekuError::Incomplete(crate::error::NeedSize::new(bit_size)));
                 }
 
-                let (bit_slice, rest) = input.split_at(bit_size);
+                // PANIC: We already check that input.len() < bit_size above, so no panic will happen
+                let bit_slice = &input[..bit_size];
 
                 let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
 
@@ -63,53 +63,53 @@ macro_rules! ImplDekuReadBits {
                         } else {
                             <$typ>::from_be_bytes(bytes.try_into()?)
                         };
-                        return Ok((rest, value));
+                        return Ok((bit_size, value));
                     }
                 }
 
-                    // Create a new BitVec from the slice and pad un-aligned chunks
-                    // i.e. [10010110, 1110] -> [10010110, 00001110]
-                    let bits: BitVec<u8, Msb0> = {
-                        let mut bits = BitVec::with_capacity(bit_slice.len() + pad);
+                // Create a new BitVec from the slice and pad un-aligned chunks
+                // i.e. [10010110, 1110] -> [10010110, 00001110]
+                let bits: BitVec<u8, Msb0> = {
+                    let mut bits = BitVec::with_capacity(bit_slice.len() + pad);
 
-                        // Copy bits to new BitVec
-                        bits.extend_from_bitslice(bit_slice);
+                    // Copy bits to new BitVec
+                    bits.extend_from_bitslice(&bit_slice);
 
-                        // Force align
-                        //i.e. [1110, 10010110] -> [11101001, 0110]
-                        bits.force_align();
+                    // Force align
+                    //i.e. [1110, 10010110] -> [11101001, 0110]
+                    bits.force_align();
 
-                        // Some padding to next byte
-                        let index = if input_is_le {
-                            bits.len() - (8 - pad)
-                        } else {
-                            0
-                        };
-                        for _ in 0..pad {
-                            bits.insert(index, false);
-                        }
-
-                        // Pad up-to size of type
-                        for _ in 0..(MAX_TYPE_BITS - bits.len()) {
-                            if input_is_le {
-                                bits.push(false);
-                            } else {
-                                bits.insert(0, false);
-                            }
-                        }
-
-                        bits
-                    };
-
-                    let bytes: &[u8] = bits.domain().region().unwrap().1;
-
-                    // Read value
-                    let value = if input_is_le {
-                        <$typ>::from_le_bytes(bytes.try_into()?)
+                    // Some padding to next byte
+                    let index = if input_is_le {
+                        bits.len() - (8 - pad)
                     } else {
-                        <$typ>::from_be_bytes(bytes.try_into()?)
+                        0
                     };
-                    Ok((rest, value))
+                    for _ in 0..pad {
+                        bits.insert(index, false);
+                    }
+
+                    // Pad up-to size of type
+                    for _ in 0..(MAX_TYPE_BITS - bits.len()) {
+                        if input_is_le {
+                            bits.push(false);
+                        } else {
+                            bits.insert(0, false);
+                        }
+                    }
+
+                    bits
+                };
+
+                let bytes: &[u8] = bits.domain().region().unwrap().1;
+
+                // Read value
+                let value = if input_is_le {
+                    <$typ>::from_le_bytes(bytes.try_into()?)
+                } else {
+                    <$typ>::from_be_bytes(bytes.try_into()?)
+                };
+                Ok((bit_size, value))
             }
         }
     };
@@ -121,7 +121,7 @@ macro_rules! ImplDekuReadBytes {
             fn read(
                 input: &BitSlice<u8, Msb0>,
                 (endian, size): (Endian, ByteSize),
-            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+            ) -> Result<(usize, Self), DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 let bit_size: usize = size.0 * 8;
 
@@ -137,7 +137,7 @@ macro_rules! ImplDekuReadBytes {
                     return Err(DekuError::Incomplete(crate::error::NeedSize::new(bit_size)));
                 }
 
-                let (bit_slice, rest) = input.split_at(bit_size);
+                let bit_slice = &input[..bit_size];
 
                 let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
 
@@ -156,7 +156,7 @@ macro_rules! ImplDekuReadBytes {
                     let mut bits: BitVec<u8, Msb0> = BitVec::with_capacity(bit_slice.len() + pad);
 
                     // Copy bits to new BitVec
-                    bits.extend_from_bitslice(bit_slice);
+                    bits.extend_from_bitslice(&bit_slice);
 
                     // Force align
                     //i.e. [1110, 10010110] -> [11101001, 0110]
@@ -180,7 +180,7 @@ macro_rules! ImplDekuReadBytes {
                     res as $typ
                 };
 
-                Ok((rest, value))
+                Ok((bit_size, value))
             }
         }
     };
@@ -192,30 +192,30 @@ macro_rules! ImplDekuReadSignExtend {
             fn read(
                 input: &BitSlice<u8, Msb0>,
                 (endian, size): (Endian, ByteSize),
-            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
-                let (rest, value) =
+            ) -> Result<(usize, Self), DekuError> {
+                let (amt_read, value) =
                     <$inner as DekuRead<'_, (Endian, ByteSize)>>::read(input, (endian, size))?;
 
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 let bit_size = size.0 * 8;
                 let shift = MAX_TYPE_BITS - bit_size;
                 let value = (value as $typ) << shift >> shift;
-                Ok((rest, value))
+                Ok((amt_read, value))
             }
         }
         impl DekuRead<'_, (Endian, BitSize)> for $typ {
             fn read(
                 input: &BitSlice<u8, Msb0>,
                 (endian, size): (Endian, BitSize),
-            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
-                let (rest, value) =
+            ) -> Result<(usize, Self), DekuError> {
+                let (amt_read, value) =
                     <$inner as DekuRead<'_, (Endian, BitSize)>>::read(input, (endian, size))?;
 
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 let bit_size = size.0;
                 let shift = MAX_TYPE_BITS - bit_size;
                 let value = (value as $typ) << shift >> shift;
-                Ok((rest, value))
+                Ok((amt_read, value))
             }
         }
     };
@@ -228,7 +228,7 @@ macro_rules! ForwardDekuRead {
             fn read(
                 input: &BitSlice<u8, Msb0>,
                 endian: Endian,
-            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+            ) -> Result<(usize, Self), DekuError> {
                 let bit_size = BitSize::of::<$typ>();
 
                 // Since we don't have a #[bits] or [bytes], check if we can use bytes for perf
@@ -245,7 +245,7 @@ macro_rules! ForwardDekuRead {
             fn read(
                 input: &BitSlice<u8, Msb0>,
                 byte_size: ByteSize,
-            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+            ) -> Result<(usize, Self), DekuError> {
                 let endian = Endian::default();
 
                 <$typ>::read(input, (endian, byte_size))
@@ -257,7 +257,7 @@ macro_rules! ForwardDekuRead {
             fn read(
                 input: &BitSlice<u8, Msb0>,
                 bit_size: BitSize,
-            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+            ) -> Result<(usize, Self), DekuError> {
                 let endian = Endian::default();
 
                 // check if we can use ByteSize for performance
@@ -270,10 +270,7 @@ macro_rules! ForwardDekuRead {
         }
 
         impl DekuRead<'_> for $typ {
-            fn read(
-                input: &BitSlice<u8, Msb0>,
-                _: (),
-            ) -> Result<(&BitSlice<u8, Msb0>, Self), DekuError> {
+            fn read(input: &BitSlice<u8, Msb0>, _: ()) -> Result<(usize, Self), DekuError> {
                 <$typ>::read(input, Endian::default())
             }
         }
@@ -483,9 +480,10 @@ ImplDekuTraitsBytes!(f64, u64);
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
     use crate::native_endian;
-    use rstest::rstest;
 
     static ENDIAN: Endian = Endian::new();
 
@@ -505,87 +503,87 @@ mod tests {
         };
     }
 
-    TestPrimitive!(test_u8, u8, vec![0xAAu8], 0xAAu8);
+    TestPrimitive!(test_u8, u8, vec![0xaau8], 0xaau8);
     TestPrimitive!(
         test_u16,
         u16,
-        vec![0xABu8, 0xCD],
-        native_endian!(0xCDAB_u16)
+        vec![0xabu8, 0xcd],
+        native_endian!(0xcdab_u16)
     );
     TestPrimitive!(
         test_u32,
         u32,
-        vec![0xABu8, 0xCD, 0xEF, 0xBE],
-        native_endian!(0xBEEFCDAB_u32)
+        vec![0xabu8, 0xcd, 0xef, 0xbe],
+        native_endian!(0xbeefcdab_u32)
     );
     TestPrimitive!(
         test_u64,
         u64,
-        vec![0xABu8, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD, 0xFE, 0xC0],
-        native_endian!(0xC0FECDABBEEFCDAB_u64)
+        vec![0xabu8, 0xcd, 0xef, 0xbe, 0xab, 0xcd, 0xfe, 0xc0],
+        native_endian!(0xc0fecdabbeefcdab_u64)
     );
     TestPrimitive!(
         test_u128,
         u128,
         vec![
-            0xABu8, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD, 0xFE, 0xC0, 0xAB, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD,
-            0xFE, 0xC0
+            0xabu8, 0xcd, 0xef, 0xbe, 0xab, 0xcd, 0xfe, 0xc0, 0xab, 0xcd, 0xef, 0xbe, 0xab, 0xcd,
+            0xfe, 0xc0
         ],
-        native_endian!(0xC0FECDABBEEFCDABC0FECDABBEEFCDAB_u128)
+        native_endian!(0xc0fecdabbeefcdabc0fecdabbeefcdab_u128)
     );
     TestPrimitive!(
         test_usize,
         usize,
-        vec![0xABu8, 0xCD, 0xEF, 0xBE, 0xAB, 0xCD, 0xFE, 0xC0],
+        vec![0xabu8, 0xcd, 0xef, 0xbe, 0xab, 0xcd, 0xfe, 0xc0],
         if core::mem::size_of::<usize>() == 8 {
-            native_endian!(0xC0FECDABBEEFCDAB_usize)
+            native_endian!(0xc0fecdabbeefcdab_usize)
         } else {
-            native_endian!(0xBEEFCDAB_usize)
+            native_endian!(0xbeefcdab_usize)
         }
     );
-    TestPrimitive!(test_i8, i8, vec![0xFBu8], -5);
-    TestPrimitive!(test_i16, i16, vec![0xFDu8, 0xFE], native_endian!(-259_i16));
+    TestPrimitive!(test_i8, i8, vec![0xfbu8], -5);
+    TestPrimitive!(test_i16, i16, vec![0xfdu8, 0xfe], native_endian!(-259_i16));
     TestPrimitive!(
         test_i32,
         i32,
-        vec![0x02u8, 0x3F, 0x01, 0xEF],
-        native_endian!(-0x10FEC0FE_i32)
+        vec![0x02u8, 0x3f, 0x01, 0xef],
+        native_endian!(-0x10fec0fe_i32)
     );
     TestPrimitive!(
         test_i64,
         i64,
-        vec![0x02u8, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF],
-        native_endian!(-0x10FEC0FE10FEC0FE_i64)
+        vec![0x02u8, 0x3f, 0x01, 0xef, 0x01, 0x3f, 0x01, 0xef],
+        native_endian!(-0x10fec0fe10fec0fe_i64)
     );
     TestPrimitive!(
         test_i128,
         i128,
         vec![
-            0x02u8, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF, 0x01, 0x3F,
-            0x01, 0xEF
+            0x02u8, 0x3f, 0x01, 0xef, 0x01, 0x3f, 0x01, 0xef, 0x01, 0x3f, 0x01, 0xef, 0x01, 0x3f,
+            0x01, 0xef
         ],
-        native_endian!(-0x10FEC0FE10FEC0FE10FEC0FE10FEC0FE_i128)
+        native_endian!(-0x10fec0fe10fec0fe10fec0fe10fec0fe_i128)
     );
     TestPrimitive!(
         test_isize,
         isize,
-        vec![0x02u8, 0x3F, 0x01, 0xEF, 0x01, 0x3F, 0x01, 0xEF],
+        vec![0x02u8, 0x3f, 0x01, 0xef, 0x01, 0x3f, 0x01, 0xef],
         if core::mem::size_of::<isize>() == 8 {
-            native_endian!(-0x10FEC0FE10FEC0FE_isize)
+            native_endian!(-0x10fec0fe10fec0fe_isize)
         } else {
-            native_endian!(-0x10FEC0FE_isize)
+            native_endian!(-0x10fec0fe_isize)
         }
     );
     TestPrimitive!(
         test_f32,
         f32,
-        vec![0xA6u8, 0x9B, 0xC4, 0xBB],
+        vec![0xa6u8, 0x9b, 0xc4, 0xbb],
         native_endian!(-0.006_f32)
     );
     TestPrimitive!(
         test_f64,
         f64,
-        vec![0xFAu8, 0x7E, 0x6A, 0xBC, 0x74, 0x93, 0x78, 0xBF],
+        vec![0xfau8, 0x7e, 0x6a, 0xbc, 0x74, 0x93, 0x78, 0xbf],
         native_endian!(-0.006_f64)
     );
 
@@ -610,13 +608,13 @@ mod tests {
     ) {
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (rest, res_read) = match bit_size {
+        let (amt_read, res_read) = match bit_size {
             Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
             None => u32::read(bit_slice, endian).unwrap(),
         };
 
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
     }
 
     #[rstest(input, endian, bit_size, expected,
@@ -651,12 +649,12 @@ mod tests {
     ) {
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (rest, res_read) = match bit_size {
+        let (amt_read, res_read) = match bit_size {
             Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
             None => u32::read(bit_slice, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut res_write = bitvec![u8, Msb0;];
         match bit_size {
@@ -675,10 +673,10 @@ mod tests {
             fn $test_name() {
                 let bit_slice = [0b10101_000].view_bits::<Msb0>();
 
-                let (rest, res_read) = <$typ>::read(bit_slice, (Endian::Little, BitSize(5))).unwrap();
+                let (amt_read, res_read) = <$typ>::read(bit_slice, (Endian::Little, BitSize(5))).unwrap();
 
                 assert_eq!(-11, res_read);
-                assert_eq!(bits![u8, Msb0; 0, 0, 0], rest);
+                assert_eq!(bits![u8, Msb0; 0, 0, 0], bit_slice[amt_read..]);
             }
         };
     }

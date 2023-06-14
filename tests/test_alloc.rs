@@ -45,10 +45,12 @@ struct TestDeku {
 }
 
 mod tests {
-    use super::*;
+    use std::convert::TryFrom;
+
     use alloc_counter::count_alloc;
     use hexlit::hex;
-    use std::convert::TryFrom;
+
+    use super::*;
 
     #[test]
     #[cfg_attr(miri, ignore)]

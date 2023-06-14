@@ -1,20 +1,19 @@
-use crate::{DekuError, DekuRead, DekuWrite};
-use bitvec::prelude::*;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+use bitvec::prelude::*;
+
+use crate::{DekuError, DekuRead, DekuWrite};
 
 impl<'a, Ctx> DekuRead<'a, Ctx> for Ipv4Addr
 where
     u32: DekuRead<'a, Ctx>,
 {
-    fn read(
-        input: &'a BitSlice<u8, Msb0>,
-        ctx: Ctx,
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+    fn read(input: &'a BitSlice<u8, Msb0>, ctx: Ctx) -> Result<(usize, Self), DekuError>
     where
         Self: Sized,
     {
-        let (rest, ip) = u32::read(input, ctx)?;
-        Ok((rest, ip.into()))
+        let (amt_read, ip) = u32::read(input, ctx)?;
+        Ok((amt_read, ip.into()))
     }
 }
 
@@ -32,15 +31,12 @@ impl<'a, Ctx> DekuRead<'a, Ctx> for Ipv6Addr
 where
     u128: DekuRead<'a, Ctx>,
 {
-    fn read(
-        input: &'a BitSlice<u8, Msb0>,
-        ctx: Ctx,
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+    fn read(input: &'a BitSlice<u8, Msb0>, ctx: Ctx) -> Result<(usize, Self), DekuError>
     where
         Self: Sized,
     {
-        let (rest, ip) = u128::read(input, ctx)?;
-        Ok((rest, ip.into()))
+        let (amt_read, ip) = u128::read(input, ctx)?;
+        Ok((amt_read, ip.into()))
     }
 }
 
@@ -69,9 +65,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
     use crate::ctx::Endian;
-    use rstest::rstest;
 
     #[rstest(input, endian, expected, expected_rest,
         case::normal_le([237, 160, 254, 145].as_ref(), Endian::Little, Ipv4Addr::new(145, 254, 160, 237), bits![u8, Msb0;]),
@@ -85,9 +82,9 @@ mod tests {
     ) {
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (rest, res_read) = Ipv4Addr::read(bit_slice, endian).unwrap();
+        let (amt_read, res_read) = Ipv4Addr::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, endian).unwrap();
@@ -106,9 +103,9 @@ mod tests {
     ) {
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (rest, res_read) = Ipv6Addr::read(bit_slice, endian).unwrap();
+        let (amt_read, res_read) = Ipv6Addr::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, endian).unwrap();
@@ -127,7 +124,7 @@ mod tests {
         ip_addr.write(&mut ret_write, Endian::Little).unwrap();
         assert_eq!(
             vec![
-                0xFF, 0x02, 0x0A, 0xC0, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0xff, 0x02, 0x0a, 0xc0, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00
             ],
             ret_write.into_vec()

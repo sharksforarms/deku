@@ -1,7 +1,10 @@
-use crate::{ctx::*, DekuError, DekuRead, DekuWrite};
-use bitvec::prelude::*;
 use std::collections::HashSet;
 use std::hash::{BuildHasher, Hash};
+
+use bitvec::prelude::*;
+
+use crate::ctx::*;
+use crate::{DekuError, DekuRead, DekuWrite};
 
 /// Read `T`s into a hashset until a given predicate returns true
 /// * `capacity` - an optional capacity to pre-allocate the hashset with
@@ -11,43 +14,44 @@ use std::hash::{BuildHasher, Hash};
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
 #[allow(clippy::type_complexity)]
-fn read_hashset_with_predicate<
-    'a,
-    T: DekuRead<'a, Ctx> + Eq + Hash,
-    S: BuildHasher + Default,
-    Ctx: Copy,
-    Predicate: FnMut(usize, &T) -> bool,
->(
+fn read_hashset_with_predicate<'a, T, S, Ctx, Predicate>(
     input: &'a BitSlice<u8, Msb0>,
     capacity: Option<usize>,
     ctx: Ctx,
     mut predicate: Predicate,
-) -> Result<(&'a BitSlice<u8, Msb0>, HashSet<T, S>), DekuError> {
+) -> Result<(usize, HashSet<T, S>), DekuError>
+where
+    T: DekuRead<'a, Ctx> + Eq + Hash,
+    S: BuildHasher + Default,
+    Ctx: Copy,
+    Predicate: FnMut(usize, &T) -> bool,
+{
     let mut res = HashSet::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
 
     let mut rest = input;
     let mut found_predicate = false;
+    let mut total_read = 0;
 
     while !found_predicate {
-        let (new_rest, val) = <T>::read(rest, ctx)?;
+        let (amt_read, val) = <T>::read(rest, ctx)?;
+        rest = &rest[amt_read..];
         found_predicate = predicate(
-            unsafe { new_rest.as_bitptr().offset_from(input.as_bitptr()) } as usize,
+            unsafe { rest.as_bitptr().offset_from(input.as_bitptr()) } as usize,
             &val,
         );
         res.insert(val);
-        rest = new_rest;
+        total_read += amt_read;
     }
 
-    Ok((rest, res))
+    Ok((total_read, res))
 }
 
-impl<
-        'a,
-        T: DekuRead<'a, Ctx> + Eq + Hash,
-        S: BuildHasher + Default,
-        Ctx: Copy,
-        Predicate: FnMut(&T) -> bool,
-    > DekuRead<'a, (Limit<T, Predicate>, Ctx)> for HashSet<T, S>
+impl<'a, T, S, Ctx, Predicate> DekuRead<'a, (Limit<T, Predicate>, Ctx)> for HashSet<T, S>
+where
+    T: DekuRead<'a, Ctx> + Eq + Hash,
+    S: BuildHasher + Default,
+    Ctx: Copy,
+    Predicate: FnMut(&T) -> bool,
 {
     /// Read `T`s until the given limit
     /// * `limit` - the limiting factor on the amount of `T`s to read
@@ -60,14 +64,15 @@ impl<
     /// # use std::collections::HashSet;
     /// let input = vec![1u8, 2, 3, 4];
     /// let expected: HashSet<u32> = vec![0x04030201].into_iter().collect();
-    /// let (rest, set) = HashSet::<u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
-    /// assert!(rest.is_empty());
+    /// let (amt_read, set) =
+    ///     HashSet::<u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
+    /// assert_eq!(amt_read, 32);
     /// assert_eq!(expected, set)
     /// ```
     fn read(
         input: &'a BitSlice<u8, Msb0>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+    ) -> Result<(usize, Self), DekuError>
     where
         Self: Sized,
     {
@@ -76,7 +81,7 @@ impl<
             Limit::Count(mut count) => {
                 // Handle the trivial case of reading an empty hashset
                 if count == 0 {
-                    return Ok((input, HashSet::<T, S>::default()));
+                    return Ok((0, HashSet::<T, S>::default()));
                 }
 
                 // Otherwise, read until we have read `count` elements
@@ -119,7 +124,7 @@ impl<'a, T: DekuRead<'a> + Eq + Hash, S: BuildHasher + Default, Predicate: FnMut
     fn read(
         input: &'a BitSlice<u8, Msb0>,
         limit: Limit<T, Predicate>,
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+    ) -> Result<(usize, Self), DekuError>
     where
         Self: Sized,
     {
@@ -153,9 +158,10 @@ impl<T: DekuWrite<Ctx>, S, Ctx: Copy> DekuWrite<Ctx> for HashSet<T, S> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rstest::rstest;
     use rustc_hash::FxHashSet;
+
+    use super::*;
 
     #[rstest(input, endian, bit_size, limit, expected, expected_rest,
         case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), FxHashSet::default(), bits![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 0]),
@@ -187,7 +193,7 @@ mod tests {
     ) {
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (rest, res_read) = match bit_size {
+        let (amt_read, res_read) = match bit_size {
             Some(bit_size) => {
                 FxHashSet::<u8>::read(bit_slice, (limit, (endian, BitSize(bit_size)))).unwrap()
             }
@@ -195,7 +201,7 @@ mod tests {
         };
 
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
     }
 
     #[rstest(input, endian, expected,
@@ -230,10 +236,10 @@ mod tests {
         // Unwrap here because all test cases are `Some`.
         let bit_size = bit_size.unwrap();
 
-        let (rest, res_read) =
+        let (amt_read, res_read) =
             FxHashSet::<u16>::read(bit_slice, (limit, (endian, BitSize(bit_size)))).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read

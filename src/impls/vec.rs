@@ -1,8 +1,10 @@
-use crate::{ctx::*, DekuError, DekuRead, DekuWrite};
-use bitvec::prelude::*;
-
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+
+use bitvec::prelude::*;
+
+use crate::ctx::*;
+use crate::{DekuError, DekuRead, DekuWrite};
 
 /// Read `T`s into a vec until a given predicate returns true
 /// * `capacity` - an optional capacity to pre-allocate the vector with
@@ -11,25 +13,27 @@ use alloc::vec::Vec;
 /// The predicate takes two parameters: the number of bits that have been read so far,
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
-fn read_vec_with_predicate<
-    'a,
-    T: DekuRead<'a, Ctx>,
-    Ctx: Copy,
-    Predicate: FnMut(usize, &T) -> bool,
->(
+fn read_vec_with_predicate<'a, T, Ctx, Predicate>(
     input: &'a BitSlice<u8, Msb0>,
     capacity: Option<usize>,
     ctx: Ctx,
     mut predicate: Predicate,
-) -> Result<(&'a BitSlice<u8, Msb0>, Vec<T>), DekuError> {
+) -> Result<(usize, Vec<T>), DekuError>
+where
+    T: DekuRead<'a, Ctx>,
+    Ctx: Copy,
+    Predicate: FnMut(usize, &T) -> bool,
+{
     let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
 
     let mut rest = input;
+    let mut total_read = 0;
 
     loop {
-        let (new_rest, val) = <T>::read(rest, ctx)?;
+        let (amt_read, val) = <T>::read(rest, ctx)?;
         res.push(val);
-        rest = new_rest;
+        rest = &rest[amt_read..];
+        total_read += amt_read;
 
         // This unwrap is safe as we are pushing to the vec immediately before it,
         // so there will always be a last element
@@ -41,11 +45,14 @@ fn read_vec_with_predicate<
         }
     }
 
-    Ok((rest, res))
+    Ok((total_read, res))
 }
 
-impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool>
-    DekuRead<'a, (Limit<T, Predicate>, Ctx)> for Vec<T>
+impl<'a, T, Ctx, Predicate> DekuRead<'a, (Limit<T, Predicate>, Ctx)> for Vec<T>
+where
+    T: DekuRead<'a, Ctx>,
+    Ctx: Copy,
+    Predicate: FnMut(&T) -> bool,
 {
     /// Read `T`s until the given limit
     /// * `limit` - the limiting factor on the amount of `T`s to read
@@ -56,14 +63,14 @@ impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool>
     /// # use deku::DekuRead;
     /// # use deku::bitvec::BitView;
     /// let input = vec![1u8, 2, 3, 4];
-    /// let (rest, v) = Vec::<u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
-    /// assert!(rest.is_empty());
+    /// let (amt_read, v) = Vec::<u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
+    /// assert_eq!(amt_read, 32);
     /// assert_eq!(vec![0x04030201], v)
     /// ```
     fn read(
         input: &'a BitSlice<u8, Msb0>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+    ) -> Result<(usize, Self), DekuError>
     where
         Self: Sized,
     {
@@ -72,7 +79,7 @@ impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy, Predicate: FnMut(&T) -> bool>
             Limit::Count(mut count) => {
                 // Handle the trivial case of reading an empty vector
                 if count == 0 {
-                    return Ok((input, Vec::new()));
+                    return Ok((0, Vec::new()));
                 }
 
                 // Otherwise, read until we have read `count` elements
@@ -113,7 +120,7 @@ impl<'a, T: DekuRead<'a>, Predicate: FnMut(&T) -> bool> DekuRead<'a, Limit<T, Pr
     fn read(
         input: &'a BitSlice<u8, Msb0>,
         limit: Limit<T, Predicate>,
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+    ) -> Result<(usize, Self), DekuError>
     where
         Self: Sized,
     {
@@ -143,8 +150,9 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Vec<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rstest::rstest;
+
+    use super::*;
 
     #[rstest(input,endian,bit_size,limit,expected,expected_rest,
         case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), vec![], bits![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 0]),
@@ -176,7 +184,7 @@ mod tests {
     ) {
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (rest, res_read) = match bit_size {
+        let (amt_read, res_read) = match bit_size {
             Some(bit_size) => {
                 Vec::<u8>::read(bit_slice, (limit, (endian, BitSize(bit_size)))).unwrap()
             }
@@ -184,7 +192,7 @@ mod tests {
         };
 
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
     }
 
     #[rstest(input, endian, expected,
@@ -219,10 +227,10 @@ mod tests {
         // Unwrap here because all test cases are `Some`.
         let bit_size = bit_size.unwrap();
 
-        let (rest, res_read) =
+        let (amt_read, res_read) =
             Vec::<u16>::read(bit_slice, (limit, (endian, BitSize(bit_size)))).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read

@@ -1,6 +1,7 @@
+use std::convert::{TryFrom, TryInto};
+
 use deku::prelude::*;
 use rstest::rstest;
-use std::convert::{TryFrom, TryInto};
 
 mod test_slice {
     use super::*;
@@ -13,7 +14,7 @@ mod test_slice {
             data: &'a [u8],
         }
 
-        let test_data: Vec<u8> = [0xAA, 0xBB].to_vec();
+        let test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
@@ -45,7 +46,7 @@ mod test_slice {
             data: &'a [u8],
         }
 
-        let test_data: Vec<u8> = [input_bits, 0xAA, 0xBB].to_vec();
+        let test_data: Vec<u8> = [input_bits, 0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
@@ -72,14 +73,14 @@ mod test_vec {
             data: Vec<u16>,
         }
 
-        let test_data: Vec<u8> = [0xAA, 0xBB].to_vec();
+        let test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
             TestStruct {
                 // We should read 16 bits, not 16 elements,
                 // thus resulting in a single u16 element
-                data: vec![0xBBAA]
+                data: vec![0xbbaa]
             },
             ret_read
         );
@@ -106,7 +107,7 @@ mod test_vec {
             data: Vec<u16>,
         }
 
-        let test_data: Vec<u8> = [input_bits, 0xAA, 0xBB].to_vec();
+        let test_data: Vec<u8> = [input_bits, 0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
@@ -115,7 +116,7 @@ mod test_vec {
 
                 // We should read 16 bits, not 16 elements,
                 // thus resulting in a single u16 element
-                data: vec![0xBBAA]
+                data: vec![0xbbaa]
             },
             ret_read
         );

@@ -1,5 +1,6 @@
-use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
+
+use deku::prelude::*;
 
 #[test]
 fn test_cond_deku() {

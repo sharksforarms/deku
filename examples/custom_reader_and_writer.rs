@@ -1,13 +1,14 @@
+use std::convert::TryInto;
+
 use deku::bitvec::{BitSlice, BitVec, Msb0};
 use deku::ctx::BitSize;
 use deku::prelude::*;
-use std::convert::TryInto;
 
 fn bit_flipper_read(
     field_a: u8,
     rest: &BitSlice<u8, Msb0>,
     bit_size: BitSize,
-) -> Result<(&BitSlice<u8, Msb0>, u8), DekuError> {
+) -> Result<(usize, u8), DekuError> {
     // Access to previously read fields
     println!("field_a = 0x{:X}", field_a);
 
@@ -18,12 +19,12 @@ fn bit_flipper_read(
     println!("bit_size: {:?}", bit_size);
 
     // read field_b, calling original func
-    let (rest, value) = u8::read(rest, bit_size)?;
+    let (amt_read, value) = u8::read(rest, bit_size)?;
 
     // flip the bits on value if field_a is 0x01
     let value = if field_a == 0x01 { !value } else { value };
 
-    Ok((rest, value))
+    Ok((amt_read, value))
 }
 
 fn bit_flipper_write(

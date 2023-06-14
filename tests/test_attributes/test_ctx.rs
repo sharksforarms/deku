@@ -1,7 +1,8 @@
+use std::convert::{TryFrom, TryInto};
+
 use bitvec::bitvec;
 use deku::bitvec::{BitView, Msb0};
 use deku::prelude::*;
-use std::convert::{TryFrom, TryInto};
 
 /// General smoke tests for ctx
 /// TODO: These should be divided into smaller units
@@ -60,8 +61,9 @@ fn test_top_level_ctx_enum() {
     }
 
     let test_data = [0x01_u8, 0x03];
-    let (rest, ret_read) = TopLevelCtxEnum::read(test_data.view_bits(), (1, 2)).unwrap();
-    assert!(rest.is_empty());
+    let bit_slice = test_data.view_bits();
+    let (amt_read, ret_read) = TopLevelCtxEnum::read(bit_slice, (1, 2)).unwrap();
+    assert!(bit_slice[amt_read..].is_empty());
     assert_eq!(ret_read, TopLevelCtxEnum::VariantA(0x06));
 
     let mut ret_write = bitvec![u8, Msb0;];
@@ -94,8 +96,9 @@ fn test_top_level_ctx_enum_default() {
     assert_eq!(test_data.to_vec(), ret_write);
 
     // Use context
-    let (rest, ret_read) = TopLevelCtxEnumDefault::read(test_data.view_bits(), (1, 2)).unwrap();
-    assert!(rest.is_empty());
+    let bit_slice = test_data.view_bits();
+    let (amt_read, ret_read) = TopLevelCtxEnumDefault::read(bit_slice, (1, 2)).unwrap();
+    assert!(bit_slice[amt_read..].is_empty());
     assert_eq!(ret_read, TopLevelCtxEnumDefault::VariantA(0x06));
     let mut ret_write = bitvec![u8, Msb0;];
     ret_read.write(&mut ret_write, (1, 2)).unwrap();
@@ -212,8 +215,9 @@ fn test_ctx_default_struct() {
     assert_eq!(ret_write, test_data);
 
     // Use context
-    let (rest, ret_read) = TopLevelCtxStructDefault::read(test_data.view_bits(), (1, 2)).unwrap();
-    assert!(rest.is_empty());
+    let bit_slice = test_data.view_bits();
+    let (amt_read, ret_read) = TopLevelCtxStructDefault::read(bit_slice, (1, 2)).unwrap();
+    assert_eq!(bit_slice.len(), amt_read);
     assert_eq!(expected, ret_read);
     let mut ret_write = bitvec![u8, Msb0;];
     ret_read.write(&mut ret_write, (1, 2)).unwrap();
@@ -240,7 +244,7 @@ fn test_enum_endian_ctx() {
 
     assert_eq!(
         EnumTypeEndian {
-            t: EnumTypeEndianCtx::VarA(0xFF)
+            t: EnumTypeEndianCtx::VarA(0xff)
         },
         ret_read
     );

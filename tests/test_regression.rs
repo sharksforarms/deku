@@ -126,7 +126,7 @@ mod issue_282 {
 // https://github.com/sharksforarms/deku/issues/292
 #[test]
 fn test_regression_292() {
-    let test_data: &[u8] = [0x0F, 0xF0].as_ref();
+    let test_data: &[u8] = [0x0f, 0xf0].as_ref();
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]

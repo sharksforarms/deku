@@ -1,8 +1,10 @@
 //! Implementations of DekuRead and DekuWrite for [T; N] where 0 < N <= 32
 
-use crate::{ctx::Limit, DekuError, DekuRead, DekuWrite};
 use bitvec::prelude::*;
 pub use deku_derive::*;
+
+use crate::ctx::Limit;
+use crate::{DekuError, DekuRead, DekuWrite};
 
 /// Read `u8`s and returns a byte slice up until a given predicate returns true
 /// * `ctx` - The context required by `u8`. It will be passed to every `u8` when constructing.
@@ -10,20 +12,24 @@ pub use deku_derive::*;
 /// The predicate takes two parameters: the number of bits that have been read so far,
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
-fn read_slice_with_predicate<'a, Ctx: Copy, Predicate: FnMut(usize, &u8) -> bool>(
+fn read_slice_with_predicate<'a, Ctx, Predicate>(
     input: &'a BitSlice<u8, Msb0>,
     ctx: Ctx,
     mut predicate: Predicate,
-) -> Result<(&'a BitSlice<u8, Msb0>, &[u8]), DekuError>
+) -> Result<(usize, &[u8]), DekuError>
 where
     u8: DekuRead<'a, Ctx>,
+    Ctx: Copy,
+    Predicate: FnMut(usize, &u8) -> bool,
 {
     let mut rest = input;
     let mut value;
+    let mut total_read = 0;
 
     loop {
-        let (new_rest, val) = u8::read(rest, ctx)?;
-        rest = new_rest;
+        let (amt_read, val) = u8::read(rest, ctx)?;
+        rest = &rest[amt_read..];
+        total_read += amt_read;
 
         let read_idx = unsafe { rest.as_bitptr().offset_from(input.as_bitptr()) } as usize;
         value = input[..read_idx].domain().region().unwrap().1;
@@ -33,13 +39,14 @@ where
         }
     }
 
-    Ok((rest, value))
+    Ok((total_read, value))
 }
 
-impl<'a, Ctx: Copy, Predicate: FnMut(&u8) -> bool> DekuRead<'a, (Limit<u8, Predicate>, Ctx)>
-    for &'a [u8]
+impl<'a, Ctx, Predicate> DekuRead<'a, (Limit<u8, Predicate>, Ctx)> for &'a [u8]
 where
     u8: DekuRead<'a, Ctx>,
+    Ctx: Copy,
+    Predicate: FnMut(&u8) -> bool,
 {
     /// Read `u8`s until the given limit
     /// * `limit` - the limiting factor on the amount of `u8`s to read
@@ -50,20 +57,20 @@ where
     /// # use deku::DekuRead;
     /// # use bitvec::view::BitView;
     /// let input = vec![1u8, 2, 3, 4];
-    /// let (rest, v) = <&[u8]>::read(input.view_bits(), (4.into(), Endian::Little)).unwrap();
-    /// assert!(rest.is_empty());
+    /// let (amt_read, v) = <&[u8]>::read(input.view_bits(), (4.into(), Endian::Little)).unwrap();
+    /// assert_eq!(amt_read, 32);
     /// assert_eq!(&[1u8, 2, 3, 4], v)
     /// ```
     fn read(
         input: &'a BitSlice<u8, Msb0>,
         (limit, inner_ctx): (Limit<u8, Predicate>, Ctx),
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError> {
+    ) -> Result<(usize, Self), DekuError> {
         match limit {
             // Read a given count of elements
             Limit::Count(mut count) => {
                 // Handle the trivial case of reading an empty slice
                 if count == 0 {
-                    return Ok((input, &input.domain().region().unwrap().1[..0]));
+                    return Ok((0, &input.domain().region().unwrap().1[..0]));
                 }
 
                 // Otherwise, read until we have read `count` elements
@@ -124,19 +131,21 @@ mod pre_const_generics_impl {
                     fn read(
                         input: &'a BitSlice<u8, Msb0>,
                         ctx: Ctx,
-                    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+                    ) -> Result<(usize, Self), DekuError>
                     where
                         Self: Sized,
                     {
                         let mut slice: [$typ; $count] = Default::default();
                         let mut rest = input;
+                        let mut total_read = 0;
                         for i in 0..$count {
-                            let (new_rest, value) = <$typ>::read(rest, ctx)?;
+                            let (amt_read, value) = <$typ>::read(rest, ctx)?;
                             slice[i] = value;
-                            rest = new_rest;
+                            rest = new_rest[amt_read..];
+                            total_read += amt_read;
                         }
 
-                        Ok((rest, slice))
+                        Ok((total_read, slice))
                     }
                 }
 
@@ -173,18 +182,15 @@ mod pre_const_generics_impl {
 
 #[cfg(feature = "const_generics")]
 mod const_generics_impl {
-    use super::*;
-
     use core::mem::MaybeUninit;
+
+    use super::*;
 
     impl<'a, Ctx: Copy, T, const N: usize> DekuRead<'a, Ctx> for [T; N]
     where
         T: DekuRead<'a, Ctx>,
     {
-        fn read(
-            input: &'a BitSlice<u8, Msb0>,
-            ctx: Ctx,
-        ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+        fn read(input: &'a BitSlice<u8, Msb0>, ctx: Ctx) -> Result<(usize, Self), DekuError>
         where
             Self: Sized,
         {
@@ -193,8 +199,9 @@ mod const_generics_impl {
             // and never return it in case of error
             let mut slice: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
             let mut rest = input;
+            let mut total_read = 0;
             for (n, item) in slice.iter_mut().enumerate() {
-                let (new_rest, value) = match T::read(rest, ctx) {
+                let (amt_read, value) = match T::read(rest, ctx) {
                     Ok(it) => it,
                     Err(err) => {
                         // For each item in the array, drop if we allocated it.
@@ -207,13 +214,15 @@ mod const_generics_impl {
                     }
                 };
                 item.write(value);
-                rest = new_rest;
+                rest = &rest[amt_read..];
+                total_read += amt_read;
             }
 
-            Ok((rest, unsafe {
+            let val = unsafe {
                 // TODO: array_assume_init: https://github.com/rust-lang/rust/issues/80908
                 (&slice as *const _ as *const [T; N]).read()
-            }))
+            };
+            Ok((total_read, val))
         }
     }
 
@@ -244,10 +253,10 @@ mod const_generics_impl {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use crate::ctx::Endian;
     use rstest::rstest;
+
+    use super::*;
+    use crate::ctx::Endian;
 
     #[rstest(input,endian,expected,expected_rest,
         case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, [0xCCDD, 0xAABB], bits![u8, Msb0;]),
@@ -261,9 +270,9 @@ mod tests {
     ) {
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (rest, res_read) = <[u16; 2]>::read(bit_slice, endian).unwrap();
+        let (amt_read, res_read) = <[u16; 2]>::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
     }
 
     #[rstest(input,endian,expected,
@@ -305,9 +314,9 @@ mod tests {
     ) {
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (rest, res_read) = <[[u16; 2]; 2]>::read(bit_slice, endian).unwrap();
+        let (amt_read, res_read) = <[[u16; 2]; 2]>::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
     }
 
     #[cfg(feature = "const_generics")]

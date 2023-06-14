@@ -1,6 +1,7 @@
+use std::convert::TryFrom;
+
 use deku::prelude::*;
 use hexlit::hex;
-use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
@@ -21,6 +22,8 @@ enum DekuTest {
     Var5 { id: u8 },
     #[deku(id_pat = "&id if id > 6")]
     Var6 { id: u8 },
+    #[deku(id_pat = "_")]
+    VarDefault { id: u8, value: u8 },
 }
 
 fn main() {

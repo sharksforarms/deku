@@ -1,16 +1,16 @@
+use std::convert::TryFrom;
+
+use darling::ast::{Data, Fields};
+use darling::ToTokens;
+use proc_macro2::TokenStream;
+use quote::quote;
+use syn::spanned::Spanned;
+
 use crate::macros::{
     gen_ctx_types_and_arg, gen_field_args, gen_internal_field_ident, gen_internal_field_idents,
     gen_type_from_ctx_id, pad_bits, token_contains_string, wrap_default_ctx,
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
-use darling::{
-    ast::{Data, Fields},
-    ToTokens,
-};
-use proc_macro2::TokenStream;
-use quote::quote;
-use std::convert::TryFrom;
-use syn::spanned::Spanned;
 
 pub(crate) fn emit_deku_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
     match &input.data {
@@ -64,19 +64,15 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use core::convert::TryFrom;
                 use ::#crate_::bitvec::BitView;
                 let __deku_input_bits = __deku_input.0.view_bits::<::#crate_::bitvec::Msb0>();
-
-                let mut __deku_rest = __deku_input_bits;
-                __deku_rest = &__deku_rest[__deku_input.1..];
+                let mut __deku_rest = &__deku_input_bits[__deku_input.1..];
+                let mut __deku_total_read = 0;
 
                 #magic_read
 
                 #(#field_reads)*
                 let __deku_value = #initialize_struct;
 
-                let __deku_pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
-                let __deku_read_idx = __deku_input_bits.len() - (__deku_rest.len() + __deku_pad);
-
-                Ok(((__deku_input_bits[__deku_read_idx..].domain().region().unwrap().1, __deku_pad), __deku_value))
+                Ok((__deku_total_read, __deku_value))
             },
             &input.ctx,
             &input.ctx_default,
@@ -98,18 +94,19 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let read_body = quote! {
         use core::convert::TryFrom;
         let mut __deku_rest = __deku_input_bits;
+        let mut __deku_total_read = 0;
 
         #magic_read
 
         #(#field_reads)*
         let __deku_value = #initialize_struct;
 
-        Ok((__deku_rest, __deku_value))
+        Ok((__deku_total_read, __deku_value))
     };
 
     tokens.extend(quote! {
         impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
-            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> core::result::Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
+            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -120,7 +117,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
-                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, _: ()) -> core::result::Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
+                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, _: ()) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -229,7 +226,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             // if we're consuming an id, set the rest to new_rest before reading the variant
             let new_rest = if consume_id {
                 quote! {
-                    __deku_rest = __deku_new_rest;
+                    __deku_rest = &__deku_rest[__deku_amt_read..];
+                    __deku_total_read += __deku_amt_read;
                 }
             } else {
                 quote! {}
@@ -289,11 +287,11 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let variant_id_read = if id.is_some() {
         quote! {
-            let (__deku_new_rest, __deku_variant_id) = (__deku_rest, (#id));
+            let (__deku_amt_read, __deku_variant_id) = (0, (#id));
         }
     } else if id_type.is_some() {
         quote! {
-            let (__deku_new_rest, __deku_variant_id) = <#id_type>::read(__deku_rest, (#id_args))?;
+            let (__deku_amt_read, __deku_variant_id) = <#id_type>::read(__deku_rest, (#id_args))?;
         }
     } else {
         // either `id` or `type` needs to be specified
@@ -317,18 +315,14 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use core::convert::TryFrom;
                 use ::#crate_::bitvec::BitView;
                 let __deku_input_bits = __deku_input.0.view_bits::<::#crate_::bitvec::Msb0>();
-
-                let mut __deku_rest = __deku_input_bits;
-                __deku_rest = &__deku_rest[__deku_input.1..];
+                let mut __deku_rest = &__deku_input_bits[__deku_input.1..];
+                let mut __deku_total_read = 0;
 
                 #magic_read
 
                 #variant_read
 
-                let __deku_pad = 8 * ((__deku_rest.len() + 7) / 8) - __deku_rest.len();
-                let __deku_read_idx = __deku_input_bits.len() - (__deku_rest.len() + __deku_pad);
-
-                Ok(((__deku_input_bits[__deku_read_idx..].domain().region().unwrap().1, __deku_pad), __deku_value))
+                Ok((__deku_total_read, __deku_value))
             },
             &input.ctx,
             &input.ctx_default,
@@ -349,18 +343,19 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let read_body = quote! {
         use core::convert::TryFrom;
         let mut __deku_rest = __deku_input_bits;
+        let mut __deku_total_read = 0;
 
         #magic_read
 
         #variant_read
 
-        Ok((__deku_rest, __deku_value))
+        Ok((__deku_total_read, __deku_value))
     };
 
     tokens.extend(quote! {
         #[allow(non_snake_case)]
         impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
-            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> core::result::Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
+            fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -372,7 +367,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             #[allow(non_snake_case)]
             impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
-                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, _: ()) -> core::result::Result<(&#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, Self), ::#crate_::DekuError> {
+                fn read(__deku_input_bits: &#lifetime ::#crate_::bitvec::BitSlice<u8, ::#crate_::bitvec::Msb0>, _: ()) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -414,12 +409,13 @@ fn emit_magic_read(input: &DekuData) -> TokenStream {
             let __deku_magic = #magic;
 
             for __deku_byte in __deku_magic {
-                let (__deku_new_rest, __deku_read_byte) = u8::read(__deku_rest, ())?;
+                let (__deku_amt_read, __deku_read_byte) = u8::read(__deku_rest, ())?;
                 if *__deku_byte != __deku_read_byte {
                     return Err(::#crate_::DekuError::Parse(format!("Missing magic value {:?}", #magic)));
                 }
 
-                __deku_rest = __deku_new_rest;
+                __deku_rest = &__deku_rest[__deku_amt_read..];
+                __deku_total_read += __deku_amt_read;
             }
         }
     } else {
@@ -497,6 +493,7 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
             if __deku_rest.len() >= __deku_pad {
                 let (__deku_padded_bits, __deku_new_rest) = __deku_rest.split_at(__deku_pad);
                 __deku_rest = __deku_new_rest;
+                __deku_total_read += __deku_pad;
             } else {
                 return Err(::#crate_::DekuError::Incomplete(::#crate_::error::NeedSize::new(__deku_pad)));
             }
@@ -655,10 +652,11 @@ fn emit_field_read(
     );
 
     let field_read_normal = quote! {
-        let (__deku_new_rest, __deku_value) = #field_read_func?;
+        let (__deku_amt_read, __deku_value) = #field_read_func?;
         let __deku_value: #field_type = #field_map(__deku_value)?;
 
-        __deku_rest = __deku_new_rest;
+        __deku_rest = &__deku_rest[__deku_amt_read..];
+        __deku_total_read += __deku_amt_read;
 
         __deku_value
     };
@@ -732,7 +730,7 @@ pub fn emit_from_bytes(
     quote! {
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
-            fn from_bytes(__deku_input: (&#lifetime [u8], usize)) -> core::result::Result<((&#lifetime [u8], usize), Self), ::#crate_::DekuError> {
+            fn from_bytes(__deku_input: (&#lifetime [u8], usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #body
             }
         }
@@ -752,8 +750,8 @@ pub fn emit_try_from(
             type Error = ::#crate_::DekuError;
 
             fn try_from(input: &#lifetime [u8]) -> core::result::Result<Self, Self::Error> {
-                let (rest, res) = <Self as ::#crate_::DekuContainerRead>::from_bytes((input, 0))?;
-                if !rest.0.is_empty() {
+                let (amt_read, res) = <Self as ::#crate_::DekuContainerRead>::from_bytes((input, 0))?;
+                if (amt_read / 8) != input.len() {
                     return Err(::#crate_::DekuError::Parse(format!("Too much data")));
                 }
                 Ok(res)

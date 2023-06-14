@@ -42,7 +42,7 @@ struct DekuTest {
 }
 
 let data: Vec<u8> = vec![0b0110_1001, 0xBE, 0xEF];
-let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (_amt_read, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 assert_eq!(DekuTest {
     field_a: 0b0110,
     field_b: 0b1001,
@@ -75,7 +75,7 @@ struct DekuHeader(u8);
 struct DekuData(u16);
 
 let data: Vec<u8> = vec![0xAA, 0xEF, 0xBE];
-let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (_amt_read, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 assert_eq!(DekuTest {
     header: DekuHeader(0xAA),
     data: DekuData(0xBEEF),
@@ -109,7 +109,7 @@ struct DekuTest {
 }
 
 let data: Vec<u8> = vec![0x02, 0xBE, 0xEF, 0xFF, 0xFF];
-let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (_amt_read, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 assert_eq!(DekuTest {
     count: 0x02,
     data: vec![0xBE, 0xEF]
@@ -176,10 +176,10 @@ enum DekuTest {
 
 let data: Vec<u8> = vec![0x01, 0x02, 0xEF, 0xBE];
 
-let (rest, val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (amt_read, val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 assert_eq!(DekuTest::VariantA , val);
 
-let (rest, val) = DekuTest::from_bytes(rest).unwrap();
+let (amt_read, val) = DekuTest::from_bytes((data.as_ref(), amt_read)).unwrap();
 assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 ```
 
@@ -210,7 +210,7 @@ struct Root {
 
 let data: Vec<u8> = vec![0x01, 0x02];
 
-let (rest, value) = Root::from_bytes((&data[..], 0)).unwrap();
+let (amt_read, value) = Root::from_bytes((&data[..], 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
@@ -295,11 +295,11 @@ pub trait DekuRead<'a, Ctx = ()> {
     /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
     /// needed.
     ///
-    /// Returns the remaining bits after parsing in addition to Self.
+    /// Returns the amount of bits read after parsing in addition to Self.
     fn read(
         input: &'a bitvec::BitSlice<u8, bitvec::Msb0>,
         ctx: Ctx,
-    ) -> Result<(&'a bitvec::BitSlice<u8, bitvec::Msb0>, Self), DekuError>
+    ) -> Result<(usize, Self), DekuError>
     where
         Self: Sized;
 }
@@ -310,8 +310,8 @@ pub trait DekuContainerRead<'a>: DekuRead<'a, ()> {
     /// Read bytes and construct type
     /// * **input** - Input given as data and bit offset
     ///
-    /// Returns the remaining bytes and bit offset after parsing in addition to Self.
-    fn from_bytes(input: (&'a [u8], usize)) -> Result<((&'a [u8], usize), Self), DekuError>
+    /// Returns the amount of bits read after parsing in addition to Self.
+    fn from_bytes(input: (&'a [u8], usize)) -> Result<(usize, Self), DekuError>
     where
         Self: Sized;
 }

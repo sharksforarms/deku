@@ -58,6 +58,7 @@ impl FromStr for Endian {
     /// # Examples
     /// ```rust
     /// use std::str::FromStr;
+    ///
     /// use deku::ctx::Endian;
     /// assert_eq!(FromStr::from_str("little"), Ok(Endian::Little));
     /// assert_eq!(FromStr::from_str("big"), Ok(Endian::Big));

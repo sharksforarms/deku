@@ -2,7 +2,8 @@
 
 #![cfg(feature = "alloc")]
 
-use alloc::{format, string::String};
+use alloc::format;
+use alloc::string::String;
 
 /// Number of bits needed to retry parsing
 #[derive(Debug, Clone, PartialEq, Eq)]

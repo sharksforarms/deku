@@ -1,6 +1,8 @@
-use crate::{DekuError, DekuRead, DekuWrite};
-use bitvec::prelude::*;
 use std::borrow::{Borrow, Cow};
+
+use bitvec::prelude::*;
+
+use crate::{DekuError, DekuRead, DekuWrite};
 
 impl<'a, T, Ctx> DekuRead<'a, Ctx> for Cow<'a, T>
 where
@@ -8,15 +10,12 @@ where
     Ctx: Copy,
 {
     /// Read a T from input and store as Cow<T>
-    fn read(
-        input: &'a BitSlice<u8, Msb0>,
-        inner_ctx: Ctx,
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
+    fn read(input: &'a BitSlice<u8, Msb0>, inner_ctx: Ctx) -> Result<(usize, Self), DekuError>
     where
         Self: Sized,
     {
-        let (rest, val) = <T>::read(input, inner_ctx)?;
-        Ok((rest, Cow::Owned(val)))
+        let (amt_read, val) = <T>::read(input, inner_ctx)?;
+        Ok((amt_read, Cow::Owned(val)))
     }
 }
 
@@ -33,9 +32,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
     use crate::native_endian;
-    use rstest::rstest;
 
     #[rstest(input, expected, expected_rest,
         case(
@@ -46,9 +46,9 @@ mod tests {
     )]
     fn test_cow(input: &[u8], expected: Cow<u16>, expected_rest: &BitSlice<u8, Msb0>) {
         let bit_slice = input.view_bits::<Msb0>();
-        let (rest, res_read) = <Cow<u16>>::read(bit_slice, ()).unwrap();
+        let (amt_read, res_read) = <Cow<u16>>::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();

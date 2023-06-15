@@ -226,7 +226,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             // if we're consuming an id, set the rest to new_rest before reading the variant
             let new_rest = if consume_id {
                 quote! {
-                    __deku_rest = &__deku_rest[__deku_amt_read..];
                     __deku_total_read += __deku_amt_read;
                 }
             } else {
@@ -291,7 +290,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
     } else if id_type.is_some() {
         quote! {
-            let (__deku_amt_read, __deku_variant_id) = <#id_type>::read(__deku_rest, (#id_args))?;
+            let (__deku_amt_read, __deku_variant_id) = <#id_type>::read(&__deku_rest[__deku_total_read..], (#id_args))?;
         }
     } else {
         // either `id` or `type` needs to be specified
@@ -409,12 +408,11 @@ fn emit_magic_read(input: &DekuData) -> TokenStream {
             let __deku_magic = #magic;
 
             for __deku_byte in __deku_magic {
-                let (__deku_amt_read, __deku_read_byte) = u8::read(__deku_rest, ())?;
+                let (__deku_amt_read, __deku_read_byte) = u8::read(&__deku_rest[__deku_total_read..], ())?;
                 if *__deku_byte != __deku_read_byte {
                     return Err(::#crate_::DekuError::Parse(format!("Missing magic value {:?}", #magic)));
                 }
 
-                __deku_rest = &__deku_rest[__deku_amt_read..];
                 __deku_total_read += __deku_amt_read;
             }
         }
@@ -490,9 +488,7 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
                 ))
             )?;
 
-            if __deku_rest.len() >= __deku_pad {
-                let (__deku_padded_bits, __deku_new_rest) = __deku_rest.split_at(__deku_pad);
-                __deku_rest = __deku_new_rest;
+            if __deku_rest[__deku_total_read..].len() >= __deku_pad {
                 __deku_total_read += __deku_pad;
             } else {
                 return Err(::#crate_::DekuError::Incomplete(::#crate_::error::NeedSize::new(__deku_pad)));
@@ -614,29 +610,29 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
+                    #type_as_deku_read::read(&__deku_rest[__deku_total_read..], (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
                 }
             }
         } else if let Some(field_bits) = &f.bits_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
+                    #type_as_deku_read::read(&__deku_rest[__deku_total_read..], (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_bytes) = &f.bytes_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_byte_size(::#crate_::ctx::ByteSize(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
+                    #type_as_deku_read::read(&__deku_rest[__deku_total_read..], (::#crate_::ctx::Limit::new_byte_size(::#crate_::ctx::ByteSize(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
                 }
             }
         } else if let Some(field_until) = &f.until {
             // We wrap the input into another closure here to enforce that it is actually a callable
             // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
-            quote! {#type_as_deku_read::read(__deku_rest, (::#crate_::ctx::Limit::new_until(#field_until), (#read_args)))}
+            quote! {#type_as_deku_read::read(&__deku_rest[__deku_total_read..], (::#crate_::ctx::Limit::new_until(#field_until), (#read_args)))}
         } else {
-            quote! {#type_as_deku_read::read(__deku_rest, (#read_args))}
+            quote! {#type_as_deku_read::read(&__deku_rest[__deku_total_read..], (#read_args))}
         }
     };
 
@@ -655,7 +651,6 @@ fn emit_field_read(
         let (__deku_amt_read, __deku_value) = #field_read_func?;
         let __deku_value: #field_type = #field_map(__deku_value)?;
 
-        __deku_rest = &__deku_rest[__deku_amt_read..];
         __deku_total_read += __deku_amt_read;
 
         __deku_value

@@ -511,7 +511,7 @@ Example:
 #[deku_derive(DekuRead, DekuWrite)]
 #[derive(Debug, PartialEq)]
 struct DekuTest {
-    #[deku(temp, temp_value = "items.len() as u8")]
+    #[deku(temp, temp_value = "(items.len() as u8)")]
     num_items: u8,
 
     #[deku(count = "num_items", endian = "big")]

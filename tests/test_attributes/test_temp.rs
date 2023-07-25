@@ -6,7 +6,7 @@ fn test_temp_field_write() {
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
     struct TestStruct {
-        #[deku(temp, temp_value = "self.field_b.len() as _")]
+        #[deku(temp, temp_value = "(self.field_b.len() as _)")]
         field_a: u8,
         #[deku(count = "field_a")]
         field_b: Vec<u8>,
@@ -88,7 +88,7 @@ fn test_temp_field_unnamed_write() {
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
     struct TestStruct(
-        #[deku(temp, temp_value = "self.0.len() as _")] u8,
+        #[deku(temp, temp_value = "(self.0.len() as _)")] u8,
         #[deku(count = "field_0")] Vec<u8>,
     );
 
@@ -159,4 +159,34 @@ fn test_temp_enum_field_write() {
     let test_data: Vec<u8> = [0xBA, 0x10].to_vec();
     let ret_write: Vec<u8> = TestEnum::VarB(0x10).to_bytes().unwrap();
     assert_eq!(test_data, ret_write);
+}
+
+#[test]
+fn test_context() {
+    use deku::prelude::*;
+    use std::convert::TryInto;
+
+    #[deku_derive(DekuRead, DekuWrite)]
+    #[derive(Debug, PartialEq)]
+    #[deku(ctx = "_field1: u8, _field2: u8")]
+    struct Child {}
+
+    #[deku_derive(DekuRead, DekuWrite)]
+    #[derive(Debug, PartialEq)]
+    struct Parent {
+        pub field1: u8,
+
+        #[deku(temp, temp_value = "self.field1")]
+        pub field2: u8,
+
+        #[deku(ctx = "*field1, *field2")]
+        pub field3: Child,
+    }
+
+    let value = Parent {
+        field1: 0x01,
+        field3: Child {},
+    };
+    let value: Vec<u8> = value.try_into().unwrap();
+    assert_eq!(vec![0x01, 0x01], value);
 }

@@ -1,9 +1,11 @@
+use std::io::Read;
+
 #[cfg(feature = "alloc")]
 use alloc::format;
 
 use bitvec::prelude::*;
 
-use crate::{DekuError, DekuRead, DekuWrite};
+use crate::{DekuError, DekuRead, DekuWrite, container};
 
 impl<'a, Ctx> DekuRead<'a, Ctx> for bool
 where
@@ -22,6 +24,21 @@ where
         }?;
 
         Ok((amt_read, ret))
+    }
+
+    fn from_reader<R: Read>(
+        container: &mut crate::container::Container<R>,
+        inner_ctx: Ctx,
+    ) -> Result<bool, DekuError> {
+        let val = u8::from_reader(container, inner_ctx)?;
+
+        let ret = match val {
+            0x01 => Ok(true),
+            0x00 => Ok(false),
+            _ => Err(DekuError::Parse(format!("cannot parse bool value: {val}",))),
+        }?;
+
+        Ok(ret)
     }
 }
 

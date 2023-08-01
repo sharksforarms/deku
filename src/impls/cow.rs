@@ -1,4 +1,4 @@
-use std::borrow::{Borrow, Cow};
+use std::{borrow::{Borrow, Cow}, io::Read};
 
 use bitvec::prelude::*;
 
@@ -16,6 +16,14 @@ where
     {
         let (amt_read, val) = <T>::read(input, inner_ctx)?;
         Ok((amt_read, Cow::Owned(val)))
+    }
+
+    fn from_reader<R: Read>(
+        container: &mut crate::container::Container<R>,
+        inner_ctx: Ctx,
+    ) -> Result<Self, DekuError> {
+        let val = <T>::from_reader(container, inner_ctx)?;
+        Ok(Cow::Owned(val))
     }
 }
 

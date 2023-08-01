@@ -2,7 +2,11 @@
 
 use std::convert::{TryFrom, TryInto};
 
-use deku::prelude::*;
+use deku::{
+    container::Container,
+    ctx::{BitSize, ByteSize, Endian},
+    prelude::*,
+};
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct FieldF {
@@ -49,8 +53,18 @@ fn main() {
     ]
     .as_ref();
 
-    let test_deku = DekuTest::try_from(test_data).unwrap();
+    let mut container = Container::new(std::io::Cursor::new(test_data.clone()));
+    let a = u8::from_reader(&mut container, (Endian::Little, ByteSize(1)));
+    let b = u8::from_reader(&mut container, (Endian::Little, BitSize(7)));
+    let c = u8::from_reader(&mut container, (Endian::Little, BitSize(1)));
+    let d = u16::from_reader(&mut container, (Endian::Big, BitSize(16)));
+    println!("{a:02x?}");
+    println!("{b:02x?}");
+    println!("{c:02x?}");
+    println!("{d:02x?}");
 
+    let test_deku = DekuTest::try_from(test_data).unwrap();
+    println!("{test_deku:02x?}");
     assert_eq!(
         DekuTest {
             field_a: 0xab,

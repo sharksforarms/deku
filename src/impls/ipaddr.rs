@@ -1,4 +1,4 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::{net::{IpAddr, Ipv4Addr, Ipv6Addr}, io::Read};
 
 use bitvec::prelude::*;
 
@@ -14,6 +14,14 @@ where
     {
         let (amt_read, ip) = u32::read(input, ctx)?;
         Ok((amt_read, ip.into()))
+    }
+
+    fn from_reader<R: Read>(
+        container: &mut crate::container::Container<R>,
+        inner_ctx: Ctx,
+    ) -> Result<Self, DekuError> {
+        let ip = u32::from_reader(container, inner_ctx)?;
+        Ok(ip.into())
     }
 }
 
@@ -37,6 +45,14 @@ where
     {
         let (amt_read, ip) = u128::read(input, ctx)?;
         Ok((amt_read, ip.into()))
+    }
+
+    fn from_reader<R: Read>(
+        container: &mut crate::container::Container<R>,
+        inner_ctx: Ctx,
+    ) -> Result<Self, DekuError> {
+        let ip = u128::from_reader(container, inner_ctx)?;
+        Ok(ip.into())
     }
 }
 

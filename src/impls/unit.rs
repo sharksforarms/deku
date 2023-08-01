@@ -1,4 +1,5 @@
 use bitvec::prelude::*;
+use std::io::Read;
 
 use crate::{DekuError, DekuRead, DekuWrite};
 
@@ -9,6 +10,13 @@ impl<Ctx: Copy> DekuRead<'_, Ctx> for () {
         Self: Sized,
     {
         Ok((0, ()))
+    }
+
+    fn from_reader<R: Read>(
+        container: &mut crate::container::Container<R>,
+        _inner_ctx: Ctx,
+    ) -> Result<Self, DekuError> {
+        Ok(())
     }
 }
 

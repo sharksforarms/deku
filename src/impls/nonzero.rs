@@ -1,6 +1,7 @@
 #[cfg(feature = "alloc")]
 use alloc::format;
 use core::num::*;
+use std::io::Read;
 
 use bitvec::prelude::*;
 
@@ -23,6 +24,19 @@ macro_rules! ImplDekuTraitsCtx {
                 match value {
                     None => Err(DekuError::Parse(format!("NonZero assertion"))),
                     Some(v) => Ok((amt_read, v)),
+                }
+            }
+
+            fn from_reader<R: Read>(
+                container: &mut crate::container::Container<R>,
+                $ctx_arg: $ctx_type,
+            ) -> Result<Self, DekuError> {
+                let value = <$readtype>::from_reader(container, $ctx_arg)?;
+                let value = <$typ>::new(value);
+
+                match value {
+                    None => Err(DekuError::Parse(format!("NonZero assertion"))),
+                    Some(v) => Ok(v),
                 }
             }
         }

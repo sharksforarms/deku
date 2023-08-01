@@ -269,6 +269,8 @@ pub struct EncodedString {
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+use std::io::Read;
+
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
@@ -281,6 +283,7 @@ pub mod bitvec {
 pub use deku_derive::*;
 
 pub mod attributes;
+pub mod container;
 pub mod ctx;
 pub mod error;
 mod impls;
@@ -302,6 +305,16 @@ pub trait DekuRead<'a, Ctx = ()> {
     ) -> Result<(usize, Self), DekuError>
     where
         Self: Sized;
+
+    fn from_reader<R: Read>(
+        container: &mut crate::container::Container<R>,
+        ctx: Ctx,
+    ) -> Result<Self, DekuError>
+    where
+        Self: Sized,
+    {
+        todo!();
+    }
 }
 
 /// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which

@@ -1,4 +1,5 @@
 use std::ffi::CString;
+use std::io::Read;
 
 use bitvec::prelude::*;
 
@@ -37,6 +38,26 @@ where
             .map_err(|e| DekuError::Parse(format!("Failed to convert Vec to CString: {e}")))?;
 
         Ok((amt_read, value))
+    }
+
+    fn from_reader<R: Read>(
+        container: &mut crate::container::Container<R>,
+        inner_ctx: Ctx,
+    ) -> Result<Self, DekuError> {
+        let mut bytes = Vec::from_reader(container, (Limit::from(|b: &u8| *b == 0x00), inner_ctx))?;
+
+        // TODO: use from_vec_with_nul instead once stable
+
+        // Remove null byte
+        let nul_byte = bytes.pop();
+        if nul_byte != Some(0x00) {
+            return Err(DekuError::Unexpected("Expected nul byte".to_string()));
+        }
+
+        let value = CString::new(bytes)
+            .map_err(|e| DekuError::Parse(format!("Failed to convert Vec to CString: {e}")))?;
+
+        Ok(value)
     }
 }
 

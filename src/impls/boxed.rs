@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
@@ -18,6 +20,14 @@ where
     {
         let (amt_read, val) = <T>::read(input, inner_ctx)?;
         Ok((amt_read, Box::new(val)))
+    }
+
+    fn from_reader<R: Read>(
+        container: &mut crate::container::Container<R>,
+        inner_ctx: Ctx,
+    ) -> Result<Self, DekuError> {
+        let val = <T>::from_reader(container, inner_ctx)?;
+        Ok(Box::new(val))
     }
 }
 
@@ -49,6 +59,15 @@ where
         // use Vec<T>'s implementation and convert to Box<[T]>
         let (amt_read, val) = <Vec<T>>::read(input, (limit, inner_ctx))?;
         Ok((amt_read, val.into_boxed_slice()))
+    }
+
+    fn from_reader<R: Read>(
+        container: &mut crate::container::Container<R>,
+        (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
+    ) -> Result<Self, DekuError> {
+        // use Vec<T>'s implementation and convert to Box<[T]>
+        let val = <Vec<T>>::from_reader(container, (limit, inner_ctx))?;
+        Ok(val.into_boxed_slice())
     }
 }
 

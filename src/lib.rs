@@ -304,7 +304,10 @@ pub trait DekuRead<'a, Ctx = ()> {
         ctx: Ctx,
     ) -> Result<(usize, Self), DekuError>
     where
-        Self: Sized;
+        Self: Sized,
+    {
+        todo!();
+    }
 
     fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,

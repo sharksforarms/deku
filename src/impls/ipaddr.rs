@@ -1,4 +1,7 @@
-use std::{net::{IpAddr, Ipv4Addr, Ipv6Addr}, io::Read};
+use std::{
+    io::Read,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+};
 
 use bitvec::prelude::*;
 

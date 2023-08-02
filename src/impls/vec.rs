@@ -48,6 +48,42 @@ where
     Ok((total_read, res))
 }
 
+/// Read `T`s into a vec until a given predicate returns true
+/// * `capacity` - an optional capacity to pre-allocate the vector with
+/// * `ctx` - The context required by `T`. It will be passed to every `T` when constructing.
+/// * `predicate` - the predicate that decides when to stop reading `T`s
+/// The predicate takes two parameters: the number of bits that have been read so far,
+/// and a borrow of the latest value to have been read. It should return `true` if reading
+/// should now stop, and `false` otherwise
+fn reader_vec_with_predicate<'a, T, Ctx, Predicate, R: std::io::Read>(
+    container: &mut crate::container::Container<R>,
+    capacity: Option<usize>,
+    ctx: Ctx,
+    mut predicate: Predicate,
+) -> Result<Vec<T>, DekuError>
+where
+    T: DekuRead<'a, Ctx>,
+    Ctx: Copy,
+    Predicate: FnMut(usize, &T) -> bool,
+{
+    let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
+
+    let mut start_read = container.bits_read;
+
+    loop {
+        let val = <T>::from_reader(container, ctx)?;
+        res.push(val);
+
+        // This unwrap is safe as we are pushing to the vec immediately before it,
+        // so there will always be a last element
+        if predicate(container.bits_read - start_read, res.last().unwrap()) {
+            break;
+        }
+    }
+
+    Ok(res)
+}
+
 impl<'a, T, Ctx, Predicate> DekuRead<'a, (Limit<T, Predicate>, Ctx)> for Vec<T>
 where
     T: DekuRead<'a, Ctx>,
@@ -118,6 +154,66 @@ where
                 }
 
                 read_vec_with_predicate(input, None, inner_ctx, move |read_bits, _| {
+                    read_bits == bit_size
+                })
+            }
+        }
+    }
+
+    /// Read `T`s until the given limit
+    /// * `limit` - the limiting factor on the amount of `T`s to read
+    /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s when constructing.
+    /// # Examples
+    /// ```rust
+    /// # use deku::ctx::*;
+    /// # use deku::DekuRead;
+    /// # use deku::bitvec::BitView;
+    /// let input = vec![1u8, 2, 3, 4];
+    /// let (amt_read, v) = Vec::<u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
+    /// assert_eq!(amt_read, 32);
+    /// assert_eq!(vec![0x04030201], v)
+    /// ```
+    fn from_reader<R: std::io::Read>(
+        container: &mut crate::container::Container<R>,
+        (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
+    ) -> Result<Self, DekuError>
+    where
+        Self: Sized,
+    {
+        match limit {
+            // Read a given count of elements
+            Limit::Count(mut count) => {
+                // Handle the trivial case of reading an empty vector
+                if count == 0 {
+                    return Ok(Vec::new());
+                }
+
+                // Otherwise, read until we have read `count` elements
+                reader_vec_with_predicate(container, Some(count), inner_ctx, move |_, _| {
+                    count -= 1;
+                    count == 0
+                })
+            }
+
+            // Read until a given predicate returns true
+            Limit::Until(mut predicate, _) => {
+                reader_vec_with_predicate(container, None, inner_ctx, move |_, value| {
+                    predicate(value)
+                })
+            }
+
+            // Read until a given quantity of bits have been read
+            Limit::BitSize(size) => {
+                let bit_size = size.0;
+                reader_vec_with_predicate(container, None, inner_ctx, move |read_bits, _| {
+                    read_bits == bit_size
+                })
+            }
+
+            // Read until a given quantity of bits have been read
+            Limit::ByteSize(size) => {
+                let bit_size = size.0 * 8;
+                reader_vec_with_predicate(container, None, inner_ctx, move |read_bits, _| {
                     read_bits == bit_size
                 })
             }

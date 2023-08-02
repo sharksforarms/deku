@@ -29,7 +29,8 @@ enum DekuTest {
 fn main() {
     let test_data = hex!("03020102").to_vec();
 
-    let deku_test = DekuTest::try_from(test_data.as_ref()).unwrap();
+    let mut container = deku::container::Container::new(std::io::Cursor::new(test_data.clone()));
+    let deku_test = DekuTest::from_reader(&mut container, ()).unwrap();
 
     assert_eq!(
         DekuTest::Var4 {

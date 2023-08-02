@@ -1,4 +1,7 @@
-use std::{borrow::{Borrow, Cow}, io::Read};
+use std::{
+    borrow::{Borrow, Cow},
+    io::Read,
+};
 
 use bitvec::prelude::*;
 

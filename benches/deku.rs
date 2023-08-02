@@ -1,4 +1,7 @@
+use std::io::Read;
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use deku::container::Container;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -10,8 +13,10 @@ struct DekuBits {
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-struct DekuByte {
-    data: u8,
+struct DekuBytes {
+    data_00: u8,
+    data_01: u16,
+    data_02: u32,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -38,24 +43,27 @@ struct DekuVec {
     data: Vec<u8>,
 }
 
-fn deku_read_bits(input: &[u8]) {
-    let (_rest, _v) = DekuBits::from_bytes((input, 0)).unwrap();
+fn deku_read_bits(reader: impl Read) {
+    let mut container = Container::new(reader);
+    let _v = DekuBits::from_reader(&mut container, ()).unwrap();
 }
 
 fn deku_write_bits(input: &DekuBits) {
     let _v = input.to_bytes().unwrap();
 }
 
-fn deku_read_byte(input: &[u8]) {
-    let (_rest, _v) = DekuByte::from_bytes((input, 0)).unwrap();
+fn deku_read_byte(reader: impl Read) {
+    let mut container = Container::new(reader);
+    let _v = DekuBytes::from_reader(&mut container, ()).unwrap();
 }
 
-fn deku_write_byte(input: &DekuByte) {
+fn deku_write_byte(input: &DekuBytes) {
     let _v = input.to_bytes().unwrap();
 }
 
 fn deku_read_enum(input: &[u8]) {
-    let (_rest, _v) = DekuEnum::from_bytes((input, 0)).unwrap();
+    let mut container = Container::new(input);
+    let _v = DekuEnum::from_reader(&mut container, ()).unwrap();
 }
 
 fn deku_write_enum(input: &DekuEnum) {
@@ -63,7 +71,8 @@ fn deku_write_enum(input: &DekuEnum) {
 }
 
 fn deku_read_vec(input: &[u8]) {
-    let (_rest, _v) = DekuVec::from_bytes((input, 0)).unwrap();
+    let mut container = Container::new(input);
+    let _v = DekuVec::from_reader(&mut container, ()).unwrap();
 }
 
 fn deku_write_vec(input: &DekuVec) {
@@ -71,7 +80,8 @@ fn deku_write_vec(input: &DekuVec) {
 }
 
 fn deku_read_vec_perf(input: &[u8]) {
-    let (_rest, _v) = DekuVecPerf::from_bytes((input, 0)).unwrap();
+    let mut container = Container::new(std::io::Cursor::new(input));
+    let _v = DekuVecPerf::from_reader(&mut container, ()).unwrap();
 }
 
 fn deku_write_vec_perf(input: &DekuVecPerf) {
@@ -79,14 +89,21 @@ fn deku_write_vec_perf(input: &DekuVecPerf) {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
+    let mut reader = std::io::repeat(0b101);
     c.bench_function("deku_read_byte", |b| {
-        b.iter(|| deku_read_byte(black_box([0x01].as_ref())))
+        b.iter(|| deku_read_byte(black_box(&mut reader)))
     });
     c.bench_function("deku_write_byte", |b| {
-        b.iter(|| deku_write_byte(black_box(&DekuByte { data: 0x01 })))
+        b.iter(|| {
+            deku_write_byte(black_box(&DekuBytes {
+                data_00: 0x00,
+                data_01: 0x02,
+                data_02: 0x03,
+            }))
+        })
     });
     c.bench_function("deku_read_bits", |b| {
-        b.iter(|| deku_read_bits(black_box([0xf1].as_ref())))
+        b.iter(|| deku_read_bits(black_box(&mut reader)))
     });
     c.bench_function("deku_write_bits", |b| {
         b.iter(|| {

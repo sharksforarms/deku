@@ -51,7 +51,8 @@ pub struct Ipv4Header {
 fn main() {
     let test_data = hex!("4500004b0f490000801163a591fea0ed91fd02cb").to_vec();
 
-    let ip_header = Ipv4Header::try_from(test_data.as_ref()).unwrap();
+    let mut container = deku::container::Container::new(std::io::Cursor::new(test_data.clone()));
+    let ip_header = Ipv4Header::from_reader(&mut container, ()).unwrap();
 
     assert_eq!(
         Ipv4Header {

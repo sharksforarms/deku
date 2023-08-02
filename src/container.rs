@@ -1,16 +1,25 @@
 use bitvec::prelude::*;
 use std::io::Read;
 
+pub enum ContainerRet {
+    Bytes,
+    Bits(BitVec<u8, Msb0>),
+}
+
 pub struct Container<R: std::io::Read> {
     inner: R,
+    // TODO; bitslice.len() == 8
     leftover: BitVec<u8, Msb0>,
+    pub(crate) bits_read: usize,
 }
 
 impl<R: Read> Container<R> {
+    #[inline]
     pub fn new(inner: R) -> Self {
         Self {
             inner,
             leftover: BitVec::new(), // with_capacity 8?
+            bits_read: 0,
         }
     }
 
@@ -39,7 +48,21 @@ impl<R: Read> Container<R> {
             self.leftover = add;
         }
 
+        self.bits_read += ret.len();
         Ok(ret)
+    }
+
+    // Attempt to read into bytes instead of bits
+    //
+    // 1. We must have no leftover bits, so that we are "aligned"
+    #[inline]
+    pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> ContainerRet {
+        if self.leftover.is_empty() {
+            self.inner.read_exact(buf);
+            ContainerRet::Bytes
+        } else {
+            ContainerRet::Bits(self.read_bits(amt * 8).unwrap())
+        }
     }
 }
 
@@ -55,12 +78,8 @@ mod tests {
         let mut container = Container::new(buf);
 
         let bits = container.read_bits(4).unwrap();
-        println!("{}", bits);
         let bits = container.read_bits(4).unwrap();
-        println!("{}", bits);
         let bits = container.read_bits(4).unwrap();
-        println!("{}", bits);
         let bits = container.read_bits(4).unwrap();
-        println!("{}", bits);
     }
 }

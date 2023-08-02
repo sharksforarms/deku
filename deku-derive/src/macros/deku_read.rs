@@ -57,51 +57,51 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let initialize_struct = super::gen_struct_init(is_named_struct, internal_fields);
 
-    //// Implement `DekuContainerRead` for types that don't need a context
-    //if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-    //    let from_bytes_body = wrap_default_ctx(
-    //        quote! {
-    //            use core::convert::TryFrom;
-    //            use ::#crate_::bitvec::BitView;
-    //            let __deku_input_bits = __deku_input.0.view_bits::<::#crate_::bitvec::Msb0>();
-    //            let mut __deku_rest = &__deku_input_bits[__deku_input.1..];
-    //            let mut __deku_total_read = 0;
+    // Implement `DekuContainerRead` for types that don't need a context
+    if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
+        //    let from_bytes_body = wrap_default_ctx(
+        //        quote! {
+        //            use core::convert::TryFrom;
+        //            use ::#crate_::bitvec::BitView;
+        //            let __deku_input_bits = __deku_input.0.view_bits::<::#crate_::bitvec::Msb0>();
+        //            let mut __deku_rest = &__deku_input_bits[__deku_input.1..];
+        //            let mut __deku_total_read = 0;
 
-    //            #magic_read
+        //            #magic_read
 
-    //            #(#field_reads)*
-    //            let __deku_value = #initialize_struct;
+        //            #(#field_reads)*
+        //            let __deku_value = #initialize_struct;
 
-    //            Ok((__deku_total_read, __deku_value))
-    //        },
-    //        &input.ctx,
-    //        &input.ctx_default,
-    //    );
+        //            Ok((__deku_total_read, __deku_value))
+        //        },
+        //        &input.ctx,
+        //        &input.ctx_default,
+        //    );
 
-    //    tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
+        //tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
-    //    tokens.extend(emit_from_bytes(
-    //        &imp,
-    //        &lifetime,
-    //        &ident,
-    //        wher,
-    //        from_bytes_body,
-    //    ));
-    //}
+        //    tokens.extend(emit_from_bytes(
+        //        &imp,
+        //        &lifetime,
+        //        &ident,
+        //        wher,
+        //        from_bytes_body,
+        //    ));
+    }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
 
     let read_body = quote! {
         use core::convert::TryFrom;
         //let mut __deku_rest = __deku_input_bits;
-        let mut __deku_total_read = 0;
+        //let mut __deku_total_read = 0;
 
         #magic_read
 
         #(#field_reads)*
         let __deku_value = #initialize_struct;
 
-        Ok((__deku_total_read, __deku_value))
+        Ok(__deku_value)
     };
 
     tokens.extend(quote! {
@@ -223,18 +223,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 deku_ids.push(deku_id);
             }
 
-            // if we're consuming an id, set the rest to new_rest before reading the variant
-            let new_rest = if consume_id {
-                quote! {
-                    //__deku_total_read += __deku_amt_read;
-                }
-            } else {
-                quote! {}
-            };
-
             quote! {
                 {
-                    #new_rest
                     #(#field_reads)*
                     Self :: #initialize_enum
                 }
@@ -290,7 +280,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
     } else if id_type.is_some() {
         quote! {
-            let (__deku_amt_read, __deku_variant_id) = <#id_type>::from_reader(container,  (#id_args))?;
+            let __deku_variant_id = <#id_type>::from_reader(container,  (#id_args))?;
         }
     } else {
         // either `id` or `type` needs to be specified
@@ -309,46 +299,46 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerRead` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-        let from_bytes_body = wrap_default_ctx(
-            quote! {
-                use core::convert::TryFrom;
-                use ::#crate_::bitvec::BitView;
-                let __deku_input_bits = __deku_input.0.view_bits::<::#crate_::bitvec::Msb0>();
-                let mut __deku_rest = &__deku_input_bits[__deku_input.1..];
-                let mut __deku_total_read = 0;
+        //let from_bytes_body = wrap_default_ctx(
+        //    quote! {
+        //        use core::convert::TryFrom;
+        //        use ::#crate_::bitvec::BitView;
+        //        let __deku_input_bits = __deku_input.0.view_bits::<::#crate_::bitvec::Msb0>();
+        //        let mut __deku_rest = &__deku_input_bits[__deku_input.1..];
+        //        let mut __deku_total_read = 0;
 
-                #magic_read
+        //        #magic_read
 
-                #variant_read
+        //        #variant_read
 
-                Ok((__deku_total_read, __deku_value))
-            },
-            &input.ctx,
-            &input.ctx_default,
-        );
+        //        Ok((__deku_total_read, __deku_value))
+        //    },
+        //    &input.ctx,
+        //    &input.ctx_default,
+        //);
 
-        tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
+        //tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
-        tokens.extend(emit_from_bytes(
-            &imp,
-            &lifetime,
-            &ident,
-            wher,
-            from_bytes_body,
-        ));
+        //tokens.extend(emit_from_bytes(
+        //    &imp,
+        //    &lifetime,
+        //    &ident,
+        //    wher,
+        //    from_bytes_body,
+        //));
     }
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
 
     let read_body = quote! {
         use core::convert::TryFrom;
-        let mut __deku_rest = __deku_input_bits;
-        let mut __deku_total_read = 0;
+        //let mut __deku_rest = __deku_input_bits;
+        //let mut __deku_total_read = 0;
 
         #magic_read
 
         #variant_read
 
-        Ok((__deku_total_read, __deku_value))
+        Ok(__deku_value)
     };
 
     tokens.extend(quote! {
@@ -608,29 +598,53 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::from_reader<R: std::io::Read>(&mut container, (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args)))
+                    #type_as_deku_read::from_reader
+                    (
+                        container,
+                        (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args))
+                    )
                 }
             }
         } else if let Some(field_bits) = &f.bits_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::from_reader<R: std::io::Read>(container, (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args)))
+                    #type_as_deku_read::from_reader
+                    (
+                        container,
+                        (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args))
+                    )
                 }
             }
         } else if let Some(field_bytes) = &f.bytes_read {
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::from_reader<R: std::io::Read>(container, (::#crate_::ctx::Limit::new_byte_size(::#crate_::ctx::ByteSize(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args)))
+                    #type_as_deku_read::from_reader
+                    (
+                        container,
+                        (::#crate_::ctx::Limit::new_byte_size(::#crate_::ctx::ByteSize(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args))
+                    )
                 }
             }
         } else if let Some(field_until) = &f.until {
             // We wrap the input into another closure here to enforce that it is actually a callable
             // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
-            quote! {#type_as_deku_read::from_reader<R: std::io::Read>(container, (::#crate_::ctx::Limit::new_until(#field_until), (#read_args)))}
+            quote! {
+                #type_as_deku_read::from_reader
+                (
+                    container,
+                    (::#crate_::ctx::Limit::new_until(#field_until), (#read_args))
+                )
+            }
         } else {
-            quote! {#type_as_deku_read::from_reader<R: std::io::Read>(container, (#read_args))}
+            quote! {
+                #type_as_deku_read::from_reader
+                (
+                    container,
+                    (#read_args)
+                )
+            }
         }
     };
 
@@ -647,7 +661,7 @@ fn emit_field_read(
 
     let field_read_normal = quote! {
         let __deku_value = #field_read_func?;
-        let __deku_value: #field_type = #field_map(__deku_value)?;
+        //let __deku_value: #field_type = #field_map(__deku_value)?;
         __deku_value
     };
 

@@ -53,7 +53,7 @@ fn test_top_level_ctx_enum() {
         #[deku(id = "1")]
         VariantA(
             #[deku(
-                reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})(deku::rest)",
+                reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})",
                 writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
             )]
             u8,
@@ -79,7 +79,7 @@ fn test_top_level_ctx_enum_default() {
         #[deku(id = "1")]
         VariantA(
             #[deku(
-                reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})(deku::rest)",
+                reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})",
                 writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
             )]
             u8,

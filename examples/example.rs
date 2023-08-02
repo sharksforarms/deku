@@ -56,6 +56,10 @@ fn main() {
     let mut container = Container::new(std::io::Cursor::new(test_data));
     let test_deku = DekuTest::from_reader(&mut container, ()).unwrap();
 
+    let mut container = Container::new(std::io::Cursor::new(test_data));
+    let test_deku_from_bytes = DekuTest::from_bytes((test_data, 0)).unwrap();
+    assert_eq!(test_deku, test_deku_from_bytes.1);
+
     println!("{test_deku:02x?}");
     assert_eq!(
         DekuTest {

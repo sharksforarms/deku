@@ -10,7 +10,7 @@ pub struct Container<R: std::io::Read> {
     inner: R,
     // TODO; bitslice.len() == 8
     leftover: BitVec<u8, Msb0>,
-    pub(crate) bits_read: usize,
+    pub bits_read: usize,
 }
 
 impl<R: Read> Container<R> {

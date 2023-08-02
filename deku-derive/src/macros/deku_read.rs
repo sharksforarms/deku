@@ -59,34 +59,32 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerRead` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-        //    let from_bytes_body = wrap_default_ctx(
-        //        quote! {
-        //            use core::convert::TryFrom;
-        //            use ::#crate_::bitvec::BitView;
-        //            let __deku_input_bits = __deku_input.0.view_bits::<::#crate_::bitvec::Msb0>();
-        //            let mut __deku_rest = &__deku_input_bits[__deku_input.1..];
-        //            let mut __deku_total_read = 0;
+        let from_bytes_body = wrap_default_ctx(
+            quote! {
+                use core::convert::TryFrom;
+                let container = &mut deku::container::Container::new(__deku_input.0);
+                let _ = container.read_bits(__deku_input.1);
 
-        //            #magic_read
+                #magic_read
 
-        //            #(#field_reads)*
-        //            let __deku_value = #initialize_struct;
+                #(#field_reads)*
+                let __deku_value = #initialize_struct;
 
-        //            Ok((__deku_total_read, __deku_value))
-        //        },
-        //        &input.ctx,
-        //        &input.ctx_default,
-        //    );
+                Ok((container.bits_read, __deku_value))
+            },
+            &input.ctx,
+            &input.ctx_default,
+        );
 
-        //tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
+        tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
-        //    tokens.extend(emit_from_bytes(
-        //        &imp,
-        //        &lifetime,
-        //        &ident,
-        //        wher,
-        //        from_bytes_body,
-        //    ));
+        tokens.extend(emit_from_bytes(
+            &imp,
+            &lifetime,
+            &ident,
+            wher,
+            from_bytes_body,
+        ));
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
@@ -299,33 +297,31 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerRead` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-        //let from_bytes_body = wrap_default_ctx(
-        //    quote! {
-        //        use core::convert::TryFrom;
-        //        use ::#crate_::bitvec::BitView;
-        //        let __deku_input_bits = __deku_input.0.view_bits::<::#crate_::bitvec::Msb0>();
-        //        let mut __deku_rest = &__deku_input_bits[__deku_input.1..];
-        //        let mut __deku_total_read = 0;
+        let from_bytes_body = wrap_default_ctx(
+            quote! {
+                use core::convert::TryFrom;
+                let container = &mut deku::container::Container::new(__deku_input.0);
+                let _ = container.read_bits(__deku_input.1);
 
-        //        #magic_read
+                #magic_read
 
-        //        #variant_read
+                #variant_read
 
-        //        Ok((__deku_total_read, __deku_value))
-        //    },
-        //    &input.ctx,
-        //    &input.ctx_default,
-        //);
+                Ok((container.bits_read, __deku_value))
+            },
+            &input.ctx,
+            &input.ctx_default,
+        );
 
-        //tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
+        tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
-        //tokens.extend(emit_from_bytes(
-        //    &imp,
-        //    &lifetime,
-        //    &ident,
-        //    wher,
-        //    from_bytes_body,
-        //));
+        tokens.extend(emit_from_bytes(
+            &imp,
+            &lifetime,
+            &ident,
+            wher,
+            from_bytes_body,
+        ));
     }
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
 
@@ -398,7 +394,7 @@ fn emit_magic_read(input: &DekuData) -> TokenStream {
             let __deku_magic = #magic;
 
             for __deku_byte in __deku_magic {
-                let __deku_read_byte = u8::from_reader(&mut container, ())?;
+                let __deku_read_byte = u8::from_reader(container, ())?;
                 if *__deku_byte != __deku_read_byte {
                     return Err(::#crate_::DekuError::Parse(format!("Missing magic value {:?}", #magic)));
                 }

@@ -8,7 +8,7 @@ fn bit_flipper_read(
     field_a: u8,
     rest: &BitSlice<u8, Msb0>,
     bit_size: BitSize,
-) -> Result<(usize, u8), DekuError> {
+) -> Result<u8, DekuError> {
     // Access to previously read fields
     println!("field_a = 0x{:X}", field_a);
 
@@ -24,7 +24,7 @@ fn bit_flipper_read(
     // flip the bits on value if field_a is 0x01
     let value = if field_a == 0x01 { !value } else { value };
 
-    Ok((amt_read, value))
+    Ok(value)
 }
 
 fn bit_flipper_write(

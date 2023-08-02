@@ -40,9 +40,7 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
                 let a = <u8>::read(&bits, (endian, size))?;
                 a.1
             }
-            ContainerRet::Bytes => {
-                <u8>::from_be_bytes(buf)
-            }
+            ContainerRet::Bytes => <u8>::from_be_bytes(buf),
         };
         Ok(a)
     }

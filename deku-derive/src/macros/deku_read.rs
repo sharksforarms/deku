@@ -63,7 +63,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             quote! {
                 use core::convert::TryFrom;
                 let container = &mut deku::container::Container::new(__deku_input.0);
-                let _ = container.read_bits(__deku_input.1);
+                let _ = container.read_bits(__deku_input.1)?;
 
                 #magic_read
 
@@ -104,7 +104,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
-            fn from_reader<R: std::io::Read>(container: &#lifetime mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader<R: std::io::Read>(container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -115,7 +115,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
-                fn from_reader<R: std::io::Read>(container: &#lifetime mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader<R: std::io::Read>(container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -274,7 +274,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let variant_id_read = if id.is_some() {
         quote! {
-            let (__deku_amt_read, __deku_variant_id) = (0, (#id));
+            let __deku_variant_id = (#id);
         }
     } else if id_type.is_some() {
         quote! {
@@ -301,7 +301,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             quote! {
                 use core::convert::TryFrom;
                 let container = &mut deku::container::Container::new(__deku_input.0);
-                let _ = container.read_bits(__deku_input.1);
+                let _ = container.read_bits(__deku_input.1)?;
 
                 #magic_read
 
@@ -340,7 +340,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     tokens.extend(quote! {
         #[allow(non_snake_case)]
         impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
-            fn from_reader<R: std::io::Read>(container: &#lifetime mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader<R: std::io::Read>(container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -352,7 +352,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             #[allow(non_snake_case)]
             impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
-                fn from_reader<R: std::io::Read>(container: &#lifetime mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader<R: std::io::Read>(container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -439,7 +439,7 @@ fn emit_bit_byte_offsets(
         .any(|v| token_contains_string(v, "__deku_byte_offset"))
     {
         Some(quote! {
-            let __deku_byte_offset = __deku_bit_offset / 8;
+            let __deku_byte_offset = container.bits_read / 8;
         })
     } else {
         None
@@ -451,7 +451,7 @@ fn emit_bit_byte_offsets(
         || byte_offset.is_some()
     {
         Some(quote! {
-            let __deku_bit_offset = usize::try_from(unsafe { __deku_rest.as_bitptr().offset_from(__deku_input_bits.as_bitptr()) } )?;
+            let __deku_bit_offset = container.bits_read;
         })
     } else {
         None
@@ -465,6 +465,7 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
     quote! {
         {
             use core::convert::TryFrom;
+            // TODO: I hope this consts in most cases?
             let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                 ::#crate_::DekuError::InvalidParam(format!(
                     "Invalid padding param \"({})\": cannot convert to usize",
@@ -472,11 +473,9 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
                 ))
             )?;
 
-            if __deku_rest[__deku_total_read..].len() >= __deku_pad {
-                __deku_total_read += __deku_pad;
-            } else {
-                return Err(::#crate_::DekuError::Incomplete(::#crate_::error::NeedSize::new(__deku_pad)));
-            }
+
+            // TODO: This could be bytes
+            container.read_bits(__deku_pad)?;
         }
     }
 }
@@ -657,7 +656,7 @@ fn emit_field_read(
 
     let field_read_normal = quote! {
         let __deku_value = #field_read_func?;
-        //let __deku_value: #field_type = #field_map(__deku_value)?;
+        let __deku_value: #field_type = #field_map(__deku_value)?;
         __deku_value
     };
 

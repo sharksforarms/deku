@@ -1,5 +1,5 @@
 use deku::prelude::*;
-use deku::bitvec::{BitVec, BitSlice, Msb0};
+use deku::bitvec::{BitVec, Msb0};
 
 #[derive(DekuRead, DekuWrite)]
 struct TestCount {
@@ -50,16 +50,16 @@ struct TestMap {
     field_b: usize
 }
 
-fn dummy_reader(
+fn dummy_reader<R: std::io::Read>(
     offset: usize,
-    rest: &BitSlice<u8, Msb0>,
-) -> Result<(usize, usize), DekuError> {
-    Ok((0, offset))
+    _reader: &mut Container<R>,
+) -> Result<usize, DekuError> {
+    Ok(0)
 }
 #[derive(DekuRead, DekuWrite)]
 struct TestReader {
     field_a: u8,
-    #[deku(reader = "dummy_reader(deku::byte_offset, deku::rest)")]
+    #[deku(reader = "dummy_reader(deku::byte_offset, deku::reader)")]
     field_b: usize
 }
 

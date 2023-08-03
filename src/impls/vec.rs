@@ -68,7 +68,7 @@ where
 {
     let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
 
-    let mut start_read = container.bits_read;
+    let start_read = container.bits_read;
 
     loop {
         let val = <T>::from_reader(container, ctx)?;

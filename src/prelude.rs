@@ -4,6 +4,6 @@
 */
 pub use crate::error::{DekuError, NeedSize};
 pub use crate::{
-    deku_derive, DekuContainerRead, DekuContainerWrite, DekuEnumExt, DekuRead, DekuUpdate,
-    DekuWrite,
+    container::Container, deku_derive, DekuContainerRead, DekuContainerWrite, DekuEnumExt,
+    DekuRead, DekuUpdate, DekuWrite,
 };

@@ -6,6 +6,8 @@ use alloc::format;
 use alloc::string::String;
 
 /// Number of bits needed to retry parsing
+///
+/// TODO: add bytes
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NeedSize {
     bits: usize,

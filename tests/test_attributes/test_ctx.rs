@@ -1,7 +1,9 @@
 use std::convert::{TryFrom, TryInto};
+use std::io::Cursor;
 
 use bitvec::bitvec;
 use deku::bitvec::{BitView, Msb0};
+use deku::container::Container;
 use deku::prelude::*;
 
 /// General smoke tests for ctx
@@ -13,7 +15,7 @@ fn test_ctx_struct() {
     #[deku(ctx = "a: u8, b: u8")]
     struct SubTypeNeedCtx {
         #[deku(
-            reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c) as usize))})(deku::rest)",
+            reader = "(u8::from_reader(container,()).map(|c|(a+b+c) as usize))",
             writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(self.i as u8)"
         )]
         i: usize,
@@ -53,7 +55,7 @@ fn test_top_level_ctx_enum() {
         #[deku(id = "1")]
         VariantA(
             #[deku(
-                reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})",
+                reader = "(u8::from_reader(container,()).map(|c|(a+b+c)))",
                 writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
             )]
             u8,
@@ -61,9 +63,8 @@ fn test_top_level_ctx_enum() {
     }
 
     let test_data = [0x01_u8, 0x03];
-    let bit_slice = test_data.view_bits();
-    let (amt_read, ret_read) = TopLevelCtxEnum::read(bit_slice, (1, 2)).unwrap();
-    assert!(bit_slice[amt_read..].is_empty());
+    let ret_read =
+        TopLevelCtxEnum::from_reader(&mut Container::new(Cursor::new(test_data)), (1, 2)).unwrap();
     assert_eq!(ret_read, TopLevelCtxEnum::VariantA(0x06));
 
     let mut ret_write = bitvec![u8, Msb0;];
@@ -79,7 +80,7 @@ fn test_top_level_ctx_enum_default() {
         #[deku(id = "1")]
         VariantA(
             #[deku(
-                reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})",
+                reader = "(u8::from_reader(container, ()).map(|c|(a+b+c)))",
                 writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
             )]
             u8,
@@ -96,9 +97,9 @@ fn test_top_level_ctx_enum_default() {
     assert_eq!(test_data.to_vec(), ret_write);
 
     // Use context
-    let bit_slice = test_data.view_bits();
-    let (amt_read, ret_read) = TopLevelCtxEnumDefault::read(bit_slice, (1, 2)).unwrap();
-    assert!(bit_slice[amt_read..].is_empty());
+    let ret_read =
+        TopLevelCtxEnumDefault::from_reader(&mut Container::new(Cursor::new(test_data)), (1, 2))
+            .unwrap();
     assert_eq!(ret_read, TopLevelCtxEnumDefault::VariantA(0x06));
     let mut ret_write = bitvec![u8, Msb0;];
     ret_read.write(&mut ret_write, (1, 2)).unwrap();
@@ -215,9 +216,9 @@ fn test_ctx_default_struct() {
     assert_eq!(ret_write, test_data);
 
     // Use context
-    let bit_slice = test_data.view_bits();
-    let (amt_read, ret_read) = TopLevelCtxStructDefault::read(bit_slice, (1, 2)).unwrap();
-    assert_eq!(bit_slice.len(), amt_read);
+    let ret_read =
+        TopLevelCtxStructDefault::from_reader(&mut Container::new(Cursor::new(test_data)), (1, 2))
+            .unwrap();
     assert_eq!(expected, ret_read);
     let mut ret_write = bitvec![u8, Msb0;];
     ret_read.write(&mut ret_write, (1, 2)).unwrap();

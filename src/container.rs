@@ -1,5 +1,7 @@
 use bitvec::prelude::*;
-use std::io::Read;
+use std::io::{self, Read};
+
+use crate::{prelude::NeedSize, DekuError};
 
 pub enum ContainerRet {
     Bytes,
@@ -23,7 +25,11 @@ impl<R: Read> Container<R> {
         }
     }
 
-    pub fn read_bits(&mut self, amt: usize) -> std::io::Result<BitVec<u8, Msb0>> {
+    #[inline]
+    pub fn read_bits(&mut self, amt: usize) -> Result<BitVec<u8, Msb0>, DekuError> {
+        if amt == 0 {
+            return Ok(BitVec::new());
+        }
         let mut ret = BitVec::with_capacity(amt);
 
         if amt < self.leftover.len() {
@@ -34,12 +40,16 @@ impl<R: Read> Container<R> {
             ret.extend(self.leftover.clone());
 
             let bits_left = amt - self.leftover.len();
-            let mut bytes_len = (bits_left / 8);
+            let mut bytes_len = bits_left / 8;
             if (bits_left % 8) != 0 {
                 bytes_len += 1;
             }
             let mut buf = vec![0; bytes_len];
-            self.inner.read_exact(&mut buf);
+            if let Err(e) = self.inner.read_exact(&mut buf) {
+                if e.kind() == io::ErrorKind::UnexpectedEof {
+                    return Err(DekuError::Incomplete(NeedSize::new(amt)));
+                }
+            }
 
             let mut rest: BitVec<u8, Msb0> = BitVec::try_from_slice(&buf).unwrap();
             let add = rest.split_off(bits_left);
@@ -56,30 +66,19 @@ impl<R: Read> Container<R> {
     //
     // 1. We must have no leftover bits, so that we are "aligned"
     #[inline]
-    pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> ContainerRet {
+    pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> Result<ContainerRet, DekuError> {
         if self.leftover.is_empty() {
-            self.inner.read_exact(buf);
-            ContainerRet::Bytes
+            if let Err(e) = self.inner.read_exact(&mut buf[..amt]) {
+                if e.kind() == io::ErrorKind::UnexpectedEof {
+                    return Err(DekuError::Incomplete(NeedSize::new(amt * 8)));
+                }
+
+                // TODO: other errors?
+            }
+            self.bits_read += amt * 8;
+            Ok(ContainerRet::Bytes)
         } else {
-            ContainerRet::Bits(self.read_bits(amt * 8).unwrap())
+            Ok(ContainerRet::Bits(self.read_bits(amt * 8)?))
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_container() {
-        use std::io::Cursor;
-        let buf = [0x12, 0x34];
-        let buf = std::io::Cursor::new(buf);
-
-        let mut container = Container::new(buf);
-
-        let bits = container.read_bits(4).unwrap();
-        let bits = container.read_bits(4).unwrap();
-        let bits = container.read_bits(4).unwrap();
-        let bits = container.read_bits(4).unwrap();
     }
 }

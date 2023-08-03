@@ -34,9 +34,9 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
         (endian, size): (Endian, ByteSize),
     ) -> Result<u8, DekuError> {
         let mut buf = [0; core::mem::size_of::<u8>()];
-        let ret = container.read_bytes(size.0, &mut buf);
+        let ret = container.read_bytes(size.0, &mut buf)?;
         let a = match ret {
-            ContainerRet::Bits(mut bits) => {
+            ContainerRet::Bits(bits) => {
                 let a = <u8>::read(&bits, (endian, size))?;
                 a.1
             }
@@ -139,7 +139,7 @@ macro_rules! ImplDekuReadBits {
                 container: &mut crate::container::Container<R>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
-                let mut bits = container.read_bits(size.0).unwrap();
+                let bits = container.read_bits(size.0)?;
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
             }
@@ -222,14 +222,18 @@ macro_rules! ImplDekuReadBytes {
                 (endian, size): (Endian, ByteSize),
             ) -> Result<$typ, DekuError> {
                 let mut buf = [0; core::mem::size_of::<$typ>()];
-                let ret = container.read_bytes(size.0, &mut buf);
+                let ret = container.read_bytes(size.0, &mut buf)?;
                 let a = match ret {
-                    ContainerRet::Bits(mut bits) => {
+                    ContainerRet::Bits(bits) => {
                         let a = <$typ>::read(&bits, (endian, size))?;
                         a.1
                     }
                     ContainerRet::Bytes => {
-                        <$typ>::from_be_bytes(buf.try_into().unwrap())
+                        if endian.is_le() {
+                            <$typ>::from_le_bytes(buf.try_into().unwrap())
+                        } else {
+                            <$typ>::from_be_bytes(buf.try_into().unwrap())
+                        }
                     }
                 };
                 Ok(a)
@@ -262,7 +266,7 @@ macro_rules! ImplDekuReadSignExtend {
                 (endian, size): (Endian, ByteSize),
             ) -> Result<$typ, DekuError> {
                 // TODO: specialize for reading byte aligned
-                let mut bits = container.read_bits(size.0 * 8).unwrap();
+                let bits = container.read_bits(size.0 * 8)?;
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
             }
@@ -289,7 +293,7 @@ macro_rules! ImplDekuReadSignExtend {
                 container: &mut crate::container::Container<R>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
-                let mut bits = container.read_bits(size.0 * 8).unwrap();
+                let bits = container.read_bits(size.0 * 8)?;
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
             }

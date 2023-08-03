@@ -11,6 +11,7 @@ use deku::{
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct FieldF {
     #[deku(bits = "6")]
+    #[deku(assert_eq = "6")]
     data: u8,
 }
 

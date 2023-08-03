@@ -101,6 +101,9 @@ impl<R: Read> Container<R> {
     #[inline]
     pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> Result<ContainerRet, DekuError> {
         if self.leftover.is_empty() {
+            if buf.len() < amt {
+                return Err(DekuError::Incomplete(NeedSize::new(amt * 8)));
+            }
             if let Err(e) = self.inner.read_exact(&mut buf[..amt]) {
                 if e.kind() == io::ErrorKind::UnexpectedEof {
                     return Err(DekuError::Incomplete(NeedSize::new(amt * 8)));

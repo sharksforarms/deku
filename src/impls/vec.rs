@@ -1,3 +1,5 @@
+use std::io::Read;
+
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
@@ -148,19 +150,6 @@ where
         }
     }
 
-    /// Read `T`s until the given limit
-    /// * `limit` - the limiting factor on the amount of `T`s to read
-    /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s when constructing.
-    /// # Examples
-    /// ```rust
-    /// # use deku::ctx::*;
-    /// # use deku::DekuRead;
-    /// # use deku::bitvec::BitView;
-    /// let input = vec![1u8, 2, 3, 4];
-    /// let (amt_read, v) = Vec::<u32>::read(input.view_bits(), (1.into(), Endian::Little)).unwrap();
-    /// assert_eq!(amt_read, 32);
-    /// assert_eq!(vec![0x04030201], v)
-    /// ```
     fn from_reader<R: std::io::Read>(
         container: &mut crate::container::Container<R>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
@@ -221,6 +210,17 @@ impl<'a, T: DekuRead<'a>, Predicate: FnMut(&T) -> bool> DekuRead<'a, Limit<T, Pr
         Self: Sized,
     {
         Vec::read(input, (limit, ()))
+    }
+
+    /// Read `T`s until the given limit from input for types which don't require context.
+    fn from_reader<R: Read>(
+        container: &mut crate::container::Container<R>,
+        limit: Limit<T, Predicate>,
+    ) -> Result<Self, DekuError>
+    where
+        Self: Sized,
+    {
+        Vec::from_reader(container, (limit, ()))
     }
 }
 

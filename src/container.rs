@@ -8,7 +8,7 @@ pub enum ContainerRet {
     /// Successfully read bytes
     Bytes,
     /// Read Bits intead
-    Bits(BitVec<u8, Msb0>),
+    Bits(Option<BitVec<u8, Msb0>>),
 }
 
 /// Container to use with `from_reader`
@@ -35,15 +35,15 @@ impl<R: Read> Container<R> {
     /// correctly add previously read and stored "leftover" bits from previous reads.
     ///
     /// # Guarantees
-    /// - The returned `BitVec` will have the size of `amt`
-    /// - `self.bits_read` will increase by `amt`
+    /// - if Some(bits), the returned `BitVec` will have the size of `amt` and
+    /// `self.bits_read` will increase by `amt`
     ///
     /// # Params
     /// `amt`    - Amount of bits that will be read
     #[inline]
-    pub fn read_bits(&mut self, amt: usize) -> Result<BitVec<u8, Msb0>, DekuError> {
+    pub fn read_bits(&mut self, amt: usize) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
         if amt == 0 {
-            return Ok(BitVec::new());
+            return Ok(None);
         }
         let mut ret = BitVec::with_capacity(amt);
 
@@ -89,7 +89,7 @@ impl<R: Read> Container<R> {
         }
 
         self.bits_read += ret.len();
-        Ok(ret)
+        Ok(Some(ret))
     }
 
     /// Attempt to read bytes from `Container`. This will return `ContainerRet::Bytes` with a valid

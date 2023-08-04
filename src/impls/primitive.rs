@@ -37,6 +37,11 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
         let ret = container.read_bytes(size.0, &mut buf)?;
         let a = match ret {
             ContainerRet::Bits(bits) => {
+                let Some(bits) = bits else {
+                    return Err(DekuError::Parse(format!(
+                        "no bits read from reader",
+                    )));
+                };
                 let a = <u8>::read(&bits, (endian, size))?;
                 a.1
             }
@@ -140,6 +145,11 @@ macro_rules! ImplDekuReadBits {
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
                 let bits = container.read_bits(size.0)?;
+                let Some(bits) = bits else {
+                    return Err(DekuError::Parse(format!(
+                        "no bits read from reader",
+                    )));
+                };
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
             }
@@ -225,6 +235,11 @@ macro_rules! ImplDekuReadBytes {
                 let ret = container.read_bytes(size.0, &mut buf)?;
                 let a = match ret {
                     ContainerRet::Bits(bits) => {
+                        let Some(bits) = bits else {
+                            return Err(DekuError::Parse(format!(
+                                "no bits read from reader",
+                            )));
+                        };
                         let a = <$typ>::read(&bits, (endian, size))?;
                         a.1
                     }
@@ -267,6 +282,11 @@ macro_rules! ImplDekuReadSignExtend {
             ) -> Result<$typ, DekuError> {
                 // TODO: specialize for reading byte aligned
                 let bits = container.read_bits(size.0 * 8)?;
+                let Some(bits) = bits else {
+                    return Err(DekuError::Parse(format!(
+                        "no bits read from reader",
+                    )));
+                };
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
             }
@@ -294,6 +314,11 @@ macro_rules! ImplDekuReadSignExtend {
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
                 let bits = container.read_bits(size.0 * 8)?;
+                let Some(bits) = bits else {
+                    return Err(DekuError::Parse(format!(
+                        "no bits read from reader",
+                    )));
+                };
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
             }

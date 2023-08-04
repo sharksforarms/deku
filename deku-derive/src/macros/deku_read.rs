@@ -63,7 +63,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             quote! {
                 use core::convert::TryFrom;
                 let container = &mut deku::container::Container::new(__deku_input.0);
-                let _ = container.read_bits(__deku_input.1)?;
+                if __deku_input.1 != 0 {
+                    let _ = container.read_bits(__deku_input.1)?;
+                }
 
                 #magic_read
 
@@ -301,7 +303,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             quote! {
                 use core::convert::TryFrom;
                 let container = &mut deku::container::Container::new(__deku_input.0);
-                let _ = container.read_bits(__deku_input.1)?;
+                if __deku_input.1 != 0 {
+                    let _ = container.read_bits(__deku_input.1)?;
+                }
 
                 #magic_read
 
@@ -475,7 +479,7 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
 
 
             // TODO: This could be bytes
-            container.read_bits(__deku_pad)?;
+            let _ = container.read_bits(__deku_pad)?;
         }
     }
 }

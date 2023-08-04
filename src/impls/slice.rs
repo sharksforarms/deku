@@ -183,6 +183,7 @@ mod pre_const_generics_impl {
 #[cfg(feature = "const_generics")]
 mod const_generics_impl {
     use core::mem::MaybeUninit;
+    use std::io::Read;
 
     use super::*;
 
@@ -223,6 +224,40 @@ mod const_generics_impl {
                 (&slice as *const _ as *const [T; N]).read()
             };
             Ok((total_read, val))
+        }
+
+        fn from_reader<R: Read>(
+            container: &mut crate::container::Container<R>,
+            ctx: Ctx,
+        ) -> Result<Self, DekuError>
+        where
+            Self: Sized,
+        {
+            #[allow(clippy::uninit_assumed_init)]
+            // This is safe because we initialize the array immediately after,
+            // and never return it in case of error
+            let mut slice: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
+            for (n, item) in slice.iter_mut().enumerate() {
+                let value = match T::from_reader(container, ctx) {
+                    Ok(it) => it,
+                    Err(err) => {
+                        // For each item in the array, drop if we allocated it.
+                        for item in &mut slice[0..n] {
+                            unsafe {
+                                item.assume_init_drop();
+                            }
+                        }
+                        return Err(err);
+                    }
+                };
+                item.write(value);
+            }
+
+            let val = unsafe {
+                // TODO: array_assume_init: https://github.com/rust-lang/rust/issues/80908
+                (&slice as *const _ as *const [T; N]).read()
+            };
+            Ok(val)
         }
     }
 

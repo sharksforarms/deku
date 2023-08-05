@@ -93,8 +93,6 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let read_body = quote! {
         use core::convert::TryFrom;
-        //let mut __deku_rest = __deku_input_bits;
-        //let mut __deku_total_read = 0;
 
         #magic_read
 
@@ -331,8 +329,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let read_body = quote! {
         use core::convert::TryFrom;
-        //let mut __deku_rest = __deku_input_bits;
-        //let mut __deku_total_read = 0;
 
         #magic_read
 

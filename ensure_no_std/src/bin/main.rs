@@ -9,33 +9,17 @@ extern crate alloc;
 extern crate wee_alloc;
 
 #[no_mangle]
-#[allow(non_snake_case)]
-fn _Unwind_Resume() {}
+pub extern "C" fn _start() -> ! {
+    loop {}
+}
+
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {}
+}
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-// Need to provide a tiny `panic` implementation for `#![no_std]`.
-// This translates into an `unreachable` instruction that will
-// raise a `trap` the WebAssembly execution if we panic at runtime.
-#[panic_handler]
-#[no_mangle]
-unsafe fn panic(_info: &::core::panic::PanicInfo) -> ! {
-    ::core::intrinsics::abort();
-}
-
-// Need to provide an allocation error handler which just aborts
-// the execution with trap.
-#[alloc_error_handler]
-#[no_mangle]
-unsafe fn oom(_: ::core::alloc::Layout) -> ! {
-    ::core::intrinsics::abort();
-}
-
-// Needed for non-wasm targets.
-#[lang = "eh_personality"]
-#[no_mangle]
-extern "C" fn eh_personality() {}
 
 use alloc::{format, vec, vec::Vec};
 use deku::prelude::*;

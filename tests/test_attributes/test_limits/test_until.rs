@@ -8,9 +8,9 @@ mod test_slice {
     #[test]
     fn test_until_static() {
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        struct TestStruct<'a> {
+        struct TestStruct {
             #[deku(until = "|v: &u8| *v == 0xBB")]
-            data: &'a [u8],
+            data: Vec<u8>,
         }
 
         let test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
@@ -18,7 +18,7 @@ mod test_slice {
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
             TestStruct {
-                data: test_data.as_ref()
+                data: test_data.to_vec()
             },
             ret_read
         );
@@ -30,11 +30,11 @@ mod test_slice {
     #[test]
     fn test_until_from_field() {
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        struct TestStruct<'a> {
+        struct TestStruct {
             until: u8,
 
             #[deku(until = "|v: &u8| *v == *until")]
-            data: &'a [u8],
+            data: Vec<u8>,
         }
 
         let test_data: Vec<u8> = [0xbb, 0xaa, 0xbb].to_vec();
@@ -43,7 +43,7 @@ mod test_slice {
         assert_eq!(
             TestStruct {
                 until: 0xbb,
-                data: &test_data[1..]
+                data: test_data[1..].to_vec()
             },
             ret_read
         );
@@ -56,11 +56,11 @@ mod test_slice {
     #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
     fn test_until_error() {
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        struct TestStruct<'a> {
+        struct TestStruct {
             until: u8,
 
             #[deku(until = "|v: &u8| *v == *until")]
-            data: &'a [u8],
+            data: Vec<u8>,
         }
 
         let test_data: Vec<u8> = [0xcc, 0xaa, 0xbb].to_vec();

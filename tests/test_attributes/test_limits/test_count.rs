@@ -8,9 +8,9 @@ mod test_slice {
     #[test]
     fn test_count_static() {
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        struct TestStruct<'a> {
+        struct TestStruct {
             #[deku(count = "2")]
-            data: &'a [u8],
+            data: Vec<u8>,
         }
 
         let test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
@@ -18,7 +18,7 @@ mod test_slice {
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
             TestStruct {
-                data: test_data.as_ref()
+                data: test_data.to_vec()
             },
             ret_read
         );
@@ -30,10 +30,10 @@ mod test_slice {
     #[test]
     fn test_count_from_field() {
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        struct TestStruct<'a> {
+        struct TestStruct {
             count: u8,
             #[deku(count = "count")]
-            data: &'a [u8],
+            data: Vec<u8>,
         }
 
         let test_data: Vec<u8> = [0x02, 0xaa, 0xbb].to_vec();
@@ -42,7 +42,7 @@ mod test_slice {
         assert_eq!(
             TestStruct {
                 count: 0x02,
-                data: &test_data[1..]
+                data: test_data[1..].to_vec(),
             },
             ret_read
         );
@@ -77,10 +77,10 @@ mod test_slice {
     #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
     fn test_count_error() {
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        struct TestStruct<'a> {
+        struct TestStruct {
             count: u8,
             #[deku(count = "count")]
-            data: &'a [u8],
+            data: Vec<u8>,
         }
 
         let test_data: Vec<u8> = [0x03, 0xaa, 0xbb].to_vec();

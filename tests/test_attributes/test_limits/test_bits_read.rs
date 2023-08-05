@@ -9,9 +9,9 @@ mod test_slice {
     #[test]
     fn test_bits_read_static() {
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        struct TestStruct<'a> {
+        struct TestStruct {
             #[deku(bits_read = "16")]
-            data: &'a [u8],
+            data: Vec<u8>,
         }
 
         let test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
@@ -19,7 +19,7 @@ mod test_slice {
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
             TestStruct {
-                data: test_data.as_ref()
+                data: test_data.to_vec()
             },
             ret_read
         );
@@ -39,11 +39,11 @@ mod test_slice {
     )]
     fn test_bits_read_from_field(input_bits: u8) {
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        struct TestStruct<'a> {
+        struct TestStruct {
             bits: u8,
 
             #[deku(bits_read = "bits")]
-            data: &'a [u8],
+            data: Vec<u8>,
         }
 
         let test_data: Vec<u8> = [input_bits, 0xaa, 0xbb].to_vec();
@@ -52,7 +52,7 @@ mod test_slice {
         assert_eq!(
             TestStruct {
                 bits: 16,
-                data: &test_data[1..]
+                data: test_data[1..].to_vec(),
             },
             ret_read
         );

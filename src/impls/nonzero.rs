@@ -1,7 +1,7 @@
+use acid_io::Read;
 #[cfg(feature = "alloc")]
 use alloc::format;
 use core::num::*;
-use std::io::Read;
 
 use bitvec::prelude::*;
 

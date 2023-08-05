@@ -1,4 +1,4 @@
-use std::io::Read;
+use acid_io::Read;
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
@@ -57,7 +57,7 @@ where
 /// The predicate takes two parameters: the number of bits that have been read so far,
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
-fn reader_vec_with_predicate<'a, T, Ctx, Predicate, R: std::io::Read>(
+fn reader_vec_with_predicate<'a, T, Ctx, Predicate, R: Read>(
     container: &mut crate::container::Container<R>,
     capacity: Option<usize>,
     ctx: Ctx,
@@ -162,7 +162,7 @@ where
         }
     }
 
-    fn from_reader<R: std::io::Read>(
+    fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
     ) -> Result<Self, DekuError>

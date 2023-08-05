@@ -1,5 +1,5 @@
+use acid_io::{self, Read};
 use bitvec::prelude::*;
-use std::io::{self, Read};
 
 use crate::{prelude::NeedSize, DekuError};
 
@@ -70,9 +70,9 @@ impl<R: Read> Container<R> {
             }
 
             // read in new bytes
-            let mut buf = vec![0; bytes_len];
+            let mut buf = alloc::vec![0; bytes_len];
             if let Err(e) = self.inner.read_exact(&mut buf) {
-                if e.kind() == io::ErrorKind::UnexpectedEof {
+                if e.kind() == acid_io::ErrorKind::UnexpectedEof {
                     return Err(DekuError::Incomplete(NeedSize::new(amt)));
                 }
 
@@ -105,7 +105,7 @@ impl<R: Read> Container<R> {
                 return Err(DekuError::Incomplete(NeedSize::new(amt * 8)));
             }
             if let Err(e) = self.inner.read_exact(&mut buf[..amt]) {
-                if e.kind() == io::ErrorKind::UnexpectedEof {
+                if e.kind() == acid_io::ErrorKind::UnexpectedEof {
                     return Err(DekuError::Incomplete(NeedSize::new(amt * 8)));
                 }
 

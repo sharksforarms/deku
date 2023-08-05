@@ -3,7 +3,7 @@
 
 #![no_std]
 #![no_main]
-#![feature(core_intrinsics, lang_items, alloc_error_handler)]
+#![feature(core_intrinsics, alloc_error_handler)]
 
 extern crate alloc;
 extern crate wee_alloc;

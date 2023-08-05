@@ -1,7 +1,6 @@
-use std::{
-    borrow::{Borrow, Cow},
-    io::Read,
-};
+use std::borrow::{Borrow, Cow};
+
+use acid_io::Read;
 
 use bitvec::prelude::*;
 

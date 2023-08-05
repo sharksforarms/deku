@@ -1,7 +1,6 @@
-use std::{
-    io::Read,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+use acid_io::Read;
 
 use bitvec::prelude::*;
 

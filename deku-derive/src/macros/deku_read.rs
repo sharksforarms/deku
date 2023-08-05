@@ -106,7 +106,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
-            fn from_reader<R: std::io::Read>(container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader<R: ::#crate_::acid_io::Read>(container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -117,7 +117,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
-                fn from_reader<R: std::io::Read>(container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader<R: ::#crate_::acid_io::Read>(container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }

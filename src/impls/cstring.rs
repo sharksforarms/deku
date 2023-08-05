@@ -1,5 +1,5 @@
+use acid_io::Read;
 use std::ffi::CString;
-use std::io::Read;
 
 use bitvec::prelude::*;
 

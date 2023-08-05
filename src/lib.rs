@@ -269,10 +269,13 @@ pub struct EncodedString {
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-use std::io::Read;
-
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+
+/// re-export of bitvec
+pub mod acid_io {
+    pub use acid_io::Read;
+}
 
 /// re-export of bitvec
 pub mod bitvec {
@@ -309,7 +312,7 @@ pub trait DekuRead<'a, Ctx = ()> {
         todo!();
     }
 
-    fn from_reader<R: Read>(
+    fn from_reader<R: acid_io::Read>(
         container: &mut crate::container::Container<R>,
         ctx: Ctx,
     ) -> Result<Self, DekuError>

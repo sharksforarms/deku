@@ -21,3 +21,4 @@ alloc = []
 [dependencies]
 wee_alloc = "0.4"
 deku = { path = "../", default-features = false, features = ["alloc"] }
+

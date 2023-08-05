@@ -62,7 +62,7 @@ mod tests {
                 let _ = TestDeku::try_from(input.as_ref()).unwrap();
             })
             .0,
-            (4, 0, 4)
+            (9, 0, 9)
         );
     }
 }

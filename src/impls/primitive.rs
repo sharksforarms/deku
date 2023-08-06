@@ -245,6 +245,11 @@ macro_rules! ImplDekuReadBytes {
                         if endian.is_le() {
                             <$typ>::from_le_bytes(buf.try_into().unwrap())
                         } else {
+                            if size.0 != core::mem::size_of::<$typ>() {
+                                let padding = core::mem::size_of::<$typ>() - size.0;
+                                buf.copy_within(0..size.0, padding);
+                                buf[..padding].fill(0x00);
+                            }
                             <$typ>::from_be_bytes(buf.try_into().unwrap())
                         }
                     }

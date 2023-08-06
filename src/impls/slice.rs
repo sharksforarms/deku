@@ -49,7 +49,7 @@ mod const_generics_impl {
 
             let val = unsafe {
                 // TODO: array_assume_init: https://github.com/rust-lang/rust/issues/80908
-                (&slice as *const _ as *const [T; N]).read()
+                (std::ptr::addr_of!(slice) as *const [T; N]).read()
             };
             Ok((total_read, val))
         }
@@ -88,7 +88,7 @@ mod const_generics_impl {
 
             let val = unsafe {
                 // TODO: array_assume_init: https://github.com/rust-lang/rust/issues/80908
-                (&slice as *const _ as *const [T; N]).read()
+                (std::ptr::addr_of!(slice) as *const [T; N]).read()
             };
             Ok(val)
         }

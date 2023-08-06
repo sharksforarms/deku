@@ -33,6 +33,9 @@ impl<Ctx: Copy> DekuWrite<Ctx> for () {
 mod tests {
     use hexlit::hex;
 
+    use crate::container::Container;
+    use std::io::Cursor;
+
     use super::*;
 
     #[test]
@@ -45,6 +48,9 @@ mod tests {
         let (amt_read, res_read) = <()>::read(bit_slice, ()).unwrap();
         assert_eq!((), res_read);
         assert_eq!(amt_read, 0);
+
+        let res_read = <()>::from_reader(&mut Container::new(Cursor::new(input)), ()).unwrap();
+        assert_eq!((), res_read);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();

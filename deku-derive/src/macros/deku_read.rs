@@ -103,7 +103,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     };
 
     tokens.extend(quote! {
-        impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
+        impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
             fn from_reader<R: ::#crate_::acid_io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
@@ -114,7 +114,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let read_body = wrap_default_ctx(read_body, &input.ctx, &input.ctx_default);
 
         tokens.extend(quote! {
-            impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
+            impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
                 fn from_reader<R: ::#crate_::acid_io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
@@ -341,7 +341,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         #[allow(non_snake_case)]
-        impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
+        impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
             fn from_reader<R: std::io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
@@ -353,7 +353,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             #[allow(non_snake_case)]
-            impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
+            impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
                 fn from_reader<R: std::io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
@@ -365,7 +365,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         Some(quote! {#id_type})
     } else if let (Some(ctx), Some(id)) = (input.ctx.as_ref(), input.id.as_ref()) {
         Some(gen_type_from_ctx_id(ctx, id).ok_or_else(|| {
-            syn::Error::new(id.span(), "DekuRead: cannot determine `id` type from `ctx`")
+            syn::Error::new(
+                id.span(),
+                "DekuReader: cannot determine `id` type from `ctx`",
+            )
         })?)
     } else {
         None
@@ -591,10 +594,10 @@ fn emit_field_read(
         let type_as_deku_read = if f.map.is_some() {
             // with map, field_type cannot be used as the
             // resulting type is within the function.
-            quote!(::#crate_::DekuRead)
+            quote!(::#crate_::DekuReader)
         } else {
             // use type directly
-            quote!(<#field_type as ::#crate_::DekuRead<'_, _>>)
+            quote!(<#field_type as ::#crate_::DekuReader<'_, _>>)
         };
 
         if use_id {

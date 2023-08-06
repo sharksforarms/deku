@@ -8,7 +8,7 @@ use bitvec::prelude::*;
 use crate::container::ContainerRet;
 use crate::ctx::*;
 use crate::prelude::NeedSize;
-use crate::{DekuError, DekuRead, DekuWrite};
+use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
 
 // specialize u8 for ByteSize
 impl DekuRead<'_, (Endian, ByteSize)> for u8 {
@@ -26,7 +26,9 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
         let value = input[..MAX_TYPE_BITS].load::<u8>();
         Ok((MAX_TYPE_BITS, value))
     }
+}
 
+impl DekuReader<'_, (Endian, ByteSize)> for u8 {
     // specialize not needed?
     #[inline]
     fn from_reader<R: Read>(
@@ -38,7 +40,7 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
         let a = match ret {
             ContainerRet::Bits(bits) => {
                 let Some(bits) = bits else {
-                    return Err(DekuError::Parse(format!("no bits read from reader",)));
+                    return Err(DekuError::Parse("no bits read from reader".to_string()));
                 };
                 let a = <u8>::read(&bits, (endian, size))?;
                 a.1
@@ -136,7 +138,9 @@ macro_rules! ImplDekuReadBits {
                 };
                 Ok((bit_size, value))
             }
+        }
 
+        impl DekuReader<'_, (Endian, BitSize)> for $typ {
             #[inline]
             fn from_reader<R: Read>(
                 container: &mut crate::container::Container<R>,
@@ -223,7 +227,9 @@ macro_rules! ImplDekuReadBytes {
 
                 Ok((bit_size, value))
             }
+        }
 
+        impl DekuReader<'_, (Endian, ByteSize)> for $typ {
             #[inline]
             fn from_reader<R: Read>(
                 container: &mut crate::container::Container<R>,
@@ -277,7 +283,9 @@ macro_rules! ImplDekuReadSignExtend {
                 let value = (value as $typ) << shift >> shift;
                 Ok((amt_read, value))
             }
+        }
 
+        impl DekuReader<'_, (Endian, ByteSize)> for $typ {
             #[inline]
             fn from_reader<R: Read>(
                 container: &mut crate::container::Container<R>,
@@ -308,7 +316,9 @@ macro_rules! ImplDekuReadSignExtend {
                 let value = (value as $typ) << shift >> shift;
                 Ok((amt_read, value))
             }
+        }
 
+        impl DekuReader<'_, (Endian, BitSize)> for $typ {
             #[inline]
             fn from_reader<R: Read>(
                 container: &mut crate::container::Container<R>,
@@ -343,7 +353,9 @@ macro_rules! ForwardDekuRead {
                     <$typ>::read(input, (endian, bit_size))
                 }
             }
+        }
 
+        impl DekuReader<'_, Endian> for $typ {
             #[inline]
             fn from_reader<R: Read>(
                 container: &mut crate::container::Container<R>,
@@ -372,7 +384,9 @@ macro_rules! ForwardDekuRead {
 
                 <$typ>::read(input, (endian, byte_size))
             }
+        }
 
+        impl DekuReader<'_, ByteSize> for $typ {
             #[inline]
             fn from_reader<R: Read>(
                 container: &mut crate::container::Container<R>,
@@ -401,7 +415,9 @@ macro_rules! ForwardDekuRead {
                     <$typ>::read(input, (endian, bit_size))
                 }
             }
+        }
 
+        impl DekuReader<'_, BitSize> for $typ {
             #[inline]
             fn from_reader<R: Read>(
                 container: &mut crate::container::Container<R>,
@@ -419,7 +435,9 @@ macro_rules! ForwardDekuRead {
             fn read(input: &BitSlice<u8, Msb0>, _: ()) -> Result<(usize, Self), DekuError> {
                 <$typ>::read(input, Endian::default())
             }
+        }
 
+        impl DekuReader<'_> for $typ {
             #[inline]
             fn from_reader<R: Read>(
                 container: &mut crate::container::Container<R>,

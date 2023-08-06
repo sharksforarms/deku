@@ -4,7 +4,7 @@ use acid_io::Read;
 
 use bitvec::prelude::*;
 
-use crate::{DekuError, DekuRead, DekuWrite};
+use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
 
 impl<'a, T, Ctx> DekuRead<'a, Ctx> for Cow<'a, T>
 where
@@ -19,7 +19,13 @@ where
         let (amt_read, val) = <T>::read(input, inner_ctx)?;
         Ok((amt_read, Cow::Owned(val)))
     }
+}
 
+impl<'a, T, Ctx> DekuReader<'a, Ctx> for Cow<'a, T>
+where
+    T: DekuReader<'a, Ctx> + Clone,
+    Ctx: Copy,
+{
     fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,
         inner_ctx: Ctx,

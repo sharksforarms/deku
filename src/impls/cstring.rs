@@ -3,7 +3,7 @@ use std::ffi::CString;
 
 use bitvec::prelude::*;
 
-use crate::ctx::*;
+use crate::{ctx::*, DekuReader};
 use crate::{DekuError, DekuRead, DekuWrite};
 
 impl<Ctx: Copy> DekuWrite<Ctx> for CString
@@ -39,7 +39,12 @@ where
 
         Ok((amt_read, value))
     }
+}
 
+impl<'a, Ctx: Copy> DekuReader<'a, Ctx> for CString
+where
+    u8: DekuReader<'a, Ctx>,
+{
     fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,
         inner_ctx: Ctx,

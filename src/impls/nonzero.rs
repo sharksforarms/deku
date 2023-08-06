@@ -6,7 +6,7 @@ use core::num::*;
 use bitvec::prelude::*;
 
 use crate::ctx::*;
-use crate::{DekuError, DekuRead, DekuWrite};
+use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
 
 macro_rules! ImplDekuTraitsCtx {
     ($typ:ty, $readtype:ty, $ctx_arg:tt, $ctx_type:tt) => {
@@ -26,7 +26,9 @@ macro_rules! ImplDekuTraitsCtx {
                     Some(v) => Ok((amt_read, v)),
                 }
             }
+        }
 
+        impl DekuReader<'_, $ctx_type> for $typ {
             fn from_reader<R: Read>(
                 container: &mut crate::container::Container<R>,
                 $ctx_arg: $ctx_type,

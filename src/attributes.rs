@@ -800,7 +800,7 @@ use deku::prelude::*;
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(
-        reader = "DekuTest::read(deku::rest)",
+        reader = "DekuTest::read(deku::container)",
         writer = "DekuTest::write(deku::output, &self.field_a)"
     )]
     field_a: String,
@@ -808,11 +808,11 @@ struct DekuTest {
 
 impl DekuTest {
     /// Read and convert to String
-    fn read(
-        rest: &BitSlice<u8, Msb0>,
-    ) -> Result<(usize, String), DekuError> {
-        let (amt_read, value) = u8::read(rest, ())?;
-        Ok((amt_read, value.to_string()))
+    fn read<R: std::io::Read>(
+        container: &mut deku::container::Container<R>,
+    ) -> Result<String, DekuError> {
+        let value = u8::from_reader(container, ())?;
+        Ok(value.to_string())
     }
 
     /// Parse from String to u8 and write

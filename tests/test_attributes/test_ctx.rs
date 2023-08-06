@@ -15,7 +15,7 @@ fn test_ctx_struct() {
     #[deku(ctx = "a: u8, b: u8")]
     struct SubTypeNeedCtx {
         #[deku(
-            reader = "(u8::from_reader(container,()).map(|c|(a+b+c) as usize))",
+            reader = "(u8::from_reader(deku::container,()).map(|c|(a+b+c) as usize))",
             writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(self.i as u8)"
         )]
         i: usize,
@@ -55,7 +55,7 @@ fn test_top_level_ctx_enum() {
         #[deku(id = "1")]
         VariantA(
             #[deku(
-                reader = "(u8::from_reader(container,()).map(|c|(a+b+c)))",
+                reader = "(u8::from_reader(deku::container,()).map(|c|(a+b+c)))",
                 writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
             )]
             u8,
@@ -80,7 +80,7 @@ fn test_top_level_ctx_enum_default() {
         #[deku(id = "1")]
         VariantA(
             #[deku(
-                reader = "(u8::from_reader(container, ()).map(|c|(a+b+c)))",
+                reader = "(u8::from_reader(deku::container, ()).map(|c|(a+b+c)))",
                 writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
             )]
             u8,

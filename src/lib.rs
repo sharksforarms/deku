@@ -238,10 +238,8 @@ tokens such as `reader`, `writer`, `map`, `count`, etc.
 These are provided as a convenience to the user.
 
 Always included:
-- `deku::input: (&[u8], usize)` - The initial input byte slice and bit offset
-(available when using [from_bytes](crate::DekuContainerRead::from_bytes))
+- `deku::container: &Container` - Current [`deku::container::Container`]
 - `deku::input_bits: &BitSlice<u8, Msb0>` - The initial input in bits
-- `deku::rest: &BitSlice<u8, Msb0>` - Remaining bits to read
 - `deku::output: &mut BitSlice<u8, Msb0>` - The output bit stream
 
 Conditionally included if referenced:

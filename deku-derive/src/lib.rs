@@ -667,11 +667,8 @@ fn apply_replacements(input: &syn::LitStr) -> Result<Cow<'_, syn::LitStr>, Repla
     }
 
     let input_str = input_value
-        // TODO: remove these?
-        //.replace("deku::input", "__deku_input") // part of the public API `from_bytes`
-        //.replace("deku::input_bits", "__deku_input_bits") // part of the public API `read`
+        .replace("deku::container", "__deku_container")
         .replace("deku::output", "__deku_output") // part of the public API `write`
-        .replace("deku::reader", "container")
         .replace("deku::bit_offset", "__deku_bit_offset")
         .replace("deku::byte_offset", "__deku_byte_offset");
 

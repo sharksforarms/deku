@@ -305,29 +305,27 @@ pub trait DekuRead<'a, Ctx = ()> {
         ctx: Ctx,
     ) -> Result<(usize, Self), DekuError>
     where
-        Self: Sized,
-    {
-        todo!();
-    }
+        Self: Sized;
+}
 
+pub trait DekuReader<'a, Ctx = ()> {
+    /// Construct type from `container` implementing [`acid_io::Read`]
     fn from_reader<R: acid_io::Read>(
         container: &mut crate::container::Container<R>,
         ctx: Ctx,
     ) -> Result<Self, DekuError>
     where
-        Self: Sized,
-    {
-        todo!();
-    }
+        Self: Sized;
 }
 
 /// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which
 /// doesn't need any context information.
-pub trait DekuContainerRead<'a>: DekuRead<'a, ()> {
+pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     /// Read bytes and construct type
     /// * **input** - Input given as data and bit offset
     ///
-    /// Returns the amount of bits read after parsing in addition to Self.
+    /// # Returns
+    /// amount of bits read after parsing in addition to Self.
     fn from_bytes(input: (&'a [u8], usize)) -> Result<(usize, Self), DekuError>
     where
         Self: Sized;

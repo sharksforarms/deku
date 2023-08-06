@@ -1,7 +1,7 @@
 use acid_io::Read;
 use bitvec::prelude::*;
 
-use crate::{DekuError, DekuRead, DekuWrite};
+use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
 
 impl<Ctx: Copy> DekuRead<'_, Ctx> for () {
     /// NOP on read
@@ -11,7 +11,9 @@ impl<Ctx: Copy> DekuRead<'_, Ctx> for () {
     {
         Ok((0, ()))
     }
+}
 
+impl<Ctx: Copy> DekuReader<'_, Ctx> for () {
     fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,
         _inner_ctx: Ctx,

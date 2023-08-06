@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use bitvec::prelude::*;
 
-use crate::ctx::*;
+use crate::{ctx::*, DekuReader};
 use crate::{DekuError, DekuRead, DekuWrite};
 
 /// Read `T`s into a vec until a given predicate returns true
@@ -64,7 +64,7 @@ fn reader_vec_with_predicate<'a, T, Ctx, Predicate, R: Read>(
     mut predicate: Predicate,
 ) -> Result<Vec<T>, DekuError>
 where
-    T: DekuRead<'a, Ctx>,
+    T: DekuReader<'a, Ctx>,
     Ctx: Copy,
     Predicate: FnMut(usize, &T) -> bool,
 {
@@ -161,7 +161,14 @@ where
             }
         }
     }
+}
 
+impl<'a, T, Ctx, Predicate> DekuReader<'a, (Limit<T, Predicate>, Ctx)> for Vec<T>
+where
+    T: DekuReader<'a, Ctx>,
+    Ctx: Copy,
+    Predicate: FnMut(&T) -> bool,
+{
     fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
@@ -223,7 +230,11 @@ impl<'a, T: DekuRead<'a>, Predicate: FnMut(&T) -> bool> DekuRead<'a, Limit<T, Pr
     {
         Vec::read(input, (limit, ()))
     }
+}
 
+impl<'a, T: DekuReader<'a>, Predicate: FnMut(&T) -> bool> DekuReader<'a, Limit<T, Predicate>>
+    for Vec<T>
+{
     /// Read `T`s until the given limit from input for types which don't require context.
     fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,

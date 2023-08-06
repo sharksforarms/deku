@@ -11,6 +11,8 @@ mod const_generics_impl {
     use core::mem::MaybeUninit;
     use std::io::Read;
 
+    use crate::DekuReader;
+
     use super::*;
 
     impl<'a, Ctx: Copy, T, const N: usize> DekuRead<'a, Ctx> for [T; N]
@@ -51,7 +53,12 @@ mod const_generics_impl {
             };
             Ok((total_read, val))
         }
+    }
 
+    impl<'a, Ctx: Copy, T, const N: usize> DekuReader<'a, Ctx> for [T; N]
+    where
+        T: DekuReader<'a, Ctx>,
+    {
         fn from_reader<R: Read>(
             container: &mut crate::container::Container<R>,
             ctx: Ctx,

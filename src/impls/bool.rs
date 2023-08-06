@@ -5,7 +5,7 @@ use alloc::format;
 
 use bitvec::prelude::*;
 
-use crate::{container, DekuError, DekuRead, DekuWrite};
+use crate::{container, DekuError, DekuRead, DekuReader, DekuWrite};
 
 impl<'a, Ctx> DekuRead<'a, Ctx> for bool
 where
@@ -25,7 +25,13 @@ where
 
         Ok((amt_read, ret))
     }
+}
 
+impl<'a, Ctx> DekuReader<'a, Ctx> for bool
+where
+    Ctx: Copy,
+    u8: DekuReader<'a, Ctx>,
+{
     fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,
         inner_ctx: Ctx,

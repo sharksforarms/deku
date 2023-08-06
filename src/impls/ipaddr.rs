@@ -4,7 +4,7 @@ use acid_io::Read;
 
 use bitvec::prelude::*;
 
-use crate::{DekuError, DekuRead, DekuWrite};
+use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
 
 impl<'a, Ctx> DekuRead<'a, Ctx> for Ipv4Addr
 where
@@ -17,7 +17,12 @@ where
         let (amt_read, ip) = u32::read(input, ctx)?;
         Ok((amt_read, ip.into()))
     }
+}
 
+impl<'a, Ctx> DekuReader<'a, Ctx> for Ipv4Addr
+where
+    u32: DekuReader<'a, Ctx>,
+{
     fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,
         inner_ctx: Ctx,
@@ -48,7 +53,12 @@ where
         let (amt_read, ip) = u128::read(input, ctx)?;
         Ok((amt_read, ip.into()))
     }
+}
 
+impl<'a, Ctx> DekuReader<'a, Ctx> for Ipv6Addr
+where
+    u128: DekuReader<'a, Ctx>,
+{
     fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,
         inner_ctx: Ctx,

@@ -1,7 +1,7 @@
 use acid_io::Read;
 use bitvec::prelude::*;
 
-use crate::{DekuError, DekuRead, DekuWrite};
+use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
 
 impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy> DekuRead<'a, Ctx> for Option<T> {
     /// Read a T from input and store as Some(T)
@@ -23,7 +23,9 @@ impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy> DekuRead<'a, Ctx> for Option<T> {
         let (amt_read, val) = <T>::read(input, inner_ctx)?;
         Ok((amt_read, Some(val)))
     }
+}
 
+impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
     fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,
         inner_ctx: Ctx,

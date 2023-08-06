@@ -21,7 +21,7 @@ fn main() {
         .flat_map(|x| x.to_bytes().unwrap().into_iter())
         .collect();
     let mut container = Container::new(std::io::Cursor::new(custom.clone()));
-    let ret = <Vec<Test> as DekuRead<Limit<_, _>>>::from_reader(
+    let ret = <Vec<Test> as DekuReader<Limit<_, _>>>::from_reader(
         &mut container,
         Limit::new_count(10_0000),
     );

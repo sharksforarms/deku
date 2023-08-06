@@ -15,7 +15,7 @@ impl<Ctx: Copy> DekuRead<'_, Ctx> for () {
 
 impl<Ctx: Copy> DekuReader<'_, Ctx> for () {
     fn from_reader<R: Read>(
-        container: &mut crate::container::Container<R>,
+        _container: &mut crate::container::Container<R>,
         _inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
         Ok(())

@@ -1,5 +1,7 @@
 //! Implementations of DekuRead and DekuWrite for tuples of length 1 to 11
 
+// TODO: impl from_reader
+
 use bitvec::prelude::*;
 
 use crate::{DekuError, DekuRead, DekuWrite};

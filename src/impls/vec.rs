@@ -271,6 +271,8 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Vec<T> {
 mod tests {
     use rstest::rstest;
 
+    use crate::container::Container;
+
     use super::*;
 
     #[rstest(input,endian,bit_size,limit,expected,expected_rest,
@@ -309,9 +311,47 @@ mod tests {
             }
             None => Vec::<u8>::read(bit_slice, (limit, (endian))).unwrap(),
         };
-
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
+    }
+
+    #[rstest(input,endian,bit_size,limit,expected,expected_rest,
+        case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), vec![], bits![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 0]),
+        case::count_1([0xAA, 0xBB].as_ref(), Endian::Little, Some(8), 1.into(), vec![0xAA], bits![u8, Msb0; 1, 0, 1, 1, 1, 0, 1, 1]),
+        case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Endian::Little, Some(8), 2.into(), vec![0xAA, 0xBB], bits![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 0]),
+        case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, None, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0], bits![u8, Msb0; 1, 0, 1, 1, 1, 0, 1, 1]),
+        case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(8).into(), vec![0xAA], bits![u8, Msb0; 1, 0, 1, 1, 1, 0, 1, 1]),
+        case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), Endian::Little, Some(6), 2.into(), vec![0b00_011010, 0b00_011110], bits![u8, Msb0; 1, 0, 0, 1]),
+        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
+        case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1.into(), vec![], bits![u8, Msb0;]),
+        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
+        case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(9), 1.into(), vec![], bits![u8, Msb0;]),
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
+        case::not_enough_data([0xAA].as_ref(), Endian::Little, Some(8), 2.into(), vec![], bits![u8, Msb0;]),
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
+        case::not_enough_data_until([0xAA].as_ref(), Endian::Little, Some(8), (|_: &u8| false).into(), vec![], bits![u8, Msb0;]),
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
+        case::not_enough_data_bits([0xAA].as_ref(), Endian::Little, Some(8), (BitSize(16)).into(), vec![], bits![u8, Msb0;]),
+        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
+        case::too_much_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(9), 1.into(), vec![], bits![u8, Msb0;]),
+    )]
+    fn test_vec_reader<Predicate: FnMut(&u8) -> bool>(
+        input: &[u8],
+        endian: Endian,
+        bit_size: Option<usize>,
+        limit: Limit<u8, Predicate>,
+        expected: Vec<u8>,
+        expected_rest: &BitSlice<u8, Msb0>,
+    ) {
+        let res_read = match bit_size {
+            Some(bit_size) => Vec::<u8>::from_reader(
+                &mut Container::new(input),
+                (limit, (endian, BitSize(bit_size))),
+            )
+            .unwrap(),
+            None => Vec::<u8>::from_reader(&mut Container::new(input), (limit, (endian))).unwrap(),
+        };
+        assert_eq!(expected, res_read);
     }
 
     #[rstest(input, endian, expected,
@@ -350,6 +390,43 @@ mod tests {
             Vec::<u16>::read(bit_slice, (limit, (endian, BitSize(bit_size)))).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
+
+        let mut res_write = bitvec![u8, Msb0;];
+        res_read
+            .write(&mut res_write, (endian, BitSize(bit_size)))
+            .unwrap();
+        assert_eq!(expected_write, res_write.into_vec());
+
+        assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
+    }
+
+    // Note: These tests also exist in boxed.rs
+    #[rstest(input, endian, bit_size, limit, expected, expected_rest, expected_write,
+        case::normal_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), 2.into(), vec![0xBBAA, 0xDDCC], bits![u8, Msb0;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), 2.into(), vec![0xAABB, 0xCCDD], bits![u8, Msb0;], vec![0xAA, 0xBB, 0xCC, 0xDD]),
+        case::predicate_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), (|v: &u16| *v == 0xBBAA).into(), vec![0xBBAA], bits![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
+        case::predicate_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), (|v: &u16| *v == 0xAABB).into(), vec![0xAABB], bits![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
+        case::bytes_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), BitSize(16).into(), vec![0xBBAA], bits![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
+        case::bytes_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), BitSize(16).into(), vec![0xAABB], bits![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
+    )]
+    fn test_vec_reader_write<Predicate: FnMut(&u16) -> bool>(
+        input: &[u8],
+        endian: Endian,
+        bit_size: Option<usize>,
+        limit: Limit<u16, Predicate>,
+        expected: Vec<u16>,
+        expected_rest: &BitSlice<u8, Msb0>,
+        expected_write: Vec<u8>,
+    ) {
+        // Unwrap here because all test cases are `Some`.
+        let bit_size = bit_size.unwrap();
+
+        let res_read = Vec::<u16>::from_reader(
+            &mut Container::new(input),
+            (limit, (endian, BitSize(bit_size))),
+        )
+        .unwrap();
+        assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read

@@ -146,6 +146,12 @@ macro_rules! ImplDekuReadBits {
                 container: &mut crate::container::Container<R>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                if size.0 > MAX_TYPE_BITS {
+                    return Err(DekuError::Parse(format!(
+                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits", size.0
+                    )));
+                }
                 let bits = container.read_bits(size.0)?;
                 let Some(bits) = bits else {
                     return Err(DekuError::Parse(format!(
@@ -324,7 +330,13 @@ macro_rules! ImplDekuReadSignExtend {
                 container: &mut crate::container::Container<R>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
-                let bits = container.read_bits(size.0 * 8)?;
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                if size.0 > MAX_TYPE_BITS {
+                    return Err(DekuError::Parse(format!(
+                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits", size.0
+                    )));
+                }
+                let bits = container.read_bits(size.0)?;
                 let Some(bits) = bits else {
                             return Err(DekuError::Parse(format!("no bits read from reader",)));
                         };
@@ -661,7 +673,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::native_endian;
+    use crate::{container::Container, native_endian};
 
     static ENDIAN: Endian = Endian::new();
 
@@ -790,9 +802,17 @@ mod tests {
             Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
             None => u32::read(bit_slice, endian).unwrap(),
         };
-
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
+
+        let res_read = match bit_size {
+            Some(bit_size) => {
+                u32::from_reader(&mut Container::new(bit_slice), (endian, BitSize(bit_size)))
+                    .unwrap()
+            }
+            None => u32::from_reader(&mut Container::new(bit_slice), endian).unwrap(),
+        };
+        assert_eq!(expected, res_read);
     }
 
     #[rstest(input, endian, bit_size, expected,
@@ -834,6 +854,15 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
 
+        let res_read = match bit_size {
+            Some(bit_size) => {
+                u32::from_reader(&mut Container::new(bit_slice), (endian, BitSize(bit_size)))
+                    .unwrap()
+            }
+            None => u32::from_reader(&mut Container::new(bit_slice), endian).unwrap(),
+        };
+        assert_eq!(expected, res_read);
+
         let mut res_write = bitvec![u8, Msb0;];
         match bit_size {
             Some(bit_size) => res_read
@@ -852,9 +881,11 @@ mod tests {
                 let bit_slice = [0b10101_000].view_bits::<Msb0>();
 
                 let (amt_read, res_read) = <$typ>::read(bit_slice, (Endian::Little, BitSize(5))).unwrap();
-
                 assert_eq!(-11, res_read);
                 assert_eq!(bits![u8, Msb0; 0, 0, 0], bit_slice[amt_read..]);
+
+                let res_read = <$typ>::from_reader(&mut Container::new(bit_slice), (Endian::Little, BitSize(5))).unwrap();
+                assert_eq!(-11, res_read);
             }
         };
     }

@@ -51,7 +51,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::native_endian;
+    use crate::{container::Container, native_endian};
 
     #[rstest(input, expected, expected_rest,
         case(
@@ -65,6 +65,9 @@ mod tests {
         let (amt_read, res_read) = <Cow<u16>>::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
+
+        let res_read = <Cow<u16>>::from_reader(&mut Container::new(input), ()).unwrap();
+        assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();

@@ -83,6 +83,8 @@ mod tests {
     use hexlit::hex;
     use rstest::rstest;
 
+    use crate::container::Container;
+
     use super::*;
 
     #[rstest(input, expected,
@@ -96,6 +98,9 @@ mod tests {
         let (amt_read, res_read) = NonZeroU8::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
         assert!(bit_slice[amt_read..].is_empty());
+
+        let res_read = NonZeroU8::from_reader(&mut Container::new(bit_slice), ()).unwrap();
+        assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();

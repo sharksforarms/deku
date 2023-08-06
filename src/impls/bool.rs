@@ -66,6 +66,8 @@ mod tests {
     use hexlit::hex;
     use rstest::rstest;
 
+    use crate::container::Container;
+
     use super::*;
 
     #[rstest(input, expected,
@@ -76,6 +78,9 @@ mod tests {
         case(&hex!("02"), false),
     )]
     fn test_bool(input: &[u8], expected: bool) {
+        let res_read = bool::from_reader(&mut Container::new(input), ()).unwrap();
+        assert_eq!(expected, res_read);
+
         let bit_slice = input.view_bits::<Msb0>();
         let (amt_read, res_read) = bool::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
@@ -94,6 +99,13 @@ mod tests {
         let (amt_read, res_read) = bool::read(bit_slice, crate::ctx::BitSize(2)).unwrap();
         assert!(res_read);
         assert_eq!(amt_read, 2);
+
+        let res_read = bool::from_reader(
+            &mut Container::new(std::io::Cursor::new(input)),
+            crate::ctx::BitSize(2),
+        )
+        .unwrap();
+        assert!(res_read);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();

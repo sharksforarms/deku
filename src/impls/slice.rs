@@ -4,7 +4,7 @@ use bitvec::prelude::*;
 pub use deku_derive::*;
 
 use crate::ctx::Limit;
-use crate::{DekuError, DekuRead, DekuWrite};
+use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
 
 #[cfg(feature = "const_generics")]
 mod const_generics_impl {
@@ -124,7 +124,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::ctx::Endian;
+    use crate::{container::Container, ctx::Endian};
 
     #[rstest(input,endian,expected,expected_rest,
         case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, [0xCCDD, 0xAABB], bits![u8, Msb0;]),
@@ -141,6 +141,9 @@ mod tests {
         let (amt_read, res_read) = <[u16; 2]>::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
+
+        let res_read = <[u16; 2]>::from_reader(&mut Container::new(bit_slice), endian).unwrap();
+        assert_eq!(expected, res_read);
     }
 
     #[rstest(input,endian,expected,
@@ -180,11 +183,16 @@ mod tests {
         expected: [[u16; 2]; 2],
         expected_rest: &BitSlice<u8, Msb0>,
     ) {
+        use crate::container::Container;
+
         let bit_slice = input.view_bits::<Msb0>();
 
         let (amt_read, res_read) = <[[u16; 2]; 2]>::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
+
+        let res_read = <[[u16; 2]; 2]>::from_reader(&mut Container::new(input), endian).unwrap();
+        assert_eq!(expected, res_read);
     }
 
     #[cfg(feature = "const_generics")]

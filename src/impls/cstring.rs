@@ -70,6 +70,8 @@ where
 mod tests {
     use rstest::rstest;
 
+    use crate::container::Container;
+
     use super::*;
 
     #[rstest(input, expected, expected_rest,
@@ -92,6 +94,9 @@ mod tests {
         let (amt_read, res_read) = CString::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
+
+        let res_read = CString::from_reader(&mut Container::new(bit_slice), ()).unwrap();
+        assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();

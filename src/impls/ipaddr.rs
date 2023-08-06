@@ -96,7 +96,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::ctx::Endian;
+    use crate::{container::Container, ctx::Endian};
 
     #[rstest(input, endian, expected, expected_rest,
         case::normal_le([237, 160, 254, 145].as_ref(), Endian::Little, Ipv4Addr::new(145, 254, 160, 237), bits![u8, Msb0;]),
@@ -113,6 +113,9 @@ mod tests {
         let (amt_read, res_read) = Ipv4Addr::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
+
+        let res_read = Ipv4Addr::from_reader(&mut Container::new(input), endian).unwrap();
+        assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, endian).unwrap();

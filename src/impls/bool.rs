@@ -5,7 +5,7 @@ use alloc::format;
 
 use bitvec::prelude::*;
 
-use crate::{container, DekuError, DekuRead, DekuReader, DekuWrite};
+use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
 
 impl<'a, Ctx> DekuRead<'a, Ctx> for bool
 where

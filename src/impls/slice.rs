@@ -3,8 +3,7 @@
 use bitvec::prelude::*;
 pub use deku_derive::*;
 
-use crate::ctx::Limit;
-use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
+use crate::{DekuError, DekuRead, DekuWrite};
 
 #[cfg(feature = "const_generics")]
 mod const_generics_impl {
@@ -124,7 +123,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::{container::Container, ctx::Endian};
+    use crate::{container::Container, ctx::Endian, DekuReader};
 
     #[rstest(input,endian,expected,expected_rest,
         case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, [0xCCDD, 0xAABB], bits![u8, Msb0;]),

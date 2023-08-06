@@ -62,9 +62,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let from_bytes_body = wrap_default_ctx(
             quote! {
                 use core::convert::TryFrom;
-                let container = &mut deku::container::Container::new(__deku_input.0);
+                let __deku_container = &mut deku::container::Container::new(__deku_input.0);
                 if __deku_input.1 != 0 {
-                    container.skip_bits(__deku_input.1)?;
+                    __deku_container.skip_bits(__deku_input.1)?;
                 }
 
                 #magic_read
@@ -72,7 +72,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 #(#field_reads)*
                 let __deku_value = #initialize_struct;
 
-                Ok((container.bits_read, __deku_value))
+                Ok((__deku_container.bits_read, __deku_value))
             },
             &input.ctx,
             &input.ctx_default,
@@ -104,7 +104,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
-            fn from_reader<R: ::#crate_::acid_io::Read>(container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader<R: ::#crate_::acid_io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -115,7 +115,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
-                fn from_reader<R: ::#crate_::acid_io::Read>(container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader<R: ::#crate_::acid_io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -280,7 +280,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
     } else if id_type.is_some() {
         quote! {
-            let __deku_variant_id = <#id_type>::from_reader(container,  (#id_args))?;
+            let __deku_variant_id = <#id_type>::from_reader(__deku_container,  (#id_args))?;
         }
     } else {
         // either `id` or `type` needs to be specified
@@ -302,16 +302,16 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let from_bytes_body = wrap_default_ctx(
             quote! {
                 use core::convert::TryFrom;
-                let container = &mut deku::container::Container::new(__deku_input.0);
+                let __deku_container = &mut deku::container::Container::new(__deku_input.0);
                 if __deku_input.1 != 0 {
-                    container.skip_bits(__deku_input.1)?;
+                    __deku_container.skip_bits(__deku_input.1)?;
                 }
 
                 #magic_read
 
                 #variant_read
 
-                Ok((container.bits_read, __deku_value))
+                Ok((__deku_container.bits_read, __deku_value))
             },
             &input.ctx,
             &input.ctx_default,
@@ -342,7 +342,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     tokens.extend(quote! {
         #[allow(non_snake_case)]
         impl #imp ::#crate_::DekuRead<#lifetime, #ctx_types> for #ident #wher {
-            fn from_reader<R: std::io::Read>(container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader<R: std::io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -354,7 +354,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             #[allow(non_snake_case)]
             impl #imp ::#crate_::DekuRead<#lifetime> for #ident #wher {
-                fn from_reader<R: std::io::Read>(container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader<R: std::io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -396,7 +396,7 @@ fn emit_magic_read(input: &DekuData) -> TokenStream {
             let __deku_magic = #magic;
 
             for __deku_byte in __deku_magic {
-                let __deku_read_byte = u8::from_reader(container, ())?;
+                let __deku_read_byte = u8::from_reader(__deku_container, ())?;
                 if *__deku_byte != __deku_read_byte {
                     return Err(::#crate_::DekuError::Parse(format!("Missing magic value {:?}", #magic)));
                 }
@@ -445,7 +445,7 @@ fn emit_bit_byte_offsets(
         .any(|v| token_contains_string(v, "__deku_byte_offset"))
     {
         Some(quote! {
-            let __deku_byte_offset = container.bits_read / 8;
+            let __deku_byte_offset = __deku_container.bits_read / 8;
         })
     } else {
         None
@@ -457,7 +457,7 @@ fn emit_bit_byte_offsets(
         || byte_offset.is_some()
     {
         Some(quote! {
-            let __deku_bit_offset = container.bits_read;
+            let __deku_bit_offset = __deku_container.bits_read;
         })
     } else {
         None
@@ -481,7 +481,7 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
 
 
             // TODO: This could be bytes
-            let _ = container.read_bits(__deku_pad)?;
+            let _ = __deku_container.read_bits(__deku_pad)?;
         }
     }
 }
@@ -580,7 +580,7 @@ fn emit_field_read(
             f.ctx.as_ref(),
         )?;
 
-        // The container limiting options are special, we need to generate `(limit, (other, ..))` for them.
+        // The __deku_container limiting options are special, we need to generate `(limit, (other, ..))` for them.
         // These have a problem where when it isn't a copy type, the field will be moved.
         // e.g. struct FooBar {
         //   a: Baz // a type implement `Into<usize>` but not `Copy`.
@@ -607,7 +607,7 @@ fn emit_field_read(
                     use core::borrow::Borrow;
                     #type_as_deku_read::from_reader
                     (
-                        container,
+                        __deku_container,
                         (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args))
                     )?
                 }
@@ -618,7 +618,7 @@ fn emit_field_read(
                     use core::borrow::Borrow;
                     #type_as_deku_read::from_reader
                     (
-                        container,
+                        __deku_container,
                         (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args))
                     )?
                 }
@@ -629,7 +629,7 @@ fn emit_field_read(
                     use core::borrow::Borrow;
                     #type_as_deku_read::from_reader
                     (
-                        container,
+                        __deku_container,
                         (::#crate_::ctx::Limit::new_byte_size(::#crate_::ctx::ByteSize(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args))
                     )?
                 }
@@ -640,7 +640,7 @@ fn emit_field_read(
             quote! {
                 #type_as_deku_read::from_reader
                 (
-                    container,
+                    __deku_container,
                     (::#crate_::ctx::Limit::new_until(#field_until), (#read_args))
                 )?
             }
@@ -648,7 +648,7 @@ fn emit_field_read(
             quote! {
                 #type_as_deku_read::from_reader
                 (
-                    container,
+                    __deku_container,
                     (#read_args)
                 )?
             }

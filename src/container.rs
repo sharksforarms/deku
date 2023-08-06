@@ -31,6 +31,17 @@ impl<R: Read> Container<R> {
         }
     }
 
+    /// Used at the beginning of `from_bytes`. Will read the `amt` of bits, but
+    /// not increase bits_read.
+    #[inline]
+    pub fn skip_bits(&mut self, amt: usize) -> Result<(), DekuError> {
+        // Save, and keep the leftover bits since the read will most likely be less than a byte
+        self.read_bits(amt)?;
+        self.bits_read = 0;
+
+        Ok(())
+    }
+
     /// Attempt to read bits from `Container`. This will always return a `BitVec` and will
     /// correctly add previously read and stored "leftover" bits from previous reads.
     ///

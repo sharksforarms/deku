@@ -45,7 +45,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         .and_then(|v| v.ident.as_ref())
         .is_some();
 
-    let (field_idents, field_reads) = emit_field_reads(input, &fields, &ident)?;
+    let (field_idents, field_reads) = emit_field_reads(input, &fields, &ident, false)?;
 
     // filter out temporary fields
     let field_idents = field_idents
@@ -64,7 +64,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use core::convert::TryFrom;
                 let container = &mut deku::container::Container::new(__deku_input.0);
                 if __deku_input.1 != 0 {
-                    let _ = container.read_bits(__deku_input.1)?;
+                    container.skip_bits(__deku_input.1)?;
                 }
 
                 #magic_read
@@ -167,13 +167,15 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .and_then(|v| v.ident.as_ref())
             .is_some();
 
-        let (consume_id, variant_id) = if let Some(variant_id) = &variant.id {
+        let (use_id, variant_id) = if let Some(variant_id) = &variant.id {
             match variant_id {
-                Id::TokenStream(v) => (true, quote! {&#v}.into_token_stream()),
-                Id::LitByteStr(v) => (true, v.into_token_stream()),
+                Id::TokenStream(v) => (false, quote! {&#v}.into_token_stream()),
+                Id::LitByteStr(v) => (false, v.into_token_stream()),
             }
         } else if let Some(variant_id_pat) = &variant.id_pat {
-            (false, variant_id_pat.clone())
+            // if set, the first field read will not read from reader and instead
+            // be __deku_variant_id
+            (true, variant_id_pat.clone())
         } else if has_discriminant {
             let ident = &variant.ident;
             let internal_ident = gen_internal_field_ident(&quote!(#ident));
@@ -200,7 +202,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             quote! { #variant_reader; }
         } else {
             let (field_idents, field_reads) =
-                emit_field_reads(input, &variant.fields.as_ref(), &ident)?;
+                emit_field_reads(input, &variant.fields.as_ref(), &ident, use_id)?;
 
             // filter out temporary fields
             let field_idents = field_idents
@@ -302,7 +304,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use core::convert::TryFrom;
                 let container = &mut deku::container::Container::new(__deku_input.0);
                 if __deku_input.1 != 0 {
-                    let _ = container.read_bits(__deku_input.1)?;
+                    container.skip_bits(__deku_input.1)?;
                 }
 
                 #magic_read
@@ -414,12 +416,16 @@ fn emit_field_reads(
     input: &DekuData,
     fields: &Fields<&FieldData>,
     ident: &TokenStream,
+    use_id: bool,
 ) -> Result<(Vec<FieldIdent>, Vec<TokenStream>), syn::Error> {
     let mut field_reads = Vec::with_capacity(fields.len());
     let mut field_idents = Vec::with_capacity(fields.len());
 
+    let mut use_id = use_id;
+
     for (i, f) in fields.iter().enumerate() {
-        let (field_ident, field_read) = emit_field_read(input, i, f, ident)?;
+        let (field_ident, field_read) = emit_field_read(input, i, f, ident, use_id)?;
+        use_id = false;
         field_idents.push(FieldIdent {
             field_ident,
             is_temp: f.temp,
@@ -485,6 +491,7 @@ fn emit_field_read(
     i: usize,
     f: &FieldData,
     ident: &TokenStream,
+    use_id: bool,
 ) -> Result<(TokenStream, TokenStream), syn::Error> {
     let crate_ = super::get_crate_name();
     let field_type = &f.ty;
@@ -564,7 +571,7 @@ fn emit_field_read(
     };
 
     let field_read_func = if field_reader.is_some() {
-        quote! { #field_reader }
+        quote! { #field_reader? }
     } else {
         let read_args = gen_field_args(
             field_endian,
@@ -589,7 +596,12 @@ fn emit_field_read(
             // use type directly
             quote!(<#field_type as ::#crate_::DekuRead<'_, _>>)
         };
-        if let Some(field_count) = &f.count {
+
+        if use_id {
+            quote! {
+                __deku_variant_id
+            }
+        } else if let Some(field_count) = &f.count {
             quote! {
                 {
                     use core::borrow::Borrow;
@@ -597,7 +609,7 @@ fn emit_field_read(
                     (
                         container,
                         (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args))
-                    )
+                    )?
                 }
             }
         } else if let Some(field_bits) = &f.bits_read {
@@ -608,7 +620,7 @@ fn emit_field_read(
                     (
                         container,
                         (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args))
-                    )
+                    )?
                 }
             }
         } else if let Some(field_bytes) = &f.bytes_read {
@@ -619,7 +631,7 @@ fn emit_field_read(
                     (
                         container,
                         (::#crate_::ctx::Limit::new_byte_size(::#crate_::ctx::ByteSize(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args))
-                    )
+                    )?
                 }
             }
         } else if let Some(field_until) = &f.until {
@@ -630,7 +642,7 @@ fn emit_field_read(
                 (
                     container,
                     (::#crate_::ctx::Limit::new_until(#field_until), (#read_args))
-                )
+                )?
             }
         } else {
             quote! {
@@ -638,7 +650,7 @@ fn emit_field_read(
                 (
                     container,
                     (#read_args)
-                )
+                )?
             }
         }
     };
@@ -655,7 +667,7 @@ fn emit_field_read(
     );
 
     let field_read_normal = quote! {
-        let __deku_value = #field_read_func?;
+        let __deku_value = #field_read_func;
         let __deku_value: #field_type = #field_map(__deku_value)?;
         __deku_value
     };

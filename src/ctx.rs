@@ -23,6 +23,7 @@ impl Endian {
     /// [`Endian::default`], but const.
     ///
     /// [`Endian::default`]: Endian::default()
+    #[inline]
     pub const fn new() -> Self {
         #[cfg(target_endian = "little")]
         let endian = Endian::Little;
@@ -34,11 +35,13 @@ impl Endian {
     }
 
     /// Is it little endian
+    #[inline]
     pub fn is_le(self) -> bool {
         self == Endian::Little
     }
 
     /// Is it big endian
+    #[inline]
     pub fn is_be(self) -> bool {
         self == Endian::Big
     }
@@ -46,6 +49,7 @@ impl Endian {
 
 impl Default for Endian {
     /// Return the endianness of the target's CPU.
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -64,6 +68,7 @@ impl FromStr for Endian {
     /// assert_eq!(FromStr::from_str("big"), Ok(Endian::Big));
     /// assert!(<Endian as FromStr>::from_str("not an endian").is_err());
     /// ```
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "little" => Ok(Endian::Little),
@@ -93,24 +98,28 @@ pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
 }
 
 impl<T> From<usize> for Limit<T, fn(&T) -> bool> {
+    #[inline]
     fn from(n: usize) -> Self {
         Limit::Count(n)
     }
 }
 
 impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> From<Predicate> for Limit<T, Predicate> {
+    #[inline]
     fn from(predicate: Predicate) -> Self {
         Limit::Until(predicate, PhantomData)
     }
 }
 
 impl<T> From<ByteSize> for Limit<T, fn(&T) -> bool> {
+    #[inline]
     fn from(size: ByteSize) -> Self {
         Limit::ByteSize(size)
     }
 }
 
 impl<T> From<BitSize> for Limit<T, fn(&T) -> bool> {
+    #[inline]
     fn from(size: BitSize) -> Self {
         Limit::BitSize(size)
     }
@@ -120,6 +129,7 @@ impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> Limit<T, Predicate> {
     /// Constructs a new Limit that reads until the given predicate returns true
     /// The predicate is given a reference to the latest read value and must return
     /// true to stop reading
+    #[inline]
     pub fn new_until(predicate: Predicate) -> Self {
         predicate.into()
     }
@@ -127,16 +137,19 @@ impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> Limit<T, Predicate> {
 
 impl<T> Limit<T, fn(&T) -> bool> {
     /// Constructs a new Limit that reads until the given number of elements are read
+    #[inline]
     pub fn new_count(count: usize) -> Self {
         count.into()
     }
 
     /// Constructs a new Limit that reads until the given size
+    #[inline]
     pub fn new_bit_size(size: BitSize) -> Self {
         size.into()
     }
 
     /// Constructs a new Limit that reads until the given size
+    #[inline]
     pub fn new_byte_size(size: ByteSize) -> Self {
         size.into()
     }
@@ -152,6 +165,7 @@ pub struct BitSize(pub usize);
 
 impl BitSize {
     /// Convert the size in bytes to a bit size.
+    #[inline]
     const fn bits_from_bytes(byte_size: usize) -> Self {
         // TODO: use checked_mul when const_option is enabled
         // link: https://github.com/rust-lang/rust/issues/67441
@@ -165,11 +179,13 @@ impl BitSize {
     ///
     /// assert_eq!(BitSize::of::<i32>(), BitSize(4 * 8));
     /// ```
+    #[inline]
     pub const fn of<T>() -> Self {
         Self::bits_from_bytes(core::mem::size_of::<T>())
     }
 
     /// Returns the bit size of the pointed-to value
+    #[inline]
     pub fn of_val<T: ?Sized>(val: &T) -> Self {
         Self::bits_from_bytes(core::mem::size_of_val(val))
     }

@@ -55,8 +55,8 @@ jobs:
           toolchain: nightly
           override: true
           components: miri
-          target: mips64-unknown-linux-gnuabi64
-      - run: cargo miri test --target mips64-unknown-linux-gnuabi64
+          target: armebv7r-none-eabi
+      - run: cargo miri test --target armebv7r-none-eabi
 
   examples:
     name: Examples

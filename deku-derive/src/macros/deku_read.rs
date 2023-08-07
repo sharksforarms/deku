@@ -567,8 +567,7 @@ fn emit_field_read(
 
     let trace_field_log = if cfg!(feature = "logging") {
         quote! {
-            // TODO: fix logging feature
-            //log::trace!("Reading: {}::{} from {}", #ident, #field_ident_str, __deku_rest);
+            log::trace!("Reading: {}::{}", #ident, #field_ident_str);
         }
     } else {
         quote! {}

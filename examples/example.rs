@@ -1,12 +1,13 @@
+//! To test out the "logging" feature:
+//! ```
+//! $ RUST_LOG=trace cargo run --example example --features logging
+//! ```
+
 #![allow(clippy::unusual_byte_groupings)]
 
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 
-use deku::{
-    container::Container,
-    ctx::{BitSize, ByteSize, Endian},
-    prelude::*,
-};
+use deku::{container::Container, prelude::*};
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct FieldF {
@@ -40,6 +41,7 @@ struct DekuTest {
 }
 
 fn main() {
+    env_logger::init();
     let test_data: &[u8] = [
         0xab,
         0b1010010_1,
@@ -57,7 +59,6 @@ fn main() {
     let mut container = Container::new(std::io::Cursor::new(test_data));
     let test_deku = DekuTest::from_reader(&mut container, ()).unwrap();
 
-    let mut container = Container::new(std::io::Cursor::new(test_data));
     let test_deku_from_bytes = DekuTest::from_bytes((test_data, 0)).unwrap();
     assert_eq!(test_deku, test_deku_from_bytes.1);
 

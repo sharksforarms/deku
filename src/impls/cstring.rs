@@ -24,17 +24,9 @@ where
     where
         Self: Sized,
     {
-        let (amt_read, mut bytes) = Vec::read(input, (Limit::from(|b: &u8| *b == 0x00), ctx))?;
+        let (amt_read, bytes) = Vec::read(input, (Limit::from(|b: &u8| *b == 0x00), ctx))?;
 
-        // TODO: use from_vec_with_nul instead once stable
-
-        // Remove null byte
-        let nul_byte = bytes.pop();
-        if nul_byte != Some(0x00) {
-            return Err(DekuError::Unexpected("Expected nul byte".to_string()));
-        }
-
-        let value = CString::new(bytes)
+        let value = CString::from_vec_with_nul(bytes)
             .map_err(|e| DekuError::Parse(format!("Failed to convert Vec to CString: {e}")))?;
 
         Ok((amt_read, value))

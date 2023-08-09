@@ -428,8 +428,11 @@ macro_rules! ForwardDekuRead {
             ) -> Result<$typ, DekuError> {
                 let endian = Endian::default();
 
-                let a = <$typ>::from_reader(container, (endian, bit_size))?;
-                Ok(a)
+                if (bit_size.0 % 8) == 0 {
+                    <$typ>::from_reader(container, (endian, ByteSize(bit_size.0 / 8)))
+                } else {
+                    <$typ>::from_reader(container, (endian, bit_size))
+                }
             }
         }
 

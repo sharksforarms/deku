@@ -1,25 +1,16 @@
-//! Based on https://github.com/rustwasm/wee_alloc/tree/master/example
-//! Run with `cargo +nightly run --release`
-
+//! cargo build --target thumbv7em-none-eabihf
 #![no_std]
 #![no_main]
-#![feature(core_intrinsics, alloc_error_handler)]
 
 extern crate alloc;
-extern crate wee_alloc;
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
-    loop {}
-}
+use core::panic::PanicInfo;
 
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
-}
+use cortex_m_rt::entry;
+use embedded_alloc::Heap;
 
 #[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+static HEAP: Heap = Heap::empty();
 
 use alloc::{format, vec, vec::Vec};
 use deku::prelude::*;
@@ -35,8 +26,19 @@ struct DekuTest {
     data: Vec<u8>,
 }
 
-#[no_mangle]
-pub extern "C" fn main() -> () {
+#[entry]
+fn main() -> ! {
+    // Initialize the allocator BEFORE you use it
+    {
+        use core::mem::MaybeUninit;
+        const HEAP_SIZE: usize = 1024;
+        static mut HEAP_MEM: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
+        unsafe { HEAP.init(HEAP_MEM.as_ptr() as usize, HEAP_SIZE) }
+    }
+
+    // now the allocator is ready types like Box, Vec can be used.
+
+    #[allow(clippy::unusual_byte_groupings)]
     let test_data: Vec<u8> = vec![0b10101_101, 0x02, 0xBE, 0xEF];
 
     // Test reading
@@ -54,4 +56,11 @@ pub extern "C" fn main() -> () {
     // Test writing
     let val = val.to_bytes().unwrap();
     assert_eq!(test_data, val);
+
+    loop { /* .. */ }
+}
+
+#[panic_handler]
+fn panic(_: &PanicInfo) -> ! {
+    loop {}
 }

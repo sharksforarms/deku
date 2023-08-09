@@ -19,6 +19,7 @@ default = ["alloc"]
 alloc = []
 
 [dependencies]
-wee_alloc = "0.4"
+cortex-m-rt = "0.7.3"
 deku = { path = "../", default-features = false, features = ["alloc"] }
+embedded-alloc = "0.5.0"
 

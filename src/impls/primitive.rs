@@ -817,6 +817,43 @@ mod tests {
         assert_eq!(expected, res_read);
     }
 
+    #[rstest(input, endian, byte_size, expected, expected_rest,
+        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(4), 0xDDCC_BBAA, bits![u8, Msb0;]),
+        case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(4), 0xAABB_CCDD, bits![u8, Msb0;]),
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
+        case::not_enough_data([].as_ref(), Endian::Little, Some(4), 0xFF, bits![u8, Msb0;]),
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
+        case::not_enough_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(4), 0xFF, bits![u8, Msb0;]),
+        #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 64 bits\")")]
+        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(8), 0xFF, bits![u8, Msb0;]),
+    )]
+    fn test_byte_read(
+        input: &[u8],
+        endian: Endian,
+        byte_size: Option<usize>,
+        expected: u32,
+        expected_rest: &BitSlice<u8, Msb0>,
+    ) {
+        let bit_slice = input.view_bits::<Msb0>();
+
+        let (amt_read, res_read) = match byte_size {
+            Some(bit_size) => u32::read(bit_slice, (endian, ByteSize(bit_size))).unwrap(),
+            None => u32::read(bit_slice, endian).unwrap(),
+        };
+        assert_eq!(expected, res_read);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
+
+        let res_read = match byte_size {
+            Some(byte_size) => u32::from_reader(
+                &mut Container::new(bit_slice),
+                (endian, ByteSize(byte_size)),
+            )
+            .unwrap(),
+            None => u32::from_reader(&mut Container::new(bit_slice), endian).unwrap(),
+        };
+        assert_eq!(expected, res_read);
+    }
+
     #[rstest(input, endian, bit_size, expected,
         case::normal_le(0xDDCC_BBAA, Endian::Little, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
         case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),

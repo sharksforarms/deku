@@ -1,3 +1,5 @@
+//! Container for reader functions
+
 use acid_io::{self, Read};
 use bitvec::prelude::*;
 

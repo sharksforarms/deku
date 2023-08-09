@@ -1,7 +1,6 @@
 use std::io::Read;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use deku::container::Container;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]

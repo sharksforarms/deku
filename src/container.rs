@@ -27,6 +27,9 @@ pub struct Container<R: Read> {
     pub bits_read: usize,
 }
 
+/// Max bits requested from [`read_bits`] during one call
+pub const MAX_BITS_AMT: usize = 128;
+
 impl<R: Read> Container<R> {
     /// Create a new `Container`
     #[inline]
@@ -59,7 +62,7 @@ impl<R: Read> Container<R> {
     /// `self.bits_read` will increase by `amt`
     ///
     /// # Params
-    /// `amt`    - Amount of bits that will be read
+    /// `amt`    - Amount of bits that will be read. Must be <= [`MAX_BITS_AMT`].
     #[inline]
     pub fn read_bits(&mut self, amt: usize) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
         #[cfg(feature = "logging")]
@@ -69,21 +72,20 @@ impl<R: Read> Container<R> {
             log::trace!("read_bits: returned None");
             return Ok(None);
         }
-        let mut ret = BitVec::with_capacity(amt);
+        let mut ret = BitVec::new();
 
         match amt.cmp(&self.leftover.len()) {
             // exact match, just use leftover
             Ordering::Equal => {
-                ret = self.leftover.clone();
+                core::mem::swap(&mut ret, &mut self.leftover);
                 self.leftover.clear();
             }
-            // The entire bits we need to return have been already read previously from bytes but
-            // not all were read, return required leftover bits
+            // previous read was not enough to satisfy the amt requirement, return all previously
             Ordering::Greater => {
                 // read bits
                 ret.extend_from_bitslice(&self.leftover);
 
-                // calulcate the amount of bytes we need to read to read enough bits
+                // calculate the amount of bytes we need to read to read enough bits
                 let bits_left = amt - self.leftover.len();
                 let mut bytes_len = bits_left / 8;
                 if (bits_left % 8) != 0 {
@@ -91,8 +93,8 @@ impl<R: Read> Container<R> {
                 }
 
                 // read in new bytes
-                let mut buf = alloc::vec![0; bytes_len];
-                if let Err(e) = self.inner.read_exact(&mut buf) {
+                let mut buf = [0; MAX_BITS_AMT];
+                if let Err(e) = self.inner.read_exact(&mut buf[..bytes_len]) {
                     if e.kind() == acid_io::ErrorKind::UnexpectedEof {
                         return Err(DekuError::Incomplete(NeedSize::new(amt)));
                     }
@@ -100,17 +102,18 @@ impl<R: Read> Container<R> {
                     // TODO: other errors?
                 }
                 #[cfg(feature = "logging")]
-                log::trace!("read_bits: read() {buf:02x?}");
+                log::trace!("read_bits: read() {:02x?}", &buf[..bytes_len]);
 
                 // create bitslice and remove unused bits
-                let mut rest: BitVec<u8, Msb0> = BitVec::try_from_slice(&buf).unwrap();
-                let not_needed = rest.split_off(bits_left);
-                self.leftover = not_needed;
+                let rest = BitSlice::try_from_slice(&buf[..bytes_len]).unwrap();
+                let (rest, not_needed) = rest.split_at(bits_left);
+                core::mem::swap(&mut not_needed.to_bitvec(), &mut self.leftover);
 
                 // create return
-                ret.extend_from_bitslice(rest.as_bitslice());
+                ret.extend_from_bitslice(rest);
             }
-            // previous read was not enough to satisfy the amt requirement, return all previously
+            // The entire bits we need to return have been already read previously from bytes but
+            // not all were read, return required leftover bits
             Ordering::Less => {
                 let used = self.leftover.split_off(amt);
                 ret.extend_from_bitslice(&self.leftover);

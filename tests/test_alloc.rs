@@ -38,9 +38,9 @@ struct TestDeku {
     field_e: Vec<u8>, // 1 alloc
     field_f: [u8; 3],
     #[deku(bits = "3")]
-    field_g: u8, // 1 alloc (bits read)
+    field_g: u8, // 3 allocs (bits read)
     #[deku(bits = "5")]
-    field_h: u8, // 1 alloc (bits read)
+    field_h: u8, // 1 alloc (bits leftover/read)
     field_i: NestedEnum2,
 }
 
@@ -59,10 +59,10 @@ mod tests {
 
         assert_eq!(
             count_alloc(|| {
-                let _ = TestDeku::try_from(input.as_ref()).unwrap();
+                let _ = TestDeku::from_bytes((input.as_ref(), 0)).unwrap();
             })
             .0,
-            (9, 0, 9)
+            (5, 0, 5)
         );
     }
 }

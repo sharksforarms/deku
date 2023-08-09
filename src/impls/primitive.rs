@@ -688,6 +688,9 @@ mod tests {
                 let (_rest, res_read) = <$typ>::read(bit_slice, ENDIAN).unwrap();
                 assert_eq!($expected, res_read);
 
+                let res_read = <$typ>::from_reader(&mut Container::new(bit_slice), ENDIAN).unwrap();
+                assert_eq!($expected, res_read);
+
                 let mut res_write = bitvec![u8, Msb0;];
                 res_read.write(&mut res_write, ENDIAN).unwrap();
                 assert_eq!(input, res_write.into_vec());
@@ -779,6 +782,29 @@ mod tests {
         native_endian!(-0.006_f64)
     );
 
+    #[rstest(bit_slice, endian, bit_size, expected, expected_rest,
+        case::normal(bits![u8, Msb0; 1], Endian::Little, Some(1), 0x1, bits![u8, Msb0;]),
+        case::normal(bits![u8, Msb0; 1], Endian::Big, Some(1), 0x1, bits![u8, Msb0;]),
+        case::normal(bits![u8, Msb0; 0, 0, 0, 0, 0, 0, 0, 1], Endian::Little, Some(8), 0x1, bits![u8, Msb0;]),
+        case::normal(bits![u8, Msb0; 0, 0, 0, 0, 0, 0, 0, 1], Endian::Big, Some(8), 0x1, bits![u8, Msb0;]),
+        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
+        case::normal(bits![u8, Msb0; 1], Endian::Big, Some(9), 0x1, bits![u8, Msb0;]),
+    )]
+    fn test_bitvec_read(
+        bit_slice: &BitSlice<u8, Msb0>,
+        endian: Endian,
+        bit_size: Option<usize>,
+        expected: u8,
+        expected_rest: &BitSlice<u8, Msb0>,
+    ) {
+        let (amt_read, res_read) = match bit_size {
+            Some(bit_size) => u8::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
+            None => u8::read(bit_slice, endian).unwrap(),
+        };
+        assert_eq!(expected, res_read);
+        assert_eq!(expected_rest, bit_slice[amt_read..]);
+    }
+
     #[rstest(input, endian, bit_size, expected, expected_rest,
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, bits![u8, Msb0;]),
         case::normal_bits_12_le([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Little, Some(12), 0b1110_1001_0110, bits![u8, Msb0; 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1]),
@@ -807,6 +833,15 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
 
+        // test both Read &[u8] and Read BitVec
+        let res_read = match bit_size {
+            Some(bit_size) => {
+                u32::from_reader(&mut Container::new(input), (endian, BitSize(bit_size))).unwrap()
+            }
+            None => u32::from_reader(&mut Container::new(input), endian).unwrap(),
+        };
+        assert_eq!(expected, res_read);
+
         let res_read = match bit_size {
             Some(bit_size) => {
                 u32::from_reader(&mut Container::new(bit_slice), (endian, BitSize(bit_size)))
@@ -821,7 +856,7 @@ mod tests {
         case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(4), 0xDDCC_BBAA, bits![u8, Msb0;]),
         case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(4), 0xAABB_CCDD, bits![u8, Msb0;]),
         case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(3), 0x00DDCC_BB, bits![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 0]),
-        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(3), 0xBB_CCDD, bits![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 0]),
+        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(3), 0x00BB_CCDD, bits![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 0]),
         #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
         case::not_enough_data([].as_ref(), Endian::Little, Some(4), 0xFF, bits![u8, Msb0;]),
         #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
@@ -844,6 +879,15 @@ mod tests {
         };
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
+
+        // test both Read &[u8] and Read BitVec
+        let res_read = match byte_size {
+            Some(byte_size) => {
+                u32::from_reader(&mut Container::new(input), (endian, ByteSize(byte_size))).unwrap()
+            }
+            None => u32::from_reader(&mut Container::new(input), endian).unwrap(),
+        };
+        assert_eq!(expected, res_read);
 
         let res_read = match byte_size {
             Some(byte_size) => u32::from_reader(

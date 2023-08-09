@@ -1,5 +1,7 @@
 //! Container for reader functions
 
+use core::cmp::Ordering;
+
 use acid_io::{self, Read};
 use bitvec::prelude::*;
 
@@ -69,47 +71,51 @@ impl<R: Read> Container<R> {
         }
         let mut ret = BitVec::with_capacity(amt);
 
-        if amt == self.leftover.len() {
+        match amt.cmp(&self.leftover.len()) {
             // exact match, just use leftover
-            ret = self.leftover.clone();
-            self.leftover.clear();
-        } else if amt < self.leftover.len() {
+            Ordering::Equal => {
+                ret = self.leftover.clone();
+                self.leftover.clear();
+            }
             // The entire bits we need to return have been already read previously from bytes but
             // not all were read, return required leftover bits
-            let used = self.leftover.split_off(amt);
-            ret.extend_from_bitslice(&self.leftover);
-            self.leftover = used;
-        } else {
-            // previous read was not enought to satisfy the amt requirement, return all previously
-            // read bits
-            ret.extend_from_bitslice(&self.leftover);
+            Ordering::Greater => {
+                // read bits
+                ret.extend_from_bitslice(&self.leftover);
 
-            // calulcate the amount of bytes we need to read to read enough bits
-            let bits_left = amt - self.leftover.len();
-            let mut bytes_len = bits_left / 8;
-            if (bits_left % 8) != 0 {
-                bytes_len += 1;
-            }
-
-            // read in new bytes
-            let mut buf = alloc::vec![0; bytes_len];
-            if let Err(e) = self.inner.read_exact(&mut buf) {
-                if e.kind() == acid_io::ErrorKind::UnexpectedEof {
-                    return Err(DekuError::Incomplete(NeedSize::new(amt)));
+                // calulcate the amount of bytes we need to read to read enough bits
+                let bits_left = amt - self.leftover.len();
+                let mut bytes_len = bits_left / 8;
+                if (bits_left % 8) != 0 {
+                    bytes_len += 1;
                 }
 
-                // TODO: other errors?
+                // read in new bytes
+                let mut buf = alloc::vec![0; bytes_len];
+                if let Err(e) = self.inner.read_exact(&mut buf) {
+                    if e.kind() == acid_io::ErrorKind::UnexpectedEof {
+                        return Err(DekuError::Incomplete(NeedSize::new(amt)));
+                    }
+
+                    // TODO: other errors?
+                }
+                #[cfg(feature = "logging")]
+                log::trace!("read_bits: read() {buf:02x?}");
+
+                // create bitslice and remove unused bits
+                let mut rest: BitVec<u8, Msb0> = BitVec::try_from_slice(&buf).unwrap();
+                let not_needed = rest.split_off(bits_left);
+                self.leftover = not_needed;
+
+                // create return
+                ret.extend_from_bitslice(rest.as_bitslice());
             }
-            #[cfg(feature = "logging")]
-            log::trace!("read_bits: read() {buf:02x?}");
-
-            // create bitslice and remove unused bits
-            let mut rest: BitVec<u8, Msb0> = BitVec::try_from_slice(&buf).unwrap();
-            let not_needed = rest.split_off(bits_left);
-            self.leftover = not_needed;
-
-            // create return
-            ret.extend_from_bitslice(rest.as_bitslice());
+            // previous read was not enough to satisfy the amt requirement, return all previously
+            Ordering::Less => {
+                let used = self.leftover.split_off(amt);
+                ret.extend_from_bitslice(&self.leftover);
+                self.leftover = used;
+            }
         }
 
         self.bits_read += ret.len();

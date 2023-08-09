@@ -292,7 +292,7 @@ pub mod prelude;
 
 pub use crate::error::DekuError;
 
-/// "Reader" trait: read bits and construct type
+/// "Read" trait: read bits and construct type
 pub trait DekuRead<'a, Ctx = ()> {
     /// Read bits and construct type
     /// * **input** - Input as bits
@@ -308,6 +308,7 @@ pub trait DekuRead<'a, Ctx = ()> {
         Self: Sized;
 }
 
+/// "Reader" trait: read bytes and bits from [`Read`]er
 pub trait DekuReader<'a, Ctx = ()> {
     /// Construct type from `container` implementing [`acid_io::Read`]
     fn from_reader<R: acid_io::Read>(

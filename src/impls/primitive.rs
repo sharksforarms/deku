@@ -820,6 +820,8 @@ mod tests {
     #[rstest(input, endian, byte_size, expected, expected_rest,
         case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(4), 0xDDCC_BBAA, bits![u8, Msb0;]),
         case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(4), 0xAABB_CCDD, bits![u8, Msb0;]),
+        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(3), 0x00DDCC_BB, bits![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 0]),
+        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(3), 0xBB_CCDD, bits![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 0]),
         #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
         case::not_enough_data([].as_ref(), Endian::Little, Some(4), 0xFF, bits![u8, Msb0;]),
         #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]

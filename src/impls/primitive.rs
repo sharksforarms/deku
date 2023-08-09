@@ -358,14 +358,9 @@ macro_rules! ForwardDekuRead {
                 input: &BitSlice<u8, Msb0>,
                 endian: Endian,
             ) -> Result<(usize, Self), DekuError> {
-                let bit_size = BitSize::of::<$typ>();
+                let byte_size = core::mem::size_of::<$typ>();
 
-                // Since we don't have a #[bits] or [bytes], check if we can use bytes for perf
-                if (bit_size.0 % 8) == 0 {
-                    <$typ>::read(input, (endian, ByteSize(bit_size.0 / 8)))
-                } else {
-                    <$typ>::read(input, (endian, bit_size))
-                }
+                <$typ>::read(input, (endian, ByteSize(byte_size)))
             }
         }
 
@@ -375,15 +370,9 @@ macro_rules! ForwardDekuRead {
                 container: &mut crate::container::Container<R>,
                 endian: Endian,
             ) -> Result<$typ, DekuError> {
-                let bit_size = BitSize::of::<$typ>();
+                let byte_size = core::mem::size_of::<$typ>();
 
-                // Since we don't have a #[bits] or [bytes], check if we can use bytes for perf
-                let a = if (bit_size.0 % 8) == 0 {
-                    <$typ>::from_reader(container, (endian, ByteSize(bit_size.0 / 8)))?
-                } else {
-                    <$typ>::from_reader(container, (endian, bit_size))?
-                };
-                Ok(a)
+                <$typ>::from_reader(container, (endian, ByteSize(byte_size)))
             }
         }
 

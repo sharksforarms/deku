@@ -1,18 +1,15 @@
 //! Implementations of DekuRead and DekuWrite for [T; N] where 0 < N <= 32
 
-use bitvec::prelude::*;
 pub use deku_derive::*;
-
-use crate::{DekuError, DekuRead, DekuWrite};
 
 #[cfg(feature = "const_generics")]
 mod const_generics_impl {
+    use crate::{DekuError, DekuRead, DekuWrite};
+    use bitvec::prelude::*;
     use core::mem::MaybeUninit;
     use std::io::Read;
 
     use crate::DekuReader;
-
-    use super::*;
 
     impl<'a, Ctx: Copy, T, const N: usize> DekuRead<'a, Ctx> for [T; N]
     where
@@ -121,8 +118,9 @@ mod const_generics_impl {
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
+    use crate::{DekuRead, DekuWrite};
+    use bitvec::prelude::*;
 
-    use super::*;
     use crate::{container::Container, ctx::Endian, DekuReader};
 
     #[rstest(input,endian,expected,expected_rest,

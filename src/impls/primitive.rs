@@ -1,5 +1,7 @@
 #[cfg(feature = "alloc")]
 use alloc::format;
+#[cfg(feature = "alloc")]
+use alloc::string::ToString;
 use core::convert::TryInto;
 
 use acid_io::Read;

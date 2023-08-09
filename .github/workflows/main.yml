@@ -112,7 +112,8 @@ jobs:
         with:
           toolchain: nightly
           override: true
-      - run: cd ensure_no_std && cargo run --release
+          target: thumbv7em-none-eabihf
+      - run: cd ensure_no_std && cargo build --release --target thumbv7em-none-eabihf
 
   ensure_wasm:
     name: Ensure wasm

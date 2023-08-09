@@ -117,9 +117,9 @@ mod const_generics_impl {
 
 #[cfg(test)]
 mod tests {
-    use rstest::rstest;
     use crate::{DekuRead, DekuWrite};
     use bitvec::prelude::*;
+    use rstest::rstest;
 
     use crate::{container::Container, ctx::Endian, DekuReader};
 

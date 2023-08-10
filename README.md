@@ -30,6 +30,8 @@ no_std:
 deku = { version = "0.16", default-features = false, features = ["alloc"] }
 ```
 
+*Compiler support: requires rustc 1.65+*
+
 ## Example
 
 See [documentation](https://docs.rs/deku) or

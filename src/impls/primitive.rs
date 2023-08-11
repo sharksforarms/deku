@@ -299,6 +299,7 @@ macro_rules! ImplDekuReadSignExtend {
                 container: &mut crate::container::Container<R>,
                 (endian, size): (Endian, ByteSize),
             ) -> Result<$typ, DekuError> {
+                // TODO: read ByteSize
                 let bits = container.read_bits(size.0 * 8)?;
                 let Some(bits) = bits else {
                             return Err(DekuError::Parse(format!("no bits read from reader",)));

@@ -41,6 +41,37 @@ impl<R: Read> Container<R> {
         }
     }
 
+    /// Inner [`Read`]er
+    #[inline]
+    pub fn reader(&mut self) -> &mut R {
+        &mut self.inner
+    }
+
+    /// Return true if we are at the end of a reader and there are no cached bits in the container
+    #[inline]
+    pub fn end(&mut self) -> bool {
+        if !self.leftover.is_empty() {
+            #[cfg(feature = "logging")]
+            log::trace!("not end");
+            false
+        } else {
+            let mut buf = [0; 1];
+            if let Err(e) = self.inner.read_exact(&mut buf) {
+                if e.kind() == acid_io::ErrorKind::UnexpectedEof {
+                    #[cfg(feature = "logging")]
+                    log::trace!("end");
+                    return true;
+                }
+            }
+
+            // logic is best if we just turn this into bits right now
+            self.leftover = BitVec::try_from_slice(&buf).unwrap();
+            #[cfg(feature = "logging")]
+            log::trace!("not end");
+            false
+        }
+    }
+
     /// Used at the beginning of `from_bytes`. Will read the `amt` of bits, but
     /// not increase bits_read.
     #[inline]

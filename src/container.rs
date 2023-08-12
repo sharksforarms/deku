@@ -217,6 +217,15 @@ mod tests {
     }
 
     #[test]
+    fn test_bits_less() {
+        let input = hex!("aa");
+        let mut container = Container::new(&input[..]);
+        let _ = container.read_bits(4);
+        let _ = container.read_bits(3);
+        let _ = container.read_bits(1);
+    }
+
+    #[test]
     fn test_inner() {
         let input = hex!("aabbcc");
         let mut container = Container::new(&input[..]);

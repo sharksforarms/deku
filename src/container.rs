@@ -41,13 +41,17 @@ impl<R: Read> Container<R> {
         }
     }
 
-    /// Inner [`Read`]er
+    /// Consume and return `Read`]
+    ///
+    /// This will not return previous bit reads that are buffered within [`Container`]
     #[inline]
-    pub fn reader(&mut self) -> &mut R {
-        &mut self.inner
+    pub fn inner(self) -> R {
+        self.inner
     }
 
     /// Return true if we are at the end of a reader and there are no cached bits in the container
+    ///
+    /// The byte that was read will be internally buffered
     #[inline]
     pub fn end(&mut self) -> bool {
         if !self.leftover.is_empty() {
@@ -86,7 +90,7 @@ impl<R: Read> Container<R> {
     }
 
     /// Attempt to read bits from `Container`. This will always return a `BitVec` and will
-    /// correctly add previously read and stored "leftover" bits from previous reads.
+    /// correctly add previously read and store "leftover" bits from previous reads.
     ///
     /// # Guarantees
     /// - if Some(bits), the returned `BitVec` will have the size of `amt` and
@@ -186,5 +190,42 @@ impl<R: Read> Container<R> {
         } else {
             Ok(ContainerRet::Bits(self.read_bits(amt * 8)?))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hexlit::hex;
+    use super::*;
+
+    #[test]
+    fn test_end() {
+        let input = hex!("aa");
+        let mut container = Container::new(&input[..]);
+        assert!(!container.end());
+        let mut buf = [0; 1];
+        let _ = container.read_bytes(1, &mut buf);
+        assert!(container.end());
+
+        let input = hex!("aa");
+        let mut container = Container::new(&input[..]);
+        assert!(!container.end());
+        let _ = container.read_bits(4);
+        assert!(!container.end());
+        let _ = container.read_bits(4);
+        assert!(container.end());
+    }
+
+    #[test]
+    fn test_inner() {
+        let input = hex!("aabbcc");
+        let mut container = Container::new(&input[..]);
+        let mut buf = [0; 1];
+        let _ = container.read_bytes(1, &mut buf);
+
+        let mut inner = container.inner();
+        let mut v = vec![];
+        inner.read_to_end(&mut v).unwrap();
+        assert_eq!(&*v, &[0xbb, 0xcc]);
     }
 }

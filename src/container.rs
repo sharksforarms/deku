@@ -195,8 +195,8 @@ impl<R: Read> Container<R> {
 
 #[cfg(test)]
 mod tests {
-    use hexlit::hex;
     use super::*;
+    use hexlit::hex;
 
     #[test]
     fn test_end() {

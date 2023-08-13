@@ -138,6 +138,9 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
 
+        let res_read = Ipv6Addr::from_reader(&mut Container::new(input), endian).unwrap();
+        assert_eq!(expected, res_read);
+
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, endian).unwrap();
         assert_eq!(input.to_vec(), res_write.into_vec());

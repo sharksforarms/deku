@@ -6,6 +6,8 @@ use acid_io::{self, Read};
 use bitvec::prelude::*;
 
 use crate::{prelude::NeedSize, DekuError};
+use alloc::vec;
+use alloc::vec::Vec;
 
 #[cfg(feature = "logging")]
 use log;
@@ -25,6 +27,8 @@ pub struct Container<R: Read> {
     leftover: BitVec<u8, Msb0>,
     /// Amount of bits read during the use of `read_bits` and `read_bytes`.
     pub bits_read: usize,
+    /// If function `enable_read_cache` is used, this field will contain all bytes that were read
+    pub read_cache: Option<Vec<u8>>,
 }
 
 /// Max bits requested from [`read_bits`] during one call
@@ -38,6 +42,7 @@ impl<R: Read> Container<R> {
             inner,
             leftover: BitVec::new(), // with_capacity 8?
             bits_read: 0,
+            read_cache: None,
         }
     }
 
@@ -47,6 +52,13 @@ impl<R: Read> Container<R> {
     #[inline]
     pub fn inner(self) -> R {
         self.inner
+    }
+
+    /// Enable `sef.read_cache` to be filled with all bytes that were read after calling this
+    /// function.
+    #[inline]
+    pub fn enable_read_cache(&mut self) {
+        self.read_cache = Some(vec![]);
     }
 
     /// Return true if we are at the end of a reader and there are no cached bits in the container
@@ -136,11 +148,17 @@ impl<R: Read> Container<R> {
 
                     // TODO: other errors?
                 }
+                let read_buf = &buf[..bytes_len];
+
+                if let Some(cache) = &mut self.read_cache {
+                    cache.append(&mut read_buf.to_vec());
+                }
+
                 #[cfg(feature = "logging")]
-                log::trace!("read_bits: read() {:02x?}", &buf[..bytes_len]);
+                log::trace!("read_bits: read() {:02x?}", read_buf);
 
                 // create bitslice and remove unused bits
-                let rest = BitSlice::try_from_slice(&buf[..bytes_len]).unwrap();
+                let rest = BitSlice::try_from_slice(read_buf).unwrap();
                 let (rest, not_needed) = rest.split_at(bits_left);
                 core::mem::swap(&mut not_needed.to_bitvec(), &mut self.leftover);
 
@@ -183,9 +201,16 @@ impl<R: Read> Container<R> {
 
                 // TODO: other errors?
             }
+
+            if let Some(cache) = &mut self.read_cache {
+                cache.append(&mut buf[..amt].to_vec());
+            }
+
             self.bits_read += amt * 8;
+
             #[cfg(feature = "logging")]
             log::trace!("read_bytes: returning {buf:02x?}");
+
             Ok(ContainerRet::Bytes)
         } else {
             Ok(ContainerRet::Bits(self.read_bits(amt * 8)?))
@@ -220,17 +245,22 @@ mod tests {
     fn test_bits_less() {
         let input = hex!("aa");
         let mut container = Container::new(&input[..]);
+        container.enable_read_cache();
+        let _ = container.read_bits(1);
+        assert_eq!(&vec![0xaa], container.read_cache.as_ref().unwrap());
         let _ = container.read_bits(4);
         let _ = container.read_bits(3);
-        let _ = container.read_bits(1);
+        assert_eq!(&vec![0xaa], container.read_cache.as_ref().unwrap());
     }
 
     #[test]
     fn test_inner() {
         let input = hex!("aabbcc");
         let mut container = Container::new(&input[..]);
+        container.enable_read_cache();
         let mut buf = [0; 1];
         let _ = container.read_bytes(1, &mut buf);
+        assert_eq!(&vec![0xaa], container.read_cache.as_ref().unwrap());
 
         let mut inner = container.inner();
         let mut v = vec![];

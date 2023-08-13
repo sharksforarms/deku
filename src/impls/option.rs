@@ -51,3 +51,17 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Option<T> {
         self.as_ref().map_or(Ok(()), |v| v.write(output, inner_ctx))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_option() {
+        use crate::bitvec::BitView;
+        use crate::ctx::*;
+        use crate::DekuRead;
+        let input = [1u8, 2, 3, 4];
+        let (amt_read, v) = Option::<u32>::read(input.view_bits(), Endian::Little).unwrap();
+        assert_eq!(amt_read, 32);
+        assert_eq!(v, Some(0x04030201))
+    }
+}

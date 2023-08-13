@@ -299,13 +299,30 @@ macro_rules! ImplDekuReadSignExtend {
                 container: &mut crate::container::Container<R>,
                 (endian, size): (Endian, ByteSize),
             ) -> Result<$typ, DekuError> {
-                // TODO: read ByteSize
-                let bits = container.read_bits(size.0 * 8)?;
-                let Some(bits) = bits else {
-                            return Err(DekuError::Parse(format!("no bits read from reader",)));
+                let mut buf = [0; core::mem::size_of::<$typ>()];
+                let ret = container.read_bytes(size.0, &mut buf)?;
+                let a = match ret {
+                    ContainerRet::Bits(bits) => {
+                        let Some(bits) = bits else {
+                            return Err(DekuError::Parse("no bits read from reader".to_string()));
                         };
-                let a = <$typ>::read(&bits, (endian, size))?;
-                Ok(a.1)
+                        let a = <$typ>::read(&bits, (endian, size))?;
+                        a.1
+                    }
+                    ContainerRet::Bytes => {
+                        if endian.is_le() {
+                            <$typ>::from_le_bytes(buf.try_into()?)
+                        } else {
+                            <$typ>::from_be_bytes(buf.try_into()?)
+                        }
+                    }
+                };
+
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                let bit_size = size.0 * 8;
+                let shift = MAX_TYPE_BITS - bit_size;
+                let value = (a as $typ) << shift >> shift;
+                Ok(value)
             }
         }
 

@@ -106,3 +106,47 @@ fn test_enum_array_type() {
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(input.to_vec(), ret_write);
 }
+
+#[test]
+fn test_id_pat_with_id() {
+    // In these tests, the id_pat is already stored in the previous read to `my_id`, so we don't
+    // use that for the next reading...
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    pub struct DekuTest {
+        my_id: u8,
+        #[deku(ctx = "*my_id")]
+        enum_from_id: MyEnum,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(ctx = "my_id: u8", id = "my_id")]
+    pub enum MyEnum {
+        #[deku(id_pat = "1..=2")]
+        VariantA(u8),
+        #[deku(id_pat = "_")]
+        VariantB,
+    }
+
+    let input = &[0x01, 0x02];
+    let (_, v) = DekuTest::from_bytes((input, 0)).unwrap();
+    assert_eq!(
+        v,
+        DekuTest {
+            my_id: 0x01,
+            enum_from_id: MyEnum::VariantA(2)
+        }
+    );
+    assert_eq!(input, &*v.to_bytes().unwrap());
+
+    let input = &[0x05];
+    let (_, v) = DekuTest::from_bytes((input, 0)).unwrap();
+    assert_eq!(
+        v,
+        DekuTest {
+            my_id: 0x05,
+            enum_from_id: MyEnum::VariantB
+        }
+    );
+    assert_eq!(input, &*v.to_bytes().unwrap());
+}

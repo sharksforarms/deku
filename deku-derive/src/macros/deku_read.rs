@@ -173,9 +173,15 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 Id::LitByteStr(v) => (false, v.into_token_stream()),
             }
         } else if let Some(variant_id_pat) = &variant.id_pat {
-            // if set, the first field read will not read from reader and instead
-            // be __deku_variant_id
-            (true, variant_id_pat.clone())
+            // If user has supplied an id, then we have an id_pat that and the id variant doesn't
+            // need read into an id value
+            if id.is_none() {
+                // if set, the first field read will not read from reader and instead
+                // be __deku_variant_id
+                (true, variant_id_pat.clone())
+            } else {
+                (false, variant_id_pat.clone())
+            }
         } else if has_discriminant {
             let ident = &variant.ident;
             let internal_ident = gen_internal_field_ident(&quote!(#ident));

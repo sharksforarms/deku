@@ -33,7 +33,7 @@ pub struct DekuTest {
 }
 
 #[wasm_bindgen]
-pub fn deku_read(input: &[u8]) -> DekuTest {
+pub fn deku_read(input: &mut [u8]) -> DekuTest {
     let (_rest, val) = DekuTest::from_bytes((input, 0)).unwrap();
 
     val

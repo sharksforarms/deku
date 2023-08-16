@@ -133,13 +133,14 @@ mod tests {
         expected: [u16; 2],
         expected_rest: &BitSlice<u8, Msb0>,
     ) {
-        let bit_slice = input.view_bits::<Msb0>();
+        let mut bit_slice = input.view_bits::<Msb0>();
 
         let (amt_read, res_read) = <[u16; 2]>::read(bit_slice, endian).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
 
-        let res_read = <[u16; 2]>::from_reader(&mut Container::new(bit_slice), endian).unwrap();
+        let mut container = Container::new(&mut bit_slice);
+        let res_read = <[u16; 2]>::from_reader(&mut container, endian).unwrap();
         assert_eq!(expected, res_read);
     }
 
@@ -180,6 +181,8 @@ mod tests {
         expected: [[u16; 2]; 2],
         expected_rest: &BitSlice<u8, Msb0>,
     ) {
+        use acid_io::Cursor;
+
         use crate::container::Container;
 
         let bit_slice = input.view_bits::<Msb0>();
@@ -188,7 +191,9 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
 
-        let res_read = <[[u16; 2]; 2]>::from_reader(&mut Container::new(input), endian).unwrap();
+        let mut cursor = Cursor::new(input);
+        let mut container = Container::new(&mut cursor);
+        let res_read = <[[u16; 2]; 2]>::from_reader(&mut container, endian).unwrap();
         assert_eq!(expected, res_read);
     }
 

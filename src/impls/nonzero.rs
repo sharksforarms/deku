@@ -94,12 +94,13 @@ mod tests {
         case(&hex!("00"), NonZeroU8::new(0xFF).unwrap()),
     )]
     fn test_non_zero(input: &[u8], expected: NonZeroU8) {
-        let bit_slice = input.view_bits::<Msb0>();
+        let mut bit_slice = input.view_bits::<Msb0>();
         let (amt_read, res_read) = NonZeroU8::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
         assert!(bit_slice[amt_read..].is_empty());
 
-        let res_read = NonZeroU8::from_reader(&mut Container::new(bit_slice), ()).unwrap();
+        let mut container = Container::new(&mut bit_slice);
+        let res_read = NonZeroU8::from_reader(&mut container, ()).unwrap();
         assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

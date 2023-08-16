@@ -48,6 +48,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use acid_io::Cursor;
     use rstest::rstest;
 
     use super::*;
@@ -66,7 +67,9 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
 
-        let res_read = <Cow<u16>>::from_reader(&mut Container::new(input), ()).unwrap();
+        let mut cursor = Cursor::new(input);
+        let mut container = Container::new(&mut cursor);
+        let res_read = <Cow<u16>>::from_reader(&mut container, ()).unwrap();
         assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

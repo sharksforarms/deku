@@ -93,6 +93,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use acid_io::Cursor;
     use rstest::rstest;
 
     use super::*;
@@ -114,7 +115,9 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
 
-        let res_read = Ipv4Addr::from_reader(&mut Container::new(input), endian).unwrap();
+        let mut cursor = Cursor::new(input);
+        let mut container = Container::new(&mut cursor);
+        let res_read = Ipv4Addr::from_reader(&mut container, endian).unwrap();
         assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];
@@ -138,7 +141,9 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
 
-        let res_read = Ipv6Addr::from_reader(&mut Container::new(input), endian).unwrap();
+        let mut cursor = Cursor::new(input);
+        let mut container = Container::new(&mut cursor);
+        let res_read = Ipv6Addr::from_reader(&mut container, endian).unwrap();
         assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

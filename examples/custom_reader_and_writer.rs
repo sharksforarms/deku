@@ -57,7 +57,7 @@ struct DekuTest {
 }
 
 fn main() {
-    let test_data: &[u8] = [0x01, 0b1001_0110].as_ref();
+    let test_data: &mut [u8] = &mut [0x01, 0b1001_0110];
 
     let (_rest, ret_read) = DekuTest::from_bytes((test_data, 0)).unwrap();
 

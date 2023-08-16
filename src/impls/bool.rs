@@ -63,6 +63,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use acid_io::Cursor;
     use hexlit::hex;
     use rstest::rstest;
 
@@ -77,10 +78,21 @@ mod tests {
         #[should_panic(expected = "Parse(\"cannot parse bool value: 2\")")]
         case(&hex!("02"), false),
     )]
-    fn test_bool(input: &[u8], expected: bool) {
-        let res_read = bool::from_reader(&mut Container::new(input), ()).unwrap();
+    fn test_bool(mut input: &[u8], expected: bool) {
+        let mut container = Container::new(&mut input);
+        let res_read = bool::from_reader(&mut container, ()).unwrap();
         assert_eq!(expected, res_read);
+    }
 
+    #[rstest(input, expected,
+        case(&hex!("00"), false),
+        case(&hex!("01"), true),
+
+        #[should_panic(expected = "Parse(\"cannot parse bool value: 2\")")]
+        case(&hex!("02"), false),
+    )]
+    fn test_bool_read(mut input: &[u8], expected: bool) {
+        let mut container = Container::new(&mut input);
         let bit_slice = input.view_bits::<Msb0>();
         let (amt_read, res_read) = bool::read(bit_slice, ()).unwrap();
         assert_eq!(expected, res_read);
@@ -100,11 +112,9 @@ mod tests {
         assert!(res_read);
         assert_eq!(amt_read, 2);
 
-        let res_read = bool::from_reader(
-            &mut Container::new(std::io::Cursor::new(input)),
-            crate::ctx::BitSize(2),
-        )
-        .unwrap();
+        let mut cursor = Cursor::new(input);
+        let mut container = Container::new(&mut cursor);
+        let res_read = bool::from_reader(&mut container, crate::ctx::BitSize(2)).unwrap();
         assert!(res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

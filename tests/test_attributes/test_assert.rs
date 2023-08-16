@@ -12,15 +12,15 @@ struct TestStruct {
 }
 
 #[rstest(input, expected,
-    case(&hex!("0102"), TestStruct {
+    case(&mut hex!("0102"), TestStruct {
         field_a: 0x01,
         field_b: 0x02,
     }),
 
     #[should_panic(expected = r#"Assertion("TestStruct.field_b field failed assertion: * field_a + * field_b >= 3")"#)]
-    case(&hex!("0101"), TestStruct::default())
+    case(&mut hex!("0101"), TestStruct::default())
 )]
-fn test_assert_read(input: &[u8], expected: TestStruct) {
+fn test_assert_read(input: &mut [u8], expected: TestStruct) {
     let ret_read = TestStruct::try_from(input).unwrap();
     assert_eq!(expected, ret_read);
 }

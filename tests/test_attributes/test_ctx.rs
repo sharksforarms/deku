@@ -29,9 +29,9 @@ fn test_ctx_struct() {
         c: SubTypeNeedCtx,
     }
 
-    let test_data = [0x01_u8, 0x02, 0x03];
+    let mut test_data = [0x01_u8, 0x02, 0x03];
 
-    let ret_read = FieldLevelCtxStruct::try_from(&test_data[..]).unwrap();
+    let ret_read = FieldLevelCtxStruct::try_from(test_data.as_mut_slice()).unwrap();
     assert_eq!(
         ret_read,
         FieldLevelCtxStruct {
@@ -62,9 +62,10 @@ fn test_top_level_ctx_enum() {
         ),
     }
 
-    let test_data = [0x01_u8, 0x03];
+    let mut test_data = [0x01_u8, 0x03];
     let ret_read =
-        TopLevelCtxEnum::from_reader(&mut Container::new(Cursor::new(test_data)), (1, 2)).unwrap();
+        TopLevelCtxEnum::from_reader(&mut Container::new(&mut Cursor::new(test_data)), (1, 2))
+            .unwrap();
     assert_eq!(ret_read, TopLevelCtxEnum::VariantA(0x06));
 
     let mut ret_write = bitvec![u8, Msb0;];
@@ -88,18 +89,20 @@ fn test_top_level_ctx_enum_default() {
     }
 
     let expected = TopLevelCtxEnumDefault::VariantA(0x06);
-    let test_data = [0x01_u8, 0x03];
+    let mut test_data = [0x01_u8, 0x03];
 
     // Use default
-    let ret_read = TopLevelCtxEnumDefault::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TopLevelCtxEnumDefault::try_from(test_data.as_mut_slice()).unwrap();
     assert_eq!(expected, ret_read);
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(test_data.to_vec(), ret_write);
 
     // Use context
-    let ret_read =
-        TopLevelCtxEnumDefault::from_reader(&mut Container::new(Cursor::new(test_data)), (1, 2))
-            .unwrap();
+    let ret_read = TopLevelCtxEnumDefault::from_reader(
+        &mut Container::new(&mut Cursor::new(test_data)),
+        (1, 2),
+    )
+    .unwrap();
     assert_eq!(ret_read, TopLevelCtxEnumDefault::VariantA(0x06));
     let mut ret_write = bitvec![u8, Msb0;];
     ret_read.write(&mut ret_write, (1, 2)).unwrap();
@@ -140,8 +143,8 @@ fn test_struct_enum_ctx_id() {
     }
 
     // VarA
-    let test_data = [0x01_u8, 0x01, 0xab, 0xab];
-    let ret_read = StructEnumId::try_from(test_data.as_ref()).unwrap();
+    let mut test_data = [0x01_u8, 0x01, 0xab, 0xab];
+    let ret_read = StructEnumId::try_from(test_data.as_mut_slice()).unwrap();
 
     assert_eq!(
         StructEnumId {
@@ -157,8 +160,8 @@ fn test_struct_enum_ctx_id() {
     assert_eq!(ret_write, test_data);
 
     // VarB
-    let test_data = [0x02_u8, 0x02];
-    let ret_read = StructEnumId::try_from(test_data.as_ref()).unwrap();
+    let mut test_data = [0x02_u8, 0x02];
+    let ret_read = StructEnumId::try_from(test_data.as_mut_slice()).unwrap();
 
     assert_eq!(
         StructEnumId {
@@ -174,8 +177,8 @@ fn test_struct_enum_ctx_id() {
     assert_eq!(ret_write, test_data);
 
     // VarC
-    let test_data = [0x02_u8, 0x03, 0xcc];
-    let (_, ret_read) = StructEnumId::from_bytes((test_data.as_ref(), 0)).unwrap();
+    let mut test_data = [0x02_u8, 0x03, 0xcc];
+    let (_, ret_read) = StructEnumId::from_bytes((test_data.as_mut_slice(), 0)).unwrap();
 
     assert_eq!(
         StructEnumId {
@@ -207,18 +210,20 @@ fn test_ctx_default_struct() {
         b: None,
     };
 
-    let test_data = [0xffu8];
+    let mut test_data = [0xffu8];
 
     // Use default
-    let ret_read = TopLevelCtxStructDefault::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TopLevelCtxStructDefault::try_from(test_data.as_mut_slice()).unwrap();
     assert_eq!(expected, ret_read);
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(ret_write, test_data);
 
     // Use context
-    let ret_read =
-        TopLevelCtxStructDefault::from_reader(&mut Container::new(Cursor::new(test_data)), (1, 2))
-            .unwrap();
+    let ret_read = TopLevelCtxStructDefault::from_reader(
+        &mut Container::new(&mut Cursor::new(test_data)),
+        (1, 2),
+    )
+    .unwrap();
     assert_eq!(expected, ret_read);
     let mut ret_write = bitvec![u8, Msb0;];
     ret_read.write(&mut ret_write, (1, 2)).unwrap();
@@ -240,8 +245,8 @@ fn test_enum_endian_ctx() {
         t: EnumTypeEndianCtx,
     }
 
-    let test_data = [0xdeu8, 0xad, 0xbe, 0xef, 0xff];
-    let ret_read = EnumTypeEndian::try_from(test_data.as_ref()).unwrap();
+    let mut test_data = [0xdeu8, 0xad, 0xbe, 0xef, 0xff];
+    let ret_read = EnumTypeEndian::try_from(test_data.as_mut_slice()).unwrap();
 
     assert_eq!(
         EnumTypeEndian {

@@ -32,21 +32,22 @@ enum TestEnum {
 }
 
 #[rstest(input,expected,
-    case(&hex!("01AB"), TestEnum::VarA(0xAB)),
-    case(&hex!("0269"), TestEnum::VarB(0b0110, 0b1001)),
-    case(&hex!("0302AABB"), TestEnum::VarC{field_a: 0x02, field_b: vec![0xAA, 0xBB]}),
-    case(&hex!("0402AABB"), TestEnum::VarD(0x02, vec![0xAA, 0xBB])),
-    case(&hex!("FF01"), TestEnum::VarDefault{id: 0xFF, value: 0x01}),
+    case(&mut hex!("01AB"), TestEnum::VarA(0xAB)),
+    case(&mut hex!("0269"), TestEnum::VarB(0b0110, 0b1001)),
+    case(&mut hex!("0302AABB"), TestEnum::VarC{field_a: 0x02, field_b: vec![0xAA, 0xBB]}),
+    case(&mut hex!("0402AABB"), TestEnum::VarD(0x02, vec![0xAA, 0xBB])),
+    case(&mut hex!("FF01"), TestEnum::VarDefault{id: 0xFF, value: 0x01}),
 
     #[should_panic(expected = "Parse(\"Too much data\")")]
-    case(&hex!("FFFFFF"), TestEnum::VarA(0xFF)),
+    case(&mut hex!("FFFFFF"), TestEnum::VarA(0xFF)),
 )]
-fn test_enum(input: &[u8], expected: TestEnum) {
-    let ret_read = TestEnum::try_from(input).unwrap();
+fn test_enum(input: &mut [u8], expected: TestEnum) {
+    let mut input = input.to_vec();
+    let ret_read = TestEnum::try_from(input.as_mut_slice()).unwrap();
     assert_eq!(expected, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(input.to_vec(), ret_write);
+    assert_eq!(input, ret_write);
 }
 
 #[test]
@@ -59,8 +60,8 @@ fn test_enum_error() {
         VarA(u8),
     }
 
-    let test_data: Vec<u8> = [0x02, 0x02].to_vec();
-    let _ret_read = TestEnum::try_from(test_data.as_ref()).unwrap();
+    let test_data = &mut [0x02, 0x02];
+    let _ret_read = TestEnum::try_from(test_data.as_mut_slice()).unwrap();
 }
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -72,19 +73,20 @@ enum TestEnumDiscriminant {
 }
 
 #[rstest(input, expected,
-    case(&hex!("00"), TestEnumDiscriminant::VarA),
-    case(&hex!("01"), TestEnumDiscriminant::VarB),
-    case(&hex!("02"), TestEnumDiscriminant::VarC),
+    case(&mut hex!("00"), TestEnumDiscriminant::VarA),
+    case(&mut hex!("01"), TestEnumDiscriminant::VarB),
+    case(&mut hex!("02"), TestEnumDiscriminant::VarC),
 
     #[should_panic(expected = "Could not match enum variant id = 3 on enum `TestEnumDiscriminant`")]
-    case(&hex!("03"), TestEnumDiscriminant::VarA),
+    case(&mut hex!("03"), TestEnumDiscriminant::VarA),
 )]
-fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
-    let ret_read = TestEnumDiscriminant::try_from(input).unwrap();
+fn test_enum_discriminant(input: &mut [u8], expected: TestEnumDiscriminant) {
+    let mut input = input.to_vec();
+    let ret_read = TestEnumDiscriminant::try_from(input.as_mut_slice()).unwrap();
     assert_eq!(expected, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(input.to_vec(), ret_write);
+    assert_eq!(input, ret_write);
 }
 
 #[test]
@@ -98,9 +100,9 @@ fn test_enum_array_type() {
         VarB,
     }
 
-    let input = b"123".as_ref();
+    let mut input = b"123".to_vec();
 
-    let ret_read = TestEnumArray::try_from(input).unwrap();
+    let ret_read = TestEnumArray::try_from(input.as_mut_slice()).unwrap();
     assert_eq!(TestEnumArray::VarA, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
@@ -128,7 +130,7 @@ fn test_id_pat_with_id() {
         VariantB,
     }
 
-    let input = &[0x01, 0x02];
+    let input = &mut [0x01, 0x02];
     let (_, v) = DekuTest::from_bytes((input, 0)).unwrap();
     assert_eq!(
         v,
@@ -139,7 +141,7 @@ fn test_id_pat_with_id() {
     );
     assert_eq!(input, &*v.to_bytes().unwrap());
 
-    let input = &[0x05];
+    let input = &mut [0x05];
     let (_, v) = DekuTest::from_bytes((input, 0)).unwrap();
     assert_eq!(
         v,

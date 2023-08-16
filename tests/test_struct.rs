@@ -35,8 +35,8 @@ fn test_read_too_much_data() {
         pub field_a: u8,
     }
 
-    let test_data = [0u8; 100].as_ref();
-    TestStruct::try_from(test_data).unwrap();
+    let mut test_data = [0u8; 100];
+    TestStruct::try_from(test_data.as_mut_slice()).unwrap();
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn test_unnamed_struct() {
         #[deku(count = "field_6")] pub Vec<u8>,
     );
 
-    let test_data: Vec<u8> = [
+    let mut test_data: Vec<u8> = [
         0xff,
         0b1001_0110,
         0xaa,
@@ -70,7 +70,7 @@ fn test_unnamed_struct() {
     .to_vec();
 
     // Read
-    let ret_read = TestUnamedStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestUnamedStruct::try_from(test_data.as_mut_slice()).unwrap();
     assert_eq!(
         TestUnamedStruct(
             0xff,
@@ -116,7 +116,7 @@ fn test_named_struct() {
         pub vec_data: Vec<u8>,
     }
 
-    let test_data: Vec<u8> = [
+    let mut test_data: Vec<u8> = [
         0xff,
         0b1001_0110,
         0xaa,
@@ -133,7 +133,7 @@ fn test_named_struct() {
     .to_vec();
 
     // Read
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: 0xff,
@@ -166,10 +166,10 @@ fn test_raw_identifiers_struct() {
         pub r#type: u8,
     }
 
-    let test_data: Vec<u8> = [0xff].to_vec();
+    let mut test_data: Vec<u8> = [0xff].to_vec();
 
     // Read
-    let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
     assert_eq!(TestStruct { r#type: 0xff }, ret_read);
 
     // Write

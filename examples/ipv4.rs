@@ -1,4 +1,4 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::net::Ipv4Addr;
 
 use deku::prelude::*;
@@ -51,7 +51,8 @@ pub struct Ipv4Header {
 fn main() {
     let test_data = hex!("4500004b0f490000801163a591fea0ed91fd02cb").to_vec();
 
-    let mut container = deku::container::Container::new(std::io::Cursor::new(test_data.clone()));
+    let mut cursor = std::io::Cursor::new(test_data.clone());
+    let mut container = deku::container::Container::new(&mut cursor);
     let ip_header = Ipv4Header::from_reader(&mut container, ()).unwrap();
 
     assert_eq!(

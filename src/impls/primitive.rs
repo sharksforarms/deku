@@ -352,13 +352,14 @@ macro_rules! ImplDekuReadSignExtend {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 if size.0 > MAX_TYPE_BITS {
                     return Err(DekuError::Parse(format!(
-                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits", size.0
+                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits",
+                        size.0
                     )));
                 }
                 let bits = container.read_bits(size.0)?;
                 let Some(bits) = bits else {
-                            return Err(DekuError::Parse(format!("no bits read from reader",)));
-                        };
+                    return Err(DekuError::Parse(format!("no bits read from reader",)));
+                };
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
             }
@@ -693,11 +694,12 @@ mod tests {
             #[test]
             fn $test_name() {
                 let input = $input;
-                let bit_slice = input.view_bits::<Msb0>();
+                let mut bit_slice = input.view_bits::<Msb0>();
                 let (_rest, res_read) = <$typ>::read(bit_slice, ENDIAN).unwrap();
                 assert_eq!($expected, res_read);
 
-                let res_read = <$typ>::from_reader(&mut Container::new(bit_slice), ENDIAN).unwrap();
+                let mut container = Container::new(&mut bit_slice);
+                let res_read = <$typ>::from_reader(&mut container, ENDIAN).unwrap();
                 assert_eq!($expected, res_read);
 
                 let mut res_write = bitvec![u8, Msb0;];
@@ -827,12 +829,13 @@ mod tests {
         case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(64), 0xFF, bits![u8, Msb0;]),
     )]
     fn test_bit_read(
-        input: &[u8],
+        mut input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
         expected: u32,
         expected_rest: &BitSlice<u8, Msb0>,
     ) {
+        let mut input_clone = input.clone();
         let bit_slice = input.view_bits::<Msb0>();
 
         let (amt_read, res_read) = match bit_size {
@@ -843,20 +846,21 @@ mod tests {
         assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         // test both Read &[u8] and Read BitVec
+        let mut container = Container::new(&mut input);
         let res_read = match bit_size {
             Some(bit_size) => {
-                u32::from_reader(&mut Container::new(input), (endian, BitSize(bit_size))).unwrap()
+                u32::from_reader(&mut container, (endian, BitSize(bit_size))).unwrap()
             }
-            None => u32::from_reader(&mut Container::new(input), endian).unwrap(),
+            None => u32::from_reader(&mut container, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
 
+        let mut container = Container::new(&mut input_clone);
         let res_read = match bit_size {
             Some(bit_size) => {
-                u32::from_reader(&mut Container::new(bit_slice), (endian, BitSize(bit_size)))
-                    .unwrap()
+                u32::from_reader(&mut container, (endian, BitSize(bit_size))).unwrap()
             }
-            None => u32::from_reader(&mut Container::new(bit_slice), endian).unwrap(),
+            None => u32::from_reader(&mut container, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
     }
@@ -874,13 +878,13 @@ mod tests {
         case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(8), 0xFF, bits![u8, Msb0;]),
     )]
     fn test_byte_read(
-        input: &[u8],
+        mut input: &[u8],
         endian: Endian,
         byte_size: Option<usize>,
         expected: u32,
         expected_rest: &BitSlice<u8, Msb0>,
     ) {
-        let bit_slice = input.view_bits::<Msb0>();
+        let mut bit_slice = input.view_bits::<Msb0>();
 
         let (amt_read, res_read) = match byte_size {
             Some(bit_size) => u32::read(bit_slice, (endian, ByteSize(bit_size))).unwrap(),
@@ -890,21 +894,21 @@ mod tests {
         assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         // test both Read &[u8] and Read BitVec
+        let mut container = Container::new(&mut input);
         let res_read = match byte_size {
             Some(byte_size) => {
-                u32::from_reader(&mut Container::new(input), (endian, ByteSize(byte_size))).unwrap()
+                u32::from_reader(&mut container, (endian, ByteSize(byte_size))).unwrap()
             }
-            None => u32::from_reader(&mut Container::new(input), endian).unwrap(),
+            None => u32::from_reader(&mut container, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
 
+        let mut container = Container::new(&mut bit_slice);
         let res_read = match byte_size {
-            Some(byte_size) => u32::from_reader(
-                &mut Container::new(bit_slice),
-                (endian, ByteSize(byte_size)),
-            )
-            .unwrap(),
-            None => u32::from_reader(&mut Container::new(bit_slice), endian).unwrap(),
+            Some(byte_size) => {
+                u32::from_reader(&mut container, (endian, ByteSize(byte_size))).unwrap()
+            }
+            None => u32::from_reader(&mut container, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
     }
@@ -939,7 +943,7 @@ mod tests {
         expected_rest: &BitSlice<u8, Msb0>,
         expected_write: Vec<u8>,
     ) {
-        let bit_slice = input.view_bits::<Msb0>();
+        let mut bit_slice = input.view_bits::<Msb0>();
 
         let (amt_read, res_read) = match bit_size {
             Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
@@ -948,12 +952,12 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(expected_rest, bit_slice[amt_read..]);
 
+        let mut container = Container::new(&mut bit_slice);
         let res_read = match bit_size {
             Some(bit_size) => {
-                u32::from_reader(&mut Container::new(bit_slice), (endian, BitSize(bit_size)))
-                    .unwrap()
+                u32::from_reader(&mut container, (endian, BitSize(bit_size))).unwrap()
             }
-            None => u32::from_reader(&mut Container::new(bit_slice), endian).unwrap(),
+            None => u32::from_reader(&mut container, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
 
@@ -972,13 +976,14 @@ mod tests {
         ($test_name:ident, $typ:ty) => {
             #[test]
             fn $test_name() {
-                let bit_slice = [0b10101_000].view_bits::<Msb0>();
+                let mut bit_slice = [0b10101_000].view_bits::<Msb0>();
 
                 let (amt_read, res_read) = <$typ>::read(bit_slice, (Endian::Little, BitSize(5))).unwrap();
                 assert_eq!(-11, res_read);
                 assert_eq!(bits![u8, Msb0; 0, 0, 0], bit_slice[amt_read..]);
 
-                let res_read = <$typ>::from_reader(&mut Container::new(bit_slice), (Endian::Little, BitSize(5))).unwrap();
+                let mut container = Container::new(&mut bit_slice);
+                let res_read = <$typ>::from_reader(&mut container, (Endian::Little, BitSize(5))).unwrap();
                 assert_eq!(-11, res_read);
             }
         };

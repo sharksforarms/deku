@@ -1,6 +1,6 @@
-use std::convert::TryFrom;
+use std::io::Cursor;
 
-use deku::prelude::*;
+use deku::{container::Container, prelude::*};
 use hexlit::hex;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -27,9 +27,10 @@ enum DekuTest {
 }
 
 fn main() {
-    let test_data = hex!("03020102").to_vec();
+    let mut test_data = hex!("03020102").to_vec();
 
-    let mut container = deku::container::Container::new(std::io::Cursor::new(test_data.clone()));
+    let mut cursor = Cursor::new(&mut test_data);
+    let mut container = Container::new(&mut cursor);
     let deku_test = DekuTest::from_reader(&mut container, ()).unwrap();
 
     assert_eq!(

@@ -42,8 +42,8 @@ struct DekuVec {
     data: Vec<u8>,
 }
 
-fn deku_read_bits(reader: impl Read) {
-    let mut container = Container::new(reader);
+fn deku_read_bits(mut reader: impl Read) {
+    let mut container = Container::new(&mut reader);
     let _v = DekuBits::from_reader(&mut container, ()).unwrap();
 }
 
@@ -51,8 +51,8 @@ fn deku_write_bits(input: &DekuBits) {
     let _v = input.to_bytes().unwrap();
 }
 
-fn deku_read_byte(reader: impl Read) {
-    let mut container = Container::new(reader);
+fn deku_read_byte(mut reader: impl Read) {
+    let mut container = Container::new(&mut reader);
     let _v = DekuBytes::from_reader(&mut container, ()).unwrap();
 }
 
@@ -60,8 +60,8 @@ fn deku_write_byte(input: &DekuBytes) {
     let _v = input.to_bytes().unwrap();
 }
 
-fn deku_read_enum(input: &[u8]) {
-    let mut container = Container::new(input);
+fn deku_read_enum(mut reader: impl Read) {
+    let mut container = Container::new(&mut reader);
     let _v = DekuEnum::from_reader(&mut container, ()).unwrap();
 }
 
@@ -69,8 +69,8 @@ fn deku_write_enum(input: &DekuEnum) {
     let _v = input.to_bytes().unwrap();
 }
 
-fn deku_read_vec(input: &[u8]) {
-    let mut container = Container::new(input);
+fn deku_read_vec(mut reader: impl Read) {
+    let mut container = Container::new(&mut reader);
     let _v = DekuVec::from_reader(&mut container, ()).unwrap();
 }
 
@@ -78,8 +78,8 @@ fn deku_write_vec(input: &DekuVec) {
     let _v = input.to_bytes().unwrap();
 }
 
-fn deku_read_vec_perf(input: &[u8]) {
-    let mut container = Container::new(std::io::Cursor::new(input));
+fn deku_read_vec_perf(mut reader: impl Read) {
+    let mut container = Container::new(&mut reader);
     let _v = DekuVecPerf::from_reader(&mut container, ()).unwrap();
 }
 
@@ -113,24 +113,20 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    let mut reader = std::io::repeat(0x01);
     c.bench_function("deku_read_enum", |b| {
-        b.iter(|| deku_read_enum(black_box([0x01, 0x02].as_ref())))
+        b.iter(|| deku_read_enum(black_box(&mut reader)))
     });
     c.bench_function("deku_write_enum", |b| {
         b.iter(|| deku_write_enum(black_box(&DekuEnum::VariantA(0x02))))
     });
 
-    let deku_read_vec_input = {
-        let mut v = [0xffu8; 101].to_vec();
-        v[0] = 100u8;
-        v
-    };
     let deku_write_vec_input = DekuVec {
         count: 100,
         data: vec![0xff; 100],
     };
     c.bench_function("deku_read_vec", |b| {
-        b.iter(|| deku_read_vec(black_box(&deku_read_vec_input)))
+        b.iter(|| deku_read_vec(black_box(&mut reader)))
     });
     c.bench_function("deku_write_vec", |b| {
         b.iter(|| deku_write_vec(black_box(&deku_write_vec_input)))
@@ -141,7 +137,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         data: vec![0xff; 100],
     };
     c.bench_function("deku_read_vec_perf", |b| {
-        b.iter(|| deku_read_vec_perf(black_box(&deku_read_vec_input)))
+        b.iter(|| deku_read_vec_perf(black_box(&mut reader)))
     });
     c.bench_function("deku_write_vec_perf", |b| {
         b.iter(|| deku_write_vec_perf(black_box(&deku_write_vec_input)))

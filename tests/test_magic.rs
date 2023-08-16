@@ -26,8 +26,8 @@ fn test_magic_struct(input: &[u8]) {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(magic = b"deku")]
     struct TestStruct {}
-
-    let ret_read = TestStruct::try_from(input).unwrap();
+    let mut input = input.to_vec();
+    let ret_read = TestStruct::try_from(input.as_mut_slice()).unwrap();
 
     assert_eq!(TestStruct {}, ret_read);
 
@@ -63,8 +63,9 @@ fn test_magic_enum(input: &[u8]) {
         #[deku(id = "0")]
         Variant,
     }
+    let mut input = input.to_vec();
 
-    let ret_read = TestEnum::try_from(input).unwrap();
+    let ret_read = TestEnum::try_from(input.as_mut_slice()).unwrap();
 
     assert_eq!(TestEnum::Variant, ret_read);
 

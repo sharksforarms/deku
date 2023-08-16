@@ -60,8 +60,8 @@ fn issue_224() {
             two: Two::Load(Op2 { w: 1, j: 2 }),
         },
     };
-    let bytes = packet.to_bytes().unwrap();
-    let _packet = Packet::from_bytes((&bytes, 0)).unwrap();
+    let mut bytes = packet.to_bytes().unwrap();
+    let _packet = Packet::from_bytes((bytes.as_mut_slice(), 0)).unwrap();
 }
 
 // Extra zeroes added when reading fewer bytes than needed to fill a number
@@ -88,7 +88,7 @@ mod issue_282 {
         // the u32 is stored as three bytes in big-endian order
         assert_eq!(zero, 0);
 
-        let data = &[a, b, c, a, b, c];
+        let data = &mut [a, b, c, a, b, c];
         let (_, BitsBytes { bits, bytes }) = BitsBytes::from_bytes((data, 0)).unwrap();
 
         assert_eq!(bits, expected);
@@ -113,7 +113,7 @@ mod issue_282 {
         // the u32 is stored as three bytes in little-endian order
         assert_eq!(zero, 0);
 
-        let data = &[a, b, c, a, b, c];
+        let data = &mut [a, b, c, a, b, c];
         let (_, BitsBytes { bits, bytes }) = BitsBytes::from_bytes((data, 0)).unwrap();
 
         assert_eq!(bits, expected);
@@ -126,7 +126,7 @@ mod issue_282 {
 // https://github.com/sharksforarms/deku/issues/292
 #[test]
 fn test_regression_292() {
-    let test_data: &[u8] = [0x0f, 0xf0].as_ref();
+    let mut test_data = vec![0x0f, 0xf0];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
@@ -139,7 +139,7 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        Container::from_bytes((test_data, 0)).unwrap().1,
+        Container::from_bytes((&mut test_data, 0)).unwrap().1,
         Container {
             field1: 0,
             field2: 0xff,
@@ -159,7 +159,7 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBits::from_bytes((test_data, 0)).unwrap().1,
+        ContainerBits::from_bytes((&mut test_data, 0)).unwrap().1,
         ContainerBits {
             field1: 0,
             field2: 0xff,
@@ -177,7 +177,9 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerByteNoEndian::from_bytes((test_data, 0)).unwrap().1,
+        ContainerByteNoEndian::from_bytes((&mut test_data, 0))
+            .unwrap()
+            .1,
         ContainerByteNoEndian {
             field1: 0,
             field2: 0xff,
@@ -194,7 +196,9 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBitPadding::from_bytes((test_data, 0)).unwrap().1,
+        ContainerBitPadding::from_bytes((&mut test_data, 0))
+            .unwrap()
+            .1,
         ContainerBitPadding {
             field2: 0xff,
             field3: 0,
@@ -212,7 +216,9 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBitPadding1::from_bytes((test_data, 0)).unwrap().1,
+        ContainerBitPadding1::from_bytes((&mut test_data, 0))
+            .unwrap()
+            .1,
         ContainerBitPadding1 {
             field1: 0,
             field2: 0xff,
@@ -220,7 +226,7 @@ fn test_regression_292() {
         }
     );
 
-    let test_data: &[u8] = [0b11000000, 0b00111111].as_ref();
+    let test_data: &mut [u8] = &mut [0b11000000, 0b00111111];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
@@ -241,7 +247,7 @@ fn test_regression_292() {
         }
     );
 
-    let test_data: &[u8] = [0b11000000, 0b00000000, 0b00111111].as_ref();
+    let test_data: &mut [u8] = &mut [0b11000000, 0b00000000, 0b00111111];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]

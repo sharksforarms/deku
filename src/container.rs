@@ -21,8 +21,8 @@ pub enum ContainerRet {
 }
 
 /// Container to use with `from_reader`
-pub struct Container<R: Read> {
-    inner: R,
+pub struct Container<'a, R: Read> {
+    inner: &'a mut R,
     /// bits stored from previous reads that didn't read to the end of a byte size
     leftover: BitVec<u8, Msb0>,
     /// Amount of bits read during the use of `read_bits` and `read_bytes`.
@@ -34,24 +34,16 @@ pub struct Container<R: Read> {
 /// Max bits requested from [`read_bits`] during one call
 pub const MAX_BITS_AMT: usize = 128;
 
-impl<R: Read> Container<R> {
+impl<'a, R: Read> Container<'a, R> {
     /// Create a new `Container`
     #[inline]
-    pub fn new(inner: R) -> Self {
+    pub fn new(inner: &'a mut R) -> Self {
         Self {
             inner,
             leftover: BitVec::new(), // with_capacity 8?
             bits_read: 0,
             read_cache: None,
         }
-    }
-
-    /// Consume and return `Read`]
-    ///
-    /// This will not return previous bit reads that are buffered within [`Container`]
-    #[inline]
-    pub fn inner(self) -> R {
-        self.inner
     }
 
     /// Enable `sef.read_cache` to be filled with all bytes that were read after calling this
@@ -221,19 +213,22 @@ impl<R: Read> Container<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use acid_io::Cursor;
     use hexlit::hex;
 
     #[test]
     fn test_end() {
-        let input = hex!("aa");
-        let mut container = Container::new(&input[..]);
+        let mut input = hex!("aa");
+        let mut cursor = Cursor::new(input);
+        let mut container = Container::new(&mut cursor);
         assert!(!container.end());
         let mut buf = [0; 1];
         let _ = container.read_bytes(1, &mut buf);
         assert!(container.end());
 
-        let input = hex!("aa");
-        let mut container = Container::new(&input[..]);
+        let mut input = hex!("aa");
+        let mut cursor = Cursor::new(input);
+        let mut container = Container::new(&mut cursor);
         assert!(!container.end());
         let _ = container.read_bits(4);
         assert!(!container.end());
@@ -243,8 +238,9 @@ mod tests {
 
     #[test]
     fn test_bits_less() {
-        let input = hex!("aa");
-        let mut container = Container::new(&input[..]);
+        let mut input = hex!("aa");
+        let mut cursor = Cursor::new(input);
+        let mut container = Container::new(&mut cursor);
         container.enable_read_cache();
         let _ = container.read_bits(1);
         assert_eq!(&vec![0xaa], container.read_cache.as_ref().unwrap());
@@ -255,16 +251,12 @@ mod tests {
 
     #[test]
     fn test_inner() {
-        let input = hex!("aabbcc");
-        let mut container = Container::new(&input[..]);
+        let mut input = hex!("aabbcc");
+        let mut cursor = Cursor::new(input);
+        let mut container = Container::new(&mut cursor);
         container.enable_read_cache();
         let mut buf = [0; 1];
         let _ = container.read_bytes(1, &mut buf);
         assert_eq!(&vec![0xaa], container.read_cache.as_ref().unwrap());
-
-        let mut inner = container.inner();
-        let mut v = vec![];
-        inner.read_to_end(&mut v).unwrap();
-        assert_eq!(&*v, &[0xbb, 0xcc]);
     }
 }

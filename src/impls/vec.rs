@@ -336,7 +336,7 @@ mod tests {
         case::too_much_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(9), 1.into(), vec![], bits![u8, Msb0;]),
     )]
     fn test_vec_reader<Predicate: FnMut(&u8) -> bool>(
-        input: &[u8],
+        mut input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
         limit: Limit<u8, Predicate>,
@@ -344,12 +344,15 @@ mod tests {
         expected_rest: &BitSlice<u8, Msb0>,
     ) {
         let res_read = match bit_size {
-            Some(bit_size) => Vec::<u8>::from_reader(
-                &mut Container::new(input),
-                (limit, (endian, BitSize(bit_size))),
-            )
-            .unwrap(),
-            None => Vec::<u8>::from_reader(&mut Container::new(input), (limit, (endian))).unwrap(),
+            Some(bit_size) => {
+                let mut container = Container::new(&mut input);
+                Vec::<u8>::from_reader(&mut container, (limit, (endian, BitSize(bit_size))))
+                    .unwrap()
+            }
+            None => {
+                let mut container = Container::new(&mut input);
+                Vec::<u8>::from_reader(&mut container, (limit, (endian))).unwrap()
+            }
         };
         assert_eq!(expected, res_read);
     }
@@ -410,7 +413,7 @@ mod tests {
         case::bytes_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), BitSize(16).into(), vec![0xAABB], bits![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1], vec![0xAA, 0xBB]),
     )]
     fn test_vec_reader_write<Predicate: FnMut(&u16) -> bool>(
-        input: &[u8],
+        mut input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
         limit: Limit<u16, Predicate>,
@@ -418,14 +421,13 @@ mod tests {
         expected_rest: &BitSlice<u8, Msb0>,
         expected_write: Vec<u8>,
     ) {
+        let input_clone = input.clone();
         // Unwrap here because all test cases are `Some`.
         let bit_size = bit_size.unwrap();
 
-        let res_read = Vec::<u16>::from_reader(
-            &mut Container::new(input),
-            (limit, (endian, BitSize(bit_size))),
-        )
-        .unwrap();
+        let mut container = Container::new(&mut input);
+        let res_read =
+            Vec::<u16>::from_reader(&mut container, (limit, (endian, BitSize(bit_size)))).unwrap();
         assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];
@@ -434,6 +436,6 @@ mod tests {
             .unwrap();
         assert_eq!(expected_write, res_write.into_vec());
 
-        assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
+        assert_eq!(input_clone[..expected_write.len()].to_vec(), expected_write);
     }
 }

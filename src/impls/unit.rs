@@ -42,14 +42,16 @@ mod tests {
     #[allow(clippy::unit_arg)]
     #[allow(clippy::unit_cmp)]
     fn test_unit() {
-        let input = &hex!("FF");
+        let mut input = &[0xff];
 
         let bit_slice = input.view_bits::<Msb0>();
         let (amt_read, res_read) = <()>::read(bit_slice, ()).unwrap();
         assert_eq!((), res_read);
         assert_eq!(amt_read, 0);
 
-        let res_read = <()>::from_reader(&mut Container::new(Cursor::new(input)), ()).unwrap();
+        let mut cursor = Cursor::new(input);
+        let mut container = Container::new(&mut cursor);
+        let res_read = <()>::from_reader(&mut container, ()).unwrap();
         assert_eq!((), res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

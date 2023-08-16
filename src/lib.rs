@@ -41,8 +41,8 @@ struct DekuTest {
     field_c: u16,
 }
 
-let data: Vec<u8> = vec![0b0110_1001, 0xBE, 0xEF];
-let (_amt_read, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let mut data: Vec<u8> = vec![0b0110_1001, 0xBE, 0xEF];
+let (_amt_read, mut val) = DekuTest::from_bytes((&mut data[..], 0)).unwrap();
 assert_eq!(DekuTest {
     field_a: 0b0110,
     field_b: 0b1001,
@@ -51,7 +51,7 @@ assert_eq!(DekuTest {
 
 val.field_c = 0xC0FE;
 
-let data_out = val.to_bytes().unwrap();
+let mut data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 ```
 
@@ -74,14 +74,14 @@ struct DekuHeader(u8);
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuData(u16);
 
-let data: Vec<u8> = vec![0xAA, 0xEF, 0xBE];
-let (_amt_read, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let mut data: Vec<u8> = vec![0xAA, 0xEF, 0xBE];
+let (_amt_read, mut val) = DekuTest::from_bytes((&mut data[..], 0)).unwrap();
 assert_eq!(DekuTest {
     header: DekuHeader(0xAA),
     data: DekuData(0xBEEF),
 }, val);
 
-let data_out = val.to_bytes().unwrap();
+let mut data_out = val.to_bytes().unwrap();
 assert_eq!(data, data_out);
 ```
 
@@ -108,14 +108,14 @@ struct DekuTest {
     data: Vec<u8>,
 }
 
-let data: Vec<u8> = vec![0x02, 0xBE, 0xEF, 0xFF, 0xFF];
-let (_amt_read, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let mut data: Vec<u8> = vec![0x02, 0xBE, 0xEF, 0xFF, 0xFF];
+let (_amt_read, mut val) = DekuTest::from_bytes((&mut data[..], 0)).unwrap();
 assert_eq!(DekuTest {
     count: 0x02,
     data: vec![0xBE, 0xEF]
 }, val);
 
-let data_out = val.to_bytes().unwrap();
+let mut data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0x02, 0xBE, 0xEF], data_out);
 
 // Pushing an element to data
@@ -126,7 +126,7 @@ assert_eq!(DekuTest {
     data: vec![0xBE, 0xEF, 0xAA]
 }, val);
 
-let data_out = val.to_bytes().unwrap();
+let mut data_out = val.to_bytes().unwrap();
 // Note: `count` is still 0x02 while 3 bytes got written
 assert_eq!(vec![0x02, 0xBE, 0xEF, 0xAA], data_out);
 
@@ -174,12 +174,12 @@ enum DekuTest {
     VariantB(u16),
 }
 
-let data: Vec<u8> = vec![0x01, 0x02, 0xEF, 0xBE];
+let mut data: Vec<u8> = vec![0x01, 0x02, 0xEF, 0xBE];
 
-let (amt_read, val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+let (amt_read, val) = DekuTest::from_bytes((&mut data[..], 0)).unwrap();
 assert_eq!(DekuTest::VariantA , val);
 
-let (amt_read, val) = DekuTest::from_bytes((data.as_ref(), amt_read)).unwrap();
+let (amt_read, val) = DekuTest::from_bytes((&mut data[..], amt_read)).unwrap();
 assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 ```
 
@@ -208,9 +208,9 @@ struct Root {
     sub: Subtype
 }
 
-let data: Vec<u8> = vec![0x01, 0x02];
+let mut data: Vec<u8> = vec![0x01, 0x02];
 
-let (amt_read, value) = Root::from_bytes((&data[..], 0)).unwrap();
+let (amt_read, value) = Root::from_bytes((&mut data[..], 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
@@ -272,6 +272,7 @@ use alloc::vec::Vec;
 
 /// re-export of bitvec
 pub mod acid_io {
+    pub use acid_io::Cursor;
     pub use acid_io::Read;
 }
 
@@ -327,7 +328,7 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     ///
     /// # Returns
     /// amount of bits read after parsing in addition to Self.
-    fn from_bytes(input: (&'a [u8], usize)) -> Result<(usize, Self), DekuError>
+    fn from_bytes(input: (&'a mut [u8], usize)) -> Result<(usize, Self), DekuError>
     where
         Self: Sized;
 }

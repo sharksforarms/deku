@@ -20,10 +20,10 @@ pub enum DekuTest {
 }
 
 fn main() {
-    let input = hex!("0A").to_vec();
+    let mut input = hex!("0A").to_vec();
     let output = hex!("03").to_vec();
 
-    let ret_read = DekuTest::try_from(input.as_slice()).unwrap();
+    let ret_read = DekuTest::try_from(input.as_mut_slice()).unwrap();
     assert_eq!(DekuTest::C, ret_read);
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(output.to_vec(), ret_write);

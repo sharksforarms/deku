@@ -1,5 +1,5 @@
-use deku::{bitvec::BitView, container, ctx::Limit, prelude::*, DekuRead, DekuWrite};
-use std::io::Write;
+use deku::{ctx::Limit, prelude::*, DekuRead, DekuWrite};
+use std::io::Cursor;
 
 #[derive(Debug, DekuRead, DekuWrite)]
 struct Test {
@@ -20,7 +20,9 @@ fn main() {
         .iter()
         .flat_map(|x| x.to_bytes().unwrap().into_iter())
         .collect();
-    let mut container = Container::new(std::io::Cursor::new(custom.clone()));
+
+    let mut binding = Cursor::new(custom.clone());
+    let mut container = Container::new(&mut binding);
     let ret = <Vec<Test> as DekuReader<Limit<_, _>>>::from_reader(
         &mut container,
         Limit::new_count(10_0000),

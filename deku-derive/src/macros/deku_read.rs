@@ -62,7 +62,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let from_bytes_body = wrap_default_ctx(
             quote! {
                 use core::convert::TryFrom;
-                let __deku_container = &mut deku::container::Container::new(__deku_input.0);
+                let mut cursor = ::#crate_::acid_io::Cursor::new(__deku_input.0);
+                let __deku_container = &mut deku::container::Container::new(&mut cursor);
                 if __deku_input.1 != 0 {
                     __deku_container.skip_bits(__deku_input.1)?;
                 }
@@ -308,7 +309,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let from_bytes_body = wrap_default_ctx(
             quote! {
                 use core::convert::TryFrom;
-                let __deku_container = &mut deku::container::Container::new(__deku_input.0);
+                let mut cursor = ::#crate_::acid_io::Cursor::new(__deku_input.0);
+                let __deku_container = &mut deku::container::Container::new(&mut cursor);
                 if __deku_input.1 != 0 {
                     __deku_container.skip_bits(__deku_input.1)?;
                 }
@@ -755,7 +757,7 @@ pub fn emit_from_bytes(
     quote! {
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
-            fn from_bytes(__deku_input: (&#lifetime [u8], usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
+            fn from_bytes(__deku_input: (&#lifetime mut [u8], usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #body
             }
         }
@@ -771,10 +773,10 @@ pub fn emit_try_from(
 ) -> TokenStream {
     let crate_ = super::get_crate_name();
     quote! {
-        impl #imp core::convert::TryFrom<&#lifetime [u8]> for #ident #wher {
+        impl #imp core::convert::TryFrom<&#lifetime mut [u8]> for #ident #wher {
             type Error = ::#crate_::DekuError;
 
-            fn try_from(input: &#lifetime [u8]) -> core::result::Result<Self, Self::Error> {
+            fn try_from(input: &#lifetime mut [u8]) -> core::result::Result<Self, Self::Error> {
                 let (amt_read, res) = <Self as ::#crate_::DekuContainerRead>::from_bytes((input, 0))?;
                 if (amt_read / 8) != input.len() {
                     return Err(::#crate_::DekuError::Parse(format!("Too much data")));

@@ -1,6 +1,6 @@
-use std::io::Read;
+use std::io::{Cursor, Read};
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -23,16 +23,6 @@ struct DekuBytes {
 enum DekuEnum {
     #[deku(id = "0x01")]
     VariantA(u8),
-}
-
-/// This is faster, because we go right to (endian, bytes)
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-struct DekuVecPerf {
-    #[deku(bytes = "1")]
-    count: u8,
-    #[deku(count = "count")]
-    #[deku(bytes = "1")]
-    data: Vec<u8>,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -78,19 +68,14 @@ fn deku_write_vec(input: &DekuVec) {
     let _v = input.to_bytes().unwrap();
 }
 
-fn deku_read_vec_perf(mut reader: impl Read) {
-    let mut container = Container::new(&mut reader);
-    let _v = DekuVecPerf::from_reader(&mut container, ()).unwrap();
-}
-
-fn deku_write_vec_perf(input: &DekuVecPerf) {
-    let _v = input.to_bytes().unwrap();
-}
-
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut reader = std::io::repeat(0b101);
     c.bench_function("deku_read_byte", |b| {
-        b.iter(|| deku_read_byte(black_box(&mut reader)))
+        let reader = Cursor::new(&[0x01; 1 + 2 + 4]);
+        b.iter_batched(
+            || reader.clone(),
+            |mut reader| deku_read_byte(&mut reader),
+            BatchSize::SmallInput,
+        )
     });
     c.bench_function("deku_write_byte", |b| {
         b.iter(|| {
@@ -102,7 +87,12 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
     });
     c.bench_function("deku_read_bits", |b| {
-        b.iter(|| deku_read_bits(black_box(&mut reader)))
+        let reader = Cursor::new(&[0x01; 1]);
+        b.iter_batched(
+            || reader.clone(),
+            |mut reader| deku_read_bits(&mut reader),
+            BatchSize::SmallInput,
+        )
     });
     c.bench_function("deku_write_bits", |b| {
         b.iter(|| {
@@ -113,9 +103,13 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    let mut reader = std::io::repeat(0x01);
     c.bench_function("deku_read_enum", |b| {
-        b.iter(|| deku_read_enum(black_box(&mut reader)))
+        let reader = Cursor::new(&[0x01; 2]);
+        b.iter_batched(
+            || reader.clone(),
+            |mut reader| deku_read_enum(&mut reader),
+            BatchSize::SmallInput,
+        )
     });
     c.bench_function("deku_write_enum", |b| {
         b.iter(|| deku_write_enum(black_box(&DekuEnum::VariantA(0x02))))
@@ -126,21 +120,15 @@ fn criterion_benchmark(c: &mut Criterion) {
         data: vec![0xff; 100],
     };
     c.bench_function("deku_read_vec", |b| {
-        b.iter(|| deku_read_vec(black_box(&mut reader)))
+        let reader = Cursor::new(&[0x08; 8 + 1]);
+        b.iter_batched(
+            || reader.clone(),
+            |mut reader| deku_read_vec(&mut reader),
+            BatchSize::SmallInput,
+        )
     });
     c.bench_function("deku_write_vec", |b| {
         b.iter(|| deku_write_vec(black_box(&deku_write_vec_input)))
-    });
-
-    let deku_write_vec_input = DekuVecPerf {
-        count: 100,
-        data: vec![0xff; 100],
-    };
-    c.bench_function("deku_read_vec_perf", |b| {
-        b.iter(|| deku_read_vec_perf(black_box(&mut reader)))
-    });
-    c.bench_function("deku_write_vec_perf", |b| {
-        b.iter(|| deku_write_vec_perf(black_box(&deku_write_vec_input)))
     });
 }
 

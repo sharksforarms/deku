@@ -331,6 +331,7 @@ pub mod no_std_io {
     pub use no_std_io::io::Cursor;
     pub use no_std_io::io::Read;
     pub use no_std_io::io::Result;
+    pub use no_std_io::io::Write;
 }
 
 /// re-export of bitvec
@@ -347,8 +348,10 @@ pub mod error;
 mod impls;
 pub mod prelude;
 pub mod reader;
+pub mod writer;
 
 pub use crate::error::DekuError;
+use crate::writer::Writer;
 
 /// "Reader" trait: read bytes and bits from [`no_std_io::Read`]er
 pub trait DekuReader<'a, Ctx = ()> {
@@ -422,27 +425,24 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
         Self: Sized;
 }
 
-/// "Writer" trait: write from type to bits
-pub trait DekuWrite<Ctx = ()> {
-    /// Write type to bits
-    /// * **output** - Sink to store resulting bits
-    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
-    /// needed.
-    fn write(
+/// "Writer" trait: write from type to bytes
+pub trait DekuWriter<Ctx = ()> {
+    /// Write type to bytes
+    fn to_writer<W: no_std_io::Write>(
         &self,
-        output: &mut bitvec::BitVec<u8, bitvec::Msb0>,
+        writer: &mut Writer<W>,
         ctx: Ctx,
     ) -> Result<(), DekuError>;
 }
 
 /// "Writer" trait: implemented on DekuWrite struct and enum containers. A `container` is a type which
 /// doesn't need any context information.
-pub trait DekuContainerWrite: DekuWrite<()> {
+pub trait DekuContainerWrite: DekuWriter<()> {
     /// Write struct/enum to Vec<u8>
     fn to_bytes(&self) -> Result<Vec<u8>, DekuError>;
 
-    /// Write struct/enum to BitVec
-    fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError>;
+    ///// Write struct/enum to BitVec
+    //fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError>;
 }
 
 /// "Updater" trait: apply mutations to a type
@@ -457,19 +457,17 @@ pub trait DekuEnumExt<'a, T> {
     fn deku_id(&self) -> Result<T, DekuError>;
 }
 
-/// Implements DekuWrite for references of types that implement DekuWrite
-impl<T, Ctx> DekuWrite<Ctx> for &T
+impl<T, Ctx> DekuWriter<Ctx> for &T
 where
-    T: DekuWrite<Ctx>,
+    T: DekuWriter<Ctx>,
     Ctx: Copy,
 {
-    /// Write value of type to bits
-    fn write(
+    fn to_writer<W: no_std_io::Write>(
         &self,
-        output: &mut bitvec::BitVec<u8, bitvec::Msb0>,
+        writer: &mut Writer<W>,
         ctx: Ctx,
     ) -> Result<(), DekuError> {
-        <T>::write(self, output, ctx)?;
+        <T>::to_writer(self, writer, ctx)?;
         Ok(())
     }
 }

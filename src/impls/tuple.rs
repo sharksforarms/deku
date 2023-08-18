@@ -1,9 +1,10 @@
 //! Implementations of DekuRead and DekuWrite for tuples of length 1 to 11
 
-use bitvec::prelude::*;
-use no_std_io::io::Read;
+use crate::writer::Writer;
 
-use crate::{DekuError, DekuReader, DekuWrite};
+use no_std_io::io::{Read, Write};
+
+use crate::{DekuError, DekuReader, DekuWriter};
 
 // Trait to help us build intermediate tuples while DekuRead'ing each element
 // from the tuple
@@ -54,13 +55,13 @@ macro_rules! ImplDekuTupleTraits {
             }
         }
 
-        impl<Ctx: Copy, $($T:DekuWrite<Ctx>),+> DekuWrite<Ctx> for ($($T,)+)
+        impl<Ctx: Copy, $($T:DekuWriter<Ctx>),+> DekuWriter<Ctx> for ($($T,)+)
         {
             #[allow(non_snake_case)]
-            fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
+            fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
                 let ($(ref $T,)+) = *self;
                 $(
-                    $T.write(output, ctx)?;
+                    $T.to_writer(writer, ctx)?;
                 )+
                 Ok(())
             }
@@ -94,10 +95,11 @@ mod tests {
     )]
     fn test_tuple_write<T>(input: T, expected: Vec<u8>)
     where
-        T: DekuWrite,
+        T: DekuWriter,
     {
-        let mut res_write = bitvec![u8, Msb0;];
-        input.write(&mut res_write, ()).unwrap();
-        assert_eq!(expected, res_write.into_vec());
+        let mut out_buf = vec![];
+        let mut writer = Writer::new(&mut out_buf);
+        input.to_writer(&mut writer, ()).unwrap();
+        assert_eq!(expected, out_buf);
     }
 }

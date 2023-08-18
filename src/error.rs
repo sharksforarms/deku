@@ -44,6 +44,8 @@ pub enum DekuError {
     Assertion(String),
     /// Could not resolve `id` for variant
     IdVariantNotFound,
+    /// IO error while writing
+    WriteError,
 }
 
 impl From<core::num::TryFromIntError> for DekuError {
@@ -78,6 +80,7 @@ impl core::fmt::Display for DekuError {
             DekuError::Unexpected(ref err) => write!(f, "Unexpected error: {err}"),
             DekuError::Assertion(ref err) => write!(f, "Assertion error: {err}"),
             DekuError::IdVariantNotFound => write!(f, "Could not resolve `id` for variant"),
+            DekuError::WriteError => write!(f, "write error"),
         }
     }
 }
@@ -100,6 +103,7 @@ impl From<DekuError> for std::io::Error {
             DekuError::Unexpected(_) => io::Error::new(io::ErrorKind::Other, error),
             DekuError::Assertion(_) => io::Error::new(io::ErrorKind::InvalidData, error),
             DekuError::IdVariantNotFound => io::Error::new(io::ErrorKind::NotFound, error),
+            DekuError::WriteError => io::Error::new(io::ErrorKind::BrokenPipe, error),
         }
     }
 }

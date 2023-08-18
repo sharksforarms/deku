@@ -1,17 +1,17 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use no_std_io::io::Read;
+use no_std_io::io::{Read, Write};
 
-use bitvec::prelude::*;
-
-use crate::{DekuError, DekuReader, DekuWrite};
+use crate::reader::Reader;
+use crate::writer::Writer;
+use crate::{DekuError, DekuReader, DekuWriter};
 
 impl<'a, Ctx> DekuReader<'a, Ctx> for Ipv4Addr
 where
     u32: DekuReader<'a, Ctx>,
 {
     fn from_reader_with_ctx<R: Read>(
-        reader: &mut crate::reader::Reader<R>,
+        reader: &mut Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
         let ip = u32::from_reader_with_ctx(reader, inner_ctx)?;
@@ -19,13 +19,13 @@ where
     }
 }
 
-impl<Ctx> DekuWrite<Ctx> for Ipv4Addr
+impl<Ctx> DekuWriter<Ctx> for Ipv4Addr
 where
-    u32: DekuWrite<Ctx>,
+    u32: DekuWriter<Ctx>,
 {
-    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
         let ip: u32 = (*self).into();
-        ip.write(output, ctx)
+        ip.to_writer(writer, ctx)
     }
 }
 
@@ -34,7 +34,7 @@ where
     u128: DekuReader<'a, Ctx>,
 {
     fn from_reader_with_ctx<R: Read>(
-        reader: &mut crate::reader::Reader<R>,
+        reader: &mut Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
         let ip = u128::from_reader_with_ctx(reader, inner_ctx)?;
@@ -42,25 +42,25 @@ where
     }
 }
 
-impl<Ctx> DekuWrite<Ctx> for Ipv6Addr
+impl<Ctx> DekuWriter<Ctx> for Ipv6Addr
 where
-    u128: DekuWrite<Ctx>,
+    u128: DekuWriter<Ctx>,
 {
-    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
         let ip: u128 = (*self).into();
-        ip.write(output, ctx)
+        ip.to_writer(writer, ctx)
     }
 }
 
-impl<Ctx> DekuWrite<Ctx> for IpAddr
+impl<Ctx> DekuWriter<Ctx> for IpAddr
 where
-    Ipv6Addr: DekuWrite<Ctx>,
-    Ipv4Addr: DekuWrite<Ctx>,
+    Ipv6Addr: DekuWriter<Ctx>,
+    Ipv4Addr: DekuWriter<Ctx>,
 {
-    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
         match self {
-            IpAddr::V4(ipv4) => ipv4.write(output, ctx),
-            IpAddr::V6(ipv6) => ipv6.write(output, ctx),
+            IpAddr::V4(ipv4) => ipv4.to_writer(writer, ctx),
+            IpAddr::V6(ipv6) => ipv6.to_writer(writer, ctx),
         }
     }
 }
@@ -83,9 +83,10 @@ mod tests {
         let res_read = Ipv4Addr::from_reader_with_ctx(&mut reader, endian).unwrap();
         assert_eq!(expected, res_read);
 
-        let mut res_write = bitvec![u8, Msb0;];
-        res_read.write(&mut res_write, endian).unwrap();
-        assert_eq!(input.to_vec(), res_write.into_vec());
+        let mut out_buf = vec![];
+        let mut writer = Writer::new(&mut out_buf);
+        res_read.to_writer(&mut writer, endian).unwrap();
+        assert_eq!(input.to_vec(), out_buf.to_vec());
     }
 
     #[rstest(input, endian, expected,
@@ -98,27 +99,31 @@ mod tests {
         let res_read = Ipv6Addr::from_reader_with_ctx(&mut reader, endian).unwrap();
         assert_eq!(expected, res_read);
 
-        let mut res_write = bitvec![u8, Msb0;];
-        res_read.write(&mut res_write, endian).unwrap();
-        assert_eq!(input.to_vec(), res_write.into_vec());
+        let mut out_buf = vec![];
+        let mut writer = Writer::new(&mut out_buf);
+        res_read.to_writer(&mut writer, endian).unwrap();
+        assert_eq!(input.to_vec(), out_buf.to_vec());
     }
 
     #[test]
     fn test_ip_addr_write() {
         let ip_addr = IpAddr::V4(Ipv4Addr::new(145, 254, 160, 237));
-        let mut ret_write = bitvec![u8, Msb0;];
-        ip_addr.write(&mut ret_write, Endian::Little).unwrap();
-        assert_eq!(vec![237, 160, 254, 145], ret_write.into_vec());
+
+        let mut out_buf = vec![];
+        let mut writer = Writer::new(&mut out_buf);
+        ip_addr.to_writer(&mut writer, Endian::Little).unwrap();
+        assert_eq!(vec![237, 160, 254, 145], out_buf.to_vec());
 
         let ip_addr = IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff));
-        let mut ret_write = bitvec![u8, Msb0;];
-        ip_addr.write(&mut ret_write, Endian::Little).unwrap();
+        let mut out_buf = vec![];
+        let mut writer = Writer::new(&mut out_buf);
+        ip_addr.to_writer(&mut writer, Endian::Little).unwrap();
         assert_eq!(
             vec![
                 0xff, 0x02, 0x0a, 0xc0, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00
             ],
-            ret_write.into_vec()
+            out_buf.to_vec()
         );
     }
 }

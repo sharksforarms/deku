@@ -605,7 +605,7 @@ fn emit_field_read(
 
     let trace_field_log = if cfg!(feature = "logging") {
         quote! {
-            log::trace!("Reading: {}::{}", #ident, #field_ident_str);
+            log::trace!("Reading: {}.{}", #ident, #field_ident_str);
         }
     } else {
         quote! {}

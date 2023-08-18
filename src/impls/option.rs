@@ -1,7 +1,6 @@
-use bitvec::prelude::*;
-use no_std_io::io::Read;
+use no_std_io::io::{Read, Write};
 
-use crate::{DekuError, DekuReader, DekuWrite};
+use crate::{writer::Writer, DekuError, DekuReader, DekuWriter};
 
 impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
     fn from_reader_with_ctx<R: Read>(
@@ -13,20 +12,10 @@ impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
     }
 }
 
-impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Option<T> {
-    /// Write T if Some
-    /// * **inner_ctx** - The context required by `T`.
-    /// # Examples
-    /// ```rust
-    /// # use deku::{ctx::Endian, DekuWrite};
-    /// # use deku::bitvec::{bitvec, Msb0};
-    /// let data = Some(1u8);
-    /// let mut output = bitvec![u8, Msb0;];
-    /// data.write(&mut output, Endian::Big).unwrap();
-    /// assert_eq!(output, bitvec![u8, Msb0; 0, 0, 0, 0, 0, 0, 0, 1])
-    /// ```
-    fn write(&self, output: &mut BitVec<u8, Msb0>, inner_ctx: Ctx) -> Result<(), DekuError> {
-        self.as_ref().map_or(Ok(()), |v| v.write(output, inner_ctx))
+impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Option<T> {
+    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, inner_ctx: Ctx) -> Result<(), DekuError> {
+        self.as_ref()
+            .map_or(Ok(()), |v| v.to_writer(writer, inner_ctx))
     }
 }
 

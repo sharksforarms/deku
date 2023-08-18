@@ -25,6 +25,8 @@ std = ["deku_derive/std", "bitvec/std", "alloc", "acid_io/std", "acid_io/alloc"]
 alloc = ["bitvec/alloc", "acid_io/alloc"]
 logging = ["deku_derive/logging", "log"]
 const_generics = []
+## Enable container.read_cache by default when a `Container` is created
+read_cache = []
 
 [dependencies]
 deku_derive = { version = "^0.16.0", path = "deku-derive", default-features = false}

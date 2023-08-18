@@ -38,12 +38,18 @@ impl<'a, R: Read> Container<'a, R> {
     /// Create a new `Container`
     #[inline]
     pub fn new(inner: &'a mut R) -> Self {
-        Self {
+        #[allow(unused_mut)]
+        let mut c = Self {
             inner,
             leftover: BitVec::new(), // with_capacity 8?
             bits_read: 0,
             read_cache: None,
-        }
+        };
+
+        #[cfg(feature = "read_cache")]
+        c.enable_read_cache();
+
+        c
     }
 
     /// Enable `sef.read_cache` to be filled with all bytes that were read after calling this

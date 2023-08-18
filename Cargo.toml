@@ -39,6 +39,7 @@ alloc_counter = "0.0.4"
 trybuild = "1.0.77"
 rustc-hash = "1.1.0"
 env_logger = "0.10.0"
+assert_hex = "0.2.2"
 
 [[bench]]
 name = "deku"

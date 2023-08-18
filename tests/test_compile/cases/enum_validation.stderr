@@ -16,8 +16,8 @@ error: conflicting: both `id` and `id_pat` specified on variant
 16 |     #[deku(id = "1", id_pat = "2..=3")]
    |                 ^^^
 
+  --> $DIR/enum_validation.rs:22:18
 error: `type` only supported on enum
-  --> $DIR/enum_validation.rs:22:15
    |
 22 | #[deku(type = "u8")]
    |               ^^^^

@@ -841,7 +841,7 @@ use deku::prelude::*;
 struct DekuTest {
     #[deku(
         reader = "DekuTest::read(deku::reader)",
-        writer = "DekuTest::write(deku::output, &self.field_a)"
+        writer = "DekuTest::write(deku::writer, &self.field_a)"
     )]
     field_a: String,
 }
@@ -856,9 +856,9 @@ impl DekuTest {
     }
 
     /// Parse from String to u8 and write
-    fn write(output: &mut BitVec<u8, Msb0>, field_a: &str) -> Result<(), DekuError> {
+    fn write<W: std::io::Write>(writer: &mut Writer<W>, field_a: &str) -> Result<(), DekuError> {
         let value = field_a.parse::<u8>().unwrap();
-        value.write(output, ())
+        value.to_writer(writer, ())
     }
 }
 

@@ -47,26 +47,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-        let to_bits_body = wrap_default_ctx(
-            quote! {
-                match *self {
-                    #destructured => {
-                        let mut __deku_acc: ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> = ::#crate_::bitvec::BitVec::new();
-                        let __deku_output = &mut __deku_acc;
-
-                        #magic_write
-                        #(#field_writes)*
-
-                    Ok(__deku_acc)
-                    }
-                }
-            },
-            &input.ctx,
-            &input.ctx_default,
-        );
-
         tokens.extend(quote! {
-            impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
+             impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
 
                 fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
@@ -84,13 +66,22 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
             impl #imp DekuContainerWrite for #ident #wher {
                 fn to_bytes(&self) -> core::result::Result<Vec<u8>, ::#crate_::DekuError> {
-                    let mut acc: ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> = self.to_bits()?;
-                    Ok(acc.into_vec())
+                    let mut out_buf = vec![];
+                    let mut __deku_writer = ::#crate_::writer::Writer::new(&mut out_buf);
+                    ::#crate_::DekuWriter::to_writer(self, &mut __deku_writer, ())?;
+                    __deku_writer.finalize()?;
+                    Ok(out_buf)
                 }
 
                 #[allow(unused_variables)]
                 fn to_bits(&self) -> core::result::Result<::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0>, ::#crate_::DekuError> {
-                    #to_bits_body
+                    let mut out_buf = vec![];
+                    let mut __deku_writer = ::#crate_::writer::Writer::new(&mut out_buf);
+                    ::#crate_::DekuWriter::to_writer(self, &mut __deku_writer, ())?;
+                    let mut leftover = __deku_writer.leftover;
+                    let mut bv = ::#crate_::bitvec::BitVec::from_slice(&out_buf);
+                    bv.append(&mut leftover);
+                    Ok(bv)
                 }
             }
         });
@@ -122,9 +113,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         }
 
-        impl #imp DekuWrite<#ctx_types> for #ident #wher {
+        impl #imp ::#crate_::DekuWriter<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
-            fn write(&self, __deku_output: &mut ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
+            fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
                 #write_body
             }
         }
@@ -134,9 +125,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let write_body = wrap_default_ctx(write_body, &input.ctx, &input.ctx_default);
 
         tokens.extend(quote! {
-            impl #imp DekuWrite for #ident #wher {
+            impl #imp ::#crate_::DekuWriter for #ident #wher {
                 #[allow(unused_variables)]
-                fn write(&self, __deku_output: &mut ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
+                fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
                     #write_body
                 }
             }
@@ -200,19 +191,19 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     Id::TokenStream(v) => {
                         quote! {
                             let mut __deku_variant_id: #id_type = #v;
-                            __deku_variant_id.write(__deku_output, (#id_args))?;
+                            __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
                         }
                     }
                     Id::Int(v) => {
                         quote! {
                             let mut __deku_variant_id: #id_type = #v;
-                            __deku_variant_id.write(__deku_output, (#id_args))?;
+                            __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
                         }
                     }
                     Id::LitByteStr(v) => {
                         quote! {
                             let mut __deku_variant_id: #id_type = *#v;
-                            __deku_variant_id.write(__deku_output, (#id_args))?;
+                            __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
                         }
                     }
                 }
@@ -221,7 +212,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             } else if has_discriminant {
                 quote! {
                     let mut __deku_variant_id: #id_type = Self::#variant_ident as #id_type;
-                    __deku_variant_id.write(__deku_output, (#id_args))?;
+                    __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
                 }
             } else {
                 return Err(syn::Error::new(
@@ -266,25 +257,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-        let to_bits_body = wrap_default_ctx(
-            quote! {
-                let mut __deku_acc: ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> = ::#crate_::bitvec::BitVec::new();
-                let __deku_output = &mut __deku_acc;
-
-                #magic_write
-
-                match self {
-                    #(#variant_writes),*
-                }
-
-                Ok(__deku_acc)
-            },
-            &input.ctx,
-            &input.ctx_default,
-        );
-
         tokens.extend(quote! {
-            impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
+             impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
 
                 fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
@@ -302,13 +276,22 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
             impl #imp DekuContainerWrite for #ident #wher {
                 fn to_bytes(&self) -> core::result::Result<Vec<u8>, ::#crate_::DekuError> {
-                    let mut acc: ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> = self.to_bits()?;
-                    Ok(acc.into_vec())
+                    let mut out_buf = vec![];
+                    let mut __deku_writer = ::#crate_::writer::Writer::new(&mut out_buf);
+                    ::#crate_::DekuWriter::to_writer(self, &mut __deku_writer, ())?;
+                    __deku_writer.finalize()?;
+                    Ok(out_buf)
                 }
 
                 #[allow(unused_variables)]
                 fn to_bits(&self) -> core::result::Result<::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0>, ::#crate_::DekuError> {
-                    #to_bits_body
+                    let mut out_buf = vec![];
+                    let mut __deku_writer = ::#crate_::writer::Writer::new(&mut out_buf);
+                    ::#crate_::DekuWriter::to_writer(self, &mut __deku_writer, ())?;
+                    let mut leftover = __deku_writer.leftover;
+                    let mut bv = ::#crate_::bitvec::BitVec::from_slice(&out_buf);
+                    bv.append(&mut leftover);
+                    Ok(bv)
                 }
             }
         })
@@ -342,9 +325,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         }
 
-        impl #imp DekuWrite<#ctx_types> for #ident #wher {
+        impl #imp ::#crate_::DekuWriter<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
-            fn write(&self, __deku_output: &mut ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
+            fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
                 #write_body
             }
         }
@@ -354,9 +337,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let write_body = wrap_default_ctx(write_body, &input.ctx, &input.ctx_default);
 
         tokens.extend(quote! {
-            impl #imp DekuWrite for #ident #wher {
+            impl #imp ::#crate_::DekuWriter for #ident #wher {
                 #[allow(unused_variables)]
-                fn write(&self, __deku_output: &mut ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
+                fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
                     #write_body
                 }
             }
@@ -368,9 +351,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 }
 
 fn emit_magic_write(input: &DekuData) -> TokenStream {
+    let crate_ = super::get_crate_name();
     if let Some(magic) = &input.magic {
         quote! {
-            #magic.write(__deku_output, ())?;
+            ::#crate_::DekuWriter::to_writer(#magic, __deku_writer, ())?;
         }
     } else {
         quote! {}
@@ -432,7 +416,7 @@ fn emit_bit_byte_offsets(
         .any(|v| token_contains_string(v, "__deku_byte_offset"))
     {
         Some(quote! {
-            let __deku_byte_offset = __deku_bit_offset / 8;
+            let __deku_byte_offset = __deku_writer.bits_written / 8;
         })
     } else {
         None
@@ -444,7 +428,7 @@ fn emit_bit_byte_offsets(
         || byte_offset.is_some()
     {
         Some(quote! {
-            let __deku_bit_offset = __deku_output.len();
+            let __deku_bit_offset = __deku_writer.bits_written;
         })
     } else {
         None
@@ -464,8 +448,7 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
                     stringify!(#bit_size)
                 ))
             )?;
-            let new_len = __deku_output.len() + __deku_pad;
-            __deku_output.resize(new_len, false);
+            __deku_writer.write_bits(::#crate_::bitvec::bitvec![u8, ::#crate_::bitvec::Msb0; 0; __deku_pad].as_bitslice())?;
         }
     }
 }
@@ -528,6 +511,14 @@ fn emit_field_write(
         }
     });
 
+    let trace_field_log = if cfg!(feature = "logging") {
+        quote! {
+            log::trace!("Writing: {}.{}", #ident, #field_ident_str);
+        }
+    } else {
+        quote! {}
+    };
+
     let field_write_func = if field_writer.is_some() {
         quote! { #field_writer }
     } else {
@@ -543,13 +534,13 @@ fn emit_field_write(
                 let field_type = &f.ty;
                 quote! {
                     let #field_ident: #field_type = #temp_value;
-                    ::#crate_::DekuWrite::write(#object_prefix &#field_ident, __deku_output, (#write_args))
+                    ::#crate_::DekuWriter::to_writer(#object_prefix &#field_ident, __deku_writer, (#write_args))
                 }
             } else {
                 quote! { core::result::Result::<(), ::#crate_::DekuError>::Ok(()) }
             }
         } else {
-            quote! { ::#crate_::DekuWrite::write(#object_prefix #field_ident, __deku_output, (#write_args)) }
+            quote! { ::#crate_::DekuWriter::to_writer(#object_prefix #field_ident, __deku_writer, (#write_args)) }
         }
     };
 
@@ -608,6 +599,7 @@ fn emit_field_write(
         #bit_offset
         #byte_offset
 
+        #trace_field_log
         #field_assert
         #field_assert_eq
 

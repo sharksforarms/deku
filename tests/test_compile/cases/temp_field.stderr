@@ -7,7 +7,7 @@ error[E0063]: missing field `field_a` in initializer of `Test1`
   = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: pattern requires `..` due to inaccessible fields
- --> $DIR/temp_field.rs:4:20
+ --> tests/test_compile/cases/temp_field.rs:4:20
   |
 4 | #[derive(DekuRead, DekuWrite)]
   |                    ^^^^^^^^^

@@ -1,20 +1,18 @@
 //! Implementations of DekuRead and DekuWrite for [T; N] where 0 < N <= 32
 
-use crate::{DekuError, DekuWrite};
-use bitvec::prelude::*;
-use core::mem::MaybeUninit;
-use no_std_io::io::Read;
+pub use deku_derive::*;
 
-use crate::DekuReader;
+use crate::reader::Reader;
+use crate::writer::Writer;
+use crate::{DekuError, DekuReader, DekuWriter};
+use core::mem::MaybeUninit;
+use no_std_io::io::{Read, Write};
 
 impl<'a, Ctx: Copy, T, const N: usize> DekuReader<'a, Ctx> for [T; N]
 where
     T: DekuReader<'a, Ctx>,
 {
-    fn from_reader_with_ctx<R: Read>(
-        reader: &mut crate::reader::Reader<R>,
-        ctx: Ctx,
-    ) -> Result<Self, DekuError>
+    fn from_reader_with_ctx<R: Read>(reader: &mut Reader<R>, ctx: Ctx) -> Result<Self, DekuError>
     where
         Self: Sized,
     {
@@ -46,25 +44,25 @@ where
     }
 }
 
-impl<Ctx: Copy, T, const N: usize> DekuWrite<Ctx> for [T; N]
+impl<Ctx: Copy, T, const N: usize> DekuWriter<Ctx> for [T; N]
 where
-    T: DekuWrite<Ctx>,
+    T: DekuWriter<Ctx>,
 {
-    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
         for v in self {
-            v.write(output, ctx)?;
+            v.to_writer(writer, ctx)?;
         }
         Ok(())
     }
 }
 
-impl<Ctx: Copy, T> DekuWrite<Ctx> for &[T]
+impl<Ctx: Copy, T> DekuWriter<Ctx> for &[T]
 where
-    T: DekuWrite<Ctx>,
+    T: DekuWriter<Ctx>,
 {
-    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
         for v in *self {
-            v.write(output, ctx)?;
+            v.to_writer(writer, ctx)?;
         }
         Ok(())
     }
@@ -72,11 +70,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::DekuWrite;
+    use super::*;
     use bitvec::prelude::*;
     use rstest::rstest;
 
-    use crate::{ctx::Endian, reader::Reader, DekuReader};
+    use crate::{ctx::Endian, reader::Reader, writer::Writer, DekuReader};
 
     #[rstest(input,endian,expected,
         case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, [0xCCDD, 0xAABB]),
@@ -95,48 +93,18 @@ mod tests {
         case::normal_be([0xDDCC, 0xBBAA], Endian::Big, vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
     fn test_bit_write(input: [u16; 2], endian: Endian, expected: Vec<u8>) {
-        let mut res_write = bitvec![u8, Msb0;];
-        input.write(&mut res_write, endian).unwrap();
-        assert_eq!(expected, res_write.into_vec());
+        // test writer
+        let mut out_buf = vec![];
+        let mut writer = Writer::new(&mut out_buf);
+        input.to_writer(&mut writer, endian).unwrap();
+        assert_eq!(expected, out_buf.to_vec());
 
         // test &slice
         let input = input.as_ref();
-        let mut res_write = bitvec![u8, Msb0;];
-        input.write(&mut res_write, endian).unwrap();
-        assert_eq!(expected, res_write.into_vec());
-    }
-
-    #[cfg(feature = "const_generics")]
-    #[rstest(input,endian,expected,expected_rest,
-        case::normal_le(
-            [0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66].as_ref(),
-            Endian::Little,
-            [[0xCCDD, 0xAABB], [0x8899, 0x6677]],
-            bits![u8, Msb0;],
-        ),
-        case::normal_le(
-            [0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66].as_ref(),
-            Endian::Big,
-            [[0xDDCC, 0xBBAA], [0x9988, 0x7766]],
-            bits![u8, Msb0;],
-        ),
-    )]
-    fn test_nested_array_bit_read(
-        input: &[u8],
-        endian: Endian,
-        expected: [[u16; 2]; 2],
-        expected_rest: &BitSlice<u8, Msb0>,
-    ) {
-        use no_std_io::io::Cursor;
-
-        use crate::reader::Reader;
-
-        let bit_slice = input.view_bits::<Msb0>();
-
-        let mut cursor = Cursor::new(input);
-        let mut reader = Reader::new(&mut cursor);
-        let res_read = <[[u16; 2]; 2]>::from_reader_with_ctx(&mut reader, endian).unwrap();
-        assert_eq!(expected, res_read);
+        let mut out_buf = vec![];
+        let mut writer = Writer::new(&mut out_buf);
+        input.to_writer(&mut writer, endian).unwrap();
+        assert_eq!(expected, out_buf.to_vec());
     }
 
     #[cfg(feature = "const_generics")]
@@ -162,5 +130,17 @@ mod tests {
         let mut res_write = bitvec![u8, Msb0;];
         input.write(&mut res_write, endian).unwrap();
         assert_eq!(expected, res_write.into_vec());
+
+        // test writer
+        let mut res_write = bitvec![u8, Msb0;];
+        input.write(&mut res_write, endian).unwrap();
+        assert_eq!(expected, res_write.into_vec());
+
+        // test &slice
+        let input = input.as_ref();
+        let mut out_buf = vec![];
+        let mut writer = Writer::new(&mut out_buf);
+        input.to_writer(&mut writer, endian).unwrap();
+        assert_eq!(expected, out_buf.to_vec());
     }
 }

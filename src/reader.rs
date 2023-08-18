@@ -218,7 +218,7 @@ impl<'a, R: Read> Reader<'a, R> {
             self.bits_read += amt * 8;
 
             #[cfg(feature = "logging")]
-            log::trace!("read_bytes: returning {buf:02x?}");
+            log::trace!("read_bytes: returning {:02x?}", &buf[..amt]);
 
             Ok(ReaderRet::Bytes)
         } else {

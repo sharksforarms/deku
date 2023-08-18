@@ -2,7 +2,9 @@ use std::convert::TryInto;
 
 use deku::bitvec::{BitVec, Msb0};
 use deku::ctx::BitSize;
-use deku::prelude::*;
+use deku::writer::Writer;
+use deku::{prelude::*, DekuWriter};
+use no_std_io::io::Write;
 
 fn bit_flipper_read<R: std::io::Read>(
     field_a: u8,
@@ -24,10 +26,10 @@ fn bit_flipper_read<R: std::io::Read>(
     Ok(value)
 }
 
-fn bit_flipper_write(
+fn bit_flipper_write<W: Write>(
     field_a: u8,
     field_b: u8,
-    output: &mut BitVec<u8, Msb0>,
+    writer: &mut Writer<W>,
     bit_size: BitSize,
 ) -> Result<(), DekuError> {
     // Access to previously written fields
@@ -42,7 +44,7 @@ fn bit_flipper_write(
     // flip the bits on value if field_a is 0x01
     let value = if field_a == 0x01 { !field_b } else { field_b };
 
-    value.write(output, bit_size)
+    value.to_writer(writer, bit_size)
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -51,7 +53,7 @@ struct DekuTest {
 
     #[deku(
         reader = "bit_flipper_read(*field_a, deku::reader, BitSize(8))",
-        writer = "bit_flipper_write(*field_a, *field_b, deku::output, BitSize(8))"
+        writer = "bit_flipper_write(*field_a, *field_b, deku::writer, BitSize(8))"
     )]
     field_b: u8,
 }

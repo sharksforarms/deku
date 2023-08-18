@@ -1,4 +1,3 @@
-use deku::bitvec::{BitVec, Msb0};
 use deku::prelude::*;
 
 #[derive(DekuRead, DekuWrite)]
@@ -73,13 +72,13 @@ struct TestCtx {
     field_b: ChildCtx,
 }
 
-fn dummy_writer(_offset: usize, _output: &mut BitVec<u8, Msb0>) -> Result<(), DekuError> {
+fn dummy_writer<W: std::io::Write>(_offset: usize, _writer: &mut deku::writer::Writer<W>) -> Result<(), DekuError> {
     Ok(())
 }
 #[derive(DekuRead, DekuWrite)]
 struct TestWriter {
     field_a: u8,
-    #[deku(writer = "dummy_writer(deku::byte_offset, deku::output)")]
+    #[deku(writer = "dummy_writer(deku::byte_offset, deku::writer)")]
     field_b: usize,
 }
 

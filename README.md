@@ -8,7 +8,7 @@
 
 Declarative binary reading and writing
 
-This crate provides bit-level, symmetric, serialization/deserialization
+This crate provides bit-level, performant, symmetric, serialization/deserialization
 implementations for structs and enums
 
 ## Why use Deku

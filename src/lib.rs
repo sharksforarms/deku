@@ -242,7 +242,7 @@ tokens such as `reader`, `writer`, `map`, `count`, etc.
 These are provided as a convenience to the user.
 
 Always included:
-- `deku::container: &Container` - Current [`deku::container::Container`]
+- `deku::container: &mut Container` - Current [Container](crate::container::Container)
 - `deku::input_bits: &BitSlice<u8, Msb0>` - The initial input in bits
 - `deku::output: &mut BitSlice<u8, Msb0>` - The output bit stream
 

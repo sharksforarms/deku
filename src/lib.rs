@@ -2,15 +2,19 @@
 # Deku: Declarative binary reading and writing
 
 Deriving a struct or enum with `DekuRead` and `DekuWrite` provides bit-level,
-symmetric, serialization/deserialization implementations.
+symmetric, performant, serialization/deserialization implementations.
 
 This allows the developer to focus on building and maintaining how the data is
 represented and manipulated and not on redundant, error-prone, parsing/writing code.
-
 This approach is especially useful when dealing with binary structures such as
-TLVs or network protocols.
+TLVs or network protocols. This allows the internal rustc compiler to choose
+the in-memory representation of the struct, while reading and writing can
+understand the struct in a "packed" C way.
 
-Under the hood, it makes use of the [bitvec](https://crates.io/crates/bitvec)
+Under the hood, many specializations are done in order to achieve performant code
+that is **almost** the same performance as if you wrote the code yourself!
+For reading and writing bytes, the std library is used.
+When bit-level control is required, it makes use of the [bitvec](https://crates.io/crates/bitvec)
 crate as the "Reader" and “Writer”
 
 For documentation and examples on available `#[deku]` attributes and features,
@@ -309,9 +313,28 @@ pub trait DekuRead<'a, Ctx = ()> {
         Self: Sized;
 }
 
-/// "Reader" trait: read bytes and bits from [`Read`]er
+/// "Reader" trait: read bytes and bits from [`acid_io::Read`]er
 pub trait DekuReader<'a, Ctx = ()> {
-    /// Construct type from `container` implementing [`acid_io::Read`]
+    /// Construct type from `container` implementing [`acid_io::Read`].
+    ///
+    /// # Example
+    /// ```rust, no_run
+    /// # use std::io::{Seek, SeekFrom, Read};
+    /// # use std::fs::File;
+    /// # use deku::prelude::*;
+    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+    /// #[deku(endian = "big")]
+    /// struct EcHdr {
+    ///     magic: [u8; 4],
+    ///     version: u8,
+    ///     padding1: [u8; 3],
+    /// }
+    ///
+    /// let mut file = File::options().read(true).open("file").unwrap();
+    /// file.seek(SeekFrom::Start(0)).unwrap();
+    /// let mut container = Container::new(&mut file);
+    /// let ec = EcHdr::from_reader(&mut container, ()).unwrap();
+    /// ```
     fn from_reader<R: acid_io::Read>(
         container: &mut crate::container::Container<R>,
         ctx: Ctx,
@@ -328,6 +351,11 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     ///
     /// # Returns
     /// amount of bits read after parsing in addition to Self.
+    ///
+    /// Note: When derived with `deku`, this function will not create a Reader wrapped around a [BufRead].
+    /// To enable this, use [DekuReader::from_reader](crate::DekuReader#tymethod.from_reader).
+    ///
+    /// [BufRead]: std::io::BufRead
     fn from_bytes(input: (&'a mut [u8], usize)) -> Result<(usize, Self), DekuError>
     where
         Self: Sized;

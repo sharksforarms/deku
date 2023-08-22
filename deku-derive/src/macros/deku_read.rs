@@ -68,10 +68,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     __deku_container.skip_bits(__deku_input.1)?;
                 }
 
-                #magic_read
-
-                #(#field_reads)*
-                let __deku_value = #initialize_struct;
+                let __deku_value = Self::from_reader(__deku_container, ())?;
 
                 Ok((__deku_container.bits_read, __deku_value))
             },
@@ -315,9 +312,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     __deku_container.skip_bits(__deku_input.1)?;
                 }
 
-                #magic_read
-
-                #variant_read
+                let __deku_value = Self::from_reader(__deku_container, ())?;
 
                 Ok((__deku_container.bits_read, __deku_value))
             },

@@ -1,10 +1,9 @@
 //! Implementations of DekuRead and DekuWrite for tuples of length 1 to 11
 
-// TODO: impl from_reader
-
+use acid_io::Read;
 use bitvec::prelude::*;
 
-use crate::{DekuError, DekuRead, DekuWrite};
+use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
 
 // Trait to help us build intermediate tuples while DekuRead'ing each element
 // from the tuple
@@ -57,6 +56,24 @@ macro_rules! ImplDekuTupleTraits {
                     _rest = &_rest[amt_read..];
                 )+
                 Ok((total_read, tuple))
+            }
+        }
+
+        impl<'a, Ctx: Copy, $($T:DekuReader<'a, Ctx>+Sized),+> DekuReader<'a, Ctx> for ($($T,)+)
+        {
+            fn from_reader<R: Read>(
+                container: &mut crate::container::Container<R>,
+                ctx: Ctx,
+            ) -> Result<Self, DekuError>
+            where
+                Self: Sized,
+            {
+                let tuple = ();
+                $(
+                    let val = <$T>::from_reader(container, ctx)?;
+                    let tuple = tuple.append(val);
+                )+
+                Ok(tuple)
             }
         }
 

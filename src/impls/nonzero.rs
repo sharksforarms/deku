@@ -6,28 +6,10 @@ use core::num::*;
 use bitvec::prelude::*;
 
 use crate::ctx::*;
-use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
+use crate::{DekuError, DekuReader, DekuWrite};
 
 macro_rules! ImplDekuTraitsCtx {
     ($typ:ty, $readtype:ty, $ctx_arg:tt, $ctx_type:tt) => {
-        impl DekuRead<'_, $ctx_type> for $typ {
-            fn read(
-                input: &BitSlice<u8, Msb0>,
-                $ctx_arg: $ctx_type,
-            ) -> Result<(usize, Self), DekuError>
-            where
-                Self: Sized,
-            {
-                let (amt_read, value) = <$readtype>::read(input, $ctx_arg)?;
-                let value = <$typ>::new(value);
-
-                match value {
-                    None => Err(DekuError::Parse(format!("NonZero assertion"))),
-                    Some(v) => Ok((amt_read, v)),
-                }
-            }
-        }
-
         impl DekuReader<'_, $ctx_type> for $typ {
             fn from_reader<R: Read>(
                 container: &mut crate::container::Container<R>,
@@ -95,9 +77,6 @@ mod tests {
     )]
     fn test_non_zero(input: &[u8], expected: NonZeroU8) {
         let mut bit_slice = input.view_bits::<Msb0>();
-        let (amt_read, res_read) = NonZeroU8::read(bit_slice, ()).unwrap();
-        assert_eq!(expected, res_read);
-        assert!(bit_slice[amt_read..].is_empty());
 
         let mut container = Container::new(&mut bit_slice);
         let res_read = NonZeroU8::from_reader(&mut container, ()).unwrap();

@@ -1,29 +1,7 @@
 use acid_io::Read;
 use bitvec::prelude::*;
 
-use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
-
-impl<'a, T: DekuRead<'a, Ctx>, Ctx: Copy> DekuRead<'a, Ctx> for Option<T> {
-    /// Read a T from input and store as Some(T)
-    /// * `inner_ctx` - The context required by `T`. It will be passed to every `T`s when constructing.
-    /// # Examples
-    /// ```rust
-    /// # use deku::ctx::*;
-    /// # use deku::DekuRead;
-    /// # use deku::bitvec::BitView;
-    /// let input = vec![1u8, 2, 3, 4];
-    /// let (amt_read, v) = Option::<u32>::read(input.view_bits(), Endian::Little).unwrap();
-    /// assert_eq!(amt_read, 32);
-    /// assert_eq!(v, Some(0x04030201))
-    /// ```
-    fn read(input: &'a BitSlice<u8, Msb0>, inner_ctx: Ctx) -> Result<(usize, Self), DekuError>
-    where
-        Self: Sized,
-    {
-        let (amt_read, val) = <T>::read(input, inner_ctx)?;
-        Ok((amt_read, Some(val)))
-    }
-}
+use crate::{DekuError, DekuReader, DekuWrite};
 
 impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
     fn from_reader<R: Read>(
@@ -54,14 +32,18 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Option<T> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use acid_io::Cursor;
+
+    use crate::container::Container;
+
     #[test]
     fn test_option() {
-        use crate::bitvec::BitView;
         use crate::ctx::*;
-        use crate::DekuRead;
-        let input = [1u8, 2, 3, 4];
-        let (amt_read, v) = Option::<u32>::read(input.view_bits(), Endian::Little).unwrap();
-        assert_eq!(amt_read, 32);
+        let input = &[1u8, 2, 3, 4];
+        let mut cursor = Cursor::new(input);
+        let mut container = Container::new(&mut cursor);
+        let v = Option::<u32>::from_reader(&mut container, Endian::Little).unwrap();
         assert_eq!(v, Some(0x04030201))
     }
 }

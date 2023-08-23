@@ -4,52 +4,12 @@ pub use deku_derive::*;
 
 #[cfg(feature = "const_generics")]
 mod const_generics_impl {
-    use crate::{DekuError, DekuRead, DekuWrite};
+    use crate::{DekuError, DekuWrite};
     use bitvec::prelude::*;
     use core::mem::MaybeUninit;
     use std::io::Read;
 
     use crate::DekuReader;
-
-    impl<'a, Ctx: Copy, T, const N: usize> DekuRead<'a, Ctx> for [T; N]
-    where
-        T: DekuRead<'a, Ctx>,
-    {
-        fn read(input: &'a BitSlice<u8, Msb0>, ctx: Ctx) -> Result<(usize, Self), DekuError>
-        where
-            Self: Sized,
-        {
-            #[allow(clippy::uninit_assumed_init)]
-            // This is safe because we initialize the array immediately after,
-            // and never return it in case of error
-            let mut slice: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
-            let mut rest = input;
-            let mut total_read = 0;
-            for (n, item) in slice.iter_mut().enumerate() {
-                let (amt_read, value) = match T::read(rest, ctx) {
-                    Ok(it) => it,
-                    Err(err) => {
-                        // For each item in the array, drop if we allocated it.
-                        for item in &mut slice[0..n] {
-                            unsafe {
-                                item.assume_init_drop();
-                            }
-                        }
-                        return Err(err);
-                    }
-                };
-                item.write(value);
-                rest = &rest[amt_read..];
-                total_read += amt_read;
-            }
-
-            let val = unsafe {
-                // TODO: array_assume_init: https://github.com/rust-lang/rust/issues/80908
-                (std::ptr::addr_of!(slice) as *const [T; N]).read()
-            };
-            Ok((total_read, val))
-        }
-    }
 
     impl<'a, Ctx: Copy, T, const N: usize> DekuReader<'a, Ctx> for [T; N]
     where
@@ -117,7 +77,7 @@ mod const_generics_impl {
 
 #[cfg(test)]
 mod tests {
-    use crate::{DekuRead, DekuWrite};
+    use crate::DekuWrite;
     use bitvec::prelude::*;
     use rstest::rstest;
 
@@ -134,10 +94,6 @@ mod tests {
         expected_rest: &BitSlice<u8, Msb0>,
     ) {
         let mut bit_slice = input.view_bits::<Msb0>();
-
-        let (amt_read, res_read) = <[u16; 2]>::read(bit_slice, endian).unwrap();
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut container = Container::new(&mut bit_slice);
         let res_read = <[u16; 2]>::from_reader(&mut container, endian).unwrap();
@@ -186,10 +142,6 @@ mod tests {
         use crate::container::Container;
 
         let bit_slice = input.view_bits::<Msb0>();
-
-        let (amt_read, res_read) = <[[u16; 2]; 2]>::read(bit_slice, endian).unwrap();
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);

@@ -4,22 +4,7 @@ use acid_io::Read;
 
 use bitvec::prelude::*;
 
-use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
-
-impl<'a, T, Ctx> DekuRead<'a, Ctx> for Cow<'a, T>
-where
-    T: DekuRead<'a, Ctx> + Clone,
-    Ctx: Copy,
-{
-    /// Read a T from input and store as Cow<T>
-    fn read(input: &'a BitSlice<u8, Msb0>, inner_ctx: Ctx) -> Result<(usize, Self), DekuError>
-    where
-        Self: Sized,
-    {
-        let (amt_read, val) = <T>::read(input, inner_ctx)?;
-        Ok((amt_read, Cow::Owned(val)))
-    }
-}
+use crate::{DekuError, DekuReader, DekuWrite};
 
 impl<'a, T, Ctx> DekuReader<'a, Ctx> for Cow<'a, T>
 where
@@ -63,9 +48,6 @@ mod tests {
     )]
     fn test_cow(input: &[u8], expected: Cow<u16>, expected_rest: &BitSlice<u8, Msb0>) {
         let bit_slice = input.view_bits::<Msb0>();
-        let (amt_read, res_read) = <Cow<u16>>::read(bit_slice, ()).unwrap();
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);

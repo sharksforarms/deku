@@ -6,22 +6,7 @@ use alloc::vec::Vec;
 use bitvec::prelude::*;
 
 use crate::ctx::Limit;
-use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
-
-impl<'a, T, Ctx> DekuRead<'a, Ctx> for Box<T>
-where
-    T: DekuRead<'a, Ctx>,
-    Ctx: Copy,
-{
-    /// Read a T from input and store as Box<T>
-    fn read(input: &'a BitSlice<u8, Msb0>, inner_ctx: Ctx) -> Result<(usize, Self), DekuError>
-    where
-        Self: Sized,
-    {
-        let (amt_read, val) = <T>::read(input, inner_ctx)?;
-        Ok((amt_read, Box::new(val)))
-    }
-}
+use crate::{DekuError, DekuReader, DekuWrite};
 
 impl<'a, T, Ctx> DekuReader<'a, Ctx> for Box<T>
 where
@@ -45,26 +30,6 @@ where
     /// Write T from box
     fn write(&self, output: &mut BitVec<u8, Msb0>, inner_ctx: Ctx) -> Result<(), DekuError> {
         self.as_ref().write(output, inner_ctx)
-    }
-}
-
-impl<'a, T, Ctx, Predicate> DekuRead<'a, (Limit<T, Predicate>, Ctx)> for Box<[T]>
-where
-    T: DekuRead<'a, Ctx>,
-    Ctx: Copy,
-    Predicate: FnMut(&T) -> bool,
-{
-    /// Read `T`s until the given limit
-    fn read(
-        input: &'a BitSlice<u8, Msb0>,
-        (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
-    ) -> Result<(usize, Self), DekuError>
-    where
-        Self: Sized,
-    {
-        // use Vec<T>'s implementation and convert to Box<[T]>
-        let (amt_read, val) = <Vec<T>>::read(input, (limit, inner_ctx))?;
-        Ok((amt_read, val.into_boxed_slice()))
     }
 }
 
@@ -117,9 +82,6 @@ mod tests {
     )]
     fn test_boxed(input: &[u8], expected: Box<u16>, expected_rest: &BitSlice<u8, Msb0>) {
         let bit_slice = input.view_bits::<Msb0>();
-        let (amt_read, res_read) = <Box<u16>>::read(bit_slice, ()).unwrap();
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);
@@ -154,13 +116,8 @@ mod tests {
         // Unwrap here because all test cases are `Some`.
         let bit_size = bit_size.unwrap();
 
-        let (amt_read, res_read) =
-            <Box<[u16]>>::read(bit_slice, (limit, (endian, BitSize(bit_size)))).unwrap();
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, bit_slice[amt_read..]);
-
         let mut res_write = bitvec![u8, Msb0;];
-        res_read
+        expected
             .write(&mut res_write, (endian, BitSize(bit_size)))
             .unwrap();
         assert_eq!(expected_write, res_write.into_vec());

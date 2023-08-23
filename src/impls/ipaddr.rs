@@ -4,20 +4,7 @@ use acid_io::Read;
 
 use bitvec::prelude::*;
 
-use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
-
-impl<'a, Ctx> DekuRead<'a, Ctx> for Ipv4Addr
-where
-    u32: DekuRead<'a, Ctx>,
-{
-    fn read(input: &'a BitSlice<u8, Msb0>, ctx: Ctx) -> Result<(usize, Self), DekuError>
-    where
-        Self: Sized,
-    {
-        let (amt_read, ip) = u32::read(input, ctx)?;
-        Ok((amt_read, ip.into()))
-    }
-}
+use crate::{DekuError, DekuReader, DekuWrite};
 
 impl<'a, Ctx> DekuReader<'a, Ctx> for Ipv4Addr
 where
@@ -39,19 +26,6 @@ where
     fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
         let ip: u32 = (*self).into();
         ip.write(output, ctx)
-    }
-}
-
-impl<'a, Ctx> DekuRead<'a, Ctx> for Ipv6Addr
-where
-    u128: DekuRead<'a, Ctx>,
-{
-    fn read(input: &'a BitSlice<u8, Msb0>, ctx: Ctx) -> Result<(usize, Self), DekuError>
-    where
-        Self: Sized,
-    {
-        let (amt_read, ip) = u128::read(input, ctx)?;
-        Ok((amt_read, ip.into()))
     }
 }
 
@@ -111,10 +85,6 @@ mod tests {
     ) {
         let bit_slice = input.view_bits::<Msb0>();
 
-        let (amt_read, res_read) = Ipv4Addr::read(bit_slice, endian).unwrap();
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, bit_slice[amt_read..]);
-
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);
         let res_read = Ipv4Addr::from_reader(&mut container, endian).unwrap();
@@ -136,10 +106,6 @@ mod tests {
         expected_rest: &BitSlice<u8, Msb0>,
     ) {
         let bit_slice = input.view_bits::<Msb0>();
-
-        let (amt_read, res_read) = Ipv6Addr::read(bit_slice, endian).unwrap();
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);

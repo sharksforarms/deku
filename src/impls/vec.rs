@@ -240,7 +240,7 @@ mod tests {
         expected_rest: &BitSlice<u8, Msb0>,
         expected_write: Vec<u8>,
     ) {
-        let input_clone = input.clone();
+        let input_clone = input;
         // Unwrap here because all test cases are `Some`.
         let bit_size = bit_size.unwrap();
 

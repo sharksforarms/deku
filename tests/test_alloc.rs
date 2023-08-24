@@ -45,8 +45,6 @@ struct TestDeku {
 }
 
 mod tests {
-    use std::convert::TryFrom;
-
     use alloc_counter::count_alloc;
     use hexlit::hex;
 

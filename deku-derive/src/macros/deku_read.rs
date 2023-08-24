@@ -59,22 +59,18 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerRead` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-        let from_bytes_body = wrap_default_ctx(
-            quote! {
-                use core::convert::TryFrom;
-                let mut cursor = ::#crate_::acid_io::Cursor::new(__deku_input.0);
-                let __deku_container = &mut deku::container::Container::new(&mut cursor);
-                if __deku_input.1 != 0 {
-                    __deku_container.skip_bits(__deku_input.1)?;
-                }
+        let from_bytes_body = quote! {
+            use core::convert::TryFrom;
+            let mut cursor = ::#crate_::acid_io::Cursor::new(__deku_input.0);
+            let __deku_container = &mut deku::container::Container::new(&mut cursor);
+            if __deku_input.1 != 0 {
+                __deku_container.skip_bits(__deku_input.1)?;
+            }
 
-                let __deku_value = Self::from_reader(__deku_container, ())?;
+            let __deku_value = Self::from_reader(__deku_container, ())?;
 
-                Ok((__deku_container.bits_read, __deku_value))
-            },
-            &input.ctx,
-            &input.ctx_default,
-        );
+            Ok((__deku_container.bits_read, __deku_value))
+        };
 
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
@@ -303,22 +299,18 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerRead` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-        let from_bytes_body = wrap_default_ctx(
-            quote! {
-                use core::convert::TryFrom;
-                let mut cursor = ::#crate_::acid_io::Cursor::new(__deku_input.0);
-                let __deku_container = &mut deku::container::Container::new(&mut cursor);
-                if __deku_input.1 != 0 {
-                    __deku_container.skip_bits(__deku_input.1)?;
-                }
+        let from_bytes_body = quote! {
+            use core::convert::TryFrom;
+            let mut cursor = ::#crate_::acid_io::Cursor::new(__deku_input.0);
+            let __deku_container = &mut deku::container::Container::new(&mut cursor);
+            if __deku_input.1 != 0 {
+                __deku_container.skip_bits(__deku_input.1)?;
+            }
 
-                let __deku_value = Self::from_reader(__deku_container, ())?;
+            let __deku_value = Self::from_reader(__deku_container, ())?;
 
-                Ok((__deku_container.bits_read, __deku_value))
-            },
-            &input.ctx,
-            &input.ctx_default,
-        );
+            Ok((__deku_container.bits_read, __deku_value))
+        };
 
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 

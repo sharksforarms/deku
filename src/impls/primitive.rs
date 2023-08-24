@@ -835,7 +835,7 @@ mod tests {
         expected: u32,
         expected_rest: &BitSlice<u8, Msb0>,
     ) {
-        let mut input_clone = input.clone();
+        let mut input_clone = input;
         let bit_slice = input.view_bits::<Msb0>();
 
         let (amt_read, res_read) = match bit_size {

@@ -1,17 +1,7 @@
 use acid_io::Read;
 use bitvec::prelude::*;
 
-use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
-
-impl<Ctx: Copy> DekuRead<'_, Ctx> for () {
-    /// NOP on read
-    fn read(_input: &BitSlice<u8, Msb0>, _inner_ctx: Ctx) -> Result<(usize, Self), DekuError>
-    where
-        Self: Sized,
-    {
-        Ok((0, ()))
-    }
-}
+use crate::{DekuError, DekuReader, DekuWrite};
 
 impl<Ctx: Copy> DekuReader<'_, Ctx> for () {
     fn from_reader<R: Read>(
@@ -43,11 +33,6 @@ mod tests {
     #[allow(clippy::unit_cmp)]
     fn test_unit() {
         let mut input = &[0xff];
-
-        let bit_slice = input.view_bits::<Msb0>();
-        let (amt_read, res_read) = <()>::read(bit_slice, ()).unwrap();
-        assert_eq!((), res_read);
-        assert_eq!(amt_read, 0);
 
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);

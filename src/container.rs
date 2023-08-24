@@ -59,6 +59,12 @@ impl<'a, R: Read> Container<'a, R> {
         self.read_cache = Some(vec![]);
     }
 
+    /// Return the unused bits
+    #[inline]
+    pub fn rest(&mut self) -> Vec<bool> {
+        self.leftover.iter().by_vals().collect()
+    }
+
     /// Return true if we are at the end of a reader and there are no cached bits in the container
     ///
     /// The byte that was read will be internally buffered

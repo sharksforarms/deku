@@ -39,9 +39,6 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
         (_, _): (Endian, ByteSize),
     ) -> Result<(usize, Self), DekuError> {
         const MAX_TYPE_BITS: usize = BitSize::of::<u8>().0;
-        if input.len() < MAX_TYPE_BITS {
-            return Err(DekuError::Incomplete(NeedSize::new(MAX_TYPE_BITS)));
-        }
 
         // PANIC: We already check that input.len() < bit_size above, so no panic will happen
         let value = input[..MAX_TYPE_BITS].load::<u8>();
@@ -50,7 +47,6 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
 }
 
 impl DekuReader<'_, (Endian, ByteSize)> for u8 {
-    // specialize not needed?
     #[inline]
     fn from_reader<R: Read>(
         container: &mut crate::container::Container<R>,
@@ -84,16 +80,6 @@ macro_rules! ImplDekuReadBits {
                 let bit_size: usize = size.0;
 
                 let input_is_le = endian.is_le();
-
-                if bit_size > MAX_TYPE_BITS {
-                    return Err(DekuError::Parse(format!(
-                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {bit_size} bits",
-                    )));
-                }
-
-                if input.len() < bit_size {
-                    return Err(DekuError::Incomplete(crate::error::NeedSize::new(bit_size)));
-                }
 
                 // PANIC: We already check that input.len() < bit_size above, so no panic will happen
                 let bit_slice = &input[..bit_size];
@@ -170,15 +156,14 @@ macro_rules! ImplDekuReadBits {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 if size.0 > MAX_TYPE_BITS {
                     return Err(DekuError::Parse(format!(
-                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits", size.0
+                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits",
+                        size.0
                     )));
                 }
                 let bits = container.read_bits(size.0)?;
                 let Some(bits) = bits else {
-                    return Err(DekuError::Parse(format!(
-                        "no bits read from reader",
-                    )));
-                };
+                            return Err(DekuError::Parse(format!("no bits read from reader",)));
+                        };
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
             }
@@ -194,62 +179,17 @@ macro_rules! ImplDekuReadBytes {
                 input: &BitSlice<u8, Msb0>,
                 (endian, size): (Endian, ByteSize),
             ) -> Result<(usize, Self), DekuError> {
-                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 let bit_size: usize = size.0 * 8;
 
                 let input_is_le = endian.is_le();
 
-                if bit_size > MAX_TYPE_BITS {
-                    return Err(DekuError::Parse(format!(
-                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {bit_size} bits",
-                    )));
-                }
-
-                if input.len() < bit_size {
-                    return Err(DekuError::Incomplete(crate::error::NeedSize::new(bit_size)));
-                }
-
                 let bit_slice = &input[..bit_size];
 
-                let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
-
                 let bytes = bit_slice.domain().region().unwrap().1;
-                let value = if pad == 0
-                    && bit_slice.len() == MAX_TYPE_BITS
-                    && bytes.len() * 8 == MAX_TYPE_BITS
-                {
-                    // if everything is aligned, just read the value
-                    if input_is_le {
-                        <$typ>::from_le_bytes(bytes.try_into()?)
-                    } else {
-                        <$typ>::from_be_bytes(bytes.try_into()?)
-                    }
+                let value = if input_is_le {
+                    <$typ>::from_le_bytes(bytes.try_into()?)
                 } else {
-                    let mut bits: BitVec<u8, Msb0> = BitVec::with_capacity(bit_slice.len() + pad);
-
-                    // Copy bits to new BitVec
-                    bits.extend_from_bitslice(&bit_slice);
-
-                    // Force align
-                    //i.e. [1110, 10010110] -> [11101001, 0110]
-                    bits.force_align();
-
-                    // cannot use from_X_bytes as we don't have enough bytes for $typ
-                    // read manually
-                    let mut res: $inner = 0;
-                    if input_is_le {
-                        for b in bytes.iter().rev() {
-                            res <<= 8 as $inner;
-                            res |= *b as $inner;
-                        }
-                    } else {
-                        for b in bytes.iter() {
-                            res <<= 8 as $inner;
-                            res |= *b as $inner;
-                        }
-                    };
-
-                    res as $typ
+                    <$typ>::from_be_bytes(bytes.try_into()?)
                 };
 
                 Ok((bit_size, value))
@@ -262,14 +202,19 @@ macro_rules! ImplDekuReadBytes {
                 container: &mut crate::container::Container<R>,
                 (endian, size): (Endian, ByteSize),
             ) -> Result<$typ, DekuError> {
+                const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
+                if size.0 > MAX_TYPE_BYTES {
+                    return Err(DekuError::Parse(format!(
+                        "too much data: container of {MAX_TYPE_BYTES} bytes cannot hold {} bytes",
+                        size.0
+                    )));
+                }
                 let mut buf = [0; core::mem::size_of::<$typ>()];
                 let ret = container.read_bytes(size.0, &mut buf)?;
                 let a = match ret {
                     ContainerRet::Bits(bits) => {
                         let Some(bits) = bits else {
-                            return Err(DekuError::Parse(format!(
-                                "no bits read from reader",
-                            )));
+                            return Err(DekuError::Parse(format!("no bits read from reader",)));
                         };
                         let a = <$typ>::read(&bits, (endian, size))?;
                         a.1
@@ -386,21 +331,11 @@ macro_rules! ImplDekuReadSignExtend {
     };
 }
 
+// TODO: these forward types should forward on a ContainerCanHoldSize or something if ByteSize or
+// BitSize wasn't defined
 macro_rules! ForwardDekuRead {
     ($typ:ty) => {
         // Only have `endian`, set `bit_size` to `Size::of::<Type>()`
-        impl DekuRead<'_, Endian> for $typ {
-            #[inline]
-            fn read(
-                input: &BitSlice<u8, Msb0>,
-                endian: Endian,
-            ) -> Result<(usize, Self), DekuError> {
-                let byte_size = core::mem::size_of::<$typ>();
-
-                <$typ>::read(input, (endian, ByteSize(byte_size)))
-            }
-        }
-
         impl DekuReader<'_, Endian> for $typ {
             #[inline]
             fn from_reader<R: Read>(
@@ -413,19 +348,7 @@ macro_rules! ForwardDekuRead {
             }
         }
 
-        // Only have `bit_size`, set `endian` to `Endian::default`.
-        impl DekuRead<'_, ByteSize> for $typ {
-            #[inline]
-            fn read(
-                input: &BitSlice<u8, Msb0>,
-                byte_size: ByteSize,
-            ) -> Result<(usize, Self), DekuError> {
-                let endian = Endian::default();
-
-                <$typ>::read(input, (endian, byte_size))
-            }
-        }
-
+        // Only have `byte_size`, set `endian` to `Endian::default`.
         impl DekuReader<'_, ByteSize> for $typ {
             #[inline]
             fn from_reader<R: Read>(
@@ -439,24 +362,7 @@ macro_rules! ForwardDekuRead {
             }
         }
 
-        // Only have `bit_size`, set `endian` to `Endian::default`.
-        impl DekuRead<'_, BitSize> for $typ {
-            #[inline]
-            fn read(
-                input: &BitSlice<u8, Msb0>,
-                bit_size: BitSize,
-            ) -> Result<(usize, Self), DekuError> {
-                let endian = Endian::default();
-
-                // check if we can use ByteSize for performance
-                if (bit_size.0 % 8) == 0 {
-                    <$typ>::read(input, (endian, ByteSize(bit_size.0 / 8)))
-                } else {
-                    <$typ>::read(input, (endian, bit_size))
-                }
-            }
-        }
-
+        //// Only have `bit_size`, set `endian` to `Endian::default`.
         impl DekuReader<'_, BitSize> for $typ {
             #[inline]
             fn from_reader<R: Read>(
@@ -470,13 +376,6 @@ macro_rules! ForwardDekuRead {
                 } else {
                     <$typ>::from_reader(container, (endian, bit_size))
                 }
-            }
-        }
-
-        impl DekuRead<'_> for $typ {
-            #[inline]
-            fn read(input: &BitSlice<u8, Msb0>, _: ()) -> Result<(usize, Self), DekuError> {
-                <$typ>::read(input, Endian::default())
             }
         }
 
@@ -712,18 +611,14 @@ mod tests {
         ($test_name:ident, $typ:ty, $input:expr, $expected:expr) => {
             #[test]
             fn $test_name() {
-                let input = $input;
-                let mut bit_slice = input.view_bits::<Msb0>();
-                let (_rest, res_read) = <$typ>::read(bit_slice, ENDIAN).unwrap();
-                assert_eq!($expected, res_read);
-
-                let mut container = Container::new(&mut bit_slice);
+                let mut r = std::io::Cursor::new($input);
+                let mut container = Container::new(&mut r);
                 let res_read = <$typ>::from_reader(&mut container, ENDIAN).unwrap();
                 assert_eq!($expected, res_read);
 
                 let mut res_write = bitvec![u8, Msb0;];
                 res_read.write(&mut res_write, ENDIAN).unwrap();
-                assert_eq!(input, res_write.into_vec());
+                assert_eq!($input, res_write.into_vec());
             }
         };
     }
@@ -812,58 +707,29 @@ mod tests {
         native_endian!(-0.006_f64)
     );
 
-    #[rstest(bit_slice, endian, bit_size, expected, expected_rest,
-        case::normal(bits![u8, Msb0; 1], Endian::Little, Some(1), 0x1, bits![u8, Msb0;]),
-        case::normal(bits![u8, Msb0; 1], Endian::Big, Some(1), 0x1, bits![u8, Msb0;]),
-        case::normal(bits![u8, Msb0; 0, 0, 0, 0, 0, 0, 0, 1], Endian::Little, Some(8), 0x1, bits![u8, Msb0;]),
-        case::normal(bits![u8, Msb0; 0, 0, 0, 0, 0, 0, 0, 1], Endian::Big, Some(8), 0x1, bits![u8, Msb0;]),
-        #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
-        case::normal(bits![u8, Msb0; 1], Endian::Big, Some(9), 0x1, bits![u8, Msb0;]),
-    )]
-    fn test_bitvec_read(
-        bit_slice: &BitSlice<u8, Msb0>,
-        endian: Endian,
-        bit_size: Option<usize>,
-        expected: u8,
-        expected_rest: &BitSlice<u8, Msb0>,
-    ) {
-        let (amt_read, res_read) = match bit_size {
-            Some(bit_size) => u8::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
-            None => u8::read(bit_slice, endian).unwrap(),
-        };
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, bit_slice[amt_read..]);
-    }
-
-    #[rstest(input, endian, bit_size, expected, expected_rest,
-        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, bits![u8, Msb0;]),
-        case::normal_bits_12_le([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Little, Some(12), 0b1110_1001_0110, bits![u8, Msb0; 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1]),
-        case::normal_bits_12_be([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Big, Some(12), 0b1001_0110_1110, bits![u8, Msb0; 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1]),
-        case::normal_bit_6([0b1001_0110].as_ref(), Endian::Little, Some(6), 0b1001_01, bits![u8, Msb0; 1, 0,]),
+    #[rstest(input, endian, bit_size, expected, expected_rest_bits, expected_rest_bytes,
+        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, bits![u8, Msb0;], &[]),
+        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(32), 0xDDCC_BBAA, bits![u8, Msb0;], &[]),
+        case::normal_bits_12_le([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Little, Some(12), 0b1110_1001_0110, bits![u8, Msb0; 0, 0, 0, 0], &[0xcc, 0xdd]),
+        case::normal_bits_12_be([0b1001_0110, 0b1110_0000, 0xCC, 0xDD ].as_ref(), Endian::Big, Some(12), 0b1001_0110_1110, bits![u8, Msb0; 0, 0, 0, 0], &[0xcc, 0xdd]),
+        case::normal_bit_6([0b1001_0110].as_ref(), Endian::Little, Some(6), 0b1001_01, bits![u8, Msb0; 1, 0,], &[]),
         #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
-        case::not_enough_data([].as_ref(), Endian::Little, Some(32), 0xFF, bits![u8, Msb0;]),
+        case::not_enough_data([].as_ref(), Endian::Little, Some(32), 0xFF, bits![u8, Msb0;], &[]),
         #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
-        case::not_enough_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(32), 0xFF, bits![u8, Msb0;]),
-        #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 64 bits\")")]
-        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(64), 0xFF, bits![u8, Msb0;]),
+        case::not_enough_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(32), 0xFF, bits![u8, Msb0;], &[]),
+        #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 64 bits\")")] // This will end up in ByteSize b/c 64 % 8 == 0
+        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(64), 0xFF, bits![u8, Msb0;], &[]),
+        #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 63 bits\")")] // This will end up staying BitSize
+        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(63), 0xFF, bits![u8, Msb0;], &[]),
     )]
     fn test_bit_read(
         mut input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
         expected: u32,
-        expected_rest: &BitSlice<u8, Msb0>,
+        expected_rest_bits: &BitSlice<u8, Msb0>,
+        expected_rest_bytes: &[u8],
     ) {
-        let mut input_clone = input;
-        let bit_slice = input.view_bits::<Msb0>();
-
-        let (amt_read, res_read) = match bit_size {
-            Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
-            None => u32::read(bit_slice, endian).unwrap(),
-        };
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, bit_slice[amt_read..]);
-
         // test both Read &[u8] and Read BitVec
         let mut container = Container::new(&mut input);
         let res_read = match bit_size {
@@ -873,44 +739,35 @@ mod tests {
             None => u32::from_reader(&mut container, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
-
-        let mut container = Container::new(&mut input_clone);
-        let res_read = match bit_size {
-            Some(bit_size) => {
-                u32::from_reader(&mut container, (endian, BitSize(bit_size))).unwrap()
-            }
-            None => u32::from_reader(&mut container, endian).unwrap(),
-        };
-        assert_eq!(expected, res_read);
+        assert_eq!(
+            container.rest(),
+            expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
+        );
+        let mut buf = vec![];
+        input.read_to_end(&mut buf).unwrap();
+        assert_eq!(expected_rest_bytes, buf);
     }
 
-    #[rstest(input, endian, byte_size, expected, expected_rest,
-        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(4), 0xDDCC_BBAA, bits![u8, Msb0;]),
-        case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(4), 0xAABB_CCDD, bits![u8, Msb0;]),
-        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(3), 0x00DDCC_BB, bits![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 0]),
-        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(3), 0x00BB_CCDD, bits![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 0]),
+    #[rstest(input, endian, byte_size, expected, expected_rest_bytes,
+        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(4), 0xDDCC_BBAA, &[]),
+        case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(4), 0xAABB_CCDD, &[]),
+        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(3), 0x00DDCC_BB, &[0xaa]),
+        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(3), 0x00BB_CCDD, &[0xaa]),
         #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
-        case::not_enough_data([].as_ref(), Endian::Little, Some(4), 0xFF, bits![u8, Msb0;]),
+        case::not_enough_data([].as_ref(), Endian::Little, Some(4), 0xFF, &[]),
         #[should_panic(expected = "Incomplete(NeedSize { bits: 32 })")]
-        case::not_enough_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(4), 0xFF, bits![u8, Msb0;]),
-        #[should_panic(expected = "Parse(\"too much data: container of 32 bits cannot hold 64 bits\")")]
-        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(8), 0xFF, bits![u8, Msb0;]),
+        case::not_enough_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(4), 0xFF, &[]),
+        #[should_panic(expected = "Parse(\"too much data: container of 4 bytes cannot hold 8 bytes\")")]
+        case::too_much_data([0xAA, 0xBB, 0xCC, 0xDD, 0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(8), 0xFF, &[]),
     )]
     fn test_byte_read(
         mut input: &[u8],
         endian: Endian,
         byte_size: Option<usize>,
         expected: u32,
-        expected_rest: &BitSlice<u8, Msb0>,
+        expected_rest_bytes: &[u8],
     ) {
         let mut bit_slice = input.view_bits::<Msb0>();
-
-        let (amt_read, res_read) = match byte_size {
-            Some(bit_size) => u32::read(bit_slice, (endian, ByteSize(bit_size))).unwrap(),
-            None => u32::read(bit_slice, endian).unwrap(),
-        };
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         // test both Read &[u8] and Read BitVec
         let mut container = Container::new(&mut input);
@@ -930,6 +787,9 @@ mod tests {
             None => u32::from_reader(&mut container, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
+        let mut buf = vec![];
+        input.read_to_end(&mut buf).unwrap();
+        assert_eq!(expected_rest_bytes, buf);
     }
 
     #[rstest(input, endian, bit_size, expected,
@@ -951,25 +811,17 @@ mod tests {
         assert_eq!(expected, res_write.into_vec());
     }
 
-    #[rstest(input, endian, bit_size, expected, expected_rest, expected_write,
-        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, bits![u8, Msb0;], vec![0xDD, 0xCC, 0xBB, 0xAA]),
+    #[rstest(input, endian, bit_size, expected, expected_write,
+        case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
     fn test_bit_read_write(
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
         expected: u32,
-        expected_rest: &BitSlice<u8, Msb0>,
         expected_write: Vec<u8>,
     ) {
         let mut bit_slice = input.view_bits::<Msb0>();
-
-        let (amt_read, res_read) = match bit_size {
-            Some(bit_size) => u32::read(bit_slice, (endian, BitSize(bit_size))).unwrap(),
-            None => u32::read(bit_slice, endian).unwrap(),
-        };
-        assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, bit_slice[amt_read..]);
 
         let mut container = Container::new(&mut bit_slice);
         let res_read = match bit_size {
@@ -995,14 +847,10 @@ mod tests {
         ($test_name:ident, $typ:ty) => {
             #[test]
             fn $test_name() {
-                let mut bit_slice = [0b10101_000].view_bits::<Msb0>();
-
-                let (amt_read, res_read) = <$typ>::read(bit_slice, (Endian::Little, BitSize(5))).unwrap();
-                assert_eq!(-11, res_read);
-                assert_eq!(bits![u8, Msb0; 0, 0, 0], bit_slice[amt_read..]);
-
-                let mut container = Container::new(&mut bit_slice);
-                let res_read = <$typ>::from_reader(&mut container, (Endian::Little, BitSize(5))).unwrap();
+                let mut slice = [0b10101_000].as_slice();
+                let mut container = Container::new(&mut slice);
+                let res_read =
+                    <$typ>::from_reader(&mut container, (Endian::Little, BitSize(5))).unwrap();
                 assert_eq!(-11, res_read);
             }
         };
@@ -1014,4 +862,30 @@ mod tests {
     TestSignExtending!(test_sign_extend_i64, i64);
     TestSignExtending!(test_sign_extend_i128, i128);
     TestSignExtending!(test_sign_extend_isize, isize);
+
+    macro_rules! TestSignExtendingPanic {
+        ($test_name:ident, $typ:ty, $size:expr) => {
+            #[test]
+            fn $test_name() {
+                let mut slice = [0b10101_000].as_slice();
+                let mut container = Container::new(&mut slice);
+                let res_read =
+                    <$typ>::from_reader(&mut container, (Endian::Little, BitSize($size + 1)));
+                assert_eq!(
+                    DekuError::Parse(format!(
+                        "too much data: container of {} bits cannot hold {} bits",
+                        $size,
+                        $size + 1
+                    )),
+                    res_read.err().unwrap()
+                );
+            }
+        };
+    }
+
+    TestSignExtendingPanic!(test_sign_extend_i8_panic, i8, 8);
+    TestSignExtendingPanic!(test_sign_extend_i16_panic, i16, 16);
+    TestSignExtendingPanic!(test_sign_extend_i32_panic, i32, 32);
+    TestSignExtendingPanic!(test_sign_extend_i64_panic, i64, 64);
+    TestSignExtendingPanic!(test_sign_extend_i128_panic, i128, 128);
 }

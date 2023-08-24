@@ -39,14 +39,13 @@ mod tests {
     use super::*;
     use crate::{container::Container, native_endian};
 
-    #[rstest(input, expected, expected_rest,
+    #[rstest(input, expected,
         case(
             &[0xEF, 0xBE],
             Cow::Owned(native_endian!(0xBEEF_u16)),
-            bits![u8, Msb0;]
         ),
     )]
-    fn test_cow(input: &[u8], expected: Cow<u16>, expected_rest: &BitSlice<u8, Msb0>) {
+    fn test_cow(input: &[u8], expected: Cow<u16>) {
         let bit_slice = input.view_bits::<Msb0>();
 
         let mut cursor = Cursor::new(input);

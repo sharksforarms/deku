@@ -46,22 +46,24 @@ mod tests {
         case(
             &[b't', b'e', b's', b't', b'\0'],
             CString::new("test").unwrap(),
-            bits![u8, Msb0;]
+            &[],
         ),
         case(
             &[b't', b'e', b's', b't', b'\0', b'a'],
             CString::new("test").unwrap(),
-            [b'a'].view_bits::<Msb0>(),
+            &[b'a'],
         ),
 
         #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case(&[b't', b'e', b's', b't'], CString::new("test").unwrap(), bits![u8, Msb0;]),
+        case(&[b't', b'e', b's', b't'], CString::new("test").unwrap(), &[]),
     )]
-    fn test_cstring(input: &[u8], expected: CString, expected_rest: &BitSlice<u8, Msb0>) {
+    fn test_cstring(input: &[u8], expected: CString, expected_rest: &[u8]) {
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);
         let res_read = CString::from_reader(&mut container, ()).unwrap();
-        assert_eq!(expected, res_read);
+        let mut buf = vec![];
+        cursor.read_to_end(&mut buf).unwrap();
+        assert_eq!(expected_rest, buf);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();

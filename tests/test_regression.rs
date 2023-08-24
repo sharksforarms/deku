@@ -251,7 +251,7 @@ fn test_regression_292() {
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
-    struct ContainerU16 {
+    struct ContainerU16Le {
         #[deku(bits = 2)]
         field1: u8,
         field2: u16,
@@ -260,11 +260,74 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerU16::from_bytes((test_data, 0)).unwrap().1,
-        ContainerU16 {
+        ContainerU16Le::from_bytes((test_data, 0)).unwrap().1,
+        ContainerU16Le {
             field1: 0b11,
             field2: 0,
             field3: 0b111111,
+        }
+    );
+
+    let test_data: &mut [u8] = &mut [0b11000000, 0b00000000, 0b00111111];
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    #[deku(endian = "big")]
+    struct ContainerU16Be {
+        #[deku(bits = 2)]
+        field1: u8,
+        field2: u16,
+        #[deku(bits = 6)]
+        field3: u8,
+    }
+
+    assert_eq!(
+        ContainerU16Be::from_bytes((test_data, 0)).unwrap().1,
+        ContainerU16Be {
+            field1: 0b11,
+            field2: 0,
+            field3: 0b111111,
+        }
+    );
+
+    let test_data: &mut [u8] = &mut [0b11000000, 0b00000000, 0b01100001];
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    #[deku(endian = "big")]
+    struct ContainerI16Le {
+        #[deku(bits = 2)]
+        field1: i8,
+        field2: i16,
+        #[deku(bits = 6)]
+        field3: i8,
+    }
+
+    assert_eq!(
+        ContainerI16Le::from_bytes((test_data, 0)).unwrap().1,
+        ContainerI16Le {
+            field1: -0b01,
+            field2: 1,
+            field3: -0b011111,
+        }
+    );
+
+    let test_data: &mut [u8] = &mut [0b11000000, 0b00000000, 0b01100001];
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    #[deku(endian = "big")]
+    struct ContainerI16Be {
+        #[deku(bits = 2)]
+        field1: i8,
+        field2: i16,
+        #[deku(bits = 6)]
+        field3: i8,
+    }
+
+    assert_eq!(
+        ContainerI16Be::from_bytes((test_data, 0)).unwrap().1,
+        ContainerI16Be {
+            field1: -0b01,
+            field2: 1,
+            field3: -0b011111,
         }
     );
 }

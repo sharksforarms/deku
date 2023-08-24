@@ -9,8 +9,27 @@ use bitvec::prelude::*;
 
 use crate::container::ContainerRet;
 use crate::ctx::*;
-use crate::prelude::NeedSize;
-use crate::{DekuError, DekuRead, DekuReader, DekuWrite};
+use crate::{DekuError, DekuReader, DekuWrite};
+
+/// "Read" trait: read bits and construct type
+trait DekuRead<'a, Ctx = ()> {
+    /// Read bits and construct type
+    /// * **input** - Input as bits
+    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
+    /// needed.
+    ///
+    /// Returns the amount of bits read after parsing in addition to Self.
+    ///
+    /// NOTE: since this is only used internally by primitive types, we don't need to verify the
+    /// size of BitSize or ByteSize to check if they fit in the requested container size
+    /// (size_of::<type>()).
+    fn read(
+        input: &'a crate::bitvec::BitSlice<u8, crate::bitvec::Msb0>,
+        ctx: Ctx,
+    ) -> Result<(usize, Self), DekuError>
+    where
+        Self: Sized;
+}
 
 // specialize u8 for ByteSize
 impl DekuRead<'_, (Endian, ByteSize)> for u8 {

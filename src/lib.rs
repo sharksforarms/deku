@@ -297,22 +297,6 @@ pub mod prelude;
 
 pub use crate::error::DekuError;
 
-/// "Read" trait: read bits and construct type
-pub trait DekuRead<'a, Ctx = ()> {
-    /// Read bits and construct type
-    /// * **input** - Input as bits
-    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
-    /// needed.
-    ///
-    /// Returns the amount of bits read after parsing in addition to Self.
-    fn read(
-        input: &'a bitvec::BitSlice<u8, bitvec::Msb0>,
-        ctx: Ctx,
-    ) -> Result<(usize, Self), DekuError>
-    where
-        Self: Sized;
-}
-
 /// "Reader" trait: read bytes and bits from [`acid_io::Read`]er
 pub trait DekuReader<'a, Ctx = ()> {
     /// Construct type from `container` implementing [`acid_io::Read`].

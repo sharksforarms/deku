@@ -15,7 +15,7 @@ Under the hood, many specializations are done in order to achieve performant cod
 that is **almost** the same performance as if you wrote the code yourself!
 For reading and writing bytes, the std library is used.
 When bit-level control is required, it makes use of the [bitvec](https://crates.io/crates/bitvec)
-crate as the "Reader" and “Writer”
+crate as the "Reader" and “Writer”.
 
 For documentation and examples on available `#[deku]` attributes and features,
 see [attributes list](attributes)
@@ -30,7 +30,8 @@ For use in `no_std` environments, `alloc` is the single feature which is require
 # Example
 
 Let's read big-endian data into a struct, with fields containing different sizes,
-modify a value, and write it back
+modify a value, and write it back. In this example we read directly from bytes already allocated,
+but we can also read from a [Reader](#read-enabled).
 
 ```rust
 use deku::prelude::*;
@@ -219,6 +220,34 @@ assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
 
+# `Read` enabled
+Parsers can be used that directly read from a source implementing [Read](crate::acid_io::Read).
+
+The crate [acid_io](crate::acid_io) is re-exported for use in `no_std` environments.
+This functions as an alias for [std::io](https://doc.rust-lang.org/stable/std/io/) when not
+using `no_std`.
+
+```rust, no_run
+# use std::io::{Seek, SeekFrom, Read};
+# use std::fs::File;
+# use deku::prelude::*;
+#[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+#[deku(endian = "big")]
+struct EcHdr {
+    magic: [u8; 4],
+    version: u8,
+    padding1: [u8; 3],
+}
+
+let mut file = File::options().read(true).open("file").unwrap();
+file.seek(SeekFrom::Start(0)).unwrap();
+
+// Create deku Reader
+let mut container = Container::new(&mut file);
+// Use Reader and parse into struct
+let ec = EcHdr::from_reader(&mut container, ()).unwrap();
+```
+
 # Internal variables and previously read fields
 
 Along similar lines to [Context](#context) variables, previously read variables
@@ -243,7 +272,6 @@ These are provided as a convenience to the user.
 
 Always included:
 - `deku::container: &mut Container` - Current [Container](crate::container::Container)
-- `deku::input_bits: &BitSlice<u8, Msb0>` - The initial input in bits
 - `deku::output: &mut BitSlice<u8, Msb0>` - The output bit stream
 
 Conditionally included if referenced:
@@ -274,7 +302,7 @@ extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-/// re-export of bitvec
+/// re-export of acid_io
 pub mod acid_io {
     pub use acid_io::Cursor;
     pub use acid_io::Read;

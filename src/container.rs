@@ -25,13 +25,13 @@ pub struct Container<'a, R: Read> {
     inner: &'a mut R,
     /// bits stored from previous reads that didn't read to the end of a byte size
     leftover: BitVec<u8, Msb0>,
-    /// Amount of bits read during the use of `read_bits` and `read_bytes`.
+    /// Amount of bits read during the use of [read_bits](Container::read_bits) and [read_bytes](Container::read_bytes).
     pub bits_read: usize,
-    /// If function `enable_read_cache` is used, this field will contain all bytes that were read
+    /// If function [enable_read_cache](Container::enable_read_cache) is used, this field will contain all bytes that were read
     pub read_cache: Option<Vec<u8>>,
 }
 
-/// Max bits requested from [`read_bits`] during one call
+/// Max bits requested from [`Container::read_bits`] during one call
 pub const MAX_BITS_AMT: usize = 128;
 
 impl<'a, R: Read> Container<'a, R> {
@@ -60,6 +60,36 @@ impl<'a, R: Read> Container<'a, R> {
     }
 
     /// Return the unused bits
+    ///
+    /// Once the parsing is complete for a struct, if the total size of the field using the `bits` attribute
+    /// isn't byte aligned the returned values could be unexpected as the "Read" will always read
+    /// to a full byte.
+    /// 
+    /// ```rust
+    /// use std::io::Cursor;
+    /// use deku::prelude::*;
+    /// 
+    /// #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    /// #[deku(endian = "big")]
+    /// struct DekuTest {
+    ///     #[deku(bits = "4")]
+    ///     field_a: u8,
+    ///     #[deku(bits = "2")]
+    ///     field_b: u8,
+    /// }
+    /// //                       |         | <= this entire byte is Read
+    /// let data: Vec<u8> = vec![0b0110_1101, 0xbe, 0xef];
+    /// let mut cursor = Cursor::new(data);
+    /// let mut container = Container::new(&mut cursor);
+    /// let val = DekuTest::from_reader(&mut container, ()).unwrap();
+    /// assert_eq!(DekuTest {
+    ///     field_a: 0b0110,
+    ///     field_b: 0b11,
+    /// }, val);
+    ///
+    /// // last 2 bits in that byte
+    /// assert_eq!(container.rest(), vec![false, true]);
+    /// ```
     #[inline]
     pub fn rest(&mut self) -> Vec<bool> {
         self.leftover.iter().by_vals().collect()
@@ -93,7 +123,7 @@ impl<'a, R: Read> Container<'a, R> {
     }
 
     /// Used at the beginning of `from_bytes`. Will read the `amt` of bits, but
-    /// not increase bits_read.
+    /// not increase `bits_read`.
     #[inline]
     pub fn skip_bits(&mut self, amt: usize) -> Result<(), DekuError> {
         #[cfg(feature = "logging")]
@@ -105,8 +135,9 @@ impl<'a, R: Read> Container<'a, R> {
         Ok(())
     }
 
-    /// Attempt to read bits from `Container`. This will always return a `BitVec` and will
-    /// correctly add previously read and store "leftover" bits from previous reads.
+    /// Attempt to read bits from `Container`. If enough bits are already "Read", we just grab
+    /// enough bits to satisfy `amt`, but will also "Read" more from the stream and store the
+    /// leftovers if enough are not already "Read".
     ///
     /// # Guarantees
     /// - if Some(bits), the returned `BitVec` will have the size of `amt` and

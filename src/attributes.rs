@@ -852,6 +852,8 @@ for example `#[deku("a, b")]`
 2. `endian`, `bytes`, `bits` attributes declared on the top-level
     - These are prepended to the list of ctx variables
 
+**Note**: The `enum` or `struct` that uses `ctx` will not implement [DekuContainerRead](crate::DekuContainerRead) or [DekuContainerWrite](crate::DekuContainerWrite) unless [ctx_default](#ctx_default) is also used.
+
 Example
 ```rust
 # use deku::prelude::*;

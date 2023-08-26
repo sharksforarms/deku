@@ -30,8 +30,7 @@ For use in `no_std` environments, `alloc` is the single feature which is require
 # Example
 
 Let's read big-endian data into a struct, with fields containing different sizes,
-modify a value, and write it back. In this example we read directly from bytes already allocated,
-but we can also read from a [Reader](#read-enabled).
+modify a value, and write it back.
 
 ```rust
 use deku::prelude::*;
@@ -46,8 +45,8 @@ struct DekuTest {
     field_c: u16,
 }
 
-let data = [0b0110_1001, 0xBE, 0xEF];
-let (_amt_read, mut val) = DekuTest::from_reader((&mut data.as_slice(), 0)).unwrap();
+let data: &[u8] = &[0b0110_1001, 0xBE, 0xEF];
+let (_amt_read, mut val) = DekuTest::from_reader((data, 0)).unwrap();
 assert_eq!(DekuTest {
     field_a: 0b0110,
     field_b: 0b1001,
@@ -79,8 +78,8 @@ struct DekuHeader(u8);
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuData(u16);
 
-let data = [0xAA, 0xEF, 0xBE];
-let (_amt_read, mut val) = DekuTest::from_reader((&mut data.as_slice(), 0)).unwrap();
+let data: &[u8] = &[0xAA, 0xEF, 0xBE];
+let (_amt_read, mut val) = DekuTest::from_reader((data, 0)).unwrap();
 assert_eq!(DekuTest {
     header: DekuHeader(0xAA),
     data: DekuData(0xBEEF),
@@ -114,7 +113,7 @@ struct DekuTest {
 }
 
 let data = vec![0x02, 0xBE, 0xEF, 0xFF, 0xFF];
-let (_amt_read, mut val) = DekuTest::from_reader((&mut data.as_slice(), 0)).unwrap();
+let (_amt_read, mut val) = DekuTest::from_reader((data.as_slice(), 0)).unwrap();
 assert_eq!(DekuTest {
     count: 0x02,
     data: vec![0xBE, 0xEF]
@@ -179,12 +178,12 @@ enum DekuTest {
     VariantB(u16),
 }
 
-let data = [0x01, 0x02, 0xEF, 0xBE];
+let data: &[u8] = &[0x01, 0x02, 0xEF, 0xBE];
 
-let (amt_read, val) = DekuTest::from_reader((&mut data.as_slice(), 0)).unwrap();
+let (amt_read, val) = DekuTest::from_reader((data, 0)).unwrap();
 assert_eq!(DekuTest::VariantA , val);
 
-let (amt_read, val) = DekuTest::from_reader((&mut data.as_slice(), amt_read)).unwrap();
+let (amt_read, val) = DekuTest::from_reader((data, amt_read)).unwrap();
 assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 ```
 
@@ -213,9 +212,9 @@ struct Root {
     sub: Subtype
 }
 
-let data = [0x01, 0x02];
+let data: &[u8] = &[0x01, 0x02];
 
-let (amt_read, value) = Root::from_reader((&mut data.as_slice(), 0)).unwrap();
+let (amt_read, value) = Root::from_reader((data, 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
@@ -239,13 +238,8 @@ struct EcHdr {
     padding1: [u8; 3],
 }
 
-let mut file = File::options().read(true).open("file").unwrap();
-file.seek(SeekFrom::Start(0)).unwrap();
-
-// Create deku Reader
-let mut reader = Reader::new(&mut file);
-// Use Reader and parse into struct
-let ec = EcHdr::from_reader_with_ctx(&mut reader, ()).unwrap();
+let file = File::options().read(true).open("file").unwrap();
+let ec = EcHdr::from_reader((file, 0)).unwrap();
 ```
 
 # Internal variables and previously read fields
@@ -344,7 +338,7 @@ pub trait DekuReader<'a, Ctx = ()> {
     ///
     /// let mut file = File::options().read(true).open("file").unwrap();
     /// file.seek(SeekFrom::Start(0)).unwrap();
-    /// let mut reader = Reader::new(&mut file);
+    /// let mut reader = Reader::new(file);
     /// let ec = EcHdr::from_reader_with_ctx(&mut reader, Endian::Big).unwrap();
     /// ```
     fn from_reader_with_ctx<R: acid_io::Read>(

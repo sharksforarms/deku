@@ -8,7 +8,7 @@ use acid_io::Read;
 use bitvec::prelude::*;
 
 use crate::ctx::*;
-use crate::reader::ReaderRet;
+use crate::reader::{Reader, ReaderRet};
 use crate::{DekuError, DekuReader, DekuWrite};
 
 /// "Read" trait: read bits and construct type
@@ -49,7 +49,7 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
 impl DekuReader<'_, (Endian, ByteSize)> for u8 {
     #[inline]
     fn from_reader_with_ctx<R: Read>(
-        reader: &mut crate::reader::Reader<R>,
+        reader: &mut Reader<R>,
         (endian, size): (Endian, ByteSize),
     ) -> Result<u8, DekuError> {
         let mut buf = [0; core::mem::size_of::<u8>()];
@@ -150,7 +150,7 @@ macro_rules! ImplDekuReadBits {
         impl DekuReader<'_, (Endian, BitSize)> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read>(
-                reader: &mut crate::reader::Reader<R>,
+                reader: &mut Reader<R>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
@@ -199,7 +199,7 @@ macro_rules! ImplDekuReadBytes {
         impl DekuReader<'_, (Endian, ByteSize)> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read>(
-                reader: &mut crate::reader::Reader<R>,
+                reader: &mut Reader<R>,
                 (endian, size): (Endian, ByteSize),
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
@@ -260,7 +260,7 @@ macro_rules! ImplDekuReadSignExtend {
         impl DekuReader<'_, (Endian, ByteSize)> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read>(
-                reader: &mut crate::reader::Reader<R>,
+                reader: &mut Reader<R>,
                 (endian, size): (Endian, ByteSize),
             ) -> Result<$typ, DekuError> {
                 let mut buf = [0; core::mem::size_of::<$typ>()];
@@ -310,7 +310,7 @@ macro_rules! ImplDekuReadSignExtend {
         impl DekuReader<'_, (Endian, BitSize)> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read>(
-                reader: &mut crate::reader::Reader<R>,
+                reader: &mut Reader<R>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
@@ -339,7 +339,7 @@ macro_rules! ForwardDekuRead {
         impl DekuReader<'_, Endian> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read>(
-                reader: &mut crate::reader::Reader<R>,
+                reader: &mut Reader<R>,
                 endian: Endian,
             ) -> Result<$typ, DekuError> {
                 let byte_size = core::mem::size_of::<$typ>();
@@ -352,7 +352,7 @@ macro_rules! ForwardDekuRead {
         impl DekuReader<'_, ByteSize> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read>(
-                reader: &mut crate::reader::Reader<R>,
+                reader: &mut Reader<R>,
                 byte_size: ByteSize,
             ) -> Result<$typ, DekuError> {
                 let endian = Endian::default();
@@ -366,7 +366,7 @@ macro_rules! ForwardDekuRead {
         impl DekuReader<'_, BitSize> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read>(
-                reader: &mut crate::reader::Reader<R>,
+                reader: &mut Reader<R>,
                 bit_size: BitSize,
             ) -> Result<$typ, DekuError> {
                 let endian = Endian::default();
@@ -382,7 +382,7 @@ macro_rules! ForwardDekuRead {
         impl DekuReader<'_> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read>(
-                reader: &mut crate::reader::Reader<R>,
+                reader: &mut Reader<R>,
                 _: (),
             ) -> Result<$typ, DekuError> {
                 <$typ>::from_reader_with_ctx(reader, Endian::default())

@@ -16,7 +16,7 @@ mod test_slice {
 
         let mut test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
 
-        let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
+        let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
         assert_eq!(
             TestStruct {
                 data: test_data.to_vec(),
@@ -45,7 +45,7 @@ mod test_slice {
 
         let mut test_data: Vec<u8> = [input_bytes, 0xaa, 0xbb].to_vec();
 
-        let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
+        let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
         assert_eq!(
             TestStruct {
                 bytes: 0x02,
@@ -94,7 +94,7 @@ mod test_vec {
 
         let mut test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
 
-        let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
+        let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
         assert_eq!(
             TestStruct {
                 // We should read two bytes, not two elements,
@@ -125,7 +125,7 @@ mod test_vec {
 
         let mut test_data: Vec<u8> = [input_bytes, 0xaa, 0xbb].to_vec();
 
-        let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
+        let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
         assert_eq!(
             TestStruct {
                 bytes: 0x02,

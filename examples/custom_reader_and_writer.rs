@@ -16,7 +16,7 @@ fn bit_flipper_read<R: std::io::Read>(
     println!("bit_size: {:?}", bit_size);
 
     // read field_b, calling original func
-    let value = u8::from_reader(container, bit_size)?;
+    let value = u8::from_reader_with_ctx(container, bit_size)?;
 
     // flip the bits on value if field_a is 0x01
     let value = if field_a == 0x01 { !value } else { value };
@@ -57,9 +57,9 @@ struct DekuTest {
 }
 
 fn main() {
-    let test_data: &mut [u8] = &mut [0x01, 0b1001_0110];
+    let test_data = [0x01, 0b1001_0110];
 
-    let (_rest, ret_read) = DekuTest::from_bytes((test_data, 0)).unwrap();
+    let (_rest, ret_read) = DekuTest::from_reader((&mut test_data.as_slice(), 0)).unwrap();
 
     assert_eq!(
         ret_read,

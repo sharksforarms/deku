@@ -53,7 +53,7 @@ fn main() {
 
     let mut cursor = std::io::Cursor::new(test_data.clone());
     let mut container = deku::container::Container::new(&mut cursor);
-    let ip_header = Ipv4Header::from_reader(&mut container, ()).unwrap();
+    let ip_header = Ipv4Header::from_reader_with_ctx(&mut container, ()).unwrap();
 
     assert_eq!(
         Ipv4Header {

@@ -16,7 +16,7 @@ fn test_skip() {
     // Skip `field_b`
     let mut test_data: Vec<u8> = [0x01, 0x02].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: 0x01,
@@ -44,7 +44,7 @@ fn test_skip_default() {
     // Skip `field_b` and default it's value to 5
     let mut test_data: Vec<u8> = [0x01, 0x02].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: 0x01,
@@ -71,7 +71,7 @@ fn test_skip_cond() {
     // if `cond` is true, skip and default `field_b` to 5
     let mut test_data: Vec<u8> = [0x01].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: 0x01,
@@ -86,7 +86,7 @@ fn test_skip_cond() {
     // if `cond` is false, read `field_b` from input
     let mut test_data: Vec<u8> = [0x02, 0x03].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: 0x02,

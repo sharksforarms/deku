@@ -54,7 +54,7 @@ struct DekuTest {
 
 fn main() {
     let data: Vec<u8> = vec![0b0110_1001, 0xBE, 0xEF];
-    let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
+    let (_rest, mut val) = DekuTest::from_reader((data.as_ref(), 0)).unwrap();
     assert_eq!(DekuTest {
         field_a: 0b0110,
         field_b: 0b1001,

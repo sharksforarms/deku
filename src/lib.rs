@@ -46,8 +46,8 @@ struct DekuTest {
     field_c: u16,
 }
 
-let mut data: Vec<u8> = vec![0b0110_1001, 0xBE, 0xEF];
-let (_amt_read, mut val) = DekuTest::from_bytes((&mut data[..], 0)).unwrap();
+let data = [0b0110_1001, 0xBE, 0xEF];
+let (_amt_read, mut val) = DekuTest::from_reader((&mut data.as_slice(), 0)).unwrap();
 assert_eq!(DekuTest {
     field_a: 0b0110,
     field_b: 0b1001,
@@ -56,7 +56,7 @@ assert_eq!(DekuTest {
 
 val.field_c = 0xC0FE;
 
-let mut data_out = val.to_bytes().unwrap();
+let data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 ```
 
@@ -79,15 +79,15 @@ struct DekuHeader(u8);
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuData(u16);
 
-let mut data: Vec<u8> = vec![0xAA, 0xEF, 0xBE];
-let (_amt_read, mut val) = DekuTest::from_bytes((&mut data[..], 0)).unwrap();
+let data = [0xAA, 0xEF, 0xBE];
+let (_amt_read, mut val) = DekuTest::from_reader((&mut data.as_slice(), 0)).unwrap();
 assert_eq!(DekuTest {
     header: DekuHeader(0xAA),
     data: DekuData(0xBEEF),
 }, val);
 
-let mut data_out = val.to_bytes().unwrap();
-assert_eq!(data, data_out);
+let data_out = val.to_bytes().unwrap();
+assert_eq!(data, &*data_out);
 ```
 
 # Vec
@@ -113,14 +113,14 @@ struct DekuTest {
     data: Vec<u8>,
 }
 
-let mut data: Vec<u8> = vec![0x02, 0xBE, 0xEF, 0xFF, 0xFF];
-let (_amt_read, mut val) = DekuTest::from_bytes((&mut data[..], 0)).unwrap();
+let data = vec![0x02, 0xBE, 0xEF, 0xFF, 0xFF];
+let (_amt_read, mut val) = DekuTest::from_reader((&mut data.as_slice(), 0)).unwrap();
 assert_eq!(DekuTest {
     count: 0x02,
     data: vec![0xBE, 0xEF]
 }, val);
 
-let mut data_out = val.to_bytes().unwrap();
+let data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0x02, 0xBE, 0xEF], data_out);
 
 // Pushing an element to data
@@ -131,7 +131,7 @@ assert_eq!(DekuTest {
     data: vec![0xBE, 0xEF, 0xAA]
 }, val);
 
-let mut data_out = val.to_bytes().unwrap();
+let data_out = val.to_bytes().unwrap();
 // Note: `count` is still 0x02 while 3 bytes got written
 assert_eq!(vec![0x02, 0xBE, 0xEF, 0xAA], data_out);
 
@@ -179,12 +179,12 @@ enum DekuTest {
     VariantB(u16),
 }
 
-let mut data: Vec<u8> = vec![0x01, 0x02, 0xEF, 0xBE];
+let data = [0x01, 0x02, 0xEF, 0xBE];
 
-let (amt_read, val) = DekuTest::from_bytes((&mut data[..], 0)).unwrap();
+let (amt_read, val) = DekuTest::from_reader((&mut data.as_slice(), 0)).unwrap();
 assert_eq!(DekuTest::VariantA , val);
 
-let (amt_read, val) = DekuTest::from_bytes((&mut data[..], amt_read)).unwrap();
+let (amt_read, val) = DekuTest::from_reader((&mut data.as_slice(), amt_read)).unwrap();
 assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 ```
 
@@ -213,9 +213,9 @@ struct Root {
     sub: Subtype
 }
 
-let mut data: Vec<u8> = vec![0x01, 0x02];
+let data = [0x01, 0x02];
 
-let (amt_read, value) = Root::from_bytes((&mut data[..], 0)).unwrap();
+let (amt_read, value) = Root::from_reader((&mut data.as_slice(), 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
@@ -245,7 +245,7 @@ file.seek(SeekFrom::Start(0)).unwrap();
 // Create deku Reader
 let mut container = Container::new(&mut file);
 // Use Reader and parse into struct
-let ec = EcHdr::from_reader(&mut container, ()).unwrap();
+let ec = EcHdr::from_reader_with_ctx(&mut container, ()).unwrap();
 ```
 
 # Internal variables and previously read fields
@@ -327,7 +327,44 @@ pub use crate::error::DekuError;
 
 /// "Reader" trait: read bytes and bits from [`acid_io::Read`]er
 pub trait DekuReader<'a, Ctx = ()> {
-    /// Construct type from `container` implementing [`acid_io::Read`].
+    /// Construct type from `container` implementing [`acid_io::Read`], with ctx.
+    ///
+    /// # Example
+    /// ```rust, no_run
+    /// # use std::io::{Seek, SeekFrom, Read};
+    /// # use std::fs::File;
+    /// # use deku::prelude::*;
+    /// # use deku::ctx::Endian;
+    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+    /// #[deku(endian = "ctx_endian", ctx = "ctx_endian: Endian")]
+    /// struct EcHdr {
+    ///     magic: [u8; 4],
+    ///     version: u8,
+    /// }
+    ///
+    /// let mut file = File::options().read(true).open("file").unwrap();
+    /// file.seek(SeekFrom::Start(0)).unwrap();
+    /// let mut container = Container::new(&mut file);
+    /// let ec = EcHdr::from_reader_with_ctx(&mut container, Endian::Big).unwrap();
+    /// ```
+    fn from_reader_with_ctx<R: acid_io::Read>(
+        container: &mut crate::container::Container<R>,
+        ctx: Ctx,
+    ) -> Result<Self, DekuError>
+    where
+        Self: Sized;
+}
+
+/// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which
+/// doesn't need any context information.
+pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
+    /// Construct type from Reader implementing [`acid_io::Read`].
+    /// * **input** - Input given as data and bit offset
+    ///
+    /// # Returns
+    /// amount of bits read after parsing in addition to Self.
+    ///
+    /// [BufRead]: std::io::BufRead
     ///
     /// # Example
     /// ```rust, no_run
@@ -339,36 +376,13 @@ pub trait DekuReader<'a, Ctx = ()> {
     /// struct EcHdr {
     ///     magic: [u8; 4],
     ///     version: u8,
-    ///     padding1: [u8; 3],
     /// }
     ///
     /// let mut file = File::options().read(true).open("file").unwrap();
     /// file.seek(SeekFrom::Start(0)).unwrap();
-    /// let mut container = Container::new(&mut file);
-    /// let ec = EcHdr::from_reader(&mut container, ()).unwrap();
+    /// let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
     /// ```
-    fn from_reader<R: acid_io::Read>(
-        container: &mut crate::container::Container<R>,
-        ctx: Ctx,
-    ) -> Result<Self, DekuError>
-    where
-        Self: Sized;
-}
-
-/// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which
-/// doesn't need any context information.
-pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
-    /// Read bytes and construct type
-    /// * **input** - Input given as data and bit offset
-    ///
-    /// # Returns
-    /// amount of bits read after parsing in addition to Self.
-    ///
-    /// Note: When derived with `deku`, this function will not create a Reader wrapped around a [BufRead].
-    /// To enable this, use [DekuReader::from_reader](crate::DekuReader#tymethod.from_reader).
-    ///
-    /// [BufRead]: std::io::BufRead
-    fn from_bytes(input: (&'a mut [u8], usize)) -> Result<(usize, Self), DekuError>
+    fn from_reader<R: acid_io::Read>(input: (R, usize)) -> Result<(usize, Self), DekuError>
     where
         Self: Sized;
 }

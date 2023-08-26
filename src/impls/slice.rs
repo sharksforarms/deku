@@ -15,7 +15,7 @@ mod const_generics_impl {
     where
         T: DekuReader<'a, Ctx>,
     {
-        fn from_reader<R: Read>(
+        fn from_reader_with_ctx<R: Read>(
             container: &mut crate::container::Container<R>,
             ctx: Ctx,
         ) -> Result<Self, DekuError>
@@ -27,7 +27,7 @@ mod const_generics_impl {
             // and never return it in case of error
             let mut slice: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
             for (n, item) in slice.iter_mut().enumerate() {
-                let value = match T::from_reader(container, ctx) {
+                let value = match T::from_reader_with_ctx(container, ctx) {
                     Ok(it) => it,
                     Err(err) => {
                         // For each item in the array, drop if we allocated it.
@@ -96,7 +96,7 @@ mod tests {
         let mut bit_slice = input.view_bits::<Msb0>();
 
         let mut container = Container::new(&mut bit_slice);
-        let res_read = <[u16; 2]>::from_reader(&mut container, endian).unwrap();
+        let res_read = <[u16; 2]>::from_reader_with_ctx(&mut container, endian).unwrap();
         assert_eq!(expected, res_read);
     }
 
@@ -145,7 +145,7 @@ mod tests {
 
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);
-        let res_read = <[[u16; 2]; 2]>::from_reader(&mut container, endian).unwrap();
+        let res_read = <[[u16; 2]; 2]>::from_reader_with_ctx(&mut container, endian).unwrap();
         assert_eq!(expected, res_read);
     }
 

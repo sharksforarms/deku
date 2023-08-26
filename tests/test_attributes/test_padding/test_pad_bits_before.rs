@@ -14,7 +14,7 @@ fn test_pad_bits_before() {
 
     let mut data: Vec<u8> = vec![0b10_01_1001];
 
-    let ret_read = TestStruct::try_from(data.as_mut_slice()).unwrap();
+    let ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 
     assert_eq!(
         TestStruct {
@@ -41,7 +41,7 @@ fn test_pad_bits_before_not_enough() {
 
     let mut data: Vec<u8> = vec![0b10_01_1001];
 
-    let _ret_read = TestStruct::try_from(data.as_mut_slice()).unwrap();
+    let _ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn test_pad_bits_before_read_err() {
 
     let mut data: Vec<u8> = vec![0b10_01_1001];
 
-    let _ret_read = TestStruct::try_from(data.as_mut_slice()).unwrap();
+    let _ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 }
 
 #[test]

@@ -13,11 +13,11 @@ where
     T: DekuReader<'a, Ctx>,
     Ctx: Copy,
 {
-    fn from_reader<R: Read>(
+    fn from_reader_with_ctx<R: Read>(
         container: &mut crate::container::Container<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
-        let val = <T>::from_reader(container, inner_ctx)?;
+        let val = <T>::from_reader_with_ctx(container, inner_ctx)?;
         Ok(Box::new(val))
     }
 }
@@ -39,12 +39,12 @@ where
     Ctx: Copy,
     Predicate: FnMut(&T) -> bool,
 {
-    fn from_reader<R: Read>(
+    fn from_reader_with_ctx<R: Read>(
         container: &mut crate::container::Container<R>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
     ) -> Result<Self, DekuError> {
         // use Vec<T>'s implementation and convert to Box<[T]>
-        let val = <Vec<T>>::from_reader(container, (limit, inner_ctx))?;
+        let val = <Vec<T>>::from_reader_with_ctx(container, (limit, inner_ctx))?;
         Ok(val.into_boxed_slice())
     }
 }
@@ -82,7 +82,7 @@ mod tests {
     fn test_boxed(input: &[u8], expected: Box<u16>) {
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);
-        let res_read = <Box<u16>>::from_reader(&mut container, ()).unwrap();
+        let res_read = <Box<u16>>::from_reader_with_ctx(&mut container, ()).unwrap();
         assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];
@@ -99,7 +99,7 @@ mod tests {
         case::bytes_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), BitSize(16).into(), vec![0xBBAA].into_boxed_slice(), bits![u8, Msb0;], &[0xcc, 0xdd], vec![0xAA, 0xBB]),
         case::bytes_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), BitSize(16).into(), vec![0xAABB].into_boxed_slice(), bits![u8, Msb0;], &[0xcc, 0xdd], vec![0xAA, 0xBB]),
     )]
-    fn test_boxed_slice_from_reader<Predicate: FnMut(&u16) -> bool>(
+    fn test_boxed_slice_from_reader_with_ctx<Predicate: FnMut(&u16) -> bool>(
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
@@ -114,9 +114,11 @@ mod tests {
 
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);
-        let res_read =
-            <Box<[u16]>>::from_reader(&mut container, (limit, (endian, BitSize(bit_size))))
-                .unwrap();
+        let res_read = <Box<[u16]>>::from_reader_with_ctx(
+            &mut container,
+            (limit, (endian, BitSize(bit_size))),
+        )
+        .unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(
             container.rest(),

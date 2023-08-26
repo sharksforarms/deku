@@ -14,7 +14,7 @@ fn test_cond_deku() {
     // `cond` is true
     let mut test_data: Vec<u8> = [0x01, 0x02].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: 0x01,
@@ -29,7 +29,7 @@ fn test_cond_deku() {
     // `cond` is false
     let mut test_data: Vec<u8> = [0x02].to_vec();
 
-    let ret_read = TestStruct::try_from(test_data.as_mut_slice()).unwrap();
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         TestStruct {
             field_a: 0x02,

@@ -60,8 +60,9 @@ fn issue_224() {
             two: Two::Load(Op2 { w: 1, j: 2 }),
         },
     };
-    let mut bytes = packet.to_bytes().unwrap();
-    let _packet = Packet::from_bytes((bytes.as_mut_slice(), 0)).unwrap();
+    let bytes = packet.to_bytes().unwrap();
+    let mut c = std::io::Cursor::new(bytes);
+    let _packet = Packet::from_reader((&mut c, 0)).unwrap();
 }
 
 // Extra zeroes added when reading fewer bytes than needed to fill a number
@@ -88,8 +89,9 @@ mod issue_282 {
         // the u32 is stored as three bytes in big-endian order
         assert_eq!(zero, 0);
 
-        let data = &mut [a, b, c, a, b, c];
-        let (_, BitsBytes { bits, bytes }) = BitsBytes::from_bytes((data, 0)).unwrap();
+        let data = [a, b, c, a, b, c];
+        let (_, BitsBytes { bits, bytes }) =
+            BitsBytes::from_reader((&mut data.as_slice(), 0)).unwrap();
 
         assert_eq!(bits, expected);
         assert_eq!(bytes, expected);
@@ -113,8 +115,9 @@ mod issue_282 {
         // the u32 is stored as three bytes in little-endian order
         assert_eq!(zero, 0);
 
-        let data = &mut [a, b, c, a, b, c];
-        let (_, BitsBytes { bits, bytes }) = BitsBytes::from_bytes((data, 0)).unwrap();
+        let data = [a, b, c, a, b, c];
+        let (_, BitsBytes { bits, bytes }) =
+            BitsBytes::from_reader((&mut data.as_slice(), 0)).unwrap();
 
         assert_eq!(bits, expected);
         assert_eq!(bytes, expected);
@@ -126,7 +129,7 @@ mod issue_282 {
 // https://github.com/sharksforarms/deku/issues/292
 #[test]
 fn test_regression_292() {
-    let mut test_data = vec![0x0f, 0xf0];
+    let test_data = [0x0f, 0xf0];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
@@ -139,7 +142,9 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        Container::from_bytes((&mut test_data, 0)).unwrap().1,
+        Container::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
         Container {
             field1: 0,
             field2: 0xff,
@@ -159,7 +164,9 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBits::from_bytes((&mut test_data, 0)).unwrap().1,
+        ContainerBits::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
         ContainerBits {
             field1: 0,
             field2: 0xff,
@@ -177,7 +184,7 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerByteNoEndian::from_bytes((&mut test_data, 0))
+        ContainerByteNoEndian::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
         ContainerByteNoEndian {
@@ -196,7 +203,7 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBitPadding::from_bytes((&mut test_data, 0))
+        ContainerBitPadding::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
         ContainerBitPadding {
@@ -216,7 +223,7 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBitPadding1::from_bytes((&mut test_data, 0))
+        ContainerBitPadding1::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
         ContainerBitPadding1 {
@@ -226,7 +233,7 @@ fn test_regression_292() {
         }
     );
 
-    let test_data: &mut [u8] = &mut [0b11000000, 0b00111111];
+    let test_data = [0b11000000, 0b00111111];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
@@ -239,7 +246,9 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerTwo::from_bytes((test_data, 0)).unwrap().1,
+        ContainerTwo::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
         ContainerTwo {
             field1: 0b11,
             field2: 0,
@@ -247,7 +256,7 @@ fn test_regression_292() {
         }
     );
 
-    let test_data: &mut [u8] = &mut [0b11000000, 0b00000000, 0b00111111];
+    let test_data = [0b11000000, 0b00000000, 0b00111111];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
@@ -260,7 +269,9 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerU16Le::from_bytes((test_data, 0)).unwrap().1,
+        ContainerU16Le::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
         ContainerU16Le {
             field1: 0b11,
             field2: 0,
@@ -268,7 +279,7 @@ fn test_regression_292() {
         }
     );
 
-    let test_data: &mut [u8] = &mut [0b11000000, 0b00000000, 0b00111111];
+    let test_data = [0b11000000, 0b00000000, 0b00111111];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "big")]
@@ -281,7 +292,9 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerU16Be::from_bytes((test_data, 0)).unwrap().1,
+        ContainerU16Be::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
         ContainerU16Be {
             field1: 0b11,
             field2: 0,
@@ -289,7 +302,7 @@ fn test_regression_292() {
         }
     );
 
-    let test_data: &mut [u8] = &mut [0b11000000, 0b00000000, 0b01100001];
+    let test_data = [0b11000000, 0b00000000, 0b01100001];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "big")]
@@ -302,7 +315,9 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerI16Le::from_bytes((test_data, 0)).unwrap().1,
+        ContainerI16Le::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
         ContainerI16Le {
             field1: -0b01,
             field2: 1,
@@ -310,7 +325,7 @@ fn test_regression_292() {
         }
     );
 
-    let test_data: &mut [u8] = &mut [0b11000000, 0b00000000, 0b01100001];
+    let test_data = [0b11000000, 0b00000000, 0b01100001];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "big")]
@@ -323,7 +338,9 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerI16Be::from_bytes((test_data, 0)).unwrap().1,
+        ContainerI16Be::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
         ContainerI16Be {
             field1: -0b01,
             field2: 1,

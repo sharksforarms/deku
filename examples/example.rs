@@ -5,7 +5,7 @@
 
 #![allow(clippy::unusual_byte_groupings)]
 
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 use deku::{container::Container, prelude::*};
 
@@ -42,7 +42,7 @@ struct DekuTest {
 
 fn main() {
     env_logger::init();
-    let mut test_data: &[u8] = [
+    let test_data: &[u8] = &[
         0xab,
         0b1010010_1,
         0xab,
@@ -53,12 +53,9 @@ fn main() {
         0xef,
         0xc0,
         0xfe,
-    ]
-    .as_ref();
-    let test_data_orig = test_data;
+    ];
 
-    let mut container = Container::new(&mut test_data);
-    let test_deku = DekuTest::from_reader(&mut container, ()).unwrap();
+    let test_deku = DekuTest::try_from(test_data).unwrap();
 
     println!("{test_deku:02x?}");
     assert_eq!(
@@ -76,5 +73,5 @@ fn main() {
     );
 
     let test_deku: Vec<u8> = test_deku.try_into().unwrap();
-    assert_eq!(test_data_orig.to_vec(), test_deku);
+    assert_eq!(test_data.to_vec(), test_deku);
 }

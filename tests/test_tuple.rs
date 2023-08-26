@@ -15,8 +15,8 @@ enum TestEnum {
     case(&mut hex!("01ABFFAA"), TestEnum::VarA((0xAB, 0xAAFF))),
 )]
 fn test_enum(input: &mut [u8], expected: TestEnum) {
-    let mut input = input.to_vec();
-    let ret_read = TestEnum::try_from(input.as_mut_slice()).unwrap();
+    let input = input.to_vec();
+    let ret_read = TestEnum::try_from(input.as_slice()).unwrap();
     assert_eq!(expected, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();

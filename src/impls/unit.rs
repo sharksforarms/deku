@@ -4,7 +4,7 @@ use bitvec::prelude::*;
 use crate::{DekuError, DekuReader, DekuWrite};
 
 impl<Ctx: Copy> DekuReader<'_, Ctx> for () {
-    fn from_reader<R: Read>(
+    fn from_reader_with_ctx<R: Read>(
         _container: &mut crate::container::Container<R>,
         _inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
@@ -36,7 +36,7 @@ mod tests {
 
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);
-        let res_read = <()>::from_reader(&mut container, ()).unwrap();
+        let res_read = <()>::from_reader_with_ctx(&mut container, ()).unwrap();
         assert_eq!((), res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

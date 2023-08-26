@@ -42,8 +42,8 @@ enum TestEnum {
     case(&mut hex!("FFFFFF"), TestEnum::VarA(0xFF)),
 )]
 fn test_enum(input: &mut [u8], expected: TestEnum) {
-    let mut input = input.to_vec();
-    let ret_read = TestEnum::try_from(input.as_mut_slice()).unwrap();
+    let input = input.to_vec();
+    let ret_read = TestEnum::try_from(input.as_slice()).unwrap();
     assert_eq!(expected, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
@@ -61,7 +61,7 @@ fn test_enum_error() {
     }
 
     let test_data = &mut [0x02, 0x02];
-    let _ret_read = TestEnum::try_from(test_data.as_mut_slice()).unwrap();
+    let _ret_read = TestEnum::try_from(test_data.as_slice()).unwrap();
 }
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -81,8 +81,8 @@ enum TestEnumDiscriminant {
     case(&mut hex!("03"), TestEnumDiscriminant::VarA),
 )]
 fn test_enum_discriminant(input: &mut [u8], expected: TestEnumDiscriminant) {
-    let mut input = input.to_vec();
-    let ret_read = TestEnumDiscriminant::try_from(input.as_mut_slice()).unwrap();
+    let input = input.to_vec();
+    let ret_read = TestEnumDiscriminant::try_from(input.as_slice()).unwrap();
     assert_eq!(expected, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
@@ -102,7 +102,7 @@ fn test_enum_array_type() {
 
     let mut input = b"123".to_vec();
 
-    let ret_read = TestEnumArray::try_from(input.as_mut_slice()).unwrap();
+    let ret_read = TestEnumArray::try_from(input.as_slice()).unwrap();
     assert_eq!(TestEnumArray::VarA, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
@@ -130,8 +130,8 @@ fn test_id_pat_with_id() {
         VariantB,
     }
 
-    let input = &mut [0x01, 0x02];
-    let (_, v) = DekuTest::from_bytes((input, 0)).unwrap();
+    let input = [0x01, 0x02];
+    let (_, v) = DekuTest::from_reader((&mut input.as_slice(), 0)).unwrap();
     assert_eq!(
         v,
         DekuTest {
@@ -141,8 +141,8 @@ fn test_id_pat_with_id() {
     );
     assert_eq!(input, &*v.to_bytes().unwrap());
 
-    let input = &mut [0x05];
-    let (_, v) = DekuTest::from_bytes((input, 0)).unwrap();
+    let input = [0x05];
+    let (_, v) = DekuTest::from_reader((&mut input.as_slice(), 0)).unwrap();
     assert_eq!(
         v,
         DekuTest {

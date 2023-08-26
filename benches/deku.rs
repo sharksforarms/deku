@@ -34,7 +34,7 @@ struct DekuVec {
 
 fn deku_read_bits(mut reader: impl Read) {
     let mut container = Container::new(&mut reader);
-    let _v = DekuBits::from_reader(&mut container, ()).unwrap();
+    let _v = DekuBits::from_reader_with_ctx(&mut container, ()).unwrap();
 }
 
 fn deku_write_bits(input: &DekuBits) {
@@ -43,7 +43,7 @@ fn deku_write_bits(input: &DekuBits) {
 
 fn deku_read_byte(mut reader: impl Read) {
     let mut container = Container::new(&mut reader);
-    let _v = DekuBytes::from_reader(&mut container, ()).unwrap();
+    let _v = DekuBytes::from_reader_with_ctx(&mut container, ()).unwrap();
 }
 
 fn deku_write_byte(input: &DekuBytes) {
@@ -52,7 +52,7 @@ fn deku_write_byte(input: &DekuBytes) {
 
 fn deku_read_enum(mut reader: impl Read) {
     let mut container = Container::new(&mut reader);
-    let _v = DekuEnum::from_reader(&mut container, ()).unwrap();
+    let _v = DekuEnum::from_reader_with_ctx(&mut container, ()).unwrap();
 }
 
 fn deku_write_enum(input: &DekuEnum) {
@@ -61,7 +61,7 @@ fn deku_write_enum(input: &DekuEnum) {
 
 fn deku_read_vec(mut reader: impl Read) {
     let mut container = Container::new(&mut reader);
-    let _v = DekuVec::from_reader(&mut container, ()).unwrap();
+    let _v = DekuVec::from_reader_with_ctx(&mut container, ()).unwrap();
 }
 
 fn deku_write_vec(input: &DekuVec) {

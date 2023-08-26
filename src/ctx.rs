@@ -166,7 +166,7 @@ pub struct BitSize(pub usize);
 impl BitSize {
     /// Convert the size in bytes to a bit size.
     #[inline]
-    const fn bits_from_bytes(byte_size: usize) -> Self {
+    const fn bits_from_reader(byte_size: usize) -> Self {
         // TODO: use checked_mul when const_option is enabled
         // link: https://github.com/rust-lang/rust/issues/67441
         Self(byte_size * 8)
@@ -181,12 +181,12 @@ impl BitSize {
     /// ```
     #[inline]
     pub const fn of<T>() -> Self {
-        Self::bits_from_bytes(core::mem::size_of::<T>())
+        Self::bits_from_reader(core::mem::size_of::<T>())
     }
 
     /// Returns the bit size of the pointed-to value
     #[inline]
     pub fn of_val<T: ?Sized>(val: &T) -> Self {
-        Self::bits_from_bytes(core::mem::size_of_val(val))
+        Self::bits_from_reader(core::mem::size_of_val(val))
     }
 }

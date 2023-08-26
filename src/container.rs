@@ -20,9 +20,9 @@ pub enum ContainerRet {
     Bits(Option<BitVec<u8, Msb0>>),
 }
 
-/// Container to use with `from_reader`
-pub struct Container<'a, R: Read> {
-    inner: &'a mut R,
+/// Container to use with `from_reader_with_ctx`
+pub struct Container<R: Read> {
+    inner: R,
     /// bits stored from previous reads that didn't read to the end of a byte size
     leftover: BitVec<u8, Msb0>,
     /// Amount of bits read during the use of [read_bits](Container::read_bits) and [read_bytes](Container::read_bytes).
@@ -34,10 +34,10 @@ pub struct Container<'a, R: Read> {
 /// Max bits requested from [`Container::read_bits`] during one call
 pub const MAX_BITS_AMT: usize = 128;
 
-impl<'a, R: Read> Container<'a, R> {
+impl<R: Read> Container<R> {
     /// Create a new `Container`
     #[inline]
-    pub fn new(inner: &'a mut R) -> Self {
+    pub fn new(inner: R) -> Self {
         #[allow(unused_mut)]
         let mut c = Self {
             inner,
@@ -64,11 +64,11 @@ impl<'a, R: Read> Container<'a, R> {
     /// Once the parsing is complete for a struct, if the total size of the field using the `bits` attribute
     /// isn't byte aligned the returned values could be unexpected as the "Read" will always read
     /// to a full byte.
-    /// 
+    ///
     /// ```rust
     /// use std::io::Cursor;
     /// use deku::prelude::*;
-    /// 
+    ///
     /// #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
     /// #[deku(endian = "big")]
     /// struct DekuTest {
@@ -81,7 +81,7 @@ impl<'a, R: Read> Container<'a, R> {
     /// let data: Vec<u8> = vec![0b0110_1101, 0xbe, 0xef];
     /// let mut cursor = Cursor::new(data);
     /// let mut container = Container::new(&mut cursor);
-    /// let val = DekuTest::from_reader(&mut container, ()).unwrap();
+    /// let val = DekuTest::from_reader_with_ctx(&mut container, ()).unwrap();
     /// assert_eq!(DekuTest {
     ///     field_a: 0b0110,
     ///     field_b: 0b11,
@@ -122,7 +122,7 @@ impl<'a, R: Read> Container<'a, R> {
         }
     }
 
-    /// Used at the beginning of `from_bytes`. Will read the `amt` of bits, but
+    /// Used at the beginning of `from_reader`. Will read the `amt` of bits, but
     /// not increase `bits_read`.
     #[inline]
     pub fn skip_bits(&mut self, amt: usize) -> Result<(), DekuError> {

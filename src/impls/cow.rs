@@ -11,11 +11,11 @@ where
     T: DekuReader<'a, Ctx> + Clone,
     Ctx: Copy,
 {
-    fn from_reader<R: Read>(
+    fn from_reader_with_ctx<R: Read>(
         container: &mut crate::container::Container<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
-        let val = <T>::from_reader(container, inner_ctx)?;
+        let val = <T>::from_reader_with_ctx(container, inner_ctx)?;
         Ok(Cow::Owned(val))
     }
 }
@@ -50,7 +50,7 @@ mod tests {
 
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);
-        let res_read = <Cow<u16>>::from_reader(&mut container, ()).unwrap();
+        let res_read = <Cow<u16>>::from_reader_with_ctx(&mut container, ()).unwrap();
         assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

@@ -31,7 +31,7 @@ fn main() {
 
     let mut cursor = Cursor::new(&mut test_data);
     let mut container = Container::new(&mut cursor);
-    let deku_test = DekuTest::from_reader(&mut container, ()).unwrap();
+    let deku_test = DekuTest::from_reader_with_ctx(&mut container, ()).unwrap();
 
     assert_eq!(
         DekuTest::Var4 {

@@ -800,7 +800,7 @@ use deku::prelude::*;
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(
-        reader = "DekuTest::read(deku::container)",
+        reader = "DekuTest::read(deku::reader)",
         writer = "DekuTest::write(deku::output, &self.field_a)"
     )]
     field_a: String,
@@ -809,9 +809,9 @@ struct DekuTest {
 impl DekuTest {
     /// Read and convert to String
     fn read<R: std::io::Read>(
-        container: &mut deku::container::Container<R>,
+        reader: &mut deku::reader::Reader<R>,
     ) -> Result<String, DekuError> {
-        let value = u8::from_reader_with_ctx(container, ())?;
+        let value = u8::from_reader_with_ctx(reader, ())?;
         Ok(value.to_string())
     }
 

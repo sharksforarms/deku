@@ -6,7 +6,7 @@ use deku::prelude::*;
 
 fn bit_flipper_read<R: std::io::Read>(
     field_a: u8,
-    container: &mut Container<R>,
+    reader: &mut Reader<R>,
     bit_size: BitSize,
 ) -> Result<u8, DekuError> {
     // Access to previously read fields
@@ -16,7 +16,7 @@ fn bit_flipper_read<R: std::io::Read>(
     println!("bit_size: {:?}", bit_size);
 
     // read field_b, calling original func
-    let value = u8::from_reader_with_ctx(container, bit_size)?;
+    let value = u8::from_reader_with_ctx(reader, bit_size)?;
 
     // flip the bits on value if field_a is 0x01
     let value = if field_a == 0x01 { !value } else { value };
@@ -50,7 +50,7 @@ struct DekuTest {
     field_a: u8,
 
     #[deku(
-        reader = "bit_flipper_read(*field_a, deku::container, BitSize(8))",
+        reader = "bit_flipper_read(*field_a, deku::reader, BitSize(8))",
         writer = "bit_flipper_write(*field_a, *field_b, deku::output, BitSize(8))"
     )]
     field_b: u8,

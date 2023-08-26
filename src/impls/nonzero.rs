@@ -12,10 +12,10 @@ macro_rules! ImplDekuTraitsCtx {
     ($typ:ty, $readtype:ty, $ctx_arg:tt, $ctx_type:tt) => {
         impl DekuReader<'_, $ctx_type> for $typ {
             fn from_reader_with_ctx<R: Read>(
-                container: &mut crate::container::Container<R>,
+                reader: &mut crate::reader::Reader<R>,
                 $ctx_arg: $ctx_type,
             ) -> Result<Self, DekuError> {
-                let value = <$readtype>::from_reader_with_ctx(container, $ctx_arg)?;
+                let value = <$readtype>::from_reader_with_ctx(reader, $ctx_arg)?;
                 let value = <$typ>::new(value);
 
                 match value {
@@ -65,7 +65,7 @@ mod tests {
     use hexlit::hex;
     use rstest::rstest;
 
-    use crate::container::Container;
+    use crate::reader::Reader;
 
     use super::*;
 
@@ -78,8 +78,8 @@ mod tests {
     fn test_non_zero(input: &[u8], expected: NonZeroU8) {
         let mut bit_slice = input.view_bits::<Msb0>();
 
-        let mut container = Container::new(&mut bit_slice);
-        let res_read = NonZeroU8::from_reader_with_ctx(&mut container, ()).unwrap();
+        let mut reader = Reader::new(&mut bit_slice);
+        let res_read = NonZeroU8::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

@@ -3,8 +3,8 @@ use std::io::Cursor;
 
 use bitvec::bitvec;
 use deku::bitvec::Msb0;
-use deku::container::Container;
 use deku::prelude::*;
+use deku::reader::Reader;
 
 /// General smoke tests for ctx
 /// TODO: These should be divided into smaller units
@@ -15,7 +15,7 @@ fn test_ctx_struct() {
     #[deku(ctx = "a: u8, b: u8")]
     struct SubTypeNeedCtx {
         #[deku(
-            reader = "(u8::from_reader_with_ctx(deku::container,()).map(|c|(a+b+c) as usize))",
+            reader = "(u8::from_reader_with_ctx(deku::reader,()).map(|c|(a+b+c) as usize))",
             writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(self.i as u8)"
         )]
         i: usize,
@@ -55,7 +55,7 @@ fn test_top_level_ctx_enum() {
         #[deku(id = "1")]
         VariantA(
             #[deku(
-                reader = "(u8::from_reader_with_ctx(deku::container,()).map(|c|(a+b+c)))",
+                reader = "(u8::from_reader_with_ctx(deku::reader,()).map(|c|(a+b+c)))",
                 writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
             )]
             u8,
@@ -64,7 +64,7 @@ fn test_top_level_ctx_enum() {
 
     let test_data = [0x01_u8, 0x03];
     let ret_read = TopLevelCtxEnum::from_reader_with_ctx(
-        &mut Container::new(&mut Cursor::new(test_data)),
+        &mut Reader::new(&mut Cursor::new(test_data)),
         (1, 2),
     )
     .unwrap();
@@ -83,7 +83,7 @@ fn test_top_level_ctx_enum_default() {
         #[deku(id = "1")]
         VariantA(
             #[deku(
-                reader = "(u8::from_reader_with_ctx(deku::container, ()).map(|c|(a+b+c)))",
+                reader = "(u8::from_reader_with_ctx(deku::reader, ()).map(|c|(a+b+c)))",
                 writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
             )]
             u8,
@@ -101,7 +101,7 @@ fn test_top_level_ctx_enum_default() {
 
     // Use context
     let ret_read = TopLevelCtxEnumDefault::from_reader_with_ctx(
-        &mut Container::new(&mut Cursor::new(test_data)),
+        &mut Reader::new(&mut Cursor::new(test_data)),
         (1, 2),
     )
     .unwrap();
@@ -222,7 +222,7 @@ fn test_ctx_default_struct() {
 
     // Use context
     let ret_read = TopLevelCtxStructDefault::from_reader_with_ctx(
-        &mut Container::new(&mut Cursor::new(test_data)),
+        &mut Reader::new(&mut Cursor::new(test_data)),
         (1, 2),
     )
     .unwrap();

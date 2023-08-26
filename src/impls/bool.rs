@@ -13,10 +13,10 @@ where
     u8: DekuReader<'a, Ctx>,
 {
     fn from_reader_with_ctx<R: Read>(
-        container: &mut crate::container::Container<R>,
+        reader: &mut crate::reader::Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<bool, DekuError> {
-        let val = u8::from_reader_with_ctx(container, inner_ctx)?;
+        let val = u8::from_reader_with_ctx(reader, inner_ctx)?;
 
         let ret = match val {
             0x01 => Ok(true),
@@ -47,7 +47,7 @@ mod tests {
     use hexlit::hex;
     use rstest::rstest;
 
-    use crate::container::Container;
+    use crate::reader::Reader;
 
     use super::*;
 
@@ -59,8 +59,8 @@ mod tests {
         case(&hex!("02"), false),
     )]
     fn test_bool(mut input: &[u8], expected: bool) {
-        let mut container = Container::new(&mut input);
-        let res_read = bool::from_reader_with_ctx(&mut container, ()).unwrap();
+        let mut reader = Reader::new(&mut input);
+        let res_read = bool::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
     }
 
@@ -69,8 +69,8 @@ mod tests {
         let input = &[0b01_000000];
 
         let mut cursor = Cursor::new(input);
-        let mut container = Container::new(&mut cursor);
-        let res_read = bool::from_reader_with_ctx(&mut container, crate::ctx::BitSize(2)).unwrap();
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = bool::from_reader_with_ctx(&mut reader, crate::ctx::BitSize(2)).unwrap();
         assert!(res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

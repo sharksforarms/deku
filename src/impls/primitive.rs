@@ -162,8 +162,8 @@ macro_rules! ImplDekuReadBits {
                 }
                 let bits = container.read_bits(size.0)?;
                 let Some(bits) = bits else {
-                            return Err(DekuError::Parse(format!("no bits read from reader",)));
-                        };
+                    return Err(DekuError::Parse(format!("no bits read from reader",)));
+                };
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
             }

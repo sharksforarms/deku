@@ -38,8 +38,8 @@ mod test {
 
     #[test]
     fn test_basic_a() {
-        let input = &mut [0u8];
-        let ret_read = BasicMapping::try_from(input.as_mut_slice()).unwrap();
+        let input: &[u8] = &[0u8];
+        let ret_read = BasicMapping::try_from(input).unwrap();
         assert_eq!(BasicMapping::A, ret_read);
         let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(input.to_vec(), ret_write);
@@ -47,8 +47,8 @@ mod test {
 
     #[test]
     fn test_basic_c() {
-        let input = &mut [2u8];
-        let ret_read = BasicMapping::try_from(input.as_mut_slice()).unwrap();
+        let input: &[u8] = &[2u8];
+        let ret_read = BasicMapping::try_from(input).unwrap();
         assert_eq!(BasicMapping::C, ret_read);
         let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(input.to_vec(), ret_write);
@@ -56,9 +56,9 @@ mod test {
 
     #[test]
     fn test_basic_pattern() {
-        let input = &mut [10u8];
+        let input: &[u8] = &[10u8];
         let output = [BasicMapping::C as u8];
-        let ret_read = BasicMapping::try_from(input.as_mut_slice()).unwrap();
+        let ret_read = BasicMapping::try_from(input).unwrap();
         assert_eq!(BasicMapping::C, ret_read);
         let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(output.to_vec(), ret_write);
@@ -66,9 +66,9 @@ mod test {
 
     #[test]
     fn test_advanced_remapping() {
-        let input = &mut [1u8];
+        let input: &[u8] = &[1u8];
         let output = [1u8];
-        let ret_read = AdvancedRemapping::try_from(input.as_mut_slice()).unwrap();
+        let ret_read = AdvancedRemapping::try_from(input).unwrap();
         assert_eq!(AdvancedRemapping::A, ret_read);
         let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(output.to_vec(), ret_write);
@@ -76,9 +76,9 @@ mod test {
 
     #[test]
     fn test_advanced_remapping_default_field() {
-        let input = &mut [10u8];
+        let input: &[u8] = &[10u8];
         let output = [3u8];
-        let ret_read = AdvancedRemapping::try_from(input.as_mut_slice()).unwrap();
+        let ret_read = AdvancedRemapping::try_from(input).unwrap();
         assert_eq!(AdvancedRemapping::C, ret_read);
         let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(output.to_vec(), ret_write);

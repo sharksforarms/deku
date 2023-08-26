@@ -48,7 +48,7 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
 
 impl DekuReader<'_, (Endian, ByteSize)> for u8 {
     #[inline]
-    fn from_reader<R: Read>(
+    fn from_reader_with_ctx<R: Read>(
         container: &mut crate::container::Container<R>,
         (endian, size): (Endian, ByteSize),
     ) -> Result<u8, DekuError> {
@@ -149,7 +149,7 @@ macro_rules! ImplDekuReadBits {
 
         impl DekuReader<'_, (Endian, BitSize)> for $typ {
             #[inline]
-            fn from_reader<R: Read>(
+            fn from_reader_with_ctx<R: Read>(
                 container: &mut crate::container::Container<R>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
@@ -198,7 +198,7 @@ macro_rules! ImplDekuReadBytes {
 
         impl DekuReader<'_, (Endian, ByteSize)> for $typ {
             #[inline]
-            fn from_reader<R: Read>(
+            fn from_reader_with_ctx<R: Read>(
                 container: &mut crate::container::Container<R>,
                 (endian, size): (Endian, ByteSize),
             ) -> Result<$typ, DekuError> {
@@ -259,7 +259,7 @@ macro_rules! ImplDekuReadSignExtend {
 
         impl DekuReader<'_, (Endian, ByteSize)> for $typ {
             #[inline]
-            fn from_reader<R: Read>(
+            fn from_reader_with_ctx<R: Read>(
                 container: &mut crate::container::Container<R>,
                 (endian, size): (Endian, ByteSize),
             ) -> Result<$typ, DekuError> {
@@ -309,7 +309,7 @@ macro_rules! ImplDekuReadSignExtend {
 
         impl DekuReader<'_, (Endian, BitSize)> for $typ {
             #[inline]
-            fn from_reader<R: Read>(
+            fn from_reader_with_ctx<R: Read>(
                 container: &mut crate::container::Container<R>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
@@ -338,26 +338,26 @@ macro_rules! ForwardDekuRead {
         // Only have `endian`, set `bit_size` to `Size::of::<Type>()`
         impl DekuReader<'_, Endian> for $typ {
             #[inline]
-            fn from_reader<R: Read>(
+            fn from_reader_with_ctx<R: Read>(
                 container: &mut crate::container::Container<R>,
                 endian: Endian,
             ) -> Result<$typ, DekuError> {
                 let byte_size = core::mem::size_of::<$typ>();
 
-                <$typ>::from_reader(container, (endian, ByteSize(byte_size)))
+                <$typ>::from_reader_with_ctx(container, (endian, ByteSize(byte_size)))
             }
         }
 
         // Only have `byte_size`, set `endian` to `Endian::default`.
         impl DekuReader<'_, ByteSize> for $typ {
             #[inline]
-            fn from_reader<R: Read>(
+            fn from_reader_with_ctx<R: Read>(
                 container: &mut crate::container::Container<R>,
                 byte_size: ByteSize,
             ) -> Result<$typ, DekuError> {
                 let endian = Endian::default();
 
-                let a = <$typ>::from_reader(container, (endian, byte_size))?;
+                let a = <$typ>::from_reader_with_ctx(container, (endian, byte_size))?;
                 Ok(a)
             }
         }
@@ -365,27 +365,27 @@ macro_rules! ForwardDekuRead {
         //// Only have `bit_size`, set `endian` to `Endian::default`.
         impl DekuReader<'_, BitSize> for $typ {
             #[inline]
-            fn from_reader<R: Read>(
+            fn from_reader_with_ctx<R: Read>(
                 container: &mut crate::container::Container<R>,
                 bit_size: BitSize,
             ) -> Result<$typ, DekuError> {
                 let endian = Endian::default();
 
                 if (bit_size.0 % 8) == 0 {
-                    <$typ>::from_reader(container, (endian, ByteSize(bit_size.0 / 8)))
+                    <$typ>::from_reader_with_ctx(container, (endian, ByteSize(bit_size.0 / 8)))
                 } else {
-                    <$typ>::from_reader(container, (endian, bit_size))
+                    <$typ>::from_reader_with_ctx(container, (endian, bit_size))
                 }
             }
         }
 
         impl DekuReader<'_> for $typ {
             #[inline]
-            fn from_reader<R: Read>(
+            fn from_reader_with_ctx<R: Read>(
                 container: &mut crate::container::Container<R>,
                 _: (),
             ) -> Result<$typ, DekuError> {
-                <$typ>::from_reader(container, Endian::default())
+                <$typ>::from_reader_with_ctx(container, Endian::default())
             }
         }
     };
@@ -613,7 +613,7 @@ mod tests {
             fn $test_name() {
                 let mut r = std::io::Cursor::new($input);
                 let mut container = Container::new(&mut r);
-                let res_read = <$typ>::from_reader(&mut container, ENDIAN).unwrap();
+                let res_read = <$typ>::from_reader_with_ctx(&mut container, ENDIAN).unwrap();
                 assert_eq!($expected, res_read);
 
                 let mut res_write = bitvec![u8, Msb0;];
@@ -734,9 +734,9 @@ mod tests {
         let mut container = Container::new(&mut input);
         let res_read = match bit_size {
             Some(bit_size) => {
-                u32::from_reader(&mut container, (endian, BitSize(bit_size))).unwrap()
+                u32::from_reader_with_ctx(&mut container, (endian, BitSize(bit_size))).unwrap()
             }
-            None => u32::from_reader(&mut container, endian).unwrap(),
+            None => u32::from_reader_with_ctx(&mut container, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
         assert_eq!(
@@ -773,18 +773,18 @@ mod tests {
         let mut container = Container::new(&mut input);
         let res_read = match byte_size {
             Some(byte_size) => {
-                u32::from_reader(&mut container, (endian, ByteSize(byte_size))).unwrap()
+                u32::from_reader_with_ctx(&mut container, (endian, ByteSize(byte_size))).unwrap()
             }
-            None => u32::from_reader(&mut container, endian).unwrap(),
+            None => u32::from_reader_with_ctx(&mut container, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
 
         let mut container = Container::new(&mut bit_slice);
         let res_read = match byte_size {
             Some(byte_size) => {
-                u32::from_reader(&mut container, (endian, ByteSize(byte_size))).unwrap()
+                u32::from_reader_with_ctx(&mut container, (endian, ByteSize(byte_size))).unwrap()
             }
-            None => u32::from_reader(&mut container, endian).unwrap(),
+            None => u32::from_reader_with_ctx(&mut container, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
         let mut buf = vec![];
@@ -826,9 +826,9 @@ mod tests {
         let mut container = Container::new(&mut bit_slice);
         let res_read = match bit_size {
             Some(bit_size) => {
-                u32::from_reader(&mut container, (endian, BitSize(bit_size))).unwrap()
+                u32::from_reader_with_ctx(&mut container, (endian, BitSize(bit_size))).unwrap()
             }
-            None => u32::from_reader(&mut container, endian).unwrap(),
+            None => u32::from_reader_with_ctx(&mut container, endian).unwrap(),
         };
         assert_eq!(expected, res_read);
 
@@ -850,7 +850,8 @@ mod tests {
                 let mut slice = [0b10101_000].as_slice();
                 let mut container = Container::new(&mut slice);
                 let res_read =
-                    <$typ>::from_reader(&mut container, (Endian::Little, BitSize(5))).unwrap();
+                    <$typ>::from_reader_with_ctx(&mut container, (Endian::Little, BitSize(5)))
+                        .unwrap();
                 assert_eq!(-11, res_read);
             }
         };
@@ -869,8 +870,10 @@ mod tests {
             fn $test_name() {
                 let mut slice = [0b10101_000].as_slice();
                 let mut container = Container::new(&mut slice);
-                let res_read =
-                    <$typ>::from_reader(&mut container, (Endian::Little, BitSize($size + 1)));
+                let res_read = <$typ>::from_reader_with_ctx(
+                    &mut container,
+                    (Endian::Little, BitSize($size + 1)),
+                );
                 assert_eq!(
                     DekuError::Parse(format!(
                         "too much data: container of {} bits cannot hold {} bits",

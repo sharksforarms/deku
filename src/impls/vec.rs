@@ -31,7 +31,7 @@ where
     let start_read = container.bits_read;
 
     loop {
-        let val = <T>::from_reader(container, ctx)?;
+        let val = <T>::from_reader_with_ctx(container, ctx)?;
         res.push(val);
 
         // This unwrap is safe as we are pushing to the vec immediately before it,
@@ -50,7 +50,7 @@ where
     Ctx: Copy,
     Predicate: FnMut(&T) -> bool,
 {
-    fn from_reader<R: Read>(
+    fn from_reader_with_ctx<R: Read>(
         container: &mut crate::container::Container<R>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
     ) -> Result<Self, DekuError>
@@ -102,14 +102,14 @@ impl<'a, T: DekuReader<'a>, Predicate: FnMut(&T) -> bool> DekuReader<'a, Limit<T
     for Vec<T>
 {
     /// Read `T`s until the given limit from input for types which don't require context.
-    fn from_reader<R: Read>(
+    fn from_reader_with_ctx<R: Read>(
         container: &mut crate::container::Container<R>,
         limit: Limit<T, Predicate>,
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
     {
-        Vec::from_reader(container, (limit, ()))
+        Vec::from_reader_with_ctx(container, (limit, ()))
     }
 }
 
@@ -172,11 +172,12 @@ mod tests {
     ) {
         let mut container = Container::new(&mut input);
         let res_read = match bit_size {
-            Some(bit_size) => {
-                Vec::<u8>::from_reader(&mut container, (limit, (endian, BitSize(bit_size))))
-                    .unwrap()
-            }
-            None => Vec::<u8>::from_reader(&mut container, (limit, (endian))).unwrap(),
+            Some(bit_size) => Vec::<u8>::from_reader_with_ctx(
+                &mut container,
+                (limit, (endian, BitSize(bit_size))),
+            )
+            .unwrap(),
+            None => Vec::<u8>::from_reader_with_ctx(&mut container, (limit, (endian))).unwrap(),
         };
         assert_eq!(expected, res_read);
         assert_eq!(
@@ -222,7 +223,8 @@ mod tests {
 
         let mut container = Container::new(&mut input);
         let res_read =
-            Vec::<u16>::from_reader(&mut container, (limit, (endian, BitSize(bit_size)))).unwrap();
+            Vec::<u16>::from_reader_with_ctx(&mut container, (limit, (endian, BitSize(bit_size))))
+                .unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(
             container.rest(),

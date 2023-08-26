@@ -39,10 +39,10 @@ fn main() -> ! {
     // now the allocator is ready types like Box, Vec can be used.
 
     #[allow(clippy::unusual_byte_groupings)]
-    let test_data = &mut [0b10101_101, 0x02, 0xBE, 0xEF];
+    let test_data: &[u8] = &[0b10101_101, 0x02, 0xBE, 0xEF];
 
     // Test reading
-    let (_rest, val) = DekuTest::from_bytes((test_data.as_mut_slice(), 0)).unwrap();
+    let (_rest, val) = DekuTest::from_reader((test_data, 0)).unwrap();
     assert_eq!(
         DekuTest {
             field_a: 0b10101,

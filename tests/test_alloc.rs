@@ -53,11 +53,11 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_simple() {
-        let mut input = hex!("aa_bbbb_cc_0102_dd_ffffff_aa_0100ff");
+        let input = hex!("aa_bbbb_cc_0102_dd_ffffff_aa_0100ff");
 
         assert_eq!(
             count_alloc(|| {
-                let _ = TestDeku::from_bytes((&mut input, 0)).unwrap();
+                let _ = TestDeku::from_reader((&mut input.as_slice(), 0)).unwrap();
             })
             .0,
             (5, 0, 5)

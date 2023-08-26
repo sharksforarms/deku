@@ -4,11 +4,11 @@ use bitvec::prelude::*;
 use crate::{DekuError, DekuReader, DekuWrite};
 
 impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
-    fn from_reader<R: Read>(
+    fn from_reader_with_ctx<R: Read>(
         container: &mut crate::container::Container<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
-        let val = <T>::from_reader(container, inner_ctx)?;
+        let val = <T>::from_reader_with_ctx(container, inner_ctx)?;
         Ok(Some(val))
     }
 }
@@ -43,7 +43,7 @@ mod tests {
         let input = &[1u8, 2, 3, 4];
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);
-        let v = Option::<u32>::from_reader(&mut container, Endian::Little).unwrap();
+        let v = Option::<u32>::from_reader_with_ctx(&mut container, Endian::Little).unwrap();
         assert_eq!(v, Some(0x04030201))
     }
 }

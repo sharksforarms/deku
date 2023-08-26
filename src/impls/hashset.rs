@@ -15,7 +15,7 @@ use crate::{DekuError, DekuReader, DekuWrite};
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
 #[allow(clippy::type_complexity)]
-fn from_reader_hashset_with_predicate<'a, T, S, Ctx, Predicate, R: Read>(
+fn from_reader_with_ctx_hashset_with_predicate<'a, T, S, Ctx, Predicate, R: Read>(
     container: &mut crate::container::Container<R>,
     capacity: Option<usize>,
     ctx: Ctx,
@@ -33,7 +33,7 @@ where
     let orig_bits_read = container.bits_read;
 
     while !found_predicate {
-        let val = <T>::from_reader(container, ctx)?;
+        let val = <T>::from_reader_with_ctx(container, ctx)?;
         found_predicate = predicate(container.bits_read - orig_bits_read, &val);
         res.insert(val);
     }
@@ -60,10 +60,10 @@ where
     /// let mut input = Cursor::new(vec![1u8, 2, 3, 4]);
     /// let expected: HashSet<u32> = vec![0x04030201].into_iter().collect();
     /// let mut container = deku::container::Container::new(&mut input);
-    /// let set = HashSet::<u32>::from_reader(&mut container, (1.into(), Endian::Little)).unwrap();
+    /// let set = HashSet::<u32>::from_reader_with_ctx(&mut container, (1.into(), Endian::Little)).unwrap();
     /// assert_eq!(expected, set)
     /// ```
-    fn from_reader<R: Read>(
+    fn from_reader_with_ctx<R: Read>(
         container: &mut crate::container::Container<R>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
     ) -> Result<Self, DekuError>
@@ -79,7 +79,7 @@ where
                 }
 
                 // Otherwise, read until we have read `count` elements
-                from_reader_hashset_with_predicate(
+                from_reader_with_ctx_hashset_with_predicate(
                     container,
                     Some(count),
                     inner_ctx,
@@ -91,16 +91,17 @@ where
             }
 
             // Read until a given predicate returns true
-            Limit::Until(mut predicate, _) => {
-                from_reader_hashset_with_predicate(container, None, inner_ctx, move |_, value| {
-                    predicate(value)
-                })
-            }
+            Limit::Until(mut predicate, _) => from_reader_with_ctx_hashset_with_predicate(
+                container,
+                None,
+                inner_ctx,
+                move |_, value| predicate(value),
+            ),
 
             // Read until a given quantity of bits have been read
             Limit::BitSize(size) => {
                 let bit_size = size.0;
-                from_reader_hashset_with_predicate(
+                from_reader_with_ctx_hashset_with_predicate(
                     container,
                     None,
                     inner_ctx,
@@ -111,7 +112,7 @@ where
             // Read until a given quantity of bits have been read
             Limit::ByteSize(size) => {
                 let bit_size = size.0 * 8;
-                from_reader_hashset_with_predicate(
+                from_reader_with_ctx_hashset_with_predicate(
                     container,
                     None,
                     inner_ctx,
@@ -126,14 +127,14 @@ impl<'a, T: DekuReader<'a> + Eq + Hash, S: BuildHasher + Default, Predicate: FnM
     DekuReader<'a, Limit<T, Predicate>> for HashSet<T, S>
 {
     /// Read `T`s until the given limit from input for types which don't require context.
-    fn from_reader<R: Read>(
+    fn from_reader_with_ctx<R: Read>(
         container: &mut crate::container::Container<R>,
         limit: Limit<T, Predicate>,
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
     {
-        Self::from_reader(container, (limit, ()))
+        Self::from_reader_with_ctx(container, (limit, ()))
     }
 }
 
@@ -203,11 +204,14 @@ mod tests {
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);
         let res_read = match bit_size {
-            Some(bit_size) => {
-                FxHashSet::<u8>::from_reader(&mut container, (limit, (endian, BitSize(bit_size))))
-                    .unwrap()
+            Some(bit_size) => FxHashSet::<u8>::from_reader_with_ctx(
+                &mut container,
+                (limit, (endian, BitSize(bit_size))),
+            )
+            .unwrap(),
+            None => {
+                FxHashSet::<u8>::from_reader_with_ctx(&mut container, (limit, (endian))).unwrap()
             }
-            None => FxHashSet::<u8>::from_reader(&mut container, (limit, (endian))).unwrap(),
         };
         assert_eq!(expected, res_read);
         assert_eq!(
@@ -252,9 +256,11 @@ mod tests {
 
         let mut cursor = Cursor::new(input);
         let mut container = Container::new(&mut cursor);
-        let res_read =
-            FxHashSet::<u16>::from_reader(&mut container, (limit, (endian, BitSize(bit_size))))
-                .unwrap();
+        let res_read = FxHashSet::<u16>::from_reader_with_ctx(
+            &mut container,
+            (limit, (endian, BitSize(bit_size))),
+        )
+        .unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(
             container.rest(),

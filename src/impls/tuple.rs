@@ -38,7 +38,7 @@ macro_rules! ImplDekuTupleTraits {
 
         impl<'a, Ctx: Copy, $($T:DekuReader<'a, Ctx>+Sized),+> DekuReader<'a, Ctx> for ($($T,)+)
         {
-            fn from_reader<R: Read>(
+            fn from_reader_with_ctx<R: Read>(
                 container: &mut crate::container::Container<R>,
                 ctx: Ctx,
             ) -> Result<Self, DekuError>
@@ -47,7 +47,7 @@ macro_rules! ImplDekuTupleTraits {
             {
                 let tuple = ();
                 $(
-                    let val = <$T>::from_reader(container, ctx)?;
+                    let val = <$T>::from_reader_with_ctx(container, ctx)?;
                     let tuple = tuple.append(val);
                 )+
                 Ok(tuple)

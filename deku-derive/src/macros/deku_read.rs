@@ -59,27 +59,26 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerRead` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-        let from_bytes_body = quote! {
+        let from_reader_body = quote! {
             use core::convert::TryFrom;
-            let mut cursor = ::#crate_::acid_io::Cursor::new(__deku_input.0);
-            let __deku_container = &mut deku::container::Container::new(&mut cursor);
+            let __deku_container = &mut deku::container::Container::new(__deku_input.0);
             if __deku_input.1 != 0 {
                 __deku_container.skip_bits(__deku_input.1)?;
             }
 
-            let __deku_value = Self::from_reader(__deku_container, ())?;
+            let __deku_value = Self::from_reader_with_ctx(__deku_container, ())?;
 
             Ok((__deku_container.bits_read, __deku_value))
         };
 
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
-        tokens.extend(emit_from_bytes(
+        tokens.extend(emit_from_reader(
             &imp,
             &lifetime,
             &ident,
             wher,
-            from_bytes_body,
+            from_reader_body,
         ));
     }
 
@@ -98,7 +97,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
-            fn from_reader<R: ::#crate_::acid_io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::acid_io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -109,7 +108,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
-                fn from_reader<R: ::#crate_::acid_io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::acid_io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -280,7 +279,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
     } else if id_type.is_some() {
         quote! {
-            let __deku_variant_id = <#id_type>::from_reader(__deku_container,  (#id_args))?;
+            let __deku_variant_id = <#id_type>::from_reader_with_ctx(__deku_container,  (#id_args))?;
         }
     } else {
         // either `id` or `type` needs to be specified
@@ -299,27 +298,26 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerRead` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-        let from_bytes_body = quote! {
+        let from_reader_body = quote! {
             use core::convert::TryFrom;
-            let mut cursor = ::#crate_::acid_io::Cursor::new(__deku_input.0);
-            let __deku_container = &mut deku::container::Container::new(&mut cursor);
+            let __deku_container = &mut deku::container::Container::new(__deku_input.0);
             if __deku_input.1 != 0 {
                 __deku_container.skip_bits(__deku_input.1)?;
             }
 
-            let __deku_value = Self::from_reader(__deku_container, ())?;
+            let __deku_value = Self::from_reader_with_ctx(__deku_container, ())?;
 
             Ok((__deku_container.bits_read, __deku_value))
         };
 
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
-        tokens.extend(emit_from_bytes(
+        tokens.extend(emit_from_reader(
             &imp,
             &lifetime,
             &ident,
             wher,
-            from_bytes_body,
+            from_reader_body,
         ));
     }
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
@@ -337,7 +335,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     tokens.extend(quote! {
         #[allow(non_snake_case)]
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
-            fn from_reader<R: std::io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::acid_io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -349,7 +347,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             #[allow(non_snake_case)]
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
-                fn from_reader<R: std::io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::acid_io::Read>(__deku_container: &mut ::#crate_::container::Container<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -394,7 +392,7 @@ fn emit_magic_read(input: &DekuData) -> TokenStream {
             let __deku_magic = #magic;
 
             for __deku_byte in __deku_magic {
-                let __deku_read_byte = u8::from_reader(__deku_container, ())?;
+                let __deku_read_byte = u8::from_reader_with_ctx(__deku_container, ())?;
                 if *__deku_byte != __deku_read_byte {
                     return Err(::#crate_::DekuError::Parse(format!("Missing magic value {:?}", #magic)));
                 }
@@ -608,7 +606,7 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::from_reader
+                    #type_as_deku_read::from_reader_with_ctx
                     (
                         __deku_container,
                         (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args))
@@ -619,7 +617,7 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::from_reader
+                    #type_as_deku_read::from_reader_with_ctx
                     (
                         __deku_container,
                         (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args))
@@ -630,7 +628,7 @@ fn emit_field_read(
             quote! {
                 {
                     use core::borrow::Borrow;
-                    #type_as_deku_read::from_reader
+                    #type_as_deku_read::from_reader_with_ctx
                     (
                         __deku_container,
                         (::#crate_::ctx::Limit::new_byte_size(::#crate_::ctx::ByteSize(usize::try_from(*((#field_bytes).borrow()))?)), (#read_args))
@@ -641,7 +639,7 @@ fn emit_field_read(
             // We wrap the input into another closure here to enforce that it is actually a callable
             // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
             quote! {
-                #type_as_deku_read::from_reader
+                #type_as_deku_read::from_reader_with_ctx
                 (
                     __deku_container,
                     (::#crate_::ctx::Limit::new_until(#field_until), (#read_args))
@@ -649,7 +647,7 @@ fn emit_field_read(
             }
         } else {
             quote! {
-                #type_as_deku_read::from_reader
+                #type_as_deku_read::from_reader_with_ctx
                 (
                     __deku_container,
                     (#read_args)
@@ -732,8 +730,8 @@ fn emit_field_read(
     Ok((field_ident, field_read))
 }
 
-/// emit `from_bytes()` for struct/enum
-pub fn emit_from_bytes(
+/// emit `from_reader()` for struct/enum
+pub fn emit_from_reader(
     imp: &syn::ImplGenerics,
     lifetime: &TokenStream,
     ident: &TokenStream,
@@ -744,7 +742,7 @@ pub fn emit_from_bytes(
     quote! {
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
-            fn from_bytes(__deku_input: (&#lifetime mut [u8], usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
+            fn from_reader<R: ::#crate_::acid_io::Read>(__deku_input: (R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #body
             }
         }
@@ -760,12 +758,14 @@ pub fn emit_try_from(
 ) -> TokenStream {
     let crate_ = super::get_crate_name();
     quote! {
-        impl #imp core::convert::TryFrom<&#lifetime mut [u8]> for #ident #wher {
+        impl #imp core::convert::TryFrom<&#lifetime [u8]> for #ident #wher {
             type Error = ::#crate_::DekuError;
 
-            fn try_from(input: &#lifetime mut [u8]) -> core::result::Result<Self, Self::Error> {
-                let (amt_read, res) = <Self as ::#crate_::DekuContainerRead>::from_bytes((input, 0))?;
-                if (amt_read / 8) != input.len() {
+            fn try_from(input: &#lifetime [u8]) -> core::result::Result<Self, Self::Error> {
+                let total_len = input.len();
+                let mut cursor = ::#crate_::acid_io::Cursor::new(input);
+                let (amt_read, res) = <Self as ::#crate_::DekuContainerRead>::from_reader((&mut cursor, 0))?;
+                if (amt_read / 8) != total_len {
                     return Err(::#crate_::DekuError::Parse(format!("Too much data")));
                 }
                 Ok(res)

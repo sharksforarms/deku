@@ -2,7 +2,7 @@
 # Deku: Declarative binary reading and writing
 
 Deriving a struct or enum with `DekuRead` and `DekuWrite` provides bit-level,
-symmetric, performant, serialization/deserialization implementations.
+symmetric, serialization/deserialization implementations.
 
 This allows the developer to focus on building and maintaining how the data is
 represented and manipulated and not on redundant, error-prone, parsing/writing code.
@@ -11,8 +11,7 @@ TLVs or network protocols. This allows the internal rustc compiler to choose
 the in-memory representation of the struct, while reading and writing can
 understand the struct in a "packed" C way.
 
-Under the hood, many specializations are done in order to achieve performant code
-that is **almost** the same performance as if you wrote the code yourself!
+Under the hood, many specializations are done in order to achieve performant code.
 For reading and writing bytes, the std library is used.
 When bit-level control is required, it makes use of the [bitvec](https://crates.io/crates/bitvec)
 crate as the "Reader" and “Writer”.

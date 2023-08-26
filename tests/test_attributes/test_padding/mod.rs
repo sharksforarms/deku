@@ -18,7 +18,7 @@ fn test_pad_bits_before_and_pad_bytes_before() {
         field_b: u8,
     }
 
-    let mut data: Vec<u8> = vec![0b10_000000, 0xaa, 0xbb];
+    let data: Vec<u8> = vec![0b10_000000, 0xaa, 0xbb];
 
     let ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 
@@ -43,7 +43,7 @@ fn test_pad_bits_after_and_pad_bytes_after() {
         field_b: u8,
     }
 
-    let mut data: Vec<u8> = vec![0b10_000000, 0xaa, 0xbb];
+    let data: Vec<u8> = vec![0b10_000000, 0xaa, 0xbb];
 
     let ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 

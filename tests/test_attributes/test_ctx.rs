@@ -2,7 +2,7 @@ use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 
 use bitvec::bitvec;
-use deku::bitvec::{BitView, Msb0};
+use deku::bitvec::Msb0;
 use deku::container::Container;
 use deku::prelude::*;
 
@@ -29,7 +29,7 @@ fn test_ctx_struct() {
         c: SubTypeNeedCtx,
     }
 
-    let mut test_data = [0x01_u8, 0x02, 0x03];
+    let test_data = [0x01_u8, 0x02, 0x03];
 
     let ret_read = FieldLevelCtxStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
@@ -91,7 +91,7 @@ fn test_top_level_ctx_enum_default() {
     }
 
     let expected = TopLevelCtxEnumDefault::VariantA(0x06);
-    let mut test_data = [0x01_u8, 0x03];
+    let test_data = [0x01_u8, 0x03];
 
     // Use default
     let ret_read = TopLevelCtxEnumDefault::try_from(test_data.as_slice()).unwrap();
@@ -212,7 +212,7 @@ fn test_ctx_default_struct() {
         b: None,
     };
 
-    let mut test_data = [0xffu8];
+    let test_data = [0xffu8];
 
     // Use default
     let ret_read = TopLevelCtxStructDefault::try_from(test_data.as_slice()).unwrap();

@@ -11,7 +11,7 @@ fn test_pad_bytes_after() {
         field_b: u8,
     }
 
-    let mut data: Vec<u8> = vec![0xaa, 0xbb, 0xcc, 0xdd];
+    let data: Vec<u8> = vec![0xaa, 0xbb, 0xcc, 0xdd];
 
     let ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 
@@ -37,7 +37,7 @@ fn test_pad_bytes_after_not_enough() {
         field_b: u8,
     }
 
-    let mut data: Vec<u8> = vec![0xaa, 0xbb, 0xcc, 0xdd];
+    let data: Vec<u8> = vec![0xaa, 0xbb, 0xcc, 0xdd];
 
     let _ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 }
@@ -54,7 +54,7 @@ fn test_pad_bytes_after_read_err() {
         field_b: u8,
     }
 
-    let mut data: Vec<u8> = vec![0xaa, 0xbb, 0xcc, 0xdd];
+    let data: Vec<u8> = vec![0xaa, 0xbb, 0xcc, 0xdd];
 
     let _ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 }

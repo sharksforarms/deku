@@ -7,7 +7,7 @@
 
 use std::convert::{TryFrom, TryInto};
 
-use deku::{container::Container, prelude::*};
+use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct FieldF {

@@ -63,7 +63,7 @@ fn test_magic_enum(input: &[u8]) {
         #[deku(id = "0")]
         Variant,
     }
-    let mut input = input.to_vec();
+    let input = input.to_vec();
 
     let ret_read = TestEnum::try_from(input.as_slice()).unwrap();
 

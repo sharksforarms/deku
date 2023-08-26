@@ -33,7 +33,7 @@ fn test_temp_field_value_ignore_on_read() {
         field_b: Vec<u8>,
     }
 
-    let mut test_data: Vec<u8> = [0x02, 0x02, 0x03].to_vec();
+    let test_data: Vec<u8> = [0x02, 0x02, 0x03].to_vec();
 
     let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
@@ -55,7 +55,7 @@ fn test_temp_field() {
         field_b: Vec<u8>,
     }
 
-    let mut test_data: Vec<u8> = [0x01, 0x02].to_vec();
+    let test_data: Vec<u8> = [0x01, 0x02].to_vec();
 
     let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
@@ -75,7 +75,7 @@ fn test_temp_field_unnamed() {
     #[derive(PartialEq, Debug)]
     struct TestStruct(#[deku(temp)] u8, #[deku(count = "field_0")] Vec<u8>);
 
-    let mut test_data: Vec<u8> = [0x01, 0x02].to_vec();
+    let test_data: Vec<u8> = [0x01, 0x02].to_vec();
 
     let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(TestStruct(vec![0x02]), ret_read);
@@ -115,7 +115,7 @@ fn test_temp_enum_field() {
         },
     }
 
-    let mut test_data: Vec<u8> = [0xab, 0x01, 0x02].to_vec();
+    let test_data: Vec<u8> = [0xab, 0x01, 0x02].to_vec();
 
     let ret_read = TestEnum::try_from(test_data.as_slice()).unwrap();
     assert_eq!(

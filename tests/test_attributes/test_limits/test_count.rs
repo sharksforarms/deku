@@ -13,7 +13,7 @@ mod test_slice {
             data: Vec<u8>,
         }
 
-        let mut test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
+        let test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
         assert_eq!(
@@ -36,7 +36,7 @@ mod test_slice {
             data: Vec<u8>,
         }
 
-        let mut test_data: Vec<u8> = [0x02, 0xaa, 0xbb].to_vec();
+        let test_data: Vec<u8> = [0x02, 0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
         assert_eq!(
@@ -61,7 +61,7 @@ mod test_slice {
             data: Vec<u8>,
         }
 
-        let mut test_data: Vec<u8> = [0x03, 0xaa, 0xbb].to_vec();
+        let test_data: Vec<u8> = [0x03, 0xaa, 0xbb].to_vec();
 
         let _ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     }
@@ -78,7 +78,7 @@ mod test_vec {
             data: Vec<u8>,
         }
 
-        let mut test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
+        let test_data: Vec<u8> = [0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
         assert_eq!(
@@ -101,7 +101,7 @@ mod test_vec {
             data: Vec<u8>,
         }
 
-        let mut test_data: Vec<u8> = [0x02, 0xaa, 0xbb].to_vec();
+        let test_data: Vec<u8> = [0x02, 0xaa, 0xbb].to_vec();
 
         let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
         assert_eq!(
@@ -126,7 +126,7 @@ mod test_vec {
             data: Vec<u8>,
         }
 
-        let mut test_data: Vec<u8> = [0x03, 0xaa, 0xbb].to_vec();
+        let test_data: Vec<u8> = [0x03, 0xaa, 0xbb].to_vec();
 
         let _ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     }

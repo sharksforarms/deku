@@ -12,7 +12,7 @@ fn test_generic_struct() {
         field_a: T,
     }
 
-    let mut test_data: Vec<u8> = [0x01].to_vec();
+    let test_data: Vec<u8> = [0x01].to_vec();
 
     let ret_read = TestStruct::<u8>::try_from(test_data.as_slice()).unwrap();
     assert_eq!(TestStruct::<u8> { field_a: 0x01 }, ret_read);
@@ -33,7 +33,7 @@ fn test_generic_enum() {
         VariantT(T),
     }
 
-    let mut test_data: Vec<u8> = [0x01, 0x02].to_vec();
+    let test_data: Vec<u8> = [0x01, 0x02].to_vec();
 
     let ret_read = TestEnum::<u8>::try_from(test_data.as_slice()).unwrap();
     assert_eq!(TestEnum::<u8>::VariantT(0x02), ret_read);

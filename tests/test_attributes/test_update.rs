@@ -12,7 +12,7 @@ fn test_update() {
     }
 
     // Update `field_a` to 5
-    let mut test_data: Vec<u8> = [0x01].to_vec();
+    let test_data: Vec<u8> = [0x01].to_vec();
 
     let mut ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(TestStruct { field_a: 0x01 }, ret_read);
@@ -37,7 +37,7 @@ fn test_update_from_field() {
     }
 
     // Update the value of `count` to the length of `data`
-    let mut test_data: Vec<u8> = [0x02, 0xaa, 0xbb].to_vec();
+    let test_data: Vec<u8> = [0x02, 0xaa, 0xbb].to_vec();
 
     // Read
     let mut ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();

@@ -100,7 +100,7 @@ fn test_enum_array_type() {
         VarB,
     }
 
-    let mut input = b"123".to_vec();
+    let input = b"123".to_vec();
 
     let ret_read = TestEnumArray::try_from(input.as_slice()).unwrap();
     assert_eq!(TestEnumArray::VarA, ret_read);

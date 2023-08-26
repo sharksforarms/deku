@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use deku::{container::Container, prelude::*};
+use deku::{prelude::*, reader::Reader};
 use hexlit::hex;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -30,8 +30,8 @@ fn main() {
     let mut test_data = hex!("03020102").to_vec();
 
     let mut cursor = Cursor::new(&mut test_data);
-    let mut container = Container::new(&mut cursor);
-    let deku_test = DekuTest::from_reader_with_ctx(&mut container, ()).unwrap();
+    let mut reader = Reader::new(&mut cursor);
+    let deku_test = DekuTest::from_reader_with_ctx(&mut reader, ()).unwrap();
 
     assert_eq!(
         DekuTest::Var4 {

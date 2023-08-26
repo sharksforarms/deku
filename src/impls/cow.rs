@@ -12,10 +12,10 @@ where
     Ctx: Copy,
 {
     fn from_reader_with_ctx<R: Read>(
-        container: &mut crate::container::Container<R>,
+        reader: &mut crate::reader::Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
-        let val = <T>::from_reader_with_ctx(container, inner_ctx)?;
+        let val = <T>::from_reader_with_ctx(reader, inner_ctx)?;
         Ok(Cow::Owned(val))
     }
 }
@@ -37,7 +37,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::{container::Container, native_endian};
+    use crate::{native_endian, reader::Reader};
 
     #[rstest(input, expected,
         case(
@@ -49,8 +49,8 @@ mod tests {
         let bit_slice = input.view_bits::<Msb0>();
 
         let mut cursor = Cursor::new(input);
-        let mut container = Container::new(&mut cursor);
-        let res_read = <Cow<u16>>::from_reader_with_ctx(&mut container, ()).unwrap();
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = <Cow<u16>>::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

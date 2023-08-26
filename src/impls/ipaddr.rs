@@ -11,10 +11,10 @@ where
     u32: DekuReader<'a, Ctx>,
 {
     fn from_reader_with_ctx<R: Read>(
-        container: &mut crate::container::Container<R>,
+        reader: &mut crate::reader::Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
-        let ip = u32::from_reader_with_ctx(container, inner_ctx)?;
+        let ip = u32::from_reader_with_ctx(reader, inner_ctx)?;
         Ok(ip.into())
     }
 }
@@ -34,10 +34,10 @@ where
     u128: DekuReader<'a, Ctx>,
 {
     fn from_reader_with_ctx<R: Read>(
-        container: &mut crate::container::Container<R>,
+        reader: &mut crate::reader::Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
-        let ip = u128::from_reader_with_ctx(container, inner_ctx)?;
+        let ip = u128::from_reader_with_ctx(reader, inner_ctx)?;
         Ok(ip.into())
     }
 }
@@ -71,7 +71,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::{container::Container, ctx::Endian};
+    use crate::{ctx::Endian, reader::Reader};
 
     #[rstest(input, endian, expected,
         case::normal_le([237, 160, 254, 145].as_ref(), Endian::Little, Ipv4Addr::new(145, 254, 160, 237)),
@@ -79,8 +79,8 @@ mod tests {
     )]
     fn test_ipv4(input: &[u8], endian: Endian, expected: Ipv4Addr) {
         let mut cursor = Cursor::new(input);
-        let mut container = Container::new(&mut cursor);
-        let res_read = Ipv4Addr::from_reader_with_ctx(&mut container, endian).unwrap();
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = Ipv4Addr::from_reader_with_ctx(&mut reader, endian).unwrap();
         assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];
@@ -94,8 +94,8 @@ mod tests {
     )]
     fn test_ipv6(input: &[u8], endian: Endian, expected: Ipv6Addr) {
         let mut cursor = Cursor::new(input);
-        let mut container = Container::new(&mut cursor);
-        let res_read = Ipv6Addr::from_reader_with_ctx(&mut container, endian).unwrap();
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = Ipv6Addr::from_reader_with_ctx(&mut reader, endian).unwrap();
         assert_eq!(expected, res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

@@ -16,7 +16,7 @@ mod const_generics_impl {
         T: DekuReader<'a, Ctx>,
     {
         fn from_reader_with_ctx<R: Read>(
-            container: &mut crate::container::Container<R>,
+            reader: &mut crate::reader::Reader<R>,
             ctx: Ctx,
         ) -> Result<Self, DekuError>
         where
@@ -27,7 +27,7 @@ mod const_generics_impl {
             // and never return it in case of error
             let mut slice: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
             for (n, item) in slice.iter_mut().enumerate() {
-                let value = match T::from_reader_with_ctx(container, ctx) {
+                let value = match T::from_reader_with_ctx(reader, ctx) {
                     Ok(it) => it,
                     Err(err) => {
                         // For each item in the array, drop if we allocated it.
@@ -81,7 +81,7 @@ mod tests {
     use bitvec::prelude::*;
     use rstest::rstest;
 
-    use crate::{container::Container, ctx::Endian, DekuReader};
+    use crate::{ctx::Endian, reader::Reader, DekuReader};
 
     #[rstest(input,endian,expected,expected_rest,
         case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, [0xCCDD, 0xAABB], bits![u8, Msb0;]),
@@ -95,8 +95,8 @@ mod tests {
     ) {
         let mut bit_slice = input.view_bits::<Msb0>();
 
-        let mut container = Container::new(&mut bit_slice);
-        let res_read = <[u16; 2]>::from_reader_with_ctx(&mut container, endian).unwrap();
+        let mut reader = Reader::new(&mut bit_slice);
+        let res_read = <[u16; 2]>::from_reader_with_ctx(&mut reader, endian).unwrap();
         assert_eq!(expected, res_read);
     }
 
@@ -139,13 +139,13 @@ mod tests {
     ) {
         use acid_io::Cursor;
 
-        use crate::container::Container;
+        use crate::reader::Reader;
 
         let bit_slice = input.view_bits::<Msb0>();
 
         let mut cursor = Cursor::new(input);
-        let mut container = Container::new(&mut cursor);
-        let res_read = <[[u16; 2]; 2]>::from_reader_with_ctx(&mut container, endian).unwrap();
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = <[[u16; 2]; 2]>::from_reader_with_ctx(&mut reader, endian).unwrap();
         assert_eq!(expected, res_read);
     }
 

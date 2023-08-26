@@ -5,7 +5,7 @@ use crate::{DekuError, DekuReader, DekuWrite};
 
 impl<Ctx: Copy> DekuReader<'_, Ctx> for () {
     fn from_reader_with_ctx<R: Read>(
-        _container: &mut crate::container::Container<R>,
+        _reader: &mut crate::reader::Reader<R>,
         _inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
         Ok(())
@@ -21,9 +21,7 @@ impl<Ctx: Copy> DekuWrite<Ctx> for () {
 
 #[cfg(test)]
 mod tests {
-    use hexlit::hex;
-
-    use crate::container::Container;
+    use crate::reader::Reader;
     use std::io::Cursor;
 
     use super::*;
@@ -35,8 +33,8 @@ mod tests {
         let mut input = &[0xff];
 
         let mut cursor = Cursor::new(input);
-        let mut container = Container::new(&mut cursor);
-        let res_read = <()>::from_reader_with_ctx(&mut container, ()).unwrap();
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = <()>::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!((), res_read);
 
         let mut res_write = bitvec![u8, Msb0;];

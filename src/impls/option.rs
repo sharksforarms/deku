@@ -5,10 +5,10 @@ use crate::{DekuError, DekuReader, DekuWrite};
 
 impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
     fn from_reader_with_ctx<R: Read>(
-        container: &mut crate::container::Container<R>,
+        reader: &mut crate::reader::Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
-        let val = <T>::from_reader_with_ctx(container, inner_ctx)?;
+        let val = <T>::from_reader_with_ctx(reader, inner_ctx)?;
         Ok(Some(val))
     }
 }
@@ -35,15 +35,15 @@ mod tests {
     use super::*;
     use acid_io::Cursor;
 
-    use crate::container::Container;
+    use crate::reader::Reader;
 
     #[test]
     fn test_option() {
         use crate::ctx::*;
         let input = &[1u8, 2, 3, 4];
         let mut cursor = Cursor::new(input);
-        let mut container = Container::new(&mut cursor);
-        let v = Option::<u32>::from_reader_with_ctx(&mut container, Endian::Little).unwrap();
+        let mut reader = Reader::new(&mut cursor);
+        let v = Option::<u32>::from_reader_with_ctx(&mut reader, Endian::Little).unwrap();
         assert_eq!(v, Some(0x04030201))
     }
 }

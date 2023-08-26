@@ -243,9 +243,9 @@ let mut file = File::options().read(true).open("file").unwrap();
 file.seek(SeekFrom::Start(0)).unwrap();
 
 // Create deku Reader
-let mut container = Container::new(&mut file);
+let mut reader = Reader::new(&mut file);
 // Use Reader and parse into struct
-let ec = EcHdr::from_reader_with_ctx(&mut container, ()).unwrap();
+let ec = EcHdr::from_reader_with_ctx(&mut reader, ()).unwrap();
 ```
 
 # Internal variables and previously read fields
@@ -271,7 +271,7 @@ tokens such as `reader`, `writer`, `map`, `count`, etc.
 These are provided as a convenience to the user.
 
 Always included:
-- `deku::container: &mut Container` - Current [Container](crate::container::Container)
+- `deku::reader: &mut Reader` - Current [Reader](crate::reader::Reader)
 - `deku::output: &mut BitSlice<u8, Msb0>` - The output bit stream
 
 Conditionally included if referenced:
@@ -317,17 +317,17 @@ pub mod bitvec {
 pub use deku_derive::*;
 
 pub mod attributes;
-pub mod container;
 pub mod ctx;
 pub mod error;
 mod impls;
 pub mod prelude;
+pub mod reader;
 
 pub use crate::error::DekuError;
 
 /// "Reader" trait: read bytes and bits from [`acid_io::Read`]er
 pub trait DekuReader<'a, Ctx = ()> {
-    /// Construct type from `container` implementing [`acid_io::Read`], with ctx.
+    /// Construct type from `reader` implementing [`acid_io::Read`], with ctx.
     ///
     /// # Example
     /// ```rust, no_run
@@ -344,11 +344,11 @@ pub trait DekuReader<'a, Ctx = ()> {
     ///
     /// let mut file = File::options().read(true).open("file").unwrap();
     /// file.seek(SeekFrom::Start(0)).unwrap();
-    /// let mut container = Container::new(&mut file);
-    /// let ec = EcHdr::from_reader_with_ctx(&mut container, Endian::Big).unwrap();
+    /// let mut reader = Reader::new(&mut file);
+    /// let ec = EcHdr::from_reader_with_ctx(&mut reader, Endian::Big).unwrap();
     /// ```
     fn from_reader_with_ctx<R: acid_io::Read>(
-        container: &mut crate::container::Container<R>,
+        reader: &mut crate::reader::Reader<R>,
         ctx: Ctx,
     ) -> Result<Self, DekuError>
     where

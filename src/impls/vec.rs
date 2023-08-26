@@ -16,7 +16,7 @@ use crate::{DekuError, DekuWrite};
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
 fn reader_vec_with_predicate<'a, T, Ctx, Predicate, R: Read>(
-    container: &mut crate::container::Container<R>,
+    reader: &mut crate::reader::Reader<R>,
     capacity: Option<usize>,
     ctx: Ctx,
     mut predicate: Predicate,
@@ -28,15 +28,15 @@ where
 {
     let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
 
-    let start_read = container.bits_read;
+    let start_read = reader.bits_read;
 
     loop {
-        let val = <T>::from_reader_with_ctx(container, ctx)?;
+        let val = <T>::from_reader_with_ctx(reader, ctx)?;
         res.push(val);
 
         // This unwrap is safe as we are pushing to the vec immediately before it,
         // so there will always be a last element
-        if predicate(container.bits_read - start_read, res.last().unwrap()) {
+        if predicate(reader.bits_read - start_read, res.last().unwrap()) {
             break;
         }
     }
@@ -51,7 +51,7 @@ where
     Predicate: FnMut(&T) -> bool,
 {
     fn from_reader_with_ctx<R: Read>(
-        container: &mut crate::container::Container<R>,
+        reader: &mut crate::reader::Reader<R>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
     ) -> Result<Self, DekuError>
     where
@@ -66,7 +66,7 @@ where
                 }
 
                 // Otherwise, read until we have read `count` elements
-                reader_vec_with_predicate(container, Some(count), inner_ctx, move |_, _| {
+                reader_vec_with_predicate(reader, Some(count), inner_ctx, move |_, _| {
                     count -= 1;
                     count == 0
                 })
@@ -74,15 +74,13 @@ where
 
             // Read until a given predicate returns true
             Limit::Until(mut predicate, _) => {
-                reader_vec_with_predicate(container, None, inner_ctx, move |_, value| {
-                    predicate(value)
-                })
+                reader_vec_with_predicate(reader, None, inner_ctx, move |_, value| predicate(value))
             }
 
             // Read until a given quantity of bits have been read
             Limit::BitSize(size) => {
                 let bit_size = size.0;
-                reader_vec_with_predicate(container, None, inner_ctx, move |read_bits, _| {
+                reader_vec_with_predicate(reader, None, inner_ctx, move |read_bits, _| {
                     read_bits == bit_size
                 })
             }
@@ -90,7 +88,7 @@ where
             // Read until a given quantity of bits have been read
             Limit::ByteSize(size) => {
                 let bit_size = size.0 * 8;
-                reader_vec_with_predicate(container, None, inner_ctx, move |read_bits, _| {
+                reader_vec_with_predicate(reader, None, inner_ctx, move |read_bits, _| {
                     read_bits == bit_size
                 })
             }
@@ -103,13 +101,13 @@ impl<'a, T: DekuReader<'a>, Predicate: FnMut(&T) -> bool> DekuReader<'a, Limit<T
 {
     /// Read `T`s until the given limit from input for types which don't require context.
     fn from_reader_with_ctx<R: Read>(
-        container: &mut crate::container::Container<R>,
+        reader: &mut crate::reader::Reader<R>,
         limit: Limit<T, Predicate>,
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
     {
-        Vec::from_reader_with_ctx(container, (limit, ()))
+        Vec::from_reader_with_ctx(reader, (limit, ()))
     }
 }
 
@@ -137,7 +135,7 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Vec<T> {
 mod tests {
     use rstest::rstest;
 
-    use crate::container::Container;
+    use crate::reader::Reader;
 
     use super::*;
 
@@ -170,18 +168,17 @@ mod tests {
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],
     ) {
-        let mut container = Container::new(&mut input);
+        let mut reader = Reader::new(&mut input);
         let res_read = match bit_size {
-            Some(bit_size) => Vec::<u8>::from_reader_with_ctx(
-                &mut container,
-                (limit, (endian, BitSize(bit_size))),
-            )
-            .unwrap(),
-            None => Vec::<u8>::from_reader_with_ctx(&mut container, (limit, (endian))).unwrap(),
+            Some(bit_size) => {
+                Vec::<u8>::from_reader_with_ctx(&mut reader, (limit, (endian, BitSize(bit_size))))
+                    .unwrap()
+            }
+            None => Vec::<u8>::from_reader_with_ctx(&mut reader, (limit, (endian))).unwrap(),
         };
         assert_eq!(expected, res_read);
         assert_eq!(
-            container.rest(),
+            reader.rest(),
             expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
         );
         let mut buf = vec![];
@@ -221,13 +218,13 @@ mod tests {
         // Unwrap here because all test cases are `Some`.
         let bit_size = bit_size.unwrap();
 
-        let mut container = Container::new(&mut input);
+        let mut reader = Reader::new(&mut input);
         let res_read =
-            Vec::<u16>::from_reader_with_ctx(&mut container, (limit, (endian, BitSize(bit_size))))
+            Vec::<u16>::from_reader_with_ctx(&mut reader, (limit, (endian, BitSize(bit_size))))
                 .unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(
-            container.rest(),
+            reader.rest(),
             expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
         );
         let mut buf = vec![];

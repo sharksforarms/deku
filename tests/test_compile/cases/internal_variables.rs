@@ -52,14 +52,14 @@ struct TestMap {
 
 fn dummy_reader<R: std::io::Read>(
     offset: usize,
-    _reader: &mut Container<R>,
+    _reader: &mut Reader<R>,
 ) -> Result<usize, DekuError> {
     Ok(0)
 }
 #[derive(DekuRead, DekuWrite)]
 struct TestReader {
     field_a: u8,
-    #[deku(reader = "dummy_reader(deku::byte_offset, deku::container)")]
+    #[deku(reader = "dummy_reader(deku::byte_offset, deku::reader)")]
     field_b: usize,
 }
 

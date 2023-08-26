@@ -1,4 +1,4 @@
-//! Container for reader functions
+//! Reader for reader functions
 
 use core::cmp::Ordering;
 
@@ -13,29 +13,29 @@ use alloc::vec::Vec;
 use log;
 
 /// Return from `read_bytes`
-pub enum ContainerRet {
+pub enum ReaderRet {
     /// Successfully read bytes
     Bytes,
     /// Read Bits intead
     Bits(Option<BitVec<u8, Msb0>>),
 }
 
-/// Container to use with `from_reader_with_ctx`
-pub struct Container<R: Read> {
+/// Reader to use with `from_reader_with_ctx`
+pub struct Reader<R: Read> {
     inner: R,
     /// bits stored from previous reads that didn't read to the end of a byte size
     leftover: BitVec<u8, Msb0>,
-    /// Amount of bits read during the use of [read_bits](Container::read_bits) and [read_bytes](Container::read_bytes).
+    /// Amount of bits read during the use of [read_bits](Reader::read_bits) and [read_bytes](Reader::read_bytes).
     pub bits_read: usize,
-    /// If function [enable_read_cache](Container::enable_read_cache) is used, this field will contain all bytes that were read
+    /// If function [enable_read_cache](Reader::enable_read_cache) is used, this field will contain all bytes that were read
     pub read_cache: Option<Vec<u8>>,
 }
 
-/// Max bits requested from [`Container::read_bits`] during one call
+/// Max bits requested from [`Reader::read_bits`] during one call
 pub const MAX_BITS_AMT: usize = 128;
 
-impl<R: Read> Container<R> {
-    /// Create a new `Container`
+impl<R: Read> Reader<R> {
+    /// Create a new `Reader`
     #[inline]
     pub fn new(inner: R) -> Self {
         #[allow(unused_mut)]
@@ -80,22 +80,22 @@ impl<R: Read> Container<R> {
     /// //                       |         | <= this entire byte is Read
     /// let data: Vec<u8> = vec![0b0110_1101, 0xbe, 0xef];
     /// let mut cursor = Cursor::new(data);
-    /// let mut container = Container::new(&mut cursor);
-    /// let val = DekuTest::from_reader_with_ctx(&mut container, ()).unwrap();
+    /// let mut reader = Reader::new(&mut cursor);
+    /// let val = DekuTest::from_reader_with_ctx(&mut reader, ()).unwrap();
     /// assert_eq!(DekuTest {
     ///     field_a: 0b0110,
     ///     field_b: 0b11,
     /// }, val);
     ///
     /// // last 2 bits in that byte
-    /// assert_eq!(container.rest(), vec![false, true]);
+    /// assert_eq!(reader.rest(), vec![false, true]);
     /// ```
     #[inline]
     pub fn rest(&mut self) -> Vec<bool> {
         self.leftover.iter().by_vals().collect()
     }
 
-    /// Return true if we are at the end of a reader and there are no cached bits in the container
+    /// Return true if we are at the end of a reader and there are no cached bits in the reader
     ///
     /// The byte that was read will be internally buffered
     #[inline]
@@ -135,7 +135,7 @@ impl<R: Read> Container<R> {
         Ok(())
     }
 
-    /// Attempt to read bits from `Container`. If enough bits are already "Read", we just grab
+    /// Attempt to read bits from `Reader`. If enough bits are already "Read", we just grab
     /// enough bits to satisfy `amt`, but will also "Read" more from the stream and store the
     /// leftovers if enough are not already "Read".
     ///
@@ -215,14 +215,14 @@ impl<R: Read> Container<R> {
         Ok(Some(ret))
     }
 
-    /// Attempt to read bytes from `Container`. This will return `ContainerRet::Bytes` with a valid
+    /// Attempt to read bytes from `Reader`. This will return `ReaderRet::Bytes` with a valid
     /// `buf` of bytes if we have no "leftover" bytes and thus are byte aligned. If we are not byte
-    /// aligned, this will call `read_bits` and return `ContainerRet::Bits(_)` of size `amt` * 8.
+    /// aligned, this will call `read_bits` and return `ReaderRet::Bits(_)` of size `amt` * 8.
     ///
     /// # Params
     /// `amt`    - Amount of bytes that will be read
     #[inline]
-    pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> Result<ContainerRet, DekuError> {
+    pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> Result<ReaderRet, DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("read_bytes: requesting {amt} bytes");
         if self.leftover.is_empty() {
@@ -246,9 +246,9 @@ impl<R: Read> Container<R> {
             #[cfg(feature = "logging")]
             log::trace!("read_bytes: returning {buf:02x?}");
 
-            Ok(ContainerRet::Bytes)
+            Ok(ReaderRet::Bytes)
         } else {
-            Ok(ContainerRet::Bits(self.read_bits(amt * 8)?))
+            Ok(ReaderRet::Bits(self.read_bits(amt * 8)?))
         }
     }
 }
@@ -261,45 +261,45 @@ mod tests {
 
     #[test]
     fn test_end() {
-        let mut input = hex!("aa");
+        let input = hex!("aa");
         let mut cursor = Cursor::new(input);
-        let mut container = Container::new(&mut cursor);
-        assert!(!container.end());
+        let mut reader = Reader::new(&mut cursor);
+        assert!(!reader.end());
         let mut buf = [0; 1];
-        let _ = container.read_bytes(1, &mut buf);
-        assert!(container.end());
+        let _ = reader.read_bytes(1, &mut buf);
+        assert!(reader.end());
 
-        let mut input = hex!("aa");
+        let input = hex!("aa");
         let mut cursor = Cursor::new(input);
-        let mut container = Container::new(&mut cursor);
-        assert!(!container.end());
-        let _ = container.read_bits(4);
-        assert!(!container.end());
-        let _ = container.read_bits(4);
-        assert!(container.end());
+        let mut reader = Reader::new(&mut cursor);
+        assert!(!reader.end());
+        let _ = reader.read_bits(4);
+        assert!(!reader.end());
+        let _ = reader.read_bits(4);
+        assert!(reader.end());
     }
 
     #[test]
     fn test_bits_less() {
-        let mut input = hex!("aa");
+        let input = hex!("aa");
         let mut cursor = Cursor::new(input);
-        let mut container = Container::new(&mut cursor);
-        container.enable_read_cache();
-        let _ = container.read_bits(1);
-        assert_eq!(&vec![0xaa], container.read_cache.as_ref().unwrap());
-        let _ = container.read_bits(4);
-        let _ = container.read_bits(3);
-        assert_eq!(&vec![0xaa], container.read_cache.as_ref().unwrap());
+        let mut reader = Reader::new(&mut cursor);
+        reader.enable_read_cache();
+        let _ = reader.read_bits(1);
+        assert_eq!(&vec![0xaa], reader.read_cache.as_ref().unwrap());
+        let _ = reader.read_bits(4);
+        let _ = reader.read_bits(3);
+        assert_eq!(&vec![0xaa], reader.read_cache.as_ref().unwrap());
     }
 
     #[test]
     fn test_inner() {
-        let mut input = hex!("aabbcc");
+        let input = hex!("aabbcc");
         let mut cursor = Cursor::new(input);
-        let mut container = Container::new(&mut cursor);
-        container.enable_read_cache();
+        let mut reader = Reader::new(&mut cursor);
+        reader.enable_read_cache();
         let mut buf = [0; 1];
-        let _ = container.read_bytes(1, &mut buf);
-        assert_eq!(&vec![0xaa], container.read_cache.as_ref().unwrap());
+        let _ = reader.read_bytes(1, &mut buf);
+        assert_eq!(&vec![0xaa], reader.read_cache.as_ref().unwrap());
     }
 }

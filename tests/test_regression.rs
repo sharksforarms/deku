@@ -133,7 +133,7 @@ fn test_regression_292() {
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
-    struct Container {
+    struct Reader {
         #[deku(bits = 4)]
         field1: u8,
         field2: u8,
@@ -142,10 +142,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        Container::from_reader((&mut test_data.as_slice(), 0))
+        Reader::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
-        Container {
+        Reader {
             field1: 0,
             field2: 0xff,
             field3: 0,
@@ -154,7 +154,7 @@ fn test_regression_292() {
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
-    struct ContainerBits {
+    struct ReaderBits {
         #[deku(bits = 4)]
         field1: u8,
         #[deku(bits = 8)]
@@ -164,10 +164,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBits::from_reader((&mut test_data.as_slice(), 0))
+        ReaderBits::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
-        ContainerBits {
+        ReaderBits {
             field1: 0,
             field2: 0xff,
             field3: 0,
@@ -175,7 +175,7 @@ fn test_regression_292() {
     );
 
     #[derive(Debug, PartialEq, DekuRead)]
-    struct ContainerByteNoEndian {
+    struct ReaderByteNoEndian {
         #[deku(bits = 4)]
         field1: u8,
         field2: u8,
@@ -184,10 +184,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerByteNoEndian::from_reader((&mut test_data.as_slice(), 0))
+        ReaderByteNoEndian::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
-        ContainerByteNoEndian {
+        ReaderByteNoEndian {
             field1: 0,
             field2: 0xff,
             field3: 0,
@@ -195,7 +195,7 @@ fn test_regression_292() {
     );
 
     #[derive(Debug, PartialEq, DekuRead)]
-    struct ContainerBitPadding {
+    struct ReaderBitPadding {
         #[deku(pad_bits_before = "4")]
         field2: u8,
         #[deku(bits = 4)]
@@ -203,17 +203,17 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBitPadding::from_reader((&mut test_data.as_slice(), 0))
+        ReaderBitPadding::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
-        ContainerBitPadding {
+        ReaderBitPadding {
             field2: 0xff,
             field3: 0,
         }
     );
 
     #[derive(Debug, PartialEq, DekuRead)]
-    struct ContainerBitPadding1 {
+    struct ReaderBitPadding1 {
         #[deku(bits = 2)]
         field1: u8,
         #[deku(pad_bits_before = "2")]
@@ -223,10 +223,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBitPadding1::from_reader((&mut test_data.as_slice(), 0))
+        ReaderBitPadding1::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
-        ContainerBitPadding1 {
+        ReaderBitPadding1 {
             field1: 0,
             field2: 0xff,
             field3: 0,
@@ -237,7 +237,7 @@ fn test_regression_292() {
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
-    struct ContainerTwo {
+    struct ReaderTwo {
         #[deku(bits = 2)]
         field1: u8,
         field2: u8,
@@ -246,10 +246,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerTwo::from_reader((&mut test_data.as_slice(), 0))
+        ReaderTwo::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
-        ContainerTwo {
+        ReaderTwo {
             field1: 0b11,
             field2: 0,
             field3: 0b111111,
@@ -260,7 +260,7 @@ fn test_regression_292() {
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
-    struct ContainerU16Le {
+    struct ReaderU16Le {
         #[deku(bits = 2)]
         field1: u8,
         field2: u16,
@@ -269,10 +269,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerU16Le::from_reader((&mut test_data.as_slice(), 0))
+        ReaderU16Le::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
-        ContainerU16Le {
+        ReaderU16Le {
             field1: 0b11,
             field2: 0,
             field3: 0b111111,
@@ -283,7 +283,7 @@ fn test_regression_292() {
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "big")]
-    struct ContainerU16Be {
+    struct ReaderU16Be {
         #[deku(bits = 2)]
         field1: u8,
         field2: u16,
@@ -292,10 +292,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerU16Be::from_reader((&mut test_data.as_slice(), 0))
+        ReaderU16Be::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
-        ContainerU16Be {
+        ReaderU16Be {
             field1: 0b11,
             field2: 0,
             field3: 0b111111,
@@ -306,7 +306,7 @@ fn test_regression_292() {
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "big")]
-    struct ContainerI16Le {
+    struct ReaderI16Le {
         #[deku(bits = 2)]
         field1: i8,
         field2: i16,
@@ -315,10 +315,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerI16Le::from_reader((&mut test_data.as_slice(), 0))
+        ReaderI16Le::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
-        ContainerI16Le {
+        ReaderI16Le {
             field1: -0b01,
             field2: 1,
             field3: -0b011111,
@@ -329,7 +329,7 @@ fn test_regression_292() {
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "big")]
-    struct ContainerI16Be {
+    struct ReaderI16Be {
         #[deku(bits = 2)]
         field1: i8,
         field2: i16,
@@ -338,10 +338,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerI16Be::from_reader((&mut test_data.as_slice(), 0))
+        ReaderI16Be::from_reader((&mut test_data.as_slice(), 0))
             .unwrap()
             .1,
-        ContainerI16Be {
+        ReaderI16Be {
             field1: -0b01,
             field2: 1,
             field3: -0b011111,

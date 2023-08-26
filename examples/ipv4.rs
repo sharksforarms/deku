@@ -52,8 +52,8 @@ fn main() {
     let test_data = hex!("4500004b0f490000801163a591fea0ed91fd02cb").to_vec();
 
     let mut cursor = std::io::Cursor::new(test_data.clone());
-    let mut container = deku::container::Container::new(&mut cursor);
-    let ip_header = Ipv4Header::from_reader_with_ctx(&mut container, ()).unwrap();
+    let mut reader = deku::reader::Reader::new(&mut cursor);
+    let ip_header = Ipv4Header::from_reader_with_ctx(&mut reader, ()).unwrap();
 
     assert_eq!(
         Ipv4Header {

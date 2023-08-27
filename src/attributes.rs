@@ -75,6 +75,7 @@ Example:
 ```rust
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
+# use std::io::Cursor;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 // #[deku(endian = "little")] // top-level, defaults to system endianness
 struct DekuTest {
@@ -84,6 +85,7 @@ struct DekuTest {
 }
 
 let data: &[u8] = &[0xAB, 0xCD, 0xAB, 0xCD];
+let mut cursor = Cursor::new(data);
 
 let value = DekuTest::try_from(data).unwrap();
 
@@ -857,6 +859,7 @@ for example `#[deku("a, b")]`
 Example
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 #[derive(DekuRead, DekuWrite)]
 #[deku(ctx = "a: u8")]
 struct Subtype {
@@ -872,8 +875,9 @@ struct Test {
 }
 
 let data: &[u8] = &[0x01, 0x02];
+let mut cursor = Cursor::new(data);
 
-let (amt_read, value) = Test::from_reader((data, 0)).unwrap();
+let (amt_read, value) = Test::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
@@ -922,6 +926,7 @@ values for the context
 Example:
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 #[derive(DekuRead, DekuWrite)]
 #[deku(ctx = "a: u8", ctx_default = "1")] // Defaults `a` to 1
 struct Subtype {
@@ -937,17 +942,19 @@ struct Test {
 }
 
 let data: &[u8] = &[0x01, 0x02];
+let mut cursor = Cursor::new(data);
 
 // Use with context from `Test`
-let (amt_Read, value) = Test::from_reader((data, 0)).unwrap();
+let (amt_read, value) = Test::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02);
 
 // Use as a stand-alone container, using defaults
 // Note: `from_reader` is now available on `SubType`
 let data: &[u8] = &[0x02];
+let mut cursor = Cursor::new(data);
 
-let (amt_read, value) = Subtype::from_reader((data, 0)).unwrap();
+let (amt_read, value) = Subtype::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(value.b, 0x01 + 0x02)
 ```
 
@@ -1009,6 +1016,7 @@ or [id (top-level)](#id-top-level)
 Example:
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
@@ -1020,8 +1028,9 @@ enum DekuTest {
 }
 
 let data: &[u8] = &[0x01, 0xFF, 0x02, 0xAB, 0xEF, 0xBE];
+let mut cursor = Cursor::new(data);
 
-let (amt_read, value) = DekuTest::from_reader((data, 0)).unwrap();
+let (amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantA(0xFF),
@@ -1031,7 +1040,7 @@ assert_eq!(
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x01, 0xFF], variant_bytes);
 
-let (amt_read, value) = DekuTest::from_reader((data, amt_read)).unwrap();
+let (amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantB(0xAB, 0xBEEF),
@@ -1045,6 +1054,7 @@ assert_eq!(vec![0x02, 0xAB, 0xEF, 0xBE], variant_bytes);
 Example discriminant
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
@@ -1054,8 +1064,9 @@ enum DekuTest {
 }
 
 let data: &[u8] = &[0x01, 0x02];
+let mut cursor = Cursor::new(data);
 
-let (amt_read, value) = DekuTest::from_reader((data, 0)).unwrap();
+let (amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantA,
@@ -1065,7 +1076,7 @@ assert_eq!(
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x01], variant_bytes);
 
-let (rest, value) = DekuTest::from_reader((data, amt_read)).unwrap();
+let (rest, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantB,
@@ -1085,6 +1096,7 @@ The enum variant must have space to store the identifier for proper writing.
 Example:
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
@@ -1100,8 +1112,9 @@ enum DekuTest {
 }
 
 let data: &[u8] = &[0x03, 0xFF];
+let mut cursor = Cursor::new(data);
 
-let (amt_read, value) = DekuTest::from_reader((data, 0)).unwrap();
+let (amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantB { id: 0x03 },
@@ -1111,7 +1124,7 @@ assert_eq!(
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x03], variant_bytes);
 
-let (rest, value) = DekuTest::from_reader((data, amt_read)).unwrap();
+let (rest, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantC(0xFF),
@@ -1135,6 +1148,7 @@ Set the bit size of the enum variant `id`
 Example:
 ```rust
 # use deku::prelude::*;
+# use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8", bits = "4")]
@@ -1144,8 +1158,9 @@ enum DekuTest {
 }
 
 let data: &[u8] = &[0b1001_0110, 0xFF];
+let mut cursor = Cursor::new(data);
 
-let (amt_read, value) = DekuTest::from_reader((data, 0)).unwrap();
+let (amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
 assert_eq!(
     DekuTest::VariantA(0b0110, 0xFF),

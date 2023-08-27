@@ -32,6 +32,7 @@ Let's read big-endian data into a struct, with fields containing different sizes
 modify a value, and write it back.
 
 ```rust
+# use std::io::Cursor;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -45,7 +46,8 @@ struct DekuTest {
 }
 
 let data: &[u8] = &[0b0110_1001, 0xBE, 0xEF];
-let (_amt_read, mut val) = DekuTest::from_reader((data, 0)).unwrap();
+let mut cursor = Cursor::new(data);
+let (_amt_read, mut val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(DekuTest {
     field_a: 0b0110,
     field_b: 0b1001,
@@ -63,6 +65,7 @@ assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 Deku structs/enums can be composed as long as they implement DekuRead / DekuWrite traits
 
 ```rust
+# use std::io::Cursor;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -78,7 +81,8 @@ struct DekuHeader(u8);
 struct DekuData(u16);
 
 let data: &[u8] = &[0xAA, 0xEF, 0xBE];
-let (_amt_read, mut val) = DekuTest::from_reader((data, 0)).unwrap();
+let mut cursor = Cursor::new(data);
+let (_amt_read, mut val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(DekuTest {
     header: DekuHeader(0xAA),
     data: DekuData(0xBEEF),
@@ -101,6 +105,7 @@ If the length of Vec changes, the original field specified in `count` will not g
 Calling `.update()` can be used to "update" the field!
 
 ```rust
+# use std::io::Cursor;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -112,7 +117,8 @@ struct DekuTest {
 }
 
 let data = vec![0x02, 0xBE, 0xEF, 0xFF, 0xFF];
-let (_amt_read, mut val) = DekuTest::from_reader((data.as_slice(), 0)).unwrap();
+let mut cursor = Cursor::new(data);
+let (_amt_read, mut val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(DekuTest {
     count: 0x02,
     data: vec![0xBE, 0xEF]
@@ -166,6 +172,7 @@ based on the field marked with `default`.
 Example:
 
 ```rust
+# use std::io::Cursor;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -178,11 +185,13 @@ enum DekuTest {
 }
 
 let data: &[u8] = &[0x01, 0x02, 0xEF, 0xBE];
+let mut cursor = Cursor::new(data);
 
-let (amt_read, val) = DekuTest::from_reader((data, 0)).unwrap();
+let (_, val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(DekuTest::VariantA , val);
 
-let (amt_read, val) = DekuTest::from_reader((data, amt_read)).unwrap();
+// cursor now points at 0x02
+let (_, val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 ```
 
@@ -195,6 +204,7 @@ For more information see [ctx attribute](attributes#ctx)
 Example:
 
 ```rust
+# use std::io::Cursor;
 use deku::prelude::*;
 
 #[derive(DekuRead, DekuWrite)]
@@ -212,8 +222,9 @@ struct Root {
 }
 
 let data: &[u8] = &[0x01, 0x02];
+let mut cursor = Cursor::new(data);
 
-let (amt_read, value) = Root::from_reader((data, 0)).unwrap();
+let (amt_read, value) = Root::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
@@ -237,8 +248,8 @@ struct EcHdr {
     padding1: [u8; 3],
 }
 
-let file = File::options().read(true).open("file").unwrap();
-let ec = EcHdr::from_reader((file, 0)).unwrap();
+let mut file = File::options().read(true).open("file").unwrap();
+let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
 ```
 
 # Internal variables and previously read fields
@@ -337,7 +348,7 @@ pub trait DekuReader<'a, Ctx = ()> {
     ///
     /// let mut file = File::options().read(true).open("file").unwrap();
     /// file.seek(SeekFrom::Start(0)).unwrap();
-    /// let mut reader = Reader::new(file);
+    /// let mut reader = Reader::new(&mut file);
     /// let ec = EcHdr::from_reader_with_ctx(&mut reader, Endian::Big).unwrap();
     /// ```
     fn from_reader_with_ctx<R: acid_io::Read>(
@@ -375,7 +386,7 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     /// file.seek(SeekFrom::Start(0)).unwrap();
     /// let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
     /// ```
-    fn from_reader<R: acid_io::Read>(input: (R, usize)) -> Result<(usize, Self), DekuError>
+    fn from_reader<R: acid_io::Read>(input: (&'a mut R, usize)) -> Result<(usize, Self), DekuError>
     where
         Self: Sized;
 }

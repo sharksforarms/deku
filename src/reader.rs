@@ -21,8 +21,8 @@ pub enum ReaderRet {
 }
 
 /// Reader to use with `from_reader_with_ctx`
-pub struct Reader<R: Read> {
-    inner: R,
+pub struct Reader<'a, R: Read> {
+    inner: &'a mut R,
     /// bits stored from previous reads that didn't read to the end of a byte size
     leftover: BitVec<u8, Msb0>,
     /// Amount of bits read during the use of [read_bits](Reader::read_bits) and [read_bytes](Reader::read_bytes).
@@ -34,10 +34,10 @@ pub struct Reader<R: Read> {
 /// Max bits requested from [`Reader::read_bits`] during one call
 pub const MAX_BITS_AMT: usize = 128;
 
-impl<R: Read> Reader<R> {
+impl<'a, R: Read> Reader<'a, R> {
     /// Create a new `Reader`
     #[inline]
-    pub fn new(inner: R) -> Self {
+    pub fn new(inner: &'a mut R) -> Self {
         #[allow(unused_mut)]
         let mut c = Self {
             inner,

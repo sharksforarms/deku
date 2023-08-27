@@ -742,7 +742,7 @@ pub fn emit_from_reader(
     quote! {
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
-            fn from_reader<R: ::#crate_::acid_io::Read>(__deku_input: (R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
+            fn from_reader<'a, R: ::#crate_::acid_io::Read>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #body
             }
         }

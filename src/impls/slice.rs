@@ -2,76 +2,73 @@
 
 pub use deku_derive::*;
 
-#[cfg(feature = "const_generics")]
-mod const_generics_impl {
-    use crate::{DekuError, DekuWrite};
-    use bitvec::prelude::*;
-    use core::mem::MaybeUninit;
-    use std::io::Read;
+use crate::{DekuError, DekuWrite};
+use acid_io::Read;
+use bitvec::prelude::*;
+use core::mem::MaybeUninit;
 
-    use crate::DekuReader;
+use crate::DekuReader;
 
-    impl<'a, Ctx: Copy, T, const N: usize> DekuReader<'a, Ctx> for [T; N]
+impl<'a, Ctx: Copy, T, const N: usize> DekuReader<'a, Ctx> for [T; N]
+where
+    T: DekuReader<'a, Ctx>,
+{
+    fn from_reader_with_ctx<R: Read>(
+        reader: &mut crate::reader::Reader<R>,
+        ctx: Ctx,
+    ) -> Result<Self, DekuError>
     where
-        T: DekuReader<'a, Ctx>,
+        Self: Sized,
     {
-        fn from_reader_with_ctx<R: Read>(
-            reader: &mut crate::reader::Reader<R>,
-            ctx: Ctx,
-        ) -> Result<Self, DekuError>
-        where
-            Self: Sized,
-        {
-            #[allow(clippy::uninit_assumed_init)]
-            // This is safe because we initialize the array immediately after,
-            // and never return it in case of error
-            let mut slice: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
-            for (n, item) in slice.iter_mut().enumerate() {
-                let value = match T::from_reader_with_ctx(reader, ctx) {
-                    Ok(it) => it,
-                    Err(err) => {
-                        // For each item in the array, drop if we allocated it.
-                        for item in &mut slice[0..n] {
-                            unsafe {
-                                item.assume_init_drop();
-                            }
+        #[allow(clippy::uninit_assumed_init)]
+        // This is safe because we initialize the array immediately after,
+        // and never return it in case of error
+        let mut slice: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
+        for (n, item) in slice.iter_mut().enumerate() {
+            let value = match T::from_reader_with_ctx(reader, ctx) {
+                Ok(it) => it,
+                Err(err) => {
+                    // For each item in the array, drop if we allocated it.
+                    for item in &mut slice[0..n] {
+                        unsafe {
+                            item.assume_init_drop();
                         }
-                        return Err(err);
                     }
-                };
-                item.write(value);
-            }
-
-            let val = unsafe {
-                // TODO: array_assume_init: https://github.com/rust-lang/rust/issues/80908
-                (std::ptr::addr_of!(slice) as *const [T; N]).read()
+                    return Err(err);
+                }
             };
-            Ok(val)
+            item.write(value);
         }
-    }
 
-    impl<Ctx: Copy, T, const N: usize> DekuWrite<Ctx> for [T; N]
-    where
-        T: DekuWrite<Ctx>,
-    {
-        fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
-            for v in self {
-                v.write(output, ctx)?;
-            }
-            Ok(())
-        }
+        let val = unsafe {
+            // TODO: array_assume_init: https://github.com/rust-lang/rust/issues/80908
+            (core::ptr::addr_of!(slice) as *const [T; N]).read()
+        };
+        Ok(val)
     }
+}
 
-    impl<Ctx: Copy, T> DekuWrite<Ctx> for &[T]
-    where
-        T: DekuWrite<Ctx>,
-    {
-        fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
-            for v in *self {
-                v.write(output, ctx)?;
-            }
-            Ok(())
+impl<Ctx: Copy, T, const N: usize> DekuWrite<Ctx> for [T; N]
+where
+    T: DekuWrite<Ctx>,
+{
+    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
+        for v in self {
+            v.write(output, ctx)?;
         }
+        Ok(())
+    }
+}
+
+impl<Ctx: Copy, T> DekuWrite<Ctx> for &[T]
+where
+    T: DekuWrite<Ctx>,
+{
+    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
+        for v in *self {
+            v.write(output, ctx)?;
+        }
+        Ok(())
     }
 }
 

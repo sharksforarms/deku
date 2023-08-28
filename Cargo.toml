@@ -24,8 +24,6 @@ default = ["std"]
 std = ["deku_derive/std", "bitvec/std", "alloc", "acid_io/std", "acid_io/alloc"]
 alloc = ["bitvec/alloc", "acid_io/alloc"]
 logging = ["deku_derive/logging", "log"]
-## Enable reader.read_cache by default when a `Reader` is created
-read_cache = []
 
 [dependencies]
 deku_derive = { version = "^0.16.0", path = "deku-derive", default-features = false}

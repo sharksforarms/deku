@@ -80,16 +80,11 @@ mod tests {
 
     use crate::{ctx::Endian, reader::Reader, DekuReader};
 
-    #[rstest(input,endian,expected,expected_rest,
-        case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, [0xCCDD, 0xAABB], bits![u8, Msb0;]),
-        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, [0xDDCC, 0xBBAA], bits![u8, Msb0;]),
+    #[rstest(input,endian,expected,
+        case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, [0xCCDD, 0xAABB]),
+        case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, [0xDDCC, 0xBBAA]),
     )]
-    fn test_bit_read(
-        input: &[u8],
-        endian: Endian,
-        expected: [u16; 2],
-        expected_rest: &BitSlice<u8, Msb0>,
-    ) {
+    fn test_bit_read(input: &[u8], endian: Endian, expected: [u16; 2]) {
         let mut bit_slice = input.view_bits::<Msb0>();
 
         let mut reader = Reader::new(&mut bit_slice);

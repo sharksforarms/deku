@@ -82,8 +82,6 @@ ImplDekuTupleTraits! { A, B, C, D, E, F, G, H, I, J, K, }
 
 #[cfg(test)]
 mod tests {
-    use core::fmt::Debug;
-
     use rstest::rstest;
 
     use super::*;

@@ -30,7 +30,7 @@ mod tests {
     #[allow(clippy::unit_arg)]
     #[allow(clippy::unit_cmp)]
     fn test_unit() {
-        let mut input = &[0xff];
+        let input = &[0xff];
 
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);

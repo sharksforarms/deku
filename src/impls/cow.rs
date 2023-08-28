@@ -46,8 +46,6 @@ mod tests {
         ),
     )]
     fn test_cow(input: &[u8], expected: Cow<u16>) {
-        let bit_slice = input.view_bits::<Msb0>();
-
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let res_read = <Cow<u16>>::from_reader_with_ctx(&mut reader, ()).unwrap();

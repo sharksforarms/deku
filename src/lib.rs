@@ -62,7 +62,8 @@ assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 
 # Composing
 
-Deku structs/enums can be composed as long as they implement DekuRead / DekuWrite traits
+Deku structs/enums can be composed as long as they implement [DekuReader] / [DekuWrite] traits which
+can be derived by using the `DekuRead` and `DekuWrite` Derive macros.
 
 ```rust
 # use std::io::Cursor;
@@ -232,7 +233,7 @@ assert_eq!(value.sub.b, 0x01 + 0x02)
 # `Read` enabled
 Parsers can be used that directly read from a source implementing [Read](crate::acid_io::Read).
 
-The crate [acid_io](crate::acid_io) is re-exported for use in `no_std` environments.
+The crate [acid_io] is re-exported for use in `no_std` environments.
 This functions as an alias for [std::io](https://doc.rust-lang.org/stable/std/io/) when not
 using `no_std`.
 

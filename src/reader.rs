@@ -6,7 +6,6 @@ use acid_io::{self, Read};
 use bitvec::prelude::*;
 
 use crate::{prelude::NeedSize, DekuError};
-use alloc::vec;
 use alloc::vec::Vec;
 
 #[cfg(feature = "logging")]
@@ -16,6 +15,7 @@ use log;
 pub enum ReaderRet {
     /// Successfully read bytes
     Bytes,
+    #[cfg(not(feature = "bytes_only"))]
     /// Read Bits intead
     Bits(Option<BitVec<u8, Msb0>>),
 }
@@ -27,8 +27,6 @@ pub struct Reader<'a, R: Read> {
     leftover: BitVec<u8, Msb0>,
     /// Amount of bits read during the use of [read_bits](Reader::read_bits) and [read_bytes](Reader::read_bytes).
     pub bits_read: usize,
-    /// If function [enable_read_cache](Reader::enable_read_cache) is used, this field will contain all bytes that were read
-    pub read_cache: Option<Vec<u8>>,
 }
 
 /// Max bits requested from [`Reader::read_bits`] during one call
@@ -42,15 +40,7 @@ impl<'a, R: Read> Reader<'a, R> {
             inner,
             leftover: BitVec::new(), // with_capacity 8?
             bits_read: 0,
-            read_cache: None,
         }
-    }
-
-    /// Enable `sef.read_cache` to be filled with all bytes that were read after calling this
-    /// function.
-    #[inline]
-    pub fn enable_read_cache(&mut self) {
-        self.read_cache = Some(vec![]);
     }
 
     /// Return the unused bits
@@ -179,10 +169,6 @@ impl<'a, R: Read> Reader<'a, R> {
                 }
                 let read_buf = &buf[..bytes_len];
 
-                if let Some(cache) = &mut self.read_cache {
-                    cache.append(&mut read_buf.to_vec());
-                }
-
                 #[cfg(feature = "logging")]
                 log::trace!("read_bits: read() {:02x?}", read_buf);
 
@@ -215,6 +201,37 @@ impl<'a, R: Read> Reader<'a, R> {
     ///
     /// # Params
     /// `amt`    - Amount of bytes that will be read
+    #[cfg(feature = "bytes_only")]
+    #[inline]
+    pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> Result<ReaderRet, DekuError> {
+        #[cfg(feature = "logging")]
+        log::trace!("read_bytes: requesting {amt} bytes");
+        if buf.len() < amt {
+            return Err(DekuError::Incomplete(NeedSize::new(amt * 8)));
+        }
+        if let Err(e) = self.inner.read_exact(&mut buf[..amt]) {
+            if e.kind() == acid_io::ErrorKind::UnexpectedEof {
+                return Err(DekuError::Incomplete(NeedSize::new(amt * 8)));
+            }
+
+            // TODO: other errors?
+        }
+
+        self.bits_read += amt * 8;
+
+        #[cfg(feature = "logging")]
+        log::trace!("read_bytes: returning {buf:02x?}");
+
+        Ok(ReaderRet::Bytes)
+    }
+
+    /// Attempt to read bytes from `Reader`. This will return `ReaderRet::Bytes` with a valid
+    /// `buf` of bytes if we have no "leftover" bytes and thus are byte aligned. If we are not byte
+    /// aligned, this will call `read_bits` and return `ReaderRet::Bits(_)` of size `amt` * 8.
+    ///
+    /// # Params
+    /// `amt`    - Amount of bytes that will be read
+    #[cfg(not(feature = "bytes_only"))]
     #[inline]
     pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> Result<ReaderRet, DekuError> {
         #[cfg(feature = "logging")]
@@ -229,10 +246,6 @@ impl<'a, R: Read> Reader<'a, R> {
                 }
 
                 // TODO: other errors?
-            }
-
-            if let Some(cache) = &mut self.read_cache {
-                cache.append(&mut buf[..amt].to_vec());
             }
 
             self.bits_read += amt * 8;
@@ -278,12 +291,9 @@ mod tests {
         let input = hex!("aa");
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        reader.enable_read_cache();
         let _ = reader.read_bits(1);
-        assert_eq!(&vec![0xaa], reader.read_cache.as_ref().unwrap());
         let _ = reader.read_bits(4);
         let _ = reader.read_bits(3);
-        assert_eq!(&vec![0xaa], reader.read_cache.as_ref().unwrap());
     }
 
     #[test]
@@ -291,9 +301,7 @@ mod tests {
         let input = hex!("aabbcc");
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        reader.enable_read_cache();
         let mut buf = [0; 1];
         let _ = reader.read_bytes(1, &mut buf);
-        assert_eq!(&vec![0xaa], reader.read_cache.as_ref().unwrap());
     }
 }

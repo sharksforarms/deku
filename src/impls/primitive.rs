@@ -50,21 +50,20 @@ impl DekuReader<'_, (Endian, ByteSize)> for u8 {
     #[inline]
     fn from_reader_with_ctx<R: Read>(
         reader: &mut Reader<R>,
-        (endian, size): (Endian, ByteSize),
+        (_endian, size): (Endian, ByteSize),
     ) -> Result<u8, DekuError> {
         let mut buf = [0; core::mem::size_of::<u8>()];
+        #[allow(unused_variables)]
         let ret = reader.read_bytes(size.0, &mut buf)?;
-        let a = match ret {
-            ReaderRet::Bits(bits) => {
-                let Some(bits) = bits else {
-                    return Err(DekuError::Parse("no bits read from reader".to_string()));
-                };
-                let a = <u8>::read(&bits, (endian, size))?;
-                a.1
-            }
-            ReaderRet::Bytes => <u8>::from_be_bytes(buf),
-        };
-        Ok(a)
+        #[cfg(not(feature = "bytes_only"))]
+        if let ReaderRet::Bits(bits) = ret {
+            let Some(bits) = bits else {
+                return Err(DekuError::Parse("no bits read from reader".to_string()));
+            };
+            let a = <u8>::read(&bits, (_endian, size))?;
+            return Ok(a.1);
+        }
+        Ok(<u8>::from_be_bytes(buf))
     }
 }
 
@@ -210,27 +209,27 @@ macro_rules! ImplDekuReadBytes {
                     )));
                 }
                 let mut buf = [0; core::mem::size_of::<$typ>()];
+                #[allow(unused_variables)]
                 let ret = reader.read_bytes(size.0, &mut buf)?;
-                let a = match ret {
-                    ReaderRet::Bits(bits) => {
+                #[cfg(not(feature = "bytes_only"))]
+                {
+                    if let ReaderRet::Bits(bits) = ret {
                         let Some(bits) = bits else {
                             return Err(DekuError::Parse(format!("no bits read from reader",)));
                         };
                         let a = <$typ>::read(&bits, (endian, size))?;
-                        a.1
+                        return Ok(a.1);
                     }
-                    ReaderRet::Bytes => {
-                        if endian.is_le() {
-                            <$typ>::from_le_bytes(buf.try_into().unwrap())
-                        } else {
-                            if size.0 != core::mem::size_of::<$typ>() {
-                                let padding = core::mem::size_of::<$typ>() - size.0;
-                                buf.copy_within(0..size.0, padding);
-                                buf[..padding].fill(0x00);
-                            }
-                            <$typ>::from_be_bytes(buf.try_into().unwrap())
-                        }
+                }
+                let a = if endian.is_le() {
+                    <$typ>::from_le_bytes(buf.try_into().unwrap())
+                } else {
+                    if size.0 != core::mem::size_of::<$typ>() {
+                        let padding = core::mem::size_of::<$typ>() - size.0;
+                        buf.copy_within(0..size.0, padding);
+                        buf[..padding].fill(0x00);
                     }
+                    <$typ>::from_be_bytes(buf.try_into().unwrap())
                 };
                 Ok(a)
             }
@@ -266,6 +265,7 @@ macro_rules! ImplDekuReadSignExtend {
                 let mut buf = [0; core::mem::size_of::<$typ>()];
                 let ret = reader.read_bytes(size.0, &mut buf)?;
                 let a = match ret {
+                    #[cfg(not(feature = "bytes_only"))]
                     ReaderRet::Bits(bits) => {
                         let Some(bits) = bits else {
                             return Err(DekuError::Parse("no bits read from reader".to_string()));

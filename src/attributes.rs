@@ -34,6 +34,7 @@ enum DekuEnum {
 |-----------|------------------|------------
 | [endian](#endian) | top-level, field | Set the endianness
 | [magic](#magic) | top-level | A magic value that must be present at the start of this struct/enum
+| [bound](#bound) | top-level | Extra where-clause items for derived impls
 | [assert](#assert) | field | Assert a condition
 | [assert_eq](#assert_eq) | field | Assert equals on the field
 | [bits](#bits) | field | Set the bit-size of the field
@@ -167,6 +168,33 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
+```
+
+# bound
+
+Adds extra where-clause items to the derived impls
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(bound = "for<'a> T: DekuRead<'a, ()> + DekuWrite<()>")]
+struct DekuTest<T> {
+    data: T,
+}
+
+let data: Vec<u8> = vec![0x01];
+
+let read_value = <DekuTest<u8>>::try_from(data.as_ref()).unwrap();
+assert_eq!(
+    DekuTest { data: 0x01_u8 },
+    read_value,
+);
+
+let write_value: Vec<u8> = read_value.try_into().unwrap();
+assert_eq!(data, write_value);
 ```
 
 # assert

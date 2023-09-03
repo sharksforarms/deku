@@ -172,18 +172,18 @@ impl<'a, R: Read> Reader<'a, R> {
 
                 // create bitslice and remove unused bits
                 let rest = BitSlice::try_from_slice(read_buf).unwrap();
-                let (rest, not_needed) = rest.split_at(bits_left);
-                core::mem::swap(&mut not_needed.to_bitvec(), &mut self.leftover);
+                let (rest, not_needed) = rest.split_at(rest.len() - bits_left);
+                self.leftover = rest.to_bitvec();
 
                 // create return
-                ret.extend_from_bitslice(rest);
+                ret.extend_from_bitslice(not_needed);
             }
             // The entire bits we need to return have been already read previously from bytes but
             // not all were read, return required leftover bits
             Ordering::Less => {
-                let used = self.leftover.split_off(amt);
-                ret.extend_from_bitslice(&self.leftover);
-                self.leftover = used;
+                let used = self.leftover.split_off(self.leftover.len() - amt);
+                ret.extend_from_bitslice(&used);
+                //self.leftover = used;
             }
         }
 

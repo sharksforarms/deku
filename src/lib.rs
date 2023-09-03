@@ -311,6 +311,7 @@ use alloc::vec::Vec;
 pub mod acid_io {
     pub use acid_io::Cursor;
     pub use acid_io::Read;
+    pub use acid_io::Result;
 }
 
 /// re-export of bitvec

@@ -118,7 +118,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     tokens.extend(quote! {
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
             #[inline]
-            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -130,7 +130,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
                 #[inline]
-                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -381,7 +381,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         #[allow(non_snake_case)]
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
             #[inline]
-            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -394,7 +394,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             #[allow(non_snake_case)]
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
                 #[inline]
-                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -795,7 +795,7 @@ pub fn emit_container_read(
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
             #[inline]
-            fn from_reader<'a, R: ::#crate_::no_std_io::Read>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
+            fn from_reader<'a, R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #from_reader_body
             }
 

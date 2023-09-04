@@ -848,7 +848,7 @@ struct DekuTest {
 
 impl DekuTest {
     /// Read and convert to String
-    fn read<R: std::io::Read>(
+    fn read<R: std::io::Read + std::io::Seek>(
         reader: &mut deku::reader::Reader<R>,
     ) -> Result<String, DekuError> {
         let value = u8::from_reader_with_ctx(reader, ())?;

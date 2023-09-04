@@ -4,13 +4,16 @@ use crate::reader::Reader;
 use crate::writer::Writer;
 use crate::{DekuError, DekuReader, DekuWriter};
 use core::mem::MaybeUninit;
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 impl<'a, Ctx: Copy, T, const N: usize> DekuReader<'a, Ctx> for [T; N]
 where
     T: DekuReader<'a, Ctx>,
 {
-    fn from_reader_with_ctx<R: Read>(reader: &mut Reader<R>, ctx: Ctx) -> Result<Self, DekuError>
+    fn from_reader_with_ctx<R: Read + Seek>(
+        reader: &mut Reader<R>,
+        ctx: Ctx,
+    ) -> Result<Self, DekuError>
     where
         Self: Sized,
     {
@@ -93,9 +96,8 @@ mod tests {
         case::normal_be([0xDD, 0xCC].as_ref(), Endian::Big, [0xDDCC, 0xBBAA]),
     )]
     fn test_bit_read(input: &[u8], endian: Endian, expected: [u16; 2]) {
-        let mut bit_slice = input.view_bits::<Msb0>();
-
-        let mut reader = Reader::new(&mut bit_slice);
+        let mut cursor = std::io::Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
         let res_read = <[u16; 2]>::from_reader_with_ctx(&mut reader, endian).unwrap();
         assert_eq!(expected, res_read);
     }

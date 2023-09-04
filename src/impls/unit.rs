@@ -1,9 +1,9 @@
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 use crate::{reader::Reader, writer::Writer, DekuError, DekuReader, DekuWriter};
 
 impl<Ctx: Copy> DekuReader<'_, Ctx> for () {
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         _reader: &mut Reader<R>,
         _inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {

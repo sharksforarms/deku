@@ -2,7 +2,7 @@
 
 use crate::writer::Writer;
 
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 use crate::{DekuError, DekuReader, DekuWriter};
 
@@ -39,7 +39,7 @@ macro_rules! ImplDekuTupleTraits {
 
         impl<'a, Ctx: Copy, $($T:DekuReader<'a, Ctx>+Sized),+> DekuReader<'a, Ctx> for ($($T,)+)
         {
-            fn from_reader_with_ctx<R: Read>(
+            fn from_reader_with_ctx<R: Read + Seek>(
                 reader: &mut crate::reader::Reader<R>,
                 ctx: Ctx,
             ) -> Result<Self, DekuError>

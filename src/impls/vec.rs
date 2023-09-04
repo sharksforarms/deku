@@ -1,4 +1,4 @@
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
@@ -15,7 +15,7 @@ use crate::{DekuError, DekuWriter};
 /// The predicate takes two parameters: the number of bits that have been read so far,
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
-fn reader_vec_with_predicate<'a, T, Ctx, Predicate, R: Read>(
+fn reader_vec_with_predicate<'a, T, Ctx, Predicate, R: Read + Seek>(
     reader: &mut Reader<R>,
     capacity: Option<usize>,
     ctx: Ctx,
@@ -44,7 +44,7 @@ where
     Ok(res)
 }
 
-fn reader_vec_to_end<'a, T, Ctx, R: Read>(
+fn reader_vec_to_end<'a, T, Ctx, R: Read + Seek>(
     reader: &mut crate::reader::Reader<R>,
     capacity: Option<usize>,
     ctx: Ctx,
@@ -71,7 +71,7 @@ where
     Ctx: Copy,
     Predicate: FnMut(&T) -> bool,
 {
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
     ) -> Result<Self, DekuError>
@@ -135,7 +135,7 @@ impl<'a, T: DekuReader<'a>, Predicate: FnMut(&T) -> bool> DekuReader<'a, Limit<T
     for Vec<T>
 {
     /// Read `T`s until the given limit from input for types which don't require context.
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
         limit: Limit<T, Predicate>,
     ) -> Result<Self, DekuError>
@@ -191,7 +191,8 @@ mod tests {
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],
     ) {
-        let mut reader = Reader::new(&mut input);
+        let mut cursor = Cursor::new(&mut input);
+        let mut reader = Reader::new(&mut cursor);
         let res_read = Vec::<u8>::from_reader_with_ctx(&mut reader, limit).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(
@@ -199,7 +200,7 @@ mod tests {
             expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
         );
         let mut buf = vec![];
-        input.read_to_end(&mut buf).unwrap();
+        cursor.read_to_end(&mut buf).unwrap();
         assert_eq!(expected_rest_bytes, buf);
     }
 
@@ -226,7 +227,7 @@ mod tests {
         case::too_much_data([0xAA, 0xBB].as_ref(), Endian::Little, Some(9), 1.into(), vec![], bits![u8, Msb0;], &[]),
     )]
     fn test_vec_reader<Predicate: FnMut(&u8) -> bool>(
-        mut input: &[u8],
+        input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
         limit: Limit<u8, Predicate>,
@@ -234,7 +235,8 @@ mod tests {
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],
     ) {
-        let mut reader = Reader::new(&mut input);
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
         let res_read = match bit_size {
             Some(bit_size) => {
                 Vec::<u8>::from_reader_with_ctx(&mut reader, (limit, (endian, BitSize(bit_size))))
@@ -248,7 +250,7 @@ mod tests {
             expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
         );
         let mut buf = vec![];
-        input.read_to_end(&mut buf).unwrap();
+        cursor.read_to_end(&mut buf).unwrap();
         assert_eq!(expected_rest_bytes, buf);
     }
 
@@ -271,7 +273,7 @@ mod tests {
         case::bytes_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), BitSize(16).into(), vec![0xAABB], bits![u8, Msb0;], &[0xcc, 0xdd], vec![0xAA, 0xBB]),
     )]
     fn test_vec_reader_write<Predicate: FnMut(&u16) -> bool>(
-        mut input: &[u8],
+        input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
         limit: Limit<u16, Predicate>,
@@ -284,7 +286,8 @@ mod tests {
         // Unwrap here because all test cases are `Some`.
         let bit_size = bit_size.unwrap();
 
-        let mut reader = Reader::new(&mut input);
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
         let res_read =
             Vec::<u16>::from_reader_with_ctx(&mut reader, (limit, (endian, BitSize(bit_size))))
                 .unwrap();
@@ -294,7 +297,7 @@ mod tests {
             expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
         );
         let mut buf = vec![];
-        input.read_to_end(&mut buf).unwrap();
+        cursor.read_to_end(&mut buf).unwrap();
         assert_eq!(expected_rest_bytes, buf);
 
         let mut writer = Writer::new(vec![]);

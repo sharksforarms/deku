@@ -354,6 +354,8 @@ pub mod no_std_io {
     pub use no_std_io::io::Cursor;
     pub use no_std_io::io::Read;
     pub use no_std_io::io::Result;
+    pub use no_std_io::io::Seek;
+    pub use no_std_io::io::SeekFrom;
     pub use no_std_io::io::Write;
 }
 
@@ -406,7 +408,7 @@ pub trait DekuReader<'a, Ctx = ()> {
     /// let mut reader = Reader::new(&mut file);
     /// let ec = EcHdr::from_reader_with_ctx(&mut reader, Endian::Big).unwrap();
     /// ```
-    fn from_reader_with_ctx<R: no_std_io::Read>(
+    fn from_reader_with_ctx<R: no_std_io::Read + no_std_io::Seek>(
         reader: &mut Reader<R>,
         ctx: Ctx,
     ) -> Result<Self, DekuError>
@@ -443,12 +445,12 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     ///     magic: [u8; 4],
     ///     version: u8,
     /// }
-    ///
+    /// ```
     /// let mut file = File::options().read(true).open("file").unwrap();
     /// file.seek(SeekFrom::Start(0)).unwrap();
     /// let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
     /// ```
-    fn from_reader<R: no_std_io::Read>(
+    fn from_reader<R: no_std_io::Read + no_std_io::Seek>(
         input: (&'a mut R, usize),
     ) -> Result<(usize, Self), DekuError>
     where

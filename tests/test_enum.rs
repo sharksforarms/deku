@@ -1,4 +1,5 @@
 use std::convert::{TryFrom, TryInto};
+use std::io::Cursor;
 
 use deku::prelude::*;
 use hexlit::hex;
@@ -131,7 +132,8 @@ fn test_id_pat_with_id() {
     }
 
     let input = [0x01, 0x02];
-    let (_, v) = DekuTest::from_reader((&mut input.as_slice(), 0)).unwrap();
+    let mut cursor = Cursor::new(input);
+    let (_, v) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
     assert_eq!(
         v,
         DekuTest {
@@ -142,7 +144,8 @@ fn test_id_pat_with_id() {
     assert_eq!(input, &*v.to_bytes().unwrap());
 
     let input = [0x05];
-    let (_, v) = DekuTest::from_reader((&mut input.as_slice(), 0)).unwrap();
+    let mut cursor = Cursor::new(input);
+    let (_, v) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
     assert_eq!(
         v,
         DekuTest {

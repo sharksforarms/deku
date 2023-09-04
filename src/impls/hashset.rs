@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::hash::{BuildHasher, Hash};
 
 use crate::writer::Writer;
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 use crate::ctx::*;
 use crate::{DekuError, DekuReader, DekuWriter};
@@ -15,7 +15,7 @@ use crate::{DekuError, DekuReader, DekuWriter};
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
 #[allow(clippy::type_complexity)]
-fn from_reader_with_ctx_hashset_with_predicate<'a, T, S, Ctx, Predicate, R: Read>(
+fn from_reader_with_ctx_hashset_with_predicate<'a, T, S, Ctx, Predicate, R: Read + Seek>(
     reader: &mut crate::reader::Reader<R>,
     capacity: Option<usize>,
     ctx: Ctx,
@@ -41,7 +41,7 @@ where
     Ok(res)
 }
 
-fn from_reader_with_ctx_hashset_to_end<'a, T, S, Ctx, R: Read>(
+fn from_reader_with_ctx_hashset_to_end<'a, T, S, Ctx, R: Read + Seek>(
     reader: &mut crate::reader::Reader<R>,
     capacity: Option<usize>,
     ctx: Ctx,
@@ -86,7 +86,7 @@ where
     /// let set = HashSet::<u32>::from_reader_with_ctx(&mut reader, (1.into(), Endian::Little)).unwrap();
     /// assert_eq!(expected, set)
     /// ```
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
     ) -> Result<Self, DekuError>
@@ -165,7 +165,7 @@ impl<'a, T: DekuReader<'a> + Eq + Hash, S: BuildHasher + Default, Predicate: FnM
     DekuReader<'a, Limit<T, Predicate>> for HashSet<T, S>
 {
     /// Read `T`s until the given limit from input for types which don't require context.
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
         limit: Limit<T, Predicate>,
     ) -> Result<Self, DekuError>

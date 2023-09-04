@@ -1,4 +1,4 @@
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek};
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use deku::prelude::*;
@@ -34,7 +34,7 @@ struct DekuVec {
     data: Vec<u8>,
 }
 
-fn deku_read_bits(mut reader: impl Read) {
+fn deku_read_bits(mut reader: impl Read + Seek) {
     let mut reader = Reader::new(&mut reader);
     let _v = DekuBits::from_reader_with_ctx(&mut reader, ()).unwrap();
 }
@@ -43,7 +43,7 @@ fn deku_write_bits(input: &DekuBits) {
     let _v = input.to_bytes().unwrap();
 }
 
-fn deku_read_byte(mut reader: impl Read) {
+fn deku_read_byte(mut reader: impl Read + Seek) {
     let mut reader = Reader::new(&mut reader);
     let _v = DekuBytes::from_reader_with_ctx(&mut reader, ()).unwrap();
 }
@@ -52,7 +52,7 @@ fn deku_write_byte(input: &DekuBytes) {
     let _v = input.to_bytes().unwrap();
 }
 
-fn deku_read_enum(mut reader: impl Read) {
+fn deku_read_enum(mut reader: impl Read + Seek) {
     let mut reader = Reader::new(&mut reader);
     let _v = DekuEnum::from_reader_with_ctx(&mut reader, ()).unwrap();
 }
@@ -61,7 +61,7 @@ fn deku_write_enum(input: &DekuEnum) {
     let _v = input.to_bytes().unwrap();
 }
 
-fn deku_read_vec(mut reader: impl Read) {
+fn deku_read_vec(mut reader: impl Read + Seek) {
     let mut reader = Reader::new(&mut reader);
     let _v = DekuVec::from_reader_with_ctx(&mut reader, ()).unwrap();
 }

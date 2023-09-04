@@ -1,10 +1,10 @@
 //! Example of a close replacement for deku::input
 use deku::prelude::*;
-use std::io::{self, Cursor, Read};
+use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
 /// Every read to this struct will be saved into an internal cache. This is to keep the cache
 /// around for the crc without reading from the buffer twice
-struct ReaderCrc<R: Read> {
+struct ReaderCrc<R: Read + Seek> {
     reader: R,
     pub cache: Vec<u8>,
 }

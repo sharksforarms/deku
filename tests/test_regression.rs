@@ -90,8 +90,8 @@ mod issue_282 {
         assert_eq!(zero, 0);
 
         let data = [a, b, c, a, b, c];
-        let (_, BitsBytes { bits, bytes }) =
-            BitsBytes::from_reader((&mut data.as_slice(), 0)).unwrap();
+        let mut cursor = Cursor::new(data);
+        let (_, BitsBytes { bits, bytes }) = BitsBytes::from_reader((&mut cursor, 0)).unwrap();
 
         assert_eq!(bits, expected);
         assert_eq!(bytes, expected);
@@ -116,8 +116,8 @@ mod issue_282 {
         assert_eq!(zero, 0);
 
         let data = [a, b, c, a, b, c];
-        let (_, BitsBytes { bits, bytes }) =
-            BitsBytes::from_reader((&mut data.as_slice(), 0)).unwrap();
+        let mut cursor = Cursor::new(data);
+        let (_, BitsBytes { bits, bytes }) = BitsBytes::from_reader((&mut cursor, 0)).unwrap();
 
         assert_eq!(bits, expected);
         assert_eq!(bytes, expected);
@@ -141,10 +141,9 @@ fn test_regression_292() {
         field3: u8,
     }
 
+    let mut cursor = Cursor::new(test_data);
     assert_eq!(
-        Reader::from_reader((&mut test_data.as_slice(), 0))
-            .unwrap()
-            .1,
+        Reader::from_reader((&mut cursor, 0)).unwrap().1,
         Reader {
             field1: 0,
             field2: 0xff,
@@ -163,10 +162,9 @@ fn test_regression_292() {
         field3: u8,
     }
 
+    let mut cursor = Cursor::new(test_data);
     assert_eq!(
-        ReaderBits::from_reader((&mut test_data.as_slice(), 0))
-            .unwrap()
-            .1,
+        ReaderBits::from_reader((&mut cursor, 0)).unwrap().1,
         ReaderBits {
             field1: 0,
             field2: 0xff,
@@ -183,10 +181,9 @@ fn test_regression_292() {
         field3: u8,
     }
 
+    let mut cursor = Cursor::new(test_data);
     assert_eq!(
-        ReaderByteNoEndian::from_reader((&mut test_data.as_slice(), 0))
-            .unwrap()
-            .1,
+        ReaderByteNoEndian::from_reader((&mut cursor, 0)).unwrap().1,
         ReaderByteNoEndian {
             field1: 0,
             field2: 0xff,
@@ -202,10 +199,9 @@ fn test_regression_292() {
         field3: u8,
     }
 
+    let mut cursor = Cursor::new(test_data);
     assert_eq!(
-        ReaderBitPadding::from_reader((&mut test_data.as_slice(), 0))
-            .unwrap()
-            .1,
+        ReaderBitPadding::from_reader((&mut cursor, 0)).unwrap().1,
         ReaderBitPadding {
             field2: 0xff,
             field3: 0,
@@ -222,10 +218,9 @@ fn test_regression_292() {
         field3: u8,
     }
 
+    let mut cursor = Cursor::new(test_data);
     assert_eq!(
-        ReaderBitPadding1::from_reader((&mut test_data.as_slice(), 0))
-            .unwrap()
-            .1,
+        ReaderBitPadding1::from_reader((&mut cursor, 0)).unwrap().1,
         ReaderBitPadding1 {
             field1: 0,
             field2: 0xff,
@@ -245,10 +240,9 @@ fn test_regression_292() {
         field3: u8,
     }
 
+    let mut cursor = Cursor::new(test_data);
     assert_eq!(
-        ReaderTwo::from_reader((&mut test_data.as_slice(), 0))
-            .unwrap()
-            .1,
+        ReaderTwo::from_reader((&mut cursor, 0)).unwrap().1,
         ReaderTwo {
             field1: 0b11,
             field2: 0,
@@ -268,10 +262,9 @@ fn test_regression_292() {
         field3: u8,
     }
 
+    let mut cursor = Cursor::new(test_data);
     assert_eq!(
-        ReaderU16Le::from_reader((&mut test_data.as_slice(), 0))
-            .unwrap()
-            .1,
+        ReaderU16Le::from_reader((&mut cursor, 0)).unwrap().1,
         ReaderU16Le {
             field1: 0b11,
             field2: 0,
@@ -291,10 +284,9 @@ fn test_regression_292() {
         field3: u8,
     }
 
+    let mut cursor = Cursor::new(test_data);
     assert_eq!(
-        ReaderU16Be::from_reader((&mut test_data.as_slice(), 0))
-            .unwrap()
-            .1,
+        ReaderU16Be::from_reader((&mut cursor, 0)).unwrap().1,
         ReaderU16Be {
             field1: 0b11,
             field2: 0,
@@ -314,10 +306,9 @@ fn test_regression_292() {
         field3: i8,
     }
 
+    let mut cursor = Cursor::new(test_data);
     assert_eq!(
-        ReaderI16Le::from_reader((&mut test_data.as_slice(), 0))
-            .unwrap()
-            .1,
+        ReaderI16Le::from_reader((&mut cursor, 0)).unwrap().1,
         ReaderI16Le {
             field1: -0b01,
             field2: 1,
@@ -337,10 +328,9 @@ fn test_regression_292() {
         field3: i8,
     }
 
+    let mut cursor = Cursor::new(test_data);
     assert_eq!(
-        ReaderI16Be::from_reader((&mut test_data.as_slice(), 0))
-            .unwrap()
-            .1,
+        ReaderI16Be::from_reader((&mut cursor, 0)).unwrap().1,
         ReaderI16Be {
             field1: -0b01,
             field2: 1,

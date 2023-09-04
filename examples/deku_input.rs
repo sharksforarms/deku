@@ -9,7 +9,7 @@ struct ReaderCrc<R: Read + Seek> {
     pub cache: Vec<u8>,
 }
 
-impl<R: Read> ReaderCrc<R> {
+impl<R: Read + Seek> ReaderCrc<R> {
     pub fn new(reader: R) -> Self {
         Self {
             reader,
@@ -18,11 +18,17 @@ impl<R: Read> ReaderCrc<R> {
     }
 }
 
-impl<R: Read> Read for ReaderCrc<R> {
+impl<R: Read + Seek> Read for ReaderCrc<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let n = self.reader.read(buf);
         self.cache.extend_from_slice(buf);
         n
+    }
+}
+
+impl<R: Read + Seek> Seek for ReaderCrc<R> {
+    fn seek(&mut self, seek: SeekFrom) -> io::Result<u64> {
+        self.reader.seek(seek)
     }
 }
 

@@ -1,4 +1,5 @@
 use deku::prelude::*;
+use std::io::Cursor;
 
 // Invalid alignment assumptions when converting
 // BitSlice to type

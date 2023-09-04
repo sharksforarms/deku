@@ -1,4 +1,4 @@
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 #[cfg(feature = "alloc")]
 use alloc::borrow::Cow;
@@ -14,7 +14,7 @@ where
     Ctx: Copy,
     u8: DekuReader<'a, Ctx>,
 {
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<bool, DekuError> {
@@ -62,8 +62,9 @@ mod tests {
         #[should_panic(expected = "Parse(\"cannot parse bool value: 2\")")]
         case(&hex!("02"), false),
     )]
-    fn test_bool(mut input: &[u8], expected: bool) {
-        let mut reader = Reader::new(&mut input);
+    fn test_bool(input: &[u8], expected: bool) {
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
         let res_read = bool::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
     }

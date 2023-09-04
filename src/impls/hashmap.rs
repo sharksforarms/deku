@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
 
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 use crate::ctx::*;
 use crate::writer::Writer;
@@ -15,7 +15,7 @@ use crate::{DekuError, DekuReader, DekuWriter};
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
 #[allow(clippy::type_complexity)]
-fn from_reader_with_ctx_hashmap_with_predicate<'a, K, V, S, Ctx, Predicate, R: Read>(
+fn from_reader_with_ctx_hashmap_with_predicate<'a, K, V, S, Ctx, Predicate, R: Read + Seek>(
     reader: &mut crate::reader::Reader<R>,
     capacity: Option<usize>,
     ctx: Ctx,
@@ -42,7 +42,7 @@ where
     Ok(res)
 }
 
-fn from_reader_with_ctx_hashmap_to_end<'a, K, V, S, Ctx, R: Read>(
+fn from_reader_with_ctx_hashmap_to_end<'a, K, V, S, Ctx, R: Read + Seek>(
     reader: &mut crate::reader::Reader<R>,
     capacity: Option<usize>,
     ctx: Ctx,
@@ -92,7 +92,7 @@ where
     /// expected.insert(100, 0x04030201);
     /// assert_eq!(expected, map)
     /// ```
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
         (limit, inner_ctx): (Limit<(K, V), Predicate>, Ctx),
     ) -> Result<Self, DekuError>
@@ -175,7 +175,7 @@ where
     Predicate: FnMut(&(K, V)) -> bool,
 {
     /// Read `K, V`s until the given limit from input for types which don't require context.
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
         limit: Limit<(K, V), Predicate>,
     ) -> Result<Self, DekuError>

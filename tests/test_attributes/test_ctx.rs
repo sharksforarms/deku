@@ -181,7 +181,8 @@ fn test_struct_enum_ctx_id() {
 
     // VarC
     let test_data = [0x02_u8, 0x03, 0xcc];
-    let (_, ret_read) = StructEnumId::from_reader((&mut test_data.as_slice(), 0)).unwrap();
+    let mut cursor = Cursor::new(test_data);
+    let (_, ret_read) = StructEnumId::from_reader((&mut cursor, 0)).unwrap();
 
     assert_eq!(
         StructEnumId {

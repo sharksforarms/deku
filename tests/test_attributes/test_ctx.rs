@@ -125,6 +125,8 @@ fn test_struct_enum_ctx_id() {
         VarB,
         #[deku(id = "(2, 3)")]
         VarC(u8),
+        #[deku(id_pat = "_")]
+        VarAll(u8),
     }
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -191,6 +193,24 @@ fn test_struct_enum_ctx_id() {
             my_id: 0x02,
             data: 0x03,
             enum_from_id: EnumId::VarC(0xcc),
+            enum_from_just_id: EnumJustId::VarB,
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(ret_write, test_data);
+
+    // VarPat
+    let test_data = [0x02_u8, 0xff, 0xcc];
+    let mut cursor = Cursor::new(test_data);
+    let (_, ret_read) = StructEnumId::from_reader((&mut cursor, 0)).unwrap();
+
+    assert_eq!(
+        StructEnumId {
+            my_id: 0x02,
+            data: 0xff,
+            enum_from_id: EnumId::VarAll(0xcc),
             enum_from_just_id: EnumJustId::VarB,
         },
         ret_read

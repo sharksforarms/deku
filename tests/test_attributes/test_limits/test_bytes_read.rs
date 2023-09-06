@@ -56,6 +56,28 @@ mod test_slice {
         let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(test_data, ret_write);
     }
+
+    #[test]
+    fn test_bytes_read_zero() {
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        struct TestStruct<'a> {
+            #[deku(bytes_read = "0")]
+            data: &'a [u8],
+        }
+
+        let test_data: Vec<u8> = [].to_vec();
+
+        let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+        assert_eq!(
+            TestStruct {
+                data: test_data.as_ref()
+            },
+            ret_read
+        );
+
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+        assert_eq!(test_data, ret_write);
+    }
 }
 
 mod test_vec {
@@ -113,6 +135,23 @@ mod test_vec {
             },
             ret_read
         );
+
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+        assert_eq!(test_data, ret_write);
+    }
+
+    #[test]
+    fn test_bytes_read_zero() {
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        struct TestStruct {
+            #[deku(endian = "little", bytes_read = "0")]
+            data: Vec<u16>,
+        }
+
+        let test_data: Vec<u8> = [].to_vec();
+
+        let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+        assert_eq!(TestStruct { data: vec![] }, ret_read);
 
         let ret_write: Vec<u8> = ret_read.try_into().unwrap();
         assert_eq!(test_data, ret_write);

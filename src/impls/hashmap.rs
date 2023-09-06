@@ -97,6 +97,12 @@ impl<
             // Read until a given quantity of bits have been read
             Limit::BitSize(size) => {
                 let bit_size = size.0;
+
+                // Handle the trivial case of reading an empty hashmap
+                if bit_size == 0 {
+                    return Ok((input, HashMap::<K, V, S>::default()));
+                }
+
                 read_hashmap_with_predicate(input, None, inner_ctx, move |read_bits, _| {
                     read_bits == bit_size
                 })
@@ -105,6 +111,12 @@ impl<
             // Read until a given quantity of bits have been read
             Limit::ByteSize(size) => {
                 let bit_size = size.0 * 8;
+
+                // Handle the trivial case of reading an empty hashmap
+                if bit_size == 0 {
+                    return Ok((input, HashMap::<K, V, S>::default()));
+                }
+
                 read_hashmap_with_predicate(input, None, inner_ctx, move |read_bits, _| {
                     read_bits == bit_size
                 })

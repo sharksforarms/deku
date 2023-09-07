@@ -27,9 +27,9 @@ enum DekuTest {
 }
 
 fn main() {
-    let mut test_data = hex!("03020102").to_vec();
+    let test_data = hex!("03020102").to_vec();
 
-    let mut cursor = Cursor::new(&mut test_data);
+    let mut cursor = Cursor::new(&test_data);
     let mut reader = Reader::new(&mut cursor);
     let deku_test = DekuTest::from_reader_with_ctx(&mut reader, ()).unwrap();
 

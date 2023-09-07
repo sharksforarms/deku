@@ -2,6 +2,142 @@
 
 ## [Unreleased]
 
+## Changes
+[#352](https://github.com/sharksforarms/deku/pull/352) replaced the byte slice interface with new interfaces depending on `io::Read`.
+This brings massive performance and usability improvements.
+- `from_bytes(..)` was replaced with `from_reader(..)`:
+
+old:
+```rust
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct TestDeku(#[deku(bits = 4)] u8);
+
+let test_data: Vec<u8> = [0b0110_0110u8, 0b0101_1010u8].to_vec();
+
+let ((rest, i), ret_read) = TestDeku::from_bytes((&test_data, 0)).unwrap();
+assert_eq!(TestDeku(0b0110), ret_read);
+assert_eq!(2, rest.len());
+assert_eq!(4, i);
+```
+
+new:
+```rust
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct TestDeku(#[deku(bits = 4)] u8);
+
+let test_data: Vec<u8> = [0b0110_0110u8, 0b0101_1010u8].to_vec();
+let mut c = std::io::Cursor::new(test_data);
+
+let (amt_read, ret_read) = TestDeku::from_reader((&mut c, 0)).unwrap();
+assert_eq!(TestDeku(0b0110), ret_read);
+assert_eq!(amt_read, 4);
+```
+
+- The more internal (with context) `read(..)` was replaced with `from_reader_with_ctx(..)`.
+Now unused variables `deku::input`, `deku::input_bits`, and `deku::rest` were removed. `deku::reader` is the replacement.
+
+old:
+```rust
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    field_a: u8,
+
+    #[deku(
+        reader = "bit_flipper_read(*field_a, deku::rest, BitSize(8))",
+    )]
+    field_b: u8,
+}
+
+fn custom_read(
+    field_a: u8,
+    rest: &BitSlice<u8, Msb0>,
+    bit_size: BitSize,
+) -> Result<(&BitSlice<u8, Msb0>, u8), DekuError> {
+
+    // read field_b, calling original func
+    let (rest, value) = u8::read(rest, bit_size)?;
+
+    Ok((rest, value))
+}
+```
+
+new:
+```rust
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    field_a: u8,
+
+    #[deku(
+        reader = "bit_flipper_read(*field_a, deku::reader, BitSize(8))",
+    )]
+    field_b: u8,
+}
+
+fn custom_read<R: std::io::Read>(
+    field_a: u8,
+    reader: &mut Reader<R>,
+    bit_size: BitSize,
+) -> Result<u8, DekuError> {
+
+    // read field_b, calling original func
+    let value = u8::from_reader_with_ctx(reader, bit_size)?;
+
+    Ok(value)
+}
+```
+
+- With the addition of using `Read`, containing a byte slice with a reference is not supported:
+
+old
+```rust
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+struct TestStruct<'a> {
+    bytes: u8,
+
+    #[deku(bytes_read = "bytes")]
+    data: &'a [u8],
+}
+```
+
+new
+```rust
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+struct TestStruct {
+    bytes: u8,
+
+    #[deku(bytes_read = "bytes")]
+    data: Vec<u8>,
+}
+```
+
+- `id_pat` is now required to be the same type as stored id.
+This also disallows using tuples for storing the id:
+
+old:
+```rust
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(type = "u8")]
+enum DekuTest {
+    #[deku(id_pat = "_")]
+    VariantC((u8, u8)),
+}
+```
+
+new:
+```rust
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(type = "u8")]
+enum DekuTest {
+    #[deku(id_pat = "_")]
+    VariantC {
+        id: u8,
+        other: u8,
+    },
+}
+```
+
+- The feature `const_generics` was removed and is enabled by default.
+
 ## [0.16.0] - 2023-02-28
 
 ### Changes

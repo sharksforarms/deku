@@ -80,6 +80,12 @@ where
             // Read until a given quantity of bits have been read
             Limit::BitSize(size) => {
                 let bit_size = size.0;
+
+                // Handle the trivial case of reading an empty vector
+                if bit_size == 0 {
+                    return Ok(Vec::new());
+                }
+
                 reader_vec_with_predicate(reader, None, inner_ctx, move |read_bits, _| {
                     read_bits == bit_size
                 })
@@ -88,6 +94,12 @@ where
             // Read until a given quantity of bits have been read
             Limit::ByteSize(size) => {
                 let bit_size = size.0 * 8;
+
+                // Handle the trivial case of reading an empty vector
+                if bit_size == 0 {
+                    return Ok(Vec::new());
+                }
+
                 reader_vec_with_predicate(reader, None, inner_ctx, move |read_bits, _| {
                     read_bits == bit_size
                 })

@@ -54,9 +54,9 @@ mod test_slice {
     #[test]
     fn test_count_zero() {
         #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-        struct TestStruct<'a> {
+        struct TestStruct {
             #[deku(count = "0")]
-            data: &'a [u8],
+            data: Vec<u8>,
         }
 
         let test_data: Vec<u8> = [].to_vec();
@@ -64,7 +64,7 @@ mod test_slice {
         let ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
         assert_eq!(
             TestStruct {
-                data: test_data.as_ref()
+                data: test_data.clone()
             },
             ret_read
         );

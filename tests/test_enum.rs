@@ -32,16 +32,16 @@ enum TestEnum {
 }
 
 #[rstest(input,expected,
-    case(&mut hex!("01AB"), TestEnum::VarA(0xAB)),
-    case(&mut hex!("0269"), TestEnum::VarB(0b0110, 0b1001)),
-    case(&mut hex!("0302AABB"), TestEnum::VarC{field_a: 0x02, field_b: vec![0xAA, 0xBB]}),
-    case(&mut hex!("0402AABB"), TestEnum::VarD(0x02, vec![0xAA, 0xBB])),
-    case(&mut hex!("FF01"), TestEnum::VarDefault{id: 0xFF, value: 0x01}),
+    case(&hex!("01AB"), TestEnum::VarA(0xAB)),
+    case(&hex!("0269"), TestEnum::VarB(0b0110, 0b1001)),
+    case(&hex!("0302AABB"), TestEnum::VarC{field_a: 0x02, field_b: vec![0xAA, 0xBB]}),
+    case(&hex!("0402AABB"), TestEnum::VarD(0x02, vec![0xAA, 0xBB])),
+    case(&hex!("FF01"), TestEnum::VarDefault{id: 0xFF, value: 0x01}),
 
     #[should_panic(expected = "Parse(\"Too much data\")")]
-    case(&mut hex!("FFFFFF"), TestEnum::VarA(0xFF)),
+    case(&hex!("FFFFFF"), TestEnum::VarA(0xFF)),
 )]
-fn test_enum(input: &mut [u8], expected: TestEnum) {
+fn test_enum(input: &[u8], expected: TestEnum) {
     let input = input.to_vec();
     let ret_read = TestEnum::try_from(input.as_slice()).unwrap();
     assert_eq!(expected, ret_read);
@@ -73,14 +73,14 @@ enum TestEnumDiscriminant {
 }
 
 #[rstest(input, expected,
-    case(&mut hex!("00"), TestEnumDiscriminant::VarA),
-    case(&mut hex!("01"), TestEnumDiscriminant::VarB),
-    case(&mut hex!("02"), TestEnumDiscriminant::VarC),
+    case(&hex!("00"), TestEnumDiscriminant::VarA),
+    case(&hex!("01"), TestEnumDiscriminant::VarB),
+    case(&hex!("02"), TestEnumDiscriminant::VarC),
 
     #[should_panic(expected = "Could not match enum variant id = 3 on enum `TestEnumDiscriminant`")]
-    case(&mut hex!("03"), TestEnumDiscriminant::VarA),
+    case(&hex!("03"), TestEnumDiscriminant::VarA),
 )]
-fn test_enum_discriminant(input: &mut [u8], expected: TestEnumDiscriminant) {
+fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
     let input = input.to_vec();
     let ret_read = TestEnumDiscriminant::try_from(input.as_slice()).unwrap();
     assert_eq!(expected, ret_read);

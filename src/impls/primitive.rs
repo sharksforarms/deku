@@ -81,7 +81,6 @@ macro_rules! ImplDekuReadBits {
 
                 let input_is_le = endian.is_le();
 
-                // PANIC: We already check that input.len() < bit_size above, so no panic will happen
                 let bit_slice = &input[..bit_size];
 
                 let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
@@ -212,12 +211,12 @@ macro_rules! ImplDekuReadBytes {
                 let mut buf = [0; core::mem::size_of::<$typ>()];
                 let ret = reader.read_bytes(size.0, &mut buf)?;
                 let a = match ret {
-                    ReaderRet::Bits(bits) => {
-                        let Some(bits) = bits else {
-                            return Err(DekuError::Parse(format!("no bits read from reader",)));
-                        };
+                    ReaderRet::Bits(Some(bits)) => {
                         let a = <$typ>::read(&bits, (endian, size))?;
                         a.1
+                    }
+                    ReaderRet::Bits(None) => {
+                        return Err(DekuError::Parse(format!("no bits read from reader")));
                     }
                     ReaderRet::Bytes => {
                         if endian.is_le() {

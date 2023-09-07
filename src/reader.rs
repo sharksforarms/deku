@@ -15,7 +15,7 @@ use log;
 pub enum ReaderRet {
     /// Successfully read bytes
     Bytes,
-    /// Read Bits intead
+    /// Successfully read bits
     Bits(Option<BitVec<u8, Msb0>>),
 }
 

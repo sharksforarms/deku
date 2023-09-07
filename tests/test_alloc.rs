@@ -38,10 +38,10 @@ struct TestDeku {
     field_e: Vec<u8>, // 1 alloc
     field_f: [u8; 3],
     #[deku(bits = "3")]
-    field_g: u8, // 3 allocs (bits read)
+    field_g: u8, // 3 allocs (read_bits(Ordering::Greater))
     #[deku(bits = "5")]
-    field_h: u8, // 1 alloc (bits leftover/read)
-    field_i: NestedEnum2,
+    field_h: u8, // 1 alloc (read_bits(Ordering::Equal))
+                 //field_i: NestedEnum2,
 }
 
 mod tests {

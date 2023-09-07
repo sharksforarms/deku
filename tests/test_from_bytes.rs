@@ -1,5 +1,5 @@
-use acid_io::Seek;
 use deku::prelude::*;
+use no_std_io::io::Seek;
 
 #[test]
 fn test_from_reader_struct() {

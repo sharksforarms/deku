@@ -1,5 +1,5 @@
-use acid_io::Read;
 use bitvec::prelude::*;
+use no_std_io::io::Read;
 
 use crate::{DekuError, DekuReader, DekuWrite};
 

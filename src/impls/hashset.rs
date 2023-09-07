@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::hash::{BuildHasher, Hash};
 
-use acid_io::Read;
 use bitvec::prelude::*;
+use no_std_io::io::Read;
 
 use crate::ctx::*;
 use crate::{DekuError, DekuReader, DekuWrite};
@@ -164,7 +164,7 @@ impl<T: DekuWrite<Ctx>, S, Ctx: Copy> DekuWrite<Ctx> for HashSet<T, S> {
 
 #[cfg(test)]
 mod tests {
-    use acid_io::Cursor;
+    use no_std_io::io::Cursor;
     use rstest::rstest;
     use rustc_hash::FxHashSet;
 

@@ -40,7 +40,7 @@ fn main() -> ! {
 
     #[allow(clippy::unusual_byte_groupings)]
     let test_data: &[u8] = &[0b10101_101, 0x02, 0xBE, 0xEF];
-    let mut cursor = deku::acid_io::Cursor::new(test_data);
+    let mut cursor = deku::no_std_io::Cursor::new(test_data);
 
     // Test reading
     let (_rest, val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();

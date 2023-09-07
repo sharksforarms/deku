@@ -2,8 +2,8 @@
 
 use core::cmp::Ordering;
 
-use acid_io::{self, Read};
 use bitvec::prelude::*;
+use no_std_io::io::{ErrorKind, Read};
 
 use crate::{prelude::NeedSize, DekuError};
 use alloc::vec::Vec;
@@ -90,7 +90,7 @@ impl<'a, R: Read> Reader<'a, R> {
         } else {
             let mut buf = [0; 1];
             if let Err(e) = self.inner.read_exact(&mut buf) {
-                if e.kind() == acid_io::ErrorKind::UnexpectedEof {
+                if e.kind() == ErrorKind::UnexpectedEof {
                     #[cfg(feature = "logging")]
                     log::trace!("end");
                     return true;
@@ -160,7 +160,7 @@ impl<'a, R: Read> Reader<'a, R> {
                 // read in new bytes
                 let mut buf = [0; MAX_BITS_AMT];
                 if let Err(e) = self.inner.read_exact(&mut buf[..bytes_len]) {
-                    if e.kind() == acid_io::ErrorKind::UnexpectedEof {
+                    if e.kind() == ErrorKind::UnexpectedEof {
                         return Err(DekuError::Incomplete(NeedSize::new(amt)));
                     }
 
@@ -209,7 +209,7 @@ impl<'a, R: Read> Reader<'a, R> {
                 return Err(DekuError::Incomplete(NeedSize::new(amt * 8)));
             }
             if let Err(e) = self.inner.read_exact(&mut buf[..amt]) {
-                if e.kind() == acid_io::ErrorKind::UnexpectedEof {
+                if e.kind() == ErrorKind::UnexpectedEof {
                     return Err(DekuError::Incomplete(NeedSize::new(amt * 8)));
                 }
 
@@ -231,8 +231,8 @@ impl<'a, R: Read> Reader<'a, R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use acid_io::Cursor;
     use hexlit::hex;
+    use no_std_io::io::Cursor;
 
     #[test]
     fn test_end() {

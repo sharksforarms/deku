@@ -1,4 +1,4 @@
-use acid_io::Read;
+use no_std_io::io::Read;
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;

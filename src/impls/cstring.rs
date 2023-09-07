@@ -1,4 +1,4 @@
-use acid_io::Read;
+use no_std_io::io::Read;
 use std::ffi::CString;
 
 use bitvec::prelude::*;
@@ -36,7 +36,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use acid_io::Cursor;
+    use no_std_io::io::Cursor;
     use rstest::rstest;
 
     use crate::reader::Reader;

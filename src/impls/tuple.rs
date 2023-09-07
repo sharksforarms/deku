@@ -1,7 +1,7 @@
 //! Implementations of DekuRead and DekuWrite for tuples of length 1 to 11
 
-use acid_io::Read;
 use bitvec::prelude::*;
+use no_std_io::io::Read;
 
 use crate::{DekuError, DekuReader, DekuWrite};
 

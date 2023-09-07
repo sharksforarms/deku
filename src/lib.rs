@@ -1,4 +1,5 @@
 /*!
+
 # Deku: Declarative binary reading and writing
 
 Deriving a struct or enum with `DekuRead` and `DekuWrite` provides bit-level,
@@ -231,9 +232,9 @@ assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
 
 # `Read` enabled
-Parsers can be used that directly read from a source implementing [Read](crate::acid_io::Read).
+Parsers can be used that directly read from a source implementing [Read](crate::no_std_io::Read).
 
-The crate [acid_io] is re-exported for use in `no_std` environments.
+The crate [no_std_io] is re-exported for use in `no_std` environments.
 This functions as an alias for [std::io](https://doc.rust-lang.org/stable/std/io/) when not
 using `no_std`.
 
@@ -307,11 +308,11 @@ extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-/// re-export of acid_io
-pub mod acid_io {
-    pub use acid_io::Cursor;
-    pub use acid_io::Read;
-    pub use acid_io::Result;
+/// re-export of no_std_io
+pub mod no_std_io {
+    pub use no_std_io::io::Cursor;
+    pub use no_std_io::io::Read;
+    pub use no_std_io::io::Result;
 }
 
 /// re-export of bitvec
@@ -331,9 +332,9 @@ pub mod reader;
 
 pub use crate::error::DekuError;
 
-/// "Reader" trait: read bytes and bits from [`acid_io::Read`]er
+/// "Reader" trait: read bytes and bits from [`no_std_io::Read`]er
 pub trait DekuReader<'a, Ctx = ()> {
-    /// Construct type from `reader` implementing [`acid_io::Read`], with ctx.
+    /// Construct type from `reader` implementing [`no_std_io::Read`], with ctx.
     ///
     /// # Example
     /// ```rust, no_run
@@ -353,7 +354,7 @@ pub trait DekuReader<'a, Ctx = ()> {
     /// let mut reader = Reader::new(&mut file);
     /// let ec = EcHdr::from_reader_with_ctx(&mut reader, Endian::Big).unwrap();
     /// ```
-    fn from_reader_with_ctx<R: acid_io::Read>(
+    fn from_reader_with_ctx<R: no_std_io::Read>(
         reader: &mut crate::reader::Reader<R>,
         ctx: Ctx,
     ) -> Result<Self, DekuError>
@@ -364,7 +365,7 @@ pub trait DekuReader<'a, Ctx = ()> {
 /// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which
 /// doesn't need any context information.
 pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
-    /// Construct type from Reader implementing [`acid_io::Read`].
+    /// Construct type from Reader implementing [`no_std_io::Read`].
     /// * **input** - Input given as data and bit offset
     ///
     /// # Returns
@@ -388,7 +389,9 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     /// file.seek(SeekFrom::Start(0)).unwrap();
     /// let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
     /// ```
-    fn from_reader<R: acid_io::Read>(input: (&'a mut R, usize)) -> Result<(usize, Self), DekuError>
+    fn from_reader<R: no_std_io::Read>(
+        input: (&'a mut R, usize),
+    ) -> Result<(usize, Self), DekuError>
     where
         Self: Sized;
 }

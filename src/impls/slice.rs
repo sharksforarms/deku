@@ -3,9 +3,9 @@
 pub use deku_derive::*;
 
 use crate::{DekuError, DekuWrite};
-use acid_io::Read;
 use bitvec::prelude::*;
 use core::mem::MaybeUninit;
+use no_std_io::io::Read;
 
 use crate::DekuReader;
 
@@ -129,7 +129,7 @@ mod tests {
         expected: [[u16; 2]; 2],
         expected_rest: &BitSlice<u8, Msb0>,
     ) {
-        use acid_io::Cursor;
+        use no_std_io::io::Cursor;
 
         use crate::reader::Reader;
 

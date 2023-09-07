@@ -1,5 +1,5 @@
-use acid_io::Read;
 use bitvec::prelude::*;
+use no_std_io::io::Read;
 
 use crate::{DekuError, DekuReader, DekuWrite};
 
@@ -33,7 +33,7 @@ impl<T: DekuWrite<Ctx>, Ctx: Copy> DekuWrite<Ctx> for Option<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use acid_io::Cursor;
+    use no_std_io::io::Cursor;
 
     use crate::reader::Reader;
 

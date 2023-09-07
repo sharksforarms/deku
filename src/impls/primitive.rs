@@ -4,8 +4,8 @@ use alloc::format;
 use alloc::string::ToString;
 use core::convert::TryInto;
 
-use acid_io::Read;
 use bitvec::prelude::*;
+use no_std_io::io::Read;
 
 use crate::ctx::*;
 use crate::reader::{Reader, ReaderRet};

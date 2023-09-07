@@ -1,4 +1,4 @@
-use acid_io::Read;
+use no_std_io::io::Read;
 
 #[cfg(feature = "alloc")]
 use alloc::format;
@@ -43,8 +43,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use acid_io::Cursor;
     use hexlit::hex;
+    use no_std_io::io::Cursor;
     use rstest::rstest;
 
     use crate::reader::Reader;

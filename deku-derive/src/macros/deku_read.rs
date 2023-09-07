@@ -97,7 +97,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
-            fn from_reader_with_ctx<R: ::#crate_::acid_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -108,7 +108,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
-                fn from_reader_with_ctx<R: ::#crate_::acid_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -335,7 +335,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     tokens.extend(quote! {
         #[allow(non_snake_case)]
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
-            fn from_reader_with_ctx<R: ::#crate_::acid_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -347,7 +347,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             #[allow(non_snake_case)]
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
-                fn from_reader_with_ctx<R: ::#crate_::acid_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -742,7 +742,7 @@ pub fn emit_from_reader(
     quote! {
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
-            fn from_reader<'a, R: ::#crate_::acid_io::Read>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
+            fn from_reader<'a, R: ::#crate_::no_std_io::Read>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #body
             }
         }
@@ -763,7 +763,7 @@ pub fn emit_try_from(
 
             fn try_from(input: &#lifetime [u8]) -> core::result::Result<Self, Self::Error> {
                 let total_len = input.len();
-                let mut cursor = ::#crate_::acid_io::Cursor::new(input);
+                let mut cursor = ::#crate_::no_std_io::Cursor::new(input);
                 let (amt_read, res) = <Self as ::#crate_::DekuContainerRead>::from_reader((&mut cursor, 0))?;
                 if (amt_read / 8) != total_len {
                     return Err(::#crate_::DekuError::Parse(format!("Too much data")));

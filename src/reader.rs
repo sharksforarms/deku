@@ -5,7 +5,7 @@ use core::cmp::Ordering;
 use bitvec::prelude::*;
 use no_std_io::io::{ErrorKind, Read};
 
-use crate::{prelude::NeedSize, DekuError, ctx::Order};
+use crate::{ctx::Order, prelude::NeedSize, DekuError};
 use alloc::vec::Vec;
 
 #[cfg(feature = "logging")]
@@ -112,7 +112,7 @@ impl<'a, R: Read> Reader<'a, R> {
         #[cfg(feature = "logging")]
         log::trace!("skip_bits: {amt}");
         // Save, and keep the leftover bits since the read will most likely be less than a byte
-        self.read_bits(amt, Order::Lsb0)?;
+        self.read_bits(amt, Order::Msb0)?;
 
         Ok(())
     }
@@ -128,7 +128,11 @@ impl<'a, R: Read> Reader<'a, R> {
     /// # Params
     /// `amt`    - Amount of bits that will be read. Must be <= [`MAX_BITS_AMT`].
     #[inline]
-    pub fn read_bits(&mut self, amt: usize, order: Order) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
+    pub fn read_bits(
+        &mut self,
+        amt: usize,
+        order: Order,
+    ) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("read_bits: requesting {amt} bits");
         if amt == 0 {
@@ -147,7 +151,6 @@ impl<'a, R: Read> Reader<'a, R> {
             // previous read was not enough to satisfy the amt requirement, return all previously
             Ordering::Greater => {
                 // read bits
-                ret.extend_from_bitslice(&self.leftover);
 
                 // calculate the amount of bytes we need to read to read enough bits
                 let bits_left = amt - self.leftover.len();
@@ -171,35 +174,38 @@ impl<'a, R: Read> Reader<'a, R> {
                 log::trace!("read_bits: read() {:02x?}", read_buf);
 
                 // create bitslice and remove unused bits
-                let rest = BitSlice::try_from_slice(read_buf).unwrap();
                 match order {
                     Order::Lsb0 => {
-                        let (rest, not_needed) = rest.split_at(bits_left);
-                        core::mem::swap(&mut not_needed.to_bitvec(), &mut self.leftover);
-                        ret.extend_from_bitslice(rest);
-                    },
-                    Order::Msb0 => {
-                        let (rest, not_needed) = rest.split_at(rest.len() - bits_left);
+                        let rest = BitSlice::try_from_slice(read_buf).unwrap();
+                        let (rest, used) = rest.split_at(rest.len() - bits_left);
+                        ret.extend_from_bitslice(&used);
+                        ret.extend_from_bitslice(&self.leftover);
+
                         self.leftover = rest.to_bitvec();
-                        ret.extend_from_bitslice(not_needed);
-                    },
+                    }
+                    Order::Msb0 => {
+                        let rest = BitSlice::try_from_slice(read_buf).unwrap();
+                        let (rest, not_needed) = rest.split_at(bits_left);
+                        ret.extend_from_bitslice(&self.leftover);
+                        ret.extend_from_bitslice(rest);
+
+                        core::mem::swap(&mut not_needed.to_bitvec(), &mut self.leftover);
+                    }
                 }
             }
             // The entire bits we need to return have been already read previously from bytes but
             // not all were read, return required leftover bits
-            Ordering::Less => {
-                match order {
-                    Order::Lsb0 => {
-                        let used = self.leftover.split_off(amt);
-                        ret.extend_from_bitslice(&self.leftover);
-                        self.leftover = used;
-                    },
-                    Order::Msb0 => {
-                        let used = self.leftover.split_off(self.leftover.len() - amt);
-                        ret.extend_from_bitslice(&used);
-                    },
+            Ordering::Less => match order {
+                Order::Lsb0 => {
+                    let used = self.leftover.split_off(self.leftover.len() - amt);
+                    ret.extend_from_bitslice(&used);
                 }
-            }
+                Order::Msb0 => {
+                    let used = self.leftover.split_off(amt);
+                    ret.extend_from_bitslice(&self.leftover);
+                    self.leftover = used;
+                }
+            },
         }
 
         self.bits_read += ret.len();
@@ -215,7 +221,12 @@ impl<'a, R: Read> Reader<'a, R> {
     /// # Params
     /// `amt`    - Amount of bytes that will be read
     #[inline]
-    pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8], order: Order) -> Result<ReaderRet, DekuError> {
+    pub fn read_bytes(
+        &mut self,
+        amt: usize,
+        buf: &mut [u8],
+        order: Order,
+    ) -> Result<ReaderRet, DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("read_bytes: requesting {amt} bytes");
         if self.leftover.is_empty() {

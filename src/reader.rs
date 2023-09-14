@@ -5,7 +5,7 @@ use core::cmp::Ordering;
 use bitvec::prelude::*;
 use no_std_io::io::{ErrorKind, Read};
 
-use crate::{prelude::NeedSize, DekuError};
+use crate::{prelude::NeedSize, DekuError, ctx::Order};
 use alloc::vec::Vec;
 
 #[cfg(feature = "logging")]
@@ -112,7 +112,7 @@ impl<'a, R: Read> Reader<'a, R> {
         #[cfg(feature = "logging")]
         log::trace!("skip_bits: {amt}");
         // Save, and keep the leftover bits since the read will most likely be less than a byte
-        self.read_bits(amt)?;
+        self.read_bits(amt, Order::Lsb0)?;
 
         Ok(())
     }
@@ -128,7 +128,7 @@ impl<'a, R: Read> Reader<'a, R> {
     /// # Params
     /// `amt`    - Amount of bits that will be read. Must be <= [`MAX_BITS_AMT`].
     #[inline]
-    pub fn read_bits(&mut self, amt: usize) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
+    pub fn read_bits(&mut self, amt: usize, order: Order) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("read_bits: requesting {amt} bits");
         if amt == 0 {
@@ -172,18 +172,33 @@ impl<'a, R: Read> Reader<'a, R> {
 
                 // create bitslice and remove unused bits
                 let rest = BitSlice::try_from_slice(read_buf).unwrap();
-                let (rest, not_needed) = rest.split_at(rest.len() - bits_left);
-                self.leftover = rest.to_bitvec();
-
-                // create return
-                ret.extend_from_bitslice(not_needed);
+                match order {
+                    Order::Lsb0 => {
+                        let (rest, not_needed) = rest.split_at(bits_left);
+                        core::mem::swap(&mut not_needed.to_bitvec(), &mut self.leftover);
+                        ret.extend_from_bitslice(rest);
+                    },
+                    Order::Msb0 => {
+                        let (rest, not_needed) = rest.split_at(rest.len() - bits_left);
+                        self.leftover = rest.to_bitvec();
+                        ret.extend_from_bitslice(not_needed);
+                    },
+                }
             }
             // The entire bits we need to return have been already read previously from bytes but
             // not all were read, return required leftover bits
             Ordering::Less => {
-                let used = self.leftover.split_off(self.leftover.len() - amt);
-                ret.extend_from_bitslice(&used);
-                //self.leftover = used;
+                match order {
+                    Order::Lsb0 => {
+                        let used = self.leftover.split_off(amt);
+                        ret.extend_from_bitslice(&self.leftover);
+                        self.leftover = used;
+                    },
+                    Order::Msb0 => {
+                        let used = self.leftover.split_off(self.leftover.len() - amt);
+                        ret.extend_from_bitslice(&used);
+                    },
+                }
             }
         }
 
@@ -200,7 +215,7 @@ impl<'a, R: Read> Reader<'a, R> {
     /// # Params
     /// `amt`    - Amount of bytes that will be read
     #[inline]
-    pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> Result<ReaderRet, DekuError> {
+    pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8], order: Order) -> Result<ReaderRet, DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("read_bytes: requesting {amt} bytes");
         if self.leftover.is_empty() {
@@ -222,7 +237,7 @@ impl<'a, R: Read> Reader<'a, R> {
 
             Ok(ReaderRet::Bytes)
         } else {
-            Ok(ReaderRet::Bits(self.read_bits(amt * 8)?))
+            Ok(ReaderRet::Bits(self.read_bits(amt * 8, order)?))
         }
     }
 }
@@ -240,16 +255,16 @@ mod tests {
         let mut reader = Reader::new(&mut cursor);
         assert!(!reader.end());
         let mut buf = [0; 1];
-        let _ = reader.read_bytes(1, &mut buf);
+        let _ = reader.read_bytes(1, &mut buf, Order::Lsb0);
         assert!(reader.end());
 
         let input = hex!("aa");
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         assert!(!reader.end());
-        let _ = reader.read_bits(4);
+        let _ = reader.read_bits(4, Order::Lsb0);
         assert!(!reader.end());
-        let _ = reader.read_bits(4);
+        let _ = reader.read_bits(4, Order::Lsb0);
         assert!(reader.end());
     }
 
@@ -258,9 +273,9 @@ mod tests {
         let input = hex!("aa");
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        let _ = reader.read_bits(1);
-        let _ = reader.read_bits(4);
-        let _ = reader.read_bits(3);
+        let _ = reader.read_bits(1, Order::Lsb0);
+        let _ = reader.read_bits(4, Order::Lsb0);
+        let _ = reader.read_bits(3, Order::Lsb0);
     }
 
     #[test]
@@ -269,7 +284,7 @@ mod tests {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let mut buf = [0; 1];
-        let _ = reader.read_bytes(1, &mut buf);
+        let _ = reader.read_bytes(1, &mut buf, Order::Lsb0);
         assert_eq!([0xaa], buf);
     }
 }

@@ -4,6 +4,11 @@
 use core::marker::PhantomData;
 use core::str::FromStr;
 
+pub enum Order {
+    Msb0,
+    Lsb0,
+}
+
 /// An endian
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Endian {

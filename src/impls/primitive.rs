@@ -32,7 +32,21 @@ trait DekuRead<'a, Ctx = ()> {
 }
 
 // specialize u8 for ByteSize
-impl DekuRead<'_, (Endian, ByteSize)> for u8 {
+impl DekuRead<'_, (Endian, ByteSize, Order)> for u8 {
+    #[inline]
+    fn read(
+        input: &BitSlice<u8, Msb0>,
+        (_, _, _): (Endian, ByteSize, Order),
+    ) -> Result<(usize, Self), DekuError> {
+        const MAX_TYPE_BITS: usize = BitSize::of::<u8>().0;
+
+        // PANIC: We already check that input.len() < bit_size above, so no panic will happen
+        let value = input[..MAX_TYPE_BITS].load::<u8>();
+        Ok((MAX_TYPE_BITS, value))
+    }
+}
+
+impl DekuRead<'_, (Endian, ByteSize )> for u8 {
     #[inline]
     fn read(
         input: &BitSlice<u8, Msb0>,
@@ -46,14 +60,14 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
     }
 }
 
-impl DekuReader<'_, (Endian, ByteSize)> for u8 {
+impl DekuReader<'_, (Endian, ByteSize, Order)> for u8 {
     #[inline]
     fn from_reader_with_ctx<R: Read>(
         reader: &mut Reader<R>,
-        (endian, size): (Endian, ByteSize),
+        (endian, size, order): (Endian, ByteSize, Order),
     ) -> Result<u8, DekuError> {
         let mut buf = [0; core::mem::size_of::<u8>()];
-        let ret = reader.read_bytes(size.0, &mut buf)?;
+        let ret = reader.read_bytes(size.0, &mut buf, order)?;
         let a = match ret {
             ReaderRet::Bits(bits) => {
                 let Some(bits) = bits else {
@@ -70,6 +84,83 @@ impl DekuReader<'_, (Endian, ByteSize)> for u8 {
 
 macro_rules! ImplDekuReadBits {
     ($typ:ty, $inner:ty) => {
+        impl DekuRead<'_, (Endian, BitSize, Order)> for $typ {
+            #[inline]
+            fn read(
+                input: &BitSlice<u8, Msb0>,
+                (endian, size, order): (Endian, BitSize, Order),
+            ) -> Result<(usize, Self), DekuError> {
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                let bit_size: usize = size.0;
+
+                let input_is_le = endian.is_le();
+
+                // PANIC: We already check that input.len() < bit_size above, so no panic will happen
+                let bit_slice = &input[..bit_size];
+
+                let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
+
+                // if everything is aligned, just read the value
+                if pad == 0 && bit_slice.len() == MAX_TYPE_BITS {
+                    let bytes = bit_slice.domain().region().unwrap().1;
+
+                    if bytes.len() * 8 == MAX_TYPE_BITS {
+                        // Read value
+                        let value = if input_is_le {
+                            <$typ>::from_le_bytes(bytes.try_into()?)
+                        } else {
+                            <$typ>::from_be_bytes(bytes.try_into()?)
+                        };
+                        return Ok((bit_size, value));
+                    }
+                }
+
+                // Create a new BitVec from the slice and pad un-aligned chunks
+                // i.e. [10010110, 1110] -> [10010110, 00001110]
+                let bits: BitVec<u8, Msb0> = {
+                    let mut bits = BitVec::with_capacity(bit_slice.len() + pad);
+
+                    // Copy bits to new BitVec
+                    bits.extend_from_bitslice(&bit_slice);
+
+                    // Force align
+                    //i.e. [1110, 10010110] -> [11101001, 0110]
+                    bits.force_align();
+
+                    // Some padding to next byte
+                    let index = if input_is_le {
+                        bits.len() - (8 - pad)
+                    } else {
+                        0
+                    };
+                    for _ in 0..pad {
+                        bits.insert(index, false);
+                    }
+
+                    // Pad up-to size of type
+                    for _ in 0..(MAX_TYPE_BITS - bits.len()) {
+                        if input_is_le {
+                            bits.push(false);
+                        } else {
+                            bits.insert(0, false);
+                        }
+                    }
+
+                    bits
+                };
+
+                let bytes: &[u8] = bits.domain().region().unwrap().1;
+
+                // Read value
+                let value = if input_is_le {
+                    <$typ>::from_le_bytes(bytes.try_into()?)
+                } else {
+                    <$typ>::from_be_bytes(bytes.try_into()?)
+                };
+                Ok((bit_size, value))
+            }
+        }
+
         impl DekuRead<'_, (Endian, BitSize)> for $typ {
             #[inline]
             fn read(
@@ -146,6 +237,28 @@ macro_rules! ImplDekuReadBits {
             }
         }
 
+        impl DekuReader<'_, (Endian, BitSize, Order)> for $typ {
+            #[inline]
+            fn from_reader_with_ctx<R: Read>(
+                reader: &mut Reader<R>,
+                (endian, size, order): (Endian, BitSize, Order),
+            ) -> Result<$typ, DekuError> {
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                if size.0 > MAX_TYPE_BITS {
+                    return Err(DekuError::Parse(format!(
+                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits",
+                        size.0
+                    )));
+                }
+                let bits = reader.read_bits(size.0, order)?;
+                let Some(bits) = bits else {
+                    return Err(DekuError::Parse(format!("no bits read from reader",)));
+                };
+                let a = <$typ>::read(&bits, (endian, size))?;
+                Ok(a.1)
+            }
+        }
+
         impl DekuReader<'_, (Endian, BitSize)> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read>(
@@ -159,7 +272,7 @@ macro_rules! ImplDekuReadBits {
                         size.0
                     )));
                 }
-                let bits = reader.read_bits(size.0)?;
+                let bits = reader.read_bits(size.0, Order::Lsb0)?;
                 let Some(bits) = bits else {
                     return Err(DekuError::Parse(format!("no bits read from reader",)));
                 };
@@ -172,6 +285,29 @@ macro_rules! ImplDekuReadBits {
 
 macro_rules! ImplDekuReadBytes {
     ($typ:ty, $inner:ty) => {
+        impl DekuRead<'_, (Endian, ByteSize, Order)> for $typ {
+            #[inline]
+            fn read(
+                input: &BitSlice<u8, Msb0>,
+                (endian, size, order): (Endian, ByteSize, Order),
+            ) -> Result<(usize, Self), DekuError> {
+                let bit_size: usize = size.0 * 8;
+
+                let input_is_le = endian.is_le();
+
+                let bit_slice = &input[..bit_size];
+
+                let bytes = bit_slice.domain().region().unwrap().1;
+                let value = if input_is_le {
+                    <$typ>::from_le_bytes(bytes.try_into()?)
+                } else {
+                    <$typ>::from_be_bytes(bytes.try_into()?)
+                };
+
+                Ok((bit_size, value))
+            }
+        }
+
         impl DekuRead<'_, (Endian, ByteSize)> for $typ {
             #[inline]
             fn read(
@@ -195,11 +331,11 @@ macro_rules! ImplDekuReadBytes {
             }
         }
 
-        impl DekuReader<'_, (Endian, ByteSize)> for $typ {
+        impl DekuReader<'_, (Endian, ByteSize, Order)> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
-                (endian, size): (Endian, ByteSize),
+                (endian, size, order): (Endian, ByteSize, Order),
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
                 if size.0 > MAX_TYPE_BYTES {
@@ -209,7 +345,7 @@ macro_rules! ImplDekuReadBytes {
                     )));
                 }
                 let mut buf = [0; core::mem::size_of::<$typ>()];
-                let ret = reader.read_bytes(size.0, &mut buf)?;
+                let ret = reader.read_bytes(size.0, &mut buf, order)?;
                 let a = match ret {
                     ReaderRet::Bits(Some(bits)) => {
                         let a = <$typ>::read(&bits, (endian, size))?;
@@ -239,6 +375,23 @@ macro_rules! ImplDekuReadBytes {
 
 macro_rules! ImplDekuReadSignExtend {
     ($typ:ty, $inner:ty) => {
+        impl DekuRead<'_, (Endian, ByteSize, Order)> for $typ {
+            #[inline]
+            fn read(
+                input: &BitSlice<u8, Msb0>,
+                (endian, size, order): (Endian, ByteSize, Order),
+            ) -> Result<(usize, Self), DekuError> {
+                let (amt_read, value) =
+                    <$inner as DekuRead<'_, (Endian, ByteSize)>>::read(input, (endian, size))?;
+
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                let bit_size = size.0 * 8;
+                let shift = MAX_TYPE_BITS - bit_size;
+                let value = (value as $typ) << shift >> shift;
+                Ok((amt_read, value))
+            }
+        }
+
         impl DekuRead<'_, (Endian, ByteSize)> for $typ {
             #[inline]
             fn read(
@@ -256,14 +409,14 @@ macro_rules! ImplDekuReadSignExtend {
             }
         }
 
-        impl DekuReader<'_, (Endian, ByteSize)> for $typ {
+        impl DekuReader<'_, (Endian, ByteSize, Order)> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
-                (endian, size): (Endian, ByteSize),
+                (endian, size, order): (Endian, ByteSize, Order),
             ) -> Result<$typ, DekuError> {
                 let mut buf = [0; core::mem::size_of::<$typ>()];
-                let ret = reader.read_bytes(size.0, &mut buf)?;
+                let ret = reader.read_bytes(size.0, &mut buf, order)?;
                 let a = match ret {
                     ReaderRet::Bits(bits) => {
                         let Some(bits) = bits else {
@@ -286,6 +439,23 @@ macro_rules! ImplDekuReadSignExtend {
                 let shift = MAX_TYPE_BITS - bit_size;
                 let value = (a as $typ) << shift >> shift;
                 Ok(value)
+            }
+        }
+
+        impl DekuRead<'_, (Endian, BitSize, Order)> for $typ {
+            #[inline]
+            fn read(
+                input: &BitSlice<u8, Msb0>,
+                (endian, size, order): (Endian, BitSize, Order),
+            ) -> Result<(usize, Self), DekuError> {
+                let (amt_read, value) =
+                    <$inner as DekuRead<'_, (Endian, BitSize, Order)>>::read(input, (endian, size, order))?;
+
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                let bit_size = size.0;
+                let shift = MAX_TYPE_BITS - bit_size;
+                let value = (value as $typ) << shift >> shift;
+                Ok((amt_read, value))
             }
         }
 
@@ -319,7 +489,29 @@ macro_rules! ImplDekuReadSignExtend {
                         size.0
                     )));
                 }
-                let bits = reader.read_bits(size.0)?;
+                let bits = reader.read_bits(size.0, Order::Lsb0)?;
+                let Some(bits) = bits else {
+                    return Err(DekuError::Parse(format!("no bits read from reader",)));
+                };
+                let a = <$typ>::read(&bits, (endian, size))?;
+                Ok(a.1)
+            }
+        }
+
+        impl DekuReader<'_, (Endian, BitSize, Order)> for $typ {
+            #[inline]
+            fn from_reader_with_ctx<R: Read>(
+                reader: &mut Reader<R>,
+                (endian, size, order): (Endian, BitSize, Order),
+            ) -> Result<$typ, DekuError> {
+                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                if size.0 > MAX_TYPE_BITS {
+                    return Err(DekuError::Parse(format!(
+                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits",
+                        size.0
+                    )));
+                }
+                let bits = reader.read_bits(size.0, order)?;
                 let Some(bits) = bits else {
                     return Err(DekuError::Parse(format!("no bits read from reader",)));
                 };
@@ -334,6 +526,28 @@ macro_rules! ImplDekuReadSignExtend {
 // BitSize wasn't defined
 macro_rules! ForwardDekuRead {
     ($typ:ty) => {
+        impl DekuReader<'_, (Endian, Order)> for $typ {
+            #[inline]
+            fn from_reader_with_ctx<R: Read>(
+                reader: &mut Reader<R>,
+                (endian, order): (Endian, Order),
+            ) -> Result<$typ, DekuError> {
+                let byte_size = core::mem::size_of::<$typ>();
+
+                <$typ>::from_reader_with_ctx(reader, (endian, ByteSize(byte_size), Order::Lsb0))
+            }
+        }
+
+        impl DekuReader<'_, (Endian, ByteSize)> for $typ {
+            #[inline]
+            fn from_reader_with_ctx<R: Read>(
+                reader: &mut Reader<R>,
+                (endian, byte_size): (Endian, ByteSize),
+            ) -> Result<$typ, DekuError> {
+                <$typ>::from_reader_with_ctx(reader, (endian, byte_size, Order::Lsb0))
+            }
+        }
+
         // Only have `endian`, set `bit_size` to `Size::of::<Type>()`
         impl DekuReader<'_, Endian> for $typ {
             #[inline]
@@ -343,7 +557,7 @@ macro_rules! ForwardDekuRead {
             ) -> Result<$typ, DekuError> {
                 let byte_size = core::mem::size_of::<$typ>();
 
-                <$typ>::from_reader_with_ctx(reader, (endian, ByteSize(byte_size)))
+                <$typ>::from_reader_with_ctx(reader, (endian, ByteSize(byte_size), Order::Lsb0))
             }
         }
 
@@ -356,7 +570,7 @@ macro_rules! ForwardDekuRead {
             ) -> Result<$typ, DekuError> {
                 let endian = Endian::default();
 
-                let a = <$typ>::from_reader_with_ctx(reader, (endian, byte_size))?;
+                let a = <$typ>::from_reader_with_ctx(reader, (endian, byte_size, Order::Lsb0))?;
                 Ok(a)
             }
         }
@@ -371,9 +585,9 @@ macro_rules! ForwardDekuRead {
                 let endian = Endian::default();
 
                 if (bit_size.0 % 8) == 0 {
-                    <$typ>::from_reader_with_ctx(reader, (endian, ByteSize(bit_size.0 / 8)))
+                    <$typ>::from_reader_with_ctx(reader, (endian, ByteSize(bit_size.0 / 8), Order::Lsb0))
                 } else {
-                    <$typ>::from_reader_with_ctx(reader, (endian, bit_size))
+                    <$typ>::from_reader_with_ctx(reader, (endian, bit_size, Order::Lsb0))
                 }
             }
         }
@@ -392,6 +606,52 @@ macro_rules! ForwardDekuRead {
 
 macro_rules! ImplDekuWrite {
     ($typ:ty) => {
+        impl DekuWrite<(Endian, BitSize, Order)> for $typ {
+            #[inline]
+            fn write(
+                &self,
+                output: &mut BitVec<u8, Msb0>,
+                (endian, size, order): (Endian, BitSize, Order),
+            ) -> Result<(), DekuError> {
+                let input = match endian {
+                    Endian::Little => self.to_le_bytes(),
+                    Endian::Big => self.to_be_bytes(),
+                };
+
+                let bit_size: usize = size.0;
+
+                let input_bits = input.view_bits::<Msb0>();
+
+                if bit_size > input_bits.len() {
+                    return Err(DekuError::InvalidParam(format!(
+                        "bit size {} is larger then input {}",
+                        bit_size,
+                        input_bits.len()
+                    )));
+                }
+
+                if matches!(endian, Endian::Little) {
+                    // Example read 10 bits u32 [0xAB, 0b11_000000]
+                    // => [10101011, 00000011, 00000000, 00000000]
+                    let mut remaining_bits = bit_size;
+                    for chunk in input_bits.chunks(8) {
+                        if chunk.len() > remaining_bits {
+                            output.extend_from_bitslice(&chunk[chunk.len() - remaining_bits..]);
+                            break;
+                        } else {
+                            output.extend_from_bitslice(chunk)
+                        }
+                        remaining_bits -= chunk.len();
+                    }
+                } else {
+                    // Example read 10 bits u32 [0xAB, 0b11_000000]
+                    // => [00000000, 00000000, 00000010, 10101111]
+                    output.extend_from_bitslice(&input_bits[input_bits.len() - bit_size..]);
+                }
+                Ok(())
+            }
+        }
+
         impl DekuWrite<(Endian, BitSize)> for $typ {
             #[inline]
             fn write(
@@ -405,6 +665,52 @@ macro_rules! ImplDekuWrite {
                 };
 
                 let bit_size: usize = size.0;
+
+                let input_bits = input.view_bits::<Msb0>();
+
+                if bit_size > input_bits.len() {
+                    return Err(DekuError::InvalidParam(format!(
+                        "bit size {} is larger then input {}",
+                        bit_size,
+                        input_bits.len()
+                    )));
+                }
+
+                if matches!(endian, Endian::Little) {
+                    // Example read 10 bits u32 [0xAB, 0b11_000000]
+                    // => [10101011, 00000011, 00000000, 00000000]
+                    let mut remaining_bits = bit_size;
+                    for chunk in input_bits.chunks(8) {
+                        if chunk.len() > remaining_bits {
+                            output.extend_from_bitslice(&chunk[chunk.len() - remaining_bits..]);
+                            break;
+                        } else {
+                            output.extend_from_bitslice(chunk)
+                        }
+                        remaining_bits -= chunk.len();
+                    }
+                } else {
+                    // Example read 10 bits u32 [0xAB, 0b11_000000]
+                    // => [00000000, 00000000, 00000010, 10101111]
+                    output.extend_from_bitslice(&input_bits[input_bits.len() - bit_size..]);
+                }
+                Ok(())
+            }
+        }
+
+        impl DekuWrite<(Endian, ByteSize, Order)> for $typ {
+            #[inline]
+            fn write(
+                &self,
+                output: &mut BitVec<u8, Msb0>,
+                (endian, size, order): (Endian, ByteSize, Order),
+            ) -> Result<(), DekuError> {
+                let input = match endian {
+                    Endian::Little => self.to_le_bytes(),
+                    Endian::Big => self.to_be_bytes(),
+                };
+
+                let bit_size: usize = size.0 * 8;
 
                 let input_bits = input.view_bits::<Msb0>();
 
@@ -485,6 +791,23 @@ macro_rules! ImplDekuWrite {
         }
 
         // Only have `endian`, return all input
+        impl DekuWrite<(Endian, Order)> for $typ {
+            #[inline]
+            fn write(
+                &self,
+                output: &mut BitVec<u8, Msb0>,
+                (endian, order): (Endian, Order),
+            ) -> Result<(), DekuError> {
+                let input = match endian {
+                    Endian::Little => self.to_le_bytes(),
+                    Endian::Big => self.to_be_bytes(),
+                };
+                output.extend_from_bitslice(input.view_bits::<Msb0>());
+                Ok(())
+            }
+        }
+
+        // Only have `endian`, return all input
         impl DekuWrite<Endian> for $typ {
             #[inline]
             fn write(
@@ -513,7 +836,7 @@ macro_rules! ForwardDekuWrite {
                 output: &mut BitVec<u8, Msb0>,
                 bit_size: BitSize,
             ) -> Result<(), DekuError> {
-                <$typ>::write(self, output, (Endian::default(), bit_size))
+                <$typ>::write(self, output, (Endian::default(), bit_size, Order::Lsb0))
             }
         }
 
@@ -525,14 +848,14 @@ macro_rules! ForwardDekuWrite {
                 output: &mut BitVec<u8, Msb0>,
                 bit_size: ByteSize,
             ) -> Result<(), DekuError> {
-                <$typ>::write(self, output, (Endian::default(), bit_size))
+                <$typ>::write(self, output, (Endian::default(), bit_size, Order::Lsb0))
             }
         }
 
         impl DekuWrite for $typ {
             #[inline]
             fn write(&self, output: &mut BitVec<u8, Msb0>, _: ()) -> Result<(), DekuError> {
-                <$typ>::write(self, output, Endian::default())
+                <$typ>::write(self, output, (Endian::default(), Order::Lsb0))
             }
         }
     };
@@ -612,7 +935,7 @@ mod tests {
             fn $test_name() {
                 let mut r = std::io::Cursor::new($input);
                 let mut reader = Reader::new(&mut r);
-                let res_read = <$typ>::from_reader_with_ctx(&mut reader, ENDIAN).unwrap();
+                let res_read = <$typ>::from_reader_with_ctx(&mut reader, (ENDIAN, Order::Lsb0)).unwrap();
                 assert_eq!($expected, res_read);
 
                 let mut res_write = bitvec![u8, Msb0;];
@@ -733,7 +1056,7 @@ mod tests {
         let mut reader = Reader::new(&mut input);
         let res_read = match bit_size {
             Some(bit_size) => {
-                u32::from_reader_with_ctx(&mut reader, (endian, BitSize(bit_size))).unwrap()
+                u32::from_reader_with_ctx(&mut reader, (endian, BitSize(bit_size), Order::Lsb0)).unwrap()
             }
             None => u32::from_reader_with_ctx(&mut reader, endian).unwrap(),
         };

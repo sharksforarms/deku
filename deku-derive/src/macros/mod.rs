@@ -271,16 +271,17 @@ fn gen_field_args(
     let endian = endian.map(gen_endian_from_str).transpose()?;
     let bits = bits.map(|n| quote! {::#crate_::ctx::BitSize(#n)});
     let bytes = bytes.map(|n| quote! {::#crate_::ctx::ByteSize(#n)});
-    let ctx = ctx.map(|c| quote! {#c});
     let bit_order = bit_order.map(gen_bit_order_from_str).transpose()?;
+    let ctx = ctx.map(|c| quote! {#c});
 
     // FIXME: Should be `into_iter` here, see https://github.com/rust-lang/rust/issues/66145.
+    // TODO: the order here should be documented
     let field_args = [
         endian.as_ref(),
         bits.as_ref(),
         bytes.as_ref(),
-        ctx.as_ref(),
         bit_order.as_ref(),
+        ctx.as_ref(),
     ]
     .iter()
     .filter_map(|i| *i)

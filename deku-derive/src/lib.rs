@@ -320,6 +320,7 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataEnum<'a> {
             deku_data.endian.as_ref(),
             deku_data.bits.as_ref(),
             deku_data.bytes.as_ref(),
+            deku_data.bit_order.as_ref(),
         )?;
 
         Ok(Self {

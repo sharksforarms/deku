@@ -238,17 +238,24 @@ pub(crate) fn gen_id_args(
     endian: Option<&syn::LitStr>,
     bits: Option<&Num>,
     bytes: Option<&Num>,
+    bit_order: Option<&syn::LitStr>,
 ) -> syn::Result<TokenStream> {
     let crate_ = get_crate_name();
     let endian = endian.map(gen_endian_from_str).transpose()?;
     let bits = bits.map(|n| quote! {::#crate_::ctx::BitSize(#n)});
     let bytes = bytes.map(|n| quote! {::#crate_::ctx::ByteSize(#n)});
+    let bit_order = bit_order.map(gen_bit_order_from_str).transpose()?;
 
     // FIXME: Should be `into_iter` here, see https://github.com/rust-lang/rust/issues/66145.
-    let id_args = [endian.as_ref(), bits.as_ref(), bytes.as_ref()]
-        .iter()
-        .filter_map(|i| *i)
-        .collect::<Vec<_>>();
+    let id_args = [
+        endian.as_ref(),
+        bits.as_ref(),
+        bytes.as_ref(),
+        bit_order.as_ref(),
+    ]
+    .iter()
+    .filter_map(|i| *i)
+    .collect::<Vec<_>>();
 
     match &id_args[..] {
         [arg] => Ok(quote! {#arg}),

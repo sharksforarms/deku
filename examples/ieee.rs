@@ -41,9 +41,9 @@ pub struct Flags {
 pub struct FrameControl {
     #[deku(bits = 4)]
     pub sub_type: u8,
-    pub frame_type: FrameType,
     #[deku(bits = 2)]
     pub protocol_version: u8,
+    pub frame_type: FrameType,
 
     pub flags: Flags,
 }
@@ -91,6 +91,25 @@ pub struct Surrounded {
     five: u8,
     #[deku(bit_order = "lsb", bits = "4")]
     six: u8,
+}
+
+#[derive(Debug, DekuRead, PartialEq)]
+#[deku(bit_order = "lsb")]
+pub struct Enums {
+    right: Choice,
+    left: Choice,
+}
+
+#[derive(Debug, DekuRead, PartialEq)]
+#[deku(
+    bits = "4",
+    type = "u8",
+    bit_order = "bit_order",
+    ctx = "bit_order: deku::ctx::Order"
+)]
+pub enum Choice {
+    Empty = 0x0,
+    Full = 0xf,
 }
 
 fn main() {
@@ -159,5 +178,15 @@ fn main() {
             six: 0xf,
         },
         header
+    );
+
+    let data = vec![0xf0];
+    let control_frame = Enums::try_from(data.as_ref()).unwrap();
+    assert_eq!(
+        control_frame,
+        Enums {
+            right: Choice::Empty,
+            left: Choice::Full,
+        }
     );
 }

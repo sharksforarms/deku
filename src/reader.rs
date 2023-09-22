@@ -153,7 +153,7 @@ impl<'a, R: Read> Reader<'a, R> {
                 // read bits
 
                 // calculate the amount of bytes we need to read to read enough bits
-                let bits_left = amt - self.leftover.len();
+                let mut bits_left = amt - self.leftover.len();
                 let mut bytes_len = bits_left / 8;
                 if (bits_left % 8) != 0 {
                     bytes_len += 1;
@@ -174,18 +174,38 @@ impl<'a, R: Read> Reader<'a, R> {
                 log::trace!("read_bits: read() {:02x?}", read_buf);
 
                 // create bitslice and remove unused bits
+                let mut rest = BitSlice::try_from_slice(read_buf).unwrap();
+
+                #[cfg(feature = "logging")]
+                log::trace!("read_bits: bits:     {}", rest);
+
+                // remove bytes until we get to the last byte, of which
+                // we need to care abount bit-order
+                let mut front_bits = None;
+                if bits_left > 8 {
+                    let (used, more) = rest.split_at(bits_left - (bits_left % 8));
+                    bits_left -= bits_left - (bits_left % 8);
+                    front_bits = Some(used);
+                    rest = more;
+                }
+
                 match order {
                     Order::Lsb0 => {
-                        let rest = BitSlice::try_from_slice(read_buf).unwrap();
                         let (rest, used) = rest.split_at(rest.len() - bits_left);
                         ret.extend_from_bitslice(&used);
                         ret.extend_from_bitslice(&self.leftover);
+                        if let Some(front_bits) = front_bits {
+                            ret.extend_from_bitslice(front_bits);
+                        }
 
                         self.leftover = rest.to_bitvec();
                     }
                     Order::Msb0 => {
-                        let rest = BitSlice::try_from_slice(read_buf).unwrap();
                         let (rest, not_needed) = rest.split_at(bits_left);
+                        // TODO: test
+                        if let Some(front_bits) = front_bits {
+                            ret.extend_from_bitslice(front_bits);
+                        }
                         ret.extend_from_bitslice(&self.leftover);
                         ret.extend_from_bitslice(rest);
 
@@ -244,7 +264,7 @@ impl<'a, R: Read> Reader<'a, R> {
             self.bits_read += amt * 8;
 
             #[cfg(feature = "logging")]
-            log::trace!("read_bytes: returning {buf:02x?}");
+            log::trace!("read_bytes: returning {:02x?}", &buf[..amt]);
 
             Ok(ReaderRet::Bytes)
         } else {

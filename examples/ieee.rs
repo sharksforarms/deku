@@ -112,8 +112,16 @@ pub enum Choice {
     Full = 0xf,
 }
 
+#[derive(Debug, DekuRead, PartialEq)]
+#[deku(bit_order = "lsb")]
+pub struct MoreFirst {
+    #[deku(bits = "13")]
+    offset: u16,
+    #[deku(bits = "3")]
+    t: u8,
+}
+
 fn main() {
-    env_logger::init();
     let data = vec![0x88u8, 0x41];
     let control_frame = FrameControl::try_from(data.as_ref()).unwrap();
     assert_eq!(
@@ -189,4 +197,12 @@ fn main() {
             left: Choice::Full,
         }
     );
+
+    // |offset                 |t  t  t |offset       |
+    // [0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]
+    // 0100_0000b
+    let data = vec![0x40, 0x40];
+    let more_first = MoreFirst::try_from(data.as_ref()).unwrap();
+    //                           bits: 13            3
+    assert_eq!(more_first, MoreFirst { offset: 0x40, t: 2 });
 }

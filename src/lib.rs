@@ -30,10 +30,9 @@ For use in `no_std` environments, `alloc` is the single feature which is require
 # Example
 
 Let's read big-endian data into a struct, with fields containing different sizes,
-modify a value, and write it back.
-
+modify a value, and write it back. In this example we use [from_bytes](DekuContainerRead::from_bytes),
+but we could also use [from_reader](DekuContainerRead::from_reader).
 ```rust
-# use std::io::Cursor;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -46,9 +45,8 @@ struct DekuTest {
     field_c: u16,
 }
 
-let data: &[u8] = &[0b0110_1001, 0xBE, 0xEF];
-let mut cursor = Cursor::new(data);
-let (_amt_read, mut val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
+let data: Vec<u8> = vec![0b0110_1001, 0xBE, 0xEF];
+let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 assert_eq!(DekuTest {
     field_a: 0b0110,
     field_b: 0b1001,
@@ -232,7 +230,7 @@ assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
 
 # `Read` enabled
-Parsers can be used that directly read from a source implementing [Read](crate::no_std_io::Read).
+Parsers can be created that directly read from a source implementing [Read](crate::no_std_io::Read).
 
 The crate [no_std_io] is re-exported for use in `no_std` environments.
 This functions as an alias for [std::io](https://doc.rust-lang.org/stable/std/io/) when not

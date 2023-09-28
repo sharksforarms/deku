@@ -105,15 +105,14 @@ impl<'a, R: Read> Reader<'a, R> {
         }
     }
 
-    /// Used at the beginning of `from_reader`. Will read the `amt` of bits, but
-    /// not increase `bits_read`.
+    /// Used at the beginning of `from_reader`.
+    /// TODO: maybe send into read_bytes() if amt >= 8
     #[inline]
     pub fn skip_bits(&mut self, amt: usize) -> Result<(), DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("skip_bits: {amt}");
         // Save, and keep the leftover bits since the read will most likely be less than a byte
         self.read_bits(amt)?;
-        self.bits_read = 0;
 
         Ok(())
     }

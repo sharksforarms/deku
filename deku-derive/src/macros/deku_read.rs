@@ -71,14 +71,33 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             Ok((__deku_reader.bits_read, __deku_value))
         };
 
+        let from_bytes_body = quote! {
+            use core::convert::TryFrom;
+            let mut __deku_cursor = std::io::Cursor::new(__deku_input.0);
+            let mut __deku_reader = &mut deku::reader::Reader::new(&mut __deku_cursor);
+            if __deku_input.1 != 0 {
+                __deku_reader.skip_bits(__deku_input.1)?;
+            }
+
+            let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
+            let read_whole_byte = (__deku_reader.bits_read % 8) == 0;
+            let idx = if read_whole_byte {
+                __deku_reader.bits_read / 8
+            } else {
+                (__deku_reader.bits_read - (__deku_reader.bits_read % 8)) / 8
+            };
+            Ok(((&__deku_input.0[idx..], __deku_reader.bits_read % 8), __deku_value))
+        };
+
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
-        tokens.extend(emit_from_reader(
+        tokens.extend(emit_container_read(
             &imp,
             &lifetime,
             &ident,
             wher,
             from_reader_body,
+            from_bytes_body,
         ));
     }
 
@@ -310,14 +329,33 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             Ok((__deku_reader.bits_read, __deku_value))
         };
 
+        let from_bytes_body = quote! {
+            use core::convert::TryFrom;
+            let mut __deku_cursor = std::io::Cursor::new(__deku_input.0);
+            let mut __deku_reader = &mut deku::reader::Reader::new(&mut __deku_cursor);
+            if __deku_input.1 != 0 {
+                __deku_reader.skip_bits(__deku_input.1)?;
+            }
+
+            let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
+            let read_whole_byte = (__deku_reader.bits_read % 8) == 0;
+            let idx = if read_whole_byte {
+                __deku_reader.bits_read / 8
+            } else {
+                (__deku_reader.bits_read - (__deku_reader.bits_read % 8)) / 8
+            };
+            Ok(((&__deku_input.0[idx..], __deku_reader.bits_read % 8), __deku_value))
+        };
+
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
-        tokens.extend(emit_from_reader(
+        tokens.extend(emit_container_read(
             &imp,
             &lifetime,
             &ident,
             wher,
             from_reader_body,
+            from_bytes_body,
         ));
     }
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
@@ -730,20 +768,26 @@ fn emit_field_read(
     Ok((field_ident, field_read))
 }
 
-/// emit `from_reader()` for struct/enum
-pub fn emit_from_reader(
+/// emit `from_reader()` and `from_bytes()` for struct/enum
+pub fn emit_container_read(
     imp: &syn::ImplGenerics,
     lifetime: &TokenStream,
     ident: &TokenStream,
     wher: Option<&syn::WhereClause>,
-    body: TokenStream,
+    from_reader_body: TokenStream,
+    from_bytes_body: TokenStream,
 ) -> TokenStream {
     let crate_ = super::get_crate_name();
     quote! {
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
             fn from_reader<'a, R: ::#crate_::no_std_io::Read>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
-                #body
+                #from_reader_body
+            }
+
+            #[allow(non_snake_case)]
+            fn from_bytes(__deku_input: (&#lifetime [u8], usize)) -> core::result::Result<((&#lifetime [u8], usize), Self), ::#crate_::DekuError> {
+                #from_bytes_body
             }
         }
     }

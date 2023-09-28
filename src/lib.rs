@@ -366,10 +366,10 @@ pub trait DekuReader<'a, Ctx = ()> {
 /// doesn't need any context information.
 pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     /// Construct type from Reader implementing [`no_std_io::Read`].
-    /// * **input** - Input given as data and bit offset
+    /// * **input** - Input given as "Reader" and bit offset
     ///
     /// # Returns
-    /// amount of bits read after parsing in addition to Self.
+    /// (amount of total bits read, Self)
     ///
     /// [BufRead]: std::io::BufRead
     ///
@@ -392,6 +392,14 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     fn from_reader<R: no_std_io::Read>(
         input: (&'a mut R, usize),
     ) -> Result<(usize, Self), DekuError>
+    where
+        Self: Sized;
+
+    /// Read bytes and construct type
+    /// * **input** - Input given as data and bit offset
+    ///
+    /// Returns the remaining bytes and bit offset after parsing in addition to Self.
+    fn from_bytes(input: (&'a [u8], usize)) -> Result<((&'a [u8], usize), Self), DekuError>
     where
         Self: Sized;
 }

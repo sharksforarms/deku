@@ -331,7 +331,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         let from_bytes_body = quote! {
             use core::convert::TryFrom;
-            let mut __deku_cursor = std::io::Cursor::new(__deku_input.0);
+            let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
             let mut __deku_reader = &mut deku::reader::Reader::new(&mut __deku_cursor);
             if __deku_input.1 != 0 {
                 __deku_reader.skip_bits(__deku_input.1)?;

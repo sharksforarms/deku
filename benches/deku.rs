@@ -7,8 +7,10 @@ use deku::prelude::*;
 struct DekuBits {
     #[deku(bits = "1")]
     data_01: u8,
-    #[deku(bits = "7")]
+    #[deku(bits = "2")]
     data_02: u8,
+    #[deku(bits = "5")]
+    data_03: u8,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -98,7 +100,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             deku_write_bits(black_box(&DekuBits {
                 data_01: 0x0f,
-                data_02: 0x01,
+                data_02: 0x00,
+                data_03: 0x01,
             }))
         })
     });

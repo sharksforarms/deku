@@ -3,34 +3,25 @@
 ## [Unreleased]
 
 ## Changes
-[#352](https://github.com/sharksforarms/deku/pull/352) replaced the byte slice interface with new interfaces depending on `io::Read`.
-This brings massive performance and usability improvements.
-- `from_bytes(..)` was replaced with `from_reader(..)`:
+[#352](https://github.com/sharksforarms/deku/pull/352) added a new function `from_reader` that uses `io::Read`.
+`io::Read` is also now used internally, bringing massive performance and usability improvements.
 
-old:
+### New `from_reader`
 ```rust
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-struct TestDeku(#[deku(bits = 4)] u8);
+use std::io::{Seek, SeekFrom, Read};
+use std::fs::File;
+use deku::prelude::*;
 
-let test_data: Vec<u8> = [0b0110_0110u8, 0b0101_1010u8].to_vec();
+#[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+#[deku(endian = "big")]
+struct EcHdr {
+    magic: [u8; 4],
+    version: u8,
+    padding1: [u8; 3],
+}
 
-let ((rest, i), ret_read) = TestDeku::from_bytes((&test_data, 0)).unwrap();
-assert_eq!(TestDeku(0b0110), ret_read);
-assert_eq!(2, rest.len());
-assert_eq!(4, i);
-```
-
-new:
-```rust
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-struct TestDeku(#[deku(bits = 4)] u8);
-
-let test_data: Vec<u8> = [0b0110_0110u8, 0b0101_1010u8].to_vec();
-let mut c = std::io::Cursor::new(test_data);
-
-let (amt_read, ret_read) = TestDeku::from_reader((&mut c, 0)).unwrap();
-assert_eq!(TestDeku(0b0110), ret_read);
-assert_eq!(amt_read, 4);
+let mut file = File::options().read(true).open("file").unwrap();
+let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
 ```
 
 - The more internal (with context) `read(..)` was replaced with `from_reader_with_ctx(..)`.

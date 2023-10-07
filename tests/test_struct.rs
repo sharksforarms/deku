@@ -113,6 +113,7 @@ fn test_named_struct() {
         pub vec_len: u8,
         #[deku(count = "vec_len")]
         pub vec_data: Vec<u8>,
+        pub rest: u8,
     }
 
     let test_data: Vec<u8> = [
@@ -128,6 +129,7 @@ fn test_named_struct() {
         0x02,
         0xBE,
         0xEF,
+        0xFF,
     ]
     .to_vec();
 
@@ -148,7 +150,8 @@ fn test_named_struct() {
                 }
             },
             vec_len: 0x02,
-            vec_data: vec![0xBE, 0xEF]
+            vec_data: vec![0xBE, 0xEF],
+            rest: 0xFF
         },
         ret_read
     );

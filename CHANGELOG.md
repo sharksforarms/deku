@@ -25,7 +25,9 @@ let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
 ```
 
 - The more internal (with context) `read(..)` was replaced with `from_reader_with_ctx(..)`.
-Now unused variables `deku::input`, `deku::input_bits`, and `deku::rest` were removed. `deku::reader` is the replacement.
+With the switch to internal streaming, the variables `deku::input`, `deku::input_bits`, and `deku::rest` are now not possible and were removed.
+`deku::reader` is a replacement for some of the functionality.
+See [examples/deku_input.rs](examples/deku_input.rs) for a new example of caching all reads.
 
 old:
 ```rust

@@ -80,16 +80,15 @@ struct DekuHeader(u8);
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuData(u16);
 
-let data: &[u8] = &[0xAA, 0xEF, 0xBE];
-let mut cursor = Cursor::new(data);
-let (_amt_read, mut val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
+let data: Vec<u8> = vec![0xAA, 0xEF, 0xBE];
+let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 assert_eq!(DekuTest {
     header: DekuHeader(0xAA),
     data: DekuData(0xBEEF),
 }, val);
 
 let data_out = val.to_bytes().unwrap();
-assert_eq!(data, &*data_out);
+assert_eq!(data, data_out);
 ```
 
 # Vec
@@ -116,9 +115,8 @@ struct DekuTest {
     data: Vec<u8>,
 }
 
-let data = vec![0x02, 0xBE, 0xEF, 0xFF, 0xFF];
-let mut cursor = Cursor::new(data);
-let (_amt_read, mut val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
+let data: Vec<u8> = vec![0x02, 0xBE, 0xEF, 0xFF, 0xFF];
+let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 assert_eq!(DekuTest {
     count: 0x02,
     data: vec![0xBE, 0xEF]

@@ -30,8 +30,6 @@ no_std:
 deku = { version = "0.16", default-features = false, features = ["alloc"] }
 ```
 
-*Compiler support: requires rustc 1.65+*
-
 ## Example
 
 See [documentation](https://docs.rs/deku) or
@@ -53,9 +51,8 @@ struct DekuTest {
 }
 
 fn main() {
-    let data: &[u8] = &[0b0110_1001, 0xBE, 0xEF];
-    let mut cursor = Cursor::new(data);
-    let (_amt_read, mut val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
+    let data: Vec<u8> = vec![0b0110_1001, 0xBE, 0xEF];
+    let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
     assert_eq!(DekuTest {
         field_a: 0b0110,
         field_b: 0b1001,

@@ -19,7 +19,7 @@ fn test_pad_bits_after() {
     assert_eq!(
         TestStruct {
             field_a: 0b10,
-            field_b: 0b0110,
+            field_b: 0b0110
         },
         ret_read
     );

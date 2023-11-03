@@ -4,6 +4,15 @@
 use core::marker::PhantomData;
 use core::str::FromStr;
 
+/// Bit numbering
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Order {
+    /// Most significant bit
+    Msb0,
+    /// least significant bit
+    Lsb0,
+}
+
 /// An endian
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Endian {

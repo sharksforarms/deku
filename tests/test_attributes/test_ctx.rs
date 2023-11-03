@@ -230,7 +230,7 @@ fn test_ctx_default_struct() {
     )
     .unwrap();
     assert_eq!(expected, ret_read);
-    let mut ret_write = bitvec![u8, Msb0;];
+    let _ret_write = bitvec![u8, Msb0;];
     let mut out_buf = vec![];
     let mut writer = Writer::new(&mut out_buf);
     ret_read.to_writer(&mut writer, (1, 2)).unwrap();

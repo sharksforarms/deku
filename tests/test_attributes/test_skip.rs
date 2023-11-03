@@ -49,7 +49,7 @@ fn test_skip_default() {
         TestStruct {
             field_a: 0x01,
             field_b: 0x05,
-            field_c: 0x02,
+            field_c: 0x02
         },
         ret_read
     );
@@ -90,7 +90,7 @@ fn test_skip_cond() {
     assert_eq!(
         TestStruct {
             field_a: 0x02,
-            field_b: 0x03,
+            field_b: 0x03
         },
         ret_read
     );

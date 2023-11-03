@@ -148,7 +148,7 @@ fn test_regression_292() {
         Reader {
             field1: 0,
             field2: 0xff,
-            field3: 0,
+            field3: 0
         }
     );
 
@@ -170,7 +170,7 @@ fn test_regression_292() {
         ReaderBits {
             field1: 0,
             field2: 0xff,
-            field3: 0,
+            field3: 0
         }
     );
 
@@ -190,7 +190,7 @@ fn test_regression_292() {
         ReaderByteNoEndian {
             field1: 0,
             field2: 0xff,
-            field3: 0,
+            field3: 0
         }
     );
 
@@ -208,7 +208,7 @@ fn test_regression_292() {
             .1,
         ReaderBitPadding {
             field2: 0xff,
-            field3: 0,
+            field3: 0
         }
     );
 
@@ -229,7 +229,7 @@ fn test_regression_292() {
         ReaderBitPadding1 {
             field1: 0,
             field2: 0xff,
-            field3: 0,
+            field3: 0
         }
     );
 
@@ -252,7 +252,7 @@ fn test_regression_292() {
         ReaderTwo {
             field1: 0b11,
             field2: 0,
-            field3: 0b111111,
+            field3: 0b111111
         }
     );
 
@@ -275,7 +275,7 @@ fn test_regression_292() {
         ReaderU16Le {
             field1: 0b11,
             field2: 0,
-            field3: 0b111111,
+            field3: 0b111111
         }
     );
 
@@ -298,7 +298,7 @@ fn test_regression_292() {
         ReaderU16Be {
             field1: 0b11,
             field2: 0,
-            field3: 0b111111,
+            field3: 0b111111
         }
     );
 
@@ -321,7 +321,7 @@ fn test_regression_292() {
         ReaderI16Le {
             field1: -0b01,
             field2: 1,
-            field3: -0b011111,
+            field3: -0b011111
         }
     );
 
@@ -344,7 +344,7 @@ fn test_regression_292() {
         ReaderI16Be {
             field1: -0b01,
             field2: 1,
-            field3: -0b011111,
+            field3: -0b011111
         }
     );
 }

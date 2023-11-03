@@ -42,7 +42,7 @@ mod test_slice {
         assert_eq!(
             TestStruct {
                 count: 0x02,
-                data: test_data[1..].to_vec(),
+                data: test_data[1..].to_vec()
             },
             ret_read
         );

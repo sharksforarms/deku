@@ -18,7 +18,7 @@ fn test_cond_deku() {
     assert_eq!(
         TestStruct {
             field_a: 0x01,
-            field_b: Some(0x02),
+            field_b: Some(0x02)
         },
         ret_read
     );

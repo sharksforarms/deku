@@ -25,7 +25,7 @@ fn test_pad_bits_before_and_pad_bytes_before() {
     assert_eq!(
         TestStruct {
             field_a: 0b10,
-            field_b: 0xbb,
+            field_b: 0xbb
         },
         ret_read
     );
@@ -50,7 +50,7 @@ fn test_pad_bits_after_and_pad_bytes_after() {
     assert_eq!(
         TestStruct {
             field_a: 0b10,
-            field_b: 0xbb,
+            field_b: 0xbb
         },
         ret_read
     );

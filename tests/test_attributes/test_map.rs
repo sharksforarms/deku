@@ -24,7 +24,7 @@ fn test_map() {
     assert_eq!(
         TestStruct {
             field_a: "1".to_string(),
-            field_b: "2".to_string(),
+            field_b: "2".to_string()
         },
         ret_read
     );

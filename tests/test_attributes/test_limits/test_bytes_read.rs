@@ -19,7 +19,7 @@ mod test_slice {
         let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
         assert_eq!(
             TestStruct {
-                data: test_data.to_vec(),
+                data: test_data.to_vec()
             },
             ret_read
         );

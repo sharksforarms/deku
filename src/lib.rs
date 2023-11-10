@@ -261,6 +261,28 @@ pub struct EncodedString {
 }
 ```
 
+# Debugging decoders with the `logging` feature.
+
+If you are having trouble understanding what causes a Deku parse error, you may find the `logging`
+feature useful.
+
+To use it, you will need to:
+ - enable the `logging` Cargo feature for your Deku dependency
+ - import the `log` crate and a compatible logging library
+
+For example, to log with `env_logger`, the dependencies in your `Cargo.toml` might look like:
+
+```
+deku = { version = "*", features = ["logging"] }
+log = "*"
+env_logger = "*"
+```
+
+Then you'd call `env_logger::init()` or `env_logger::try_init()` prior to doing Deku decoding.
+
+Deku uses the `trace` logging level, so if you run your application with `RUST_LOG=trace` in your
+environment, you will see logging messages as Deku does its deserialising.
+
 */
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]

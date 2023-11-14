@@ -196,10 +196,10 @@ impl<'a, R: Read> Reader<'a, R> {
                     Order::Lsb0 => {
                         let (rest, used) = rest.split_at(rest.len() - bits_left);
                         ret.extend_from_bitslice(used);
-                        ret.extend_from_bitslice(&self.leftover);
                         if let Some(front_bits) = front_bits {
                             ret.extend_from_bitslice(front_bits);
                         }
+                        ret.extend_from_bitslice(&self.leftover);
 
                         self.leftover = rest.to_bitvec();
                     }

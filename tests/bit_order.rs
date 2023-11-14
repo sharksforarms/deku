@@ -339,3 +339,63 @@ fn test_bit_order_more_first_be() {
     let bytes = more_first.to_bytes().unwrap();
     assert_eq_hex!(bytes, data);
 }
+
+#[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+#[deku(endian = "little", bit_order = "lsb")]
+pub struct BitOrderLittle {
+    #[deku(bits = 4)]
+    value_a: u16,
+
+    #[deku(bits = 11)]
+    value_b: u16,
+
+    #[deku(bits = 13)]
+    value_c: u16,
+
+    #[deku(bits = 10)]
+    value_d: u16,
+
+    #[deku(bits = 8)]
+    value_e: u16,
+
+    #[deku(bits = 9)]
+    value_f: u16,
+
+    #[deku(bits = 9)]
+    value_g: u16,
+
+    #[deku(bits = 8)]
+    value_h: u16,
+
+    #[deku(bits = 7)]
+    value_i: u16,
+
+    #[deku(bits = 9)]
+    value_j: u16,
+}
+
+#[test]
+fn test_bit_order_little() {
+    let data = vec![
+        0x8B, 0xF3, 0xDC, 0x7B, 0x94, 0x38, 0x98, 0x42, 0x78, 0xB8, 0x5E,
+    ];
+    let bit_order_little = BitOrderLittle::try_from(data.as_ref()).unwrap();
+    assert_eq!(
+        bit_order_little,
+        BitOrderLittle {
+            value_a: 11,
+            value_b: 1848,
+            value_c: 6073,
+            value_d: 327,
+            value_e: 226,
+            value_f: 96,
+            value_g: 133,
+            value_h: 120,
+            value_i: 56,
+            value_j: 189,
+        }
+    );
+
+    let bytes = bit_order_little.to_bytes().unwrap();
+    assert_eq_hex!(bytes, data);
+}

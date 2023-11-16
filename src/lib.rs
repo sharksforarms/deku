@@ -272,7 +272,7 @@ To use it, you will need to:
 
 For example, to log with `env_logger`, the dependencies in your `Cargo.toml` might look like:
 
-```
+```text
 deku = { version = "*", features = ["logging"] }
 log = "*"
 env_logger = "*"

@@ -117,7 +117,7 @@ fn gen_internal_field_ident(ident: &TokenStream) -> TokenStream {
     // Concat token: https://github.com/rust-lang/rust/issues/29599
     let span = ident.span();
     let s = ident.to_string();
-    let mut name = "__deku_".to_owned();
+    let mut name = "__deku___".to_owned();
     // If its a raw identifier, we must remove 'r#'
     name.push_str(s.strip_prefix("r#").unwrap_or(&s));
 

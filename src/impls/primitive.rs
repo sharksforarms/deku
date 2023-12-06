@@ -334,7 +334,7 @@ macro_rules! ImplDekuWrite {
 
                 if bit_size > input_bits.len() {
                     return Err(DekuError::InvalidParam(format!(
-                        "bit size {} is larger then input {}",
+                        "bit size {} is larger than input {}",
                         bit_size,
                         input_bits.len()
                     )));
@@ -379,7 +379,7 @@ macro_rules! ImplDekuWrite {
 
                 if bit_size > input_bits.len() {
                     return Err(DekuError::InvalidParam(format!(
-                        "bit size {} is larger then input {}",
+                        "bit size {} is larger than input {}",
                         bit_size,
                         input_bits.len()
                     )));
@@ -659,7 +659,7 @@ mod tests {
         case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
         case::bit_size_le_smaller(0x03AB, Endian::Little, Some(10), vec![0xAB, 0b11_000000]),
         case::bit_size_be_smaller(0x03AB, Endian::Big, Some(10), vec![0b11_1010_10, 0b11_000000]),
-        #[should_panic(expected = "InvalidParam(\"bit size 100 is larger then input 32\")")]
+        #[should_panic(expected = "InvalidParam(\"bit size 100 is larger than input 32\")")]
         case::bit_size_le_bigger(0x03AB, Endian::Little, Some(100), vec![0xAB, 0b11_000000]),
     )]
     fn test_bit_write(input: u32, endian: Endian, bit_size: Option<usize>, expected: Vec<u8>) {

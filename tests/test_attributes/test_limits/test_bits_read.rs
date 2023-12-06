@@ -52,7 +52,7 @@ mod test_slice {
         assert_eq!(
             TestStruct {
                 bits: 16,
-                data: test_data[1..].to_vec(),
+                data: test_data[1..].to_vec()
             },
             ret_read
         );

@@ -18,7 +18,7 @@ fn test_pad_bytes_before() {
     assert_eq!(
         TestStruct {
             field_a: 0xaa,
-            field_b: 0xdd,
+            field_b: 0xdd
         },
         ret_read
     );

@@ -1,6 +1,5 @@
 use std::convert::TryInto;
 
-use deku::bitvec::{BitVec, Msb0};
 use deku::ctx::BitSize;
 use deku::writer::Writer;
 use deku::{prelude::*, DekuWriter};

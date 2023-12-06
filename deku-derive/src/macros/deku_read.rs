@@ -517,9 +517,11 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
             if (__deku_pad % 8) == 0 {
                 let bytes_read = __deku_pad / 8;
                 let mut buf = vec![0; bytes_read];
-                let _ = __deku_reader.read_bytes(bytes_read, &mut buf)?;
+                // TODO: use skip_bytes, or Seek in the future?
+                let _ = __deku_reader.read_bytes(bytes_read, &mut buf, ::#crate_::ctx::Order::Msb0)?;
             } else {
-                let _ = __deku_reader.read_bits(__deku_pad)?;
+                // TODO: use skip_bits, or Seek in the future?
+                let _ = __deku_reader.read_bits(__deku_pad, ::#crate_::ctx::Order::Msb0)?;
             }
         }
     }
@@ -536,6 +538,7 @@ fn emit_field_read(
     let field_type = &f.ty;
 
     let field_endian = f.endian.as_ref().or(input.endian.as_ref());
+    let field_bit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());
 
     let field_reader = &f.reader;
 
@@ -617,6 +620,7 @@ fn emit_field_read(
             f.bits.as_ref(),
             f.bytes.as_ref(),
             f.ctx.as_ref(),
+            field_bit_order,
         )?;
 
         // The __deku_reader limiting options are special, we need to generate `(limit, (other, ..))` for them.

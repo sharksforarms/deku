@@ -418,6 +418,7 @@ fn emit_field_write(
 ) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
     let field_endian = f.endian.as_ref().or(input.endian.as_ref());
+    let field_bit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());
 
     // fields to check usage of bit/byte offset
     let field_check_vars = [
@@ -483,6 +484,7 @@ fn emit_field_write(
             f.bits.as_ref(),
             f.bytes.as_ref(),
             f.ctx.as_ref(),
+            field_bit_order,
         )?;
 
         if f.temp {

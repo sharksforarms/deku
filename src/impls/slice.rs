@@ -28,7 +28,7 @@ where
         let read_idx = unsafe { rest.as_bitptr().offset_from(input.as_bitptr()) } as usize;
         value = input[..read_idx].domain().region().unwrap().1;
 
-        if predicate(read_idx, &val) {
+        if predicate(read_idx, &val) || rest.is_empty() {
             break;
         }
     }

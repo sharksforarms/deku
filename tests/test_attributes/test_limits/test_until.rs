@@ -133,4 +133,17 @@ mod test_vec {
 
         let _ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
     }
+
+    #[test]
+    fn test_until_empty() {
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        struct TestStruct {
+            #[deku(until = "|v: &u8| *v == 0xDD")]
+            data: Vec<u8>,
+        }
+
+        let test_data: Vec<u8> = [0xCC, 0xAA, 0xBB].to_vec();
+
+        let _ret_read = TestStruct::try_from(test_data.as_ref()).unwrap();
+    }
 }

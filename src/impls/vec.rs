@@ -36,7 +36,7 @@ fn read_vec_with_predicate<
         if predicate(
             unsafe { rest.as_bitptr().offset_from(input.as_bitptr()) } as usize,
             res.last().unwrap(),
-        ) {
+        ) || rest.is_empty() {
             break;
         }
     }

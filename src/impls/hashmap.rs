@@ -29,7 +29,7 @@ fn read_hashmap_with_predicate<
     let mut rest = input;
     let mut found_predicate = false;
 
-    while !found_predicate {
+    while !found_predicate && !rest.is_empty(){
         let (new_rest, kv) = <(K, V)>::read(rest, ctx)?;
         found_predicate = predicate(
             unsafe { new_rest.as_bitptr().offset_from(input.as_bitptr()) } as usize,

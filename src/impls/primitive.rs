@@ -60,7 +60,7 @@ where
 
 // specialize u8 for ByteSize
 impl DekuRead<'_, (Endian, ByteSize)> for u8 {
-    #[inline]
+    #[inline(always)]
     fn read(
         input: &BitSlice<u8, Msb0>,
         (_, _): (Endian, ByteSize),
@@ -74,7 +74,7 @@ impl DekuRead<'_, (Endian, ByteSize)> for u8 {
 }
 
 impl DekuReader<'_, (Endian, ByteSize)> for u8 {
-    #[inline]
+    #[inline(always)]
     fn from_reader_with_ctx<R: Read>(
         reader: &mut Reader<R>,
         (endian, size): (Endian, ByteSize),
@@ -98,7 +98,7 @@ impl DekuReader<'_, (Endian, ByteSize)> for u8 {
 macro_rules! ImplDekuReadBits {
     ($typ:ty, $inner:ty) => {
         impl DekuRead<'_, (Endian, BitSize)> for $typ {
-            #[inline]
+            #[inline(always)]
             fn read(
                 input: &BitSlice<u8, Msb0>,
                 (endian, size): (Endian, BitSize),
@@ -174,7 +174,7 @@ macro_rules! ImplDekuReadBits {
         }
 
         impl DekuReader<'_, (Endian, BitSize)> for $typ {
-            #[inline]
+            #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
                 (endian, size): (Endian, BitSize),
@@ -200,7 +200,7 @@ macro_rules! ImplDekuReadBits {
 macro_rules! ImplDekuReadBytes {
     ($typ:ty, $inner:ty) => {
         impl DekuRead<'_, (Endian, ByteSize)> for $typ {
-            #[inline]
+            #[inline(always)]
             fn read(
                 input: &BitSlice<u8, Msb0>,
                 (endian, size): (Endian, ByteSize),
@@ -223,7 +223,7 @@ macro_rules! ImplDekuReadBytes {
         }
 
         impl DekuReader<'_, (Endian, ByteSize)> for $typ {
-            #[inline]
+            #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
                 (endian, size): (Endian, ByteSize),
@@ -267,7 +267,7 @@ macro_rules! ImplDekuReadBytes {
 macro_rules! ImplDekuReadSignExtend {
     ($typ:ty, $inner:ty) => {
         impl DekuRead<'_, (Endian, ByteSize)> for $typ {
-            #[inline]
+            #[inline(always)]
             fn read(
                 input: &BitSlice<u8, Msb0>,
                 (endian, size): (Endian, ByteSize),
@@ -284,7 +284,7 @@ macro_rules! ImplDekuReadSignExtend {
         }
 
         impl DekuReader<'_, (Endian, ByteSize)> for $typ {
-            #[inline]
+            #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
                 (endian, size): (Endian, ByteSize),
@@ -317,7 +317,7 @@ macro_rules! ImplDekuReadSignExtend {
         }
 
         impl DekuRead<'_, (Endian, BitSize)> for $typ {
-            #[inline]
+            #[inline(always)]
             fn read(
                 input: &BitSlice<u8, Msb0>,
                 (endian, size): (Endian, BitSize),
@@ -334,7 +334,7 @@ macro_rules! ImplDekuReadSignExtend {
         }
 
         impl DekuReader<'_, (Endian, BitSize)> for $typ {
-            #[inline]
+            #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
                 (endian, size): (Endian, BitSize),
@@ -363,7 +363,7 @@ macro_rules! ForwardDekuRead {
     ($typ:ty) => {
         // Only have `endian`, set `bit_size` to `Size::of::<Type>()`
         impl DekuReader<'_, Endian> for $typ {
-            #[inline]
+            #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
                 endian: Endian,
@@ -376,7 +376,7 @@ macro_rules! ForwardDekuRead {
 
         // Only have `byte_size`, set `endian` to `Endian::default`.
         impl DekuReader<'_, ByteSize> for $typ {
-            #[inline]
+            #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
                 byte_size: ByteSize,
@@ -390,7 +390,7 @@ macro_rules! ForwardDekuRead {
 
         //// Only have `bit_size`, set `endian` to `Endian::default`.
         impl DekuReader<'_, BitSize> for $typ {
-            #[inline]
+            #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
                 bit_size: BitSize,
@@ -406,7 +406,7 @@ macro_rules! ForwardDekuRead {
         }
 
         impl DekuReader<'_> for $typ {
-            #[inline]
+            #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
                 _: (),
@@ -420,7 +420,7 @@ macro_rules! ForwardDekuRead {
 macro_rules! ImplDekuWrite {
     ($typ:ty) => {
         impl DekuWriter<(Endian, BitSize)> for $typ {
-            #[inline]
+            #[inline(always)]
             fn to_writer<W: Write>(
                 &self,
                 writer: &mut Writer<W>,
@@ -466,7 +466,7 @@ macro_rules! ImplDekuWrite {
         }
 
         impl DekuWriter<(Endian, ByteSize)> for $typ {
-            #[inline]
+            #[inline(always)]
             fn to_writer<W: Write>(
                 &self,
                 writer: &mut Writer<W>,
@@ -517,7 +517,7 @@ macro_rules! ImplDekuWrite {
 macro_rules! ForwardDekuWrite {
     ($typ:ty) => {
         impl DekuWriter<BitSize> for $typ {
-            #[inline]
+            #[inline(always)]
             fn to_writer<W: Write>(
                 &self,
                 writer: &mut Writer<W>,
@@ -528,7 +528,7 @@ macro_rules! ForwardDekuWrite {
         }
 
         impl DekuWriter<ByteSize> for $typ {
-            #[inline]
+            #[inline(always)]
             fn to_writer<W: Write>(
                 &self,
                 writer: &mut Writer<W>,
@@ -539,7 +539,7 @@ macro_rules! ForwardDekuWrite {
         }
 
         impl DekuWriter for $typ {
-            #[inline]
+            #[inline(always)]
             fn to_writer<W: Write>(&self, writer: &mut Writer<W>, _: ()) -> Result<(), DekuError> {
                 <$typ>::to_writer(self, writer, Endian::default())
             }

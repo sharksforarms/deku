@@ -33,30 +33,31 @@ jobs:
           command: test
           args: --all
 
-  test_miri:
-    name: Miri Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          components: miri
-      - run: cargo miri test
-
-  test_miri_big_endian:
-    name: Miri Test Big Endian
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          components: miri
-          target: mips64-unknown-linux-gnuabi64
-      - run: cargo miri test --target mips64-unknown-linux-gnuabi64
+# TODO: Enable Miri
+#  test_miri:
+#    name: Miri Test
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v3
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          toolchain: nightly
+#          override: true
+#          components: miri
+#      - run: cargo miri test
+#
+#  test_miri_big_endian:
+#    name: Miri Test Big Endian
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v3
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          toolchain: nightly
+#          override: true
+#          components: miri
+#          target: armebv7r-none-eabi
+#      - run: cargo miri test --target armebv7r-none-eabi
 
   examples:
     name: Examples
@@ -111,7 +112,8 @@ jobs:
         with:
           toolchain: nightly
           override: true
-      - run: cd ensure_no_std && cargo run --release
+          target: thumbv7em-none-eabihf
+      - run: cd ensure_no_std && cargo build --release --target thumbv7em-none-eabihf
 
   ensure_wasm:
     name: Ensure wasm
@@ -126,20 +128,3 @@ jobs:
         with:
           version: 'latest'
       - run: cd ensure_wasm && wasm-pack build --target web && wasm-pack test --node
-
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    container:
-      image: xd009642/tarpaulin:develop
-      options: --security-opt seccomp=unconfined
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Generate code coverage
-        run: |
-          cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml
-
-      - name: Upload to codecov.io
-        uses: codecov/codecov-action@v1

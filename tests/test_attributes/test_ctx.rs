@@ -1,7 +1,10 @@
-use bitvec::bitvec;
-use deku::bitvec::{BitView, Msb0};
-use deku::prelude::*;
 use std::convert::{TryFrom, TryInto};
+use std::io::Cursor;
+
+use bitvec::bitvec;
+use deku::bitvec::Msb0;
+use deku::prelude::*;
+use deku::reader::Reader;
 
 /// General smoke tests for ctx
 /// TODO: These should be divided into smaller units
@@ -12,7 +15,7 @@ fn test_ctx_struct() {
     #[deku(ctx = "a: u8, b: u8")]
     struct SubTypeNeedCtx {
         #[deku(
-            reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c) as usize))})(deku::rest)",
+            reader = "(u8::from_reader_with_ctx(deku::reader,()).map(|c|(a+b+c) as usize))",
             writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(self.i as u8)"
         )]
         i: usize,
@@ -28,7 +31,7 @@ fn test_ctx_struct() {
 
     let test_data = [0x01_u8, 0x02, 0x03];
 
-    let ret_read = FieldLevelCtxStruct::try_from(&test_data[..]).unwrap();
+    let ret_read = FieldLevelCtxStruct::try_from(test_data.as_slice()).unwrap();
     assert_eq!(
         ret_read,
         FieldLevelCtxStruct {
@@ -52,7 +55,7 @@ fn test_top_level_ctx_enum() {
         #[deku(id = "1")]
         VariantA(
             #[deku(
-                reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})(deku::rest)",
+                reader = "(u8::from_reader_with_ctx(deku::reader,()).map(|c|(a+b+c)))",
                 writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
             )]
             u8,
@@ -60,8 +63,11 @@ fn test_top_level_ctx_enum() {
     }
 
     let test_data = [0x01_u8, 0x03];
-    let (rest, ret_read) = TopLevelCtxEnum::read(test_data.view_bits(), (1, 2)).unwrap();
-    assert!(rest.is_empty());
+    let ret_read = TopLevelCtxEnum::from_reader_with_ctx(
+        &mut Reader::new(&mut Cursor::new(test_data)),
+        (1, 2),
+    )
+    .unwrap();
     assert_eq!(ret_read, TopLevelCtxEnum::VariantA(0x06));
 
     let mut ret_write = bitvec![u8, Msb0;];
@@ -77,7 +83,7 @@ fn test_top_level_ctx_enum_default() {
         #[deku(id = "1")]
         VariantA(
             #[deku(
-                reader = "(|rest|{u8::read(rest,()).map(|(slice,c)|(slice,(a+b+c)))})(deku::rest)",
+                reader = "(u8::from_reader_with_ctx(deku::reader, ()).map(|c|(a+b+c)))",
                 writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
             )]
             u8,
@@ -88,14 +94,17 @@ fn test_top_level_ctx_enum_default() {
     let test_data = [0x01_u8, 0x03];
 
     // Use default
-    let ret_read = TopLevelCtxEnumDefault::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TopLevelCtxEnumDefault::try_from(test_data.as_slice()).unwrap();
     assert_eq!(expected, ret_read);
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(test_data.to_vec(), ret_write);
 
     // Use context
-    let (rest, ret_read) = TopLevelCtxEnumDefault::read(test_data.view_bits(), (1, 2)).unwrap();
-    assert!(rest.is_empty());
+    let ret_read = TopLevelCtxEnumDefault::from_reader_with_ctx(
+        &mut Reader::new(&mut Cursor::new(test_data)),
+        (1, 2),
+    )
+    .unwrap();
     assert_eq!(ret_read, TopLevelCtxEnumDefault::VariantA(0x06));
     let mut ret_write = bitvec![u8, Msb0;];
     ret_read.write(&mut ret_write, (1, 2)).unwrap();
@@ -137,7 +146,7 @@ fn test_struct_enum_ctx_id() {
 
     // VarA
     let test_data = [0x01_u8, 0x01, 0xab, 0xab];
-    let ret_read = StructEnumId::try_from(test_data.as_ref()).unwrap();
+    let ret_read = StructEnumId::try_from(test_data.as_slice()).unwrap();
 
     assert_eq!(
         StructEnumId {
@@ -154,7 +163,7 @@ fn test_struct_enum_ctx_id() {
 
     // VarB
     let test_data = [0x02_u8, 0x02];
-    let ret_read = StructEnumId::try_from(test_data.as_ref()).unwrap();
+    let ret_read = StructEnumId::try_from(test_data.as_slice()).unwrap();
 
     assert_eq!(
         StructEnumId {
@@ -171,7 +180,7 @@ fn test_struct_enum_ctx_id() {
 
     // VarC
     let test_data = [0x02_u8, 0x03, 0xcc];
-    let (_, ret_read) = StructEnumId::from_bytes((test_data.as_ref(), 0)).unwrap();
+    let (_, ret_read) = StructEnumId::from_reader((&mut test_data.as_slice(), 0)).unwrap();
 
     assert_eq!(
         StructEnumId {
@@ -206,14 +215,17 @@ fn test_ctx_default_struct() {
     let test_data = [0xffu8];
 
     // Use default
-    let ret_read = TopLevelCtxStructDefault::try_from(test_data.as_ref()).unwrap();
+    let ret_read = TopLevelCtxStructDefault::try_from(test_data.as_slice()).unwrap();
     assert_eq!(expected, ret_read);
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(ret_write, test_data);
 
     // Use context
-    let (rest, ret_read) = TopLevelCtxStructDefault::read(test_data.view_bits(), (1, 2)).unwrap();
-    assert!(rest.is_empty());
+    let ret_read = TopLevelCtxStructDefault::from_reader_with_ctx(
+        &mut Reader::new(&mut Cursor::new(test_data)),
+        (1, 2),
+    )
+    .unwrap();
     assert_eq!(expected, ret_read);
     let mut ret_write = bitvec![u8, Msb0;];
     ret_read.write(&mut ret_write, (1, 2)).unwrap();
@@ -236,11 +248,11 @@ fn test_enum_endian_ctx() {
     }
 
     let test_data = [0xdeu8, 0xad, 0xbe, 0xef, 0xff];
-    let ret_read = EnumTypeEndian::try_from(test_data.as_ref()).unwrap();
+    let ret_read = EnumTypeEndian::try_from(test_data.as_slice()).unwrap();
 
     assert_eq!(
         EnumTypeEndian {
-            t: EnumTypeEndianCtx::VarA(0xFF)
+            t: EnumTypeEndianCtx::VarA(0xff)
         },
         ret_read
     );

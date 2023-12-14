@@ -9,6 +9,7 @@ keywords = ["deku", "bits", "serialization", "deserialization", "struct"]
 categories = ["encoding", "parsing", "no-std"]
 description = "bit level serialization/deserialization proc-macro for structs"
 readme = "README.md"
+rust-version = "1.65.0"
 
 [lib]
 bench = false
@@ -19,16 +20,16 @@ members = [
 ]
 
 [features]
-default = ["std", "const_generics"]
-std = ["deku_derive/std", "bitvec/std", "alloc"]
+default = ["std"]
+std = ["deku_derive/std", "bitvec/std", "alloc", "no_std_io/std"]
 alloc = ["bitvec/alloc"]
 logging = ["deku_derive/logging", "log"]
-const_generics = []
 
 [dependencies]
 deku_derive = { version = "^0.16.0", path = "deku-derive", default-features = false}
 bitvec = { version = "1.0.1", default-features = false }
 log = { version = "0.4.17", optional = true }
+no_std_io = { version = "0.5.0", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
 rstest = "0.16.0"

@@ -61,7 +61,8 @@ fn issue_224() {
         },
     };
     let bytes = packet.to_bytes().unwrap();
-    let _packet = Packet::from_bytes((&bytes, 0)).unwrap();
+    let mut c = std::io::Cursor::new(bytes);
+    let _packet = Packet::from_reader((&mut c, 0)).unwrap();
 }
 
 // Extra zeroes added when reading fewer bytes than needed to fill a number
@@ -88,8 +89,9 @@ mod issue_282 {
         // the u32 is stored as three bytes in big-endian order
         assert_eq!(zero, 0);
 
-        let data = &[a, b, c, a, b, c];
-        let (_, BitsBytes { bits, bytes }) = BitsBytes::from_bytes((data, 0)).unwrap();
+        let data = [a, b, c, a, b, c];
+        let (_, BitsBytes { bits, bytes }) =
+            BitsBytes::from_reader((&mut data.as_slice(), 0)).unwrap();
 
         assert_eq!(bits, expected);
         assert_eq!(bytes, expected);
@@ -113,8 +115,9 @@ mod issue_282 {
         // the u32 is stored as three bytes in little-endian order
         assert_eq!(zero, 0);
 
-        let data = &[a, b, c, a, b, c];
-        let (_, BitsBytes { bits, bytes }) = BitsBytes::from_bytes((data, 0)).unwrap();
+        let data = [a, b, c, a, b, c];
+        let (_, BitsBytes { bits, bytes }) =
+            BitsBytes::from_reader((&mut data.as_slice(), 0)).unwrap();
 
         assert_eq!(bits, expected);
         assert_eq!(bytes, expected);
@@ -126,11 +129,11 @@ mod issue_282 {
 // https://github.com/sharksforarms/deku/issues/292
 #[test]
 fn test_regression_292() {
-    let test_data: &[u8] = [0x0F, 0xF0].as_ref();
+    let test_data = [0x0f, 0xf0];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
-    struct Container {
+    struct Reader {
         #[deku(bits = 4)]
         field1: u8,
         field2: u8,
@@ -139,8 +142,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        Container::from_bytes((test_data, 0)).unwrap().1,
-        Container {
+        Reader::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
+        Reader {
             field1: 0,
             field2: 0xff,
             field3: 0,
@@ -149,7 +154,7 @@ fn test_regression_292() {
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
-    struct ContainerBits {
+    struct ReaderBits {
         #[deku(bits = 4)]
         field1: u8,
         #[deku(bits = 8)]
@@ -159,8 +164,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBits::from_bytes((test_data, 0)).unwrap().1,
-        ContainerBits {
+        ReaderBits::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
+        ReaderBits {
             field1: 0,
             field2: 0xff,
             field3: 0,
@@ -168,7 +175,7 @@ fn test_regression_292() {
     );
 
     #[derive(Debug, PartialEq, DekuRead)]
-    struct ContainerByteNoEndian {
+    struct ReaderByteNoEndian {
         #[deku(bits = 4)]
         field1: u8,
         field2: u8,
@@ -177,8 +184,10 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerByteNoEndian::from_bytes((test_data, 0)).unwrap().1,
-        ContainerByteNoEndian {
+        ReaderByteNoEndian::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
+        ReaderByteNoEndian {
             field1: 0,
             field2: 0xff,
             field3: 0,
@@ -186,7 +195,7 @@ fn test_regression_292() {
     );
 
     #[derive(Debug, PartialEq, DekuRead)]
-    struct ContainerBitPadding {
+    struct ReaderBitPadding {
         #[deku(pad_bits_before = "4")]
         field2: u8,
         #[deku(bits = 4)]
@@ -194,15 +203,17 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBitPadding::from_bytes((test_data, 0)).unwrap().1,
-        ContainerBitPadding {
+        ReaderBitPadding::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
+        ReaderBitPadding {
             field2: 0xff,
             field3: 0,
         }
     );
 
     #[derive(Debug, PartialEq, DekuRead)]
-    struct ContainerBitPadding1 {
+    struct ReaderBitPadding1 {
         #[deku(bits = 2)]
         field1: u8,
         #[deku(pad_bits_before = "2")]
@@ -212,19 +223,21 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerBitPadding1::from_bytes((test_data, 0)).unwrap().1,
-        ContainerBitPadding1 {
+        ReaderBitPadding1::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
+        ReaderBitPadding1 {
             field1: 0,
             field2: 0xff,
             field3: 0,
         }
     );
 
-    let test_data: &[u8] = [0b11000000, 0b00111111].as_ref();
+    let test_data = [0b11000000, 0b00111111];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
-    struct ContainerTwo {
+    struct ReaderTwo {
         #[deku(bits = 2)]
         field1: u8,
         field2: u8,
@@ -233,19 +246,21 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerTwo::from_bytes((test_data, 0)).unwrap().1,
-        ContainerTwo {
+        ReaderTwo::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
+        ReaderTwo {
             field1: 0b11,
             field2: 0,
             field3: 0b111111,
         }
     );
 
-    let test_data: &[u8] = [0b11000000, 0b00000000, 0b00111111].as_ref();
+    let test_data = [0b11000000, 0b00000000, 0b00111111];
 
     #[derive(Debug, PartialEq, DekuRead)]
     #[deku(endian = "little")]
-    struct ContainerU16 {
+    struct ReaderU16Le {
         #[deku(bits = 2)]
         field1: u8,
         field2: u16,
@@ -254,11 +269,82 @@ fn test_regression_292() {
     }
 
     assert_eq!(
-        ContainerU16::from_bytes((test_data, 0)).unwrap().1,
-        ContainerU16 {
+        ReaderU16Le::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
+        ReaderU16Le {
             field1: 0b11,
             field2: 0,
             field3: 0b111111,
+        }
+    );
+
+    let test_data = [0b11000000, 0b00000000, 0b00111111];
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    #[deku(endian = "big")]
+    struct ReaderU16Be {
+        #[deku(bits = 2)]
+        field1: u8,
+        field2: u16,
+        #[deku(bits = 6)]
+        field3: u8,
+    }
+
+    assert_eq!(
+        ReaderU16Be::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
+        ReaderU16Be {
+            field1: 0b11,
+            field2: 0,
+            field3: 0b111111,
+        }
+    );
+
+    let test_data = [0b11000000, 0b00000000, 0b01100001];
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    #[deku(endian = "big")]
+    struct ReaderI16Le {
+        #[deku(bits = 2)]
+        field1: i8,
+        field2: i16,
+        #[deku(bits = 6)]
+        field3: i8,
+    }
+
+    assert_eq!(
+        ReaderI16Le::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
+        ReaderI16Le {
+            field1: -0b01,
+            field2: 1,
+            field3: -0b011111,
+        }
+    );
+
+    let test_data = [0b11000000, 0b00000000, 0b01100001];
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    #[deku(endian = "big")]
+    struct ReaderI16Be {
+        #[deku(bits = 2)]
+        field1: i8,
+        field2: i16,
+        #[deku(bits = 6)]
+        field3: i8,
+    }
+
+    assert_eq!(
+        ReaderI16Be::from_reader((&mut test_data.as_slice(), 0))
+            .unwrap()
+            .1,
+        ReaderI16Be {
+            field1: -0b01,
+            field2: 1,
+            field3: -0b011111,
         }
     );
 }

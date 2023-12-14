@@ -1,22 +1,22 @@
-use crate::{DekuError, DekuRead, DekuWrite};
-use bitvec::prelude::*;
 use std::borrow::{Borrow, Cow};
 
-impl<'a, T, Ctx> DekuRead<'a, Ctx> for Cow<'a, T>
+use no_std_io::io::Read;
+
+use bitvec::prelude::*;
+
+use crate::{DekuError, DekuReader, DekuWrite};
+
+impl<'a, T, Ctx> DekuReader<'a, Ctx> for Cow<'a, T>
 where
-    T: DekuRead<'a, Ctx> + Clone,
+    T: DekuReader<'a, Ctx> + Clone,
     Ctx: Copy,
 {
-    /// Read a T from input and store as Cow<T>
-    fn read(
-        input: &'a BitSlice<u8, Msb0>,
+    fn from_reader_with_ctx<R: Read>(
+        reader: &mut crate::reader::Reader<R>,
         inner_ctx: Ctx,
-    ) -> Result<(&'a BitSlice<u8, Msb0>, Self), DekuError>
-    where
-        Self: Sized,
-    {
-        let (rest, val) = <T>::read(input, inner_ctx)?;
-        Ok((rest, Cow::Owned(val)))
+    ) -> Result<Self, DekuError> {
+        let val = <T>::from_reader_with_ctx(reader, inner_ctx)?;
+        Ok(Cow::Owned(val))
     }
 }
 
@@ -33,22 +33,23 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::native_endian;
+    use no_std_io::io::Cursor;
     use rstest::rstest;
 
-    #[rstest(input, expected, expected_rest,
+    use super::*;
+    use crate::{native_endian, reader::Reader};
+
+    #[rstest(input, expected,
         case(
             &[0xEF, 0xBE],
             Cow::Owned(native_endian!(0xBEEF_u16)),
-            bits![u8, Msb0;]
         ),
     )]
-    fn test_cow(input: &[u8], expected: Cow<u16>, expected_rest: &BitSlice<u8, Msb0>) {
-        let bit_slice = input.view_bits::<Msb0>();
-        let (rest, res_read) = <Cow<u16>>::read(bit_slice, ()).unwrap();
+    fn test_cow(input: &[u8], expected: Cow<u16>) {
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = <Cow<u16>>::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
-        assert_eq!(expected_rest, rest);
 
         let mut res_write = bitvec![u8, Msb0;];
         res_read.write(&mut res_write, ()).unwrap();

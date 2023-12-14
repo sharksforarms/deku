@@ -1,6 +1,7 @@
-use deku::prelude::*;
+use std::io::Cursor;
+
+use deku::{prelude::*, reader::Reader};
 use hexlit::hex;
-use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
@@ -21,12 +22,16 @@ enum DekuTest {
     Var5 { id: u8 },
     #[deku(id_pat = "&id if id > 6")]
     Var6 { id: u8 },
+    #[deku(id_pat = "_")]
+    VarDefault { id: u8, value: u8 },
 }
 
 fn main() {
     let test_data = hex!("03020102").to_vec();
 
-    let deku_test = DekuTest::try_from(test_data.as_ref()).unwrap();
+    let mut cursor = Cursor::new(&test_data);
+    let mut reader = Reader::new(&mut cursor);
+    let deku_test = DekuTest::from_reader_with_ctx(&mut reader, ()).unwrap();
 
     assert_eq!(
         DekuTest::Var4 {

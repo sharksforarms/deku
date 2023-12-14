@@ -29,7 +29,7 @@ logging = ["deku_derive/logging", "log"]
 deku_derive = { version = "^0.16.0", path = "deku-derive", default-features = false}
 bitvec = { version = "1.0.1", default-features = false }
 log = { version = "0.4.17", optional = true }
-no_std_io = { version = "0.5.0", default-features = false, features = ["alloc"] }
+no_std_io = { version = "0.6.0", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
 rstest = "0.16.0"

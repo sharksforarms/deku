@@ -562,11 +562,20 @@ fn emit_field_write(
         #field_write_func ?;
     };
 
+    let skipping_log = if cfg!(feature = "logging") {
+        quote! {
+            log::trace!("skipping");
+        }
+    } else {
+        quote! {}
+    };
+
     let field_write_tokens = match (f.skip, &f.cond) {
         (true, Some(field_cond)) => {
             // #[deku(skip, cond = "...")] ==> `skip` if `cond`
             quote! {
                 if (#field_cond) {
+                    #skipping_log
                    // skipping, no write
                 } else {
                     #field_write_normal
@@ -576,6 +585,7 @@ fn emit_field_write(
         (true, None) => {
             // #[deku(skip)] ==> `skip`
             quote! {
+                #skipping_log
                 // skipping, no write
             }
         }

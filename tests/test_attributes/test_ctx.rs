@@ -51,7 +51,7 @@ fn test_ctx_struct() {
 #[test]
 fn test_top_level_ctx_enum() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "u8", ctx = "a: u8, b: u8")]
+    #[deku(id_type = "u8", ctx = "a: u8, b: u8")]
     enum TopLevelCtxEnum {
         #[deku(id = "1")]
         VariantA(
@@ -80,7 +80,7 @@ fn test_top_level_ctx_enum() {
 #[test]
 fn test_top_level_ctx_enum_default() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "u8", ctx = "a: u8, b: u8", ctx_default = "1,2")]
+    #[deku(id_type = "u8", ctx = "a: u8, b: u8", ctx_default = "1,2")]
     enum TopLevelCtxEnumDefault {
         #[deku(id = "1")]
         VariantA(
@@ -240,7 +240,7 @@ fn test_ctx_default_struct() {
 #[test]
 fn test_enum_endian_ctx() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "u32", endian = "endian", ctx = "endian: deku::ctx::Endian")]
+    #[deku(id_type = "u32", endian = "endian", ctx = "endian: deku::ctx::Endian")]
     enum EnumTypeEndianCtx {
         #[deku(id = "0xDEADBEEF")]
         VarA(u8),

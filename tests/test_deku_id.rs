@@ -3,7 +3,7 @@ use deku::prelude::*;
 #[test]
 fn test_regular() {
     #[derive(Debug, DekuRead, DekuWrite)]
-    #[deku(type = "u8")]
+    #[deku(id_type = "u8")]
     enum Request1 {
         #[deku(id = "0x01")]
         Cats { toy: u8 },
@@ -19,7 +19,7 @@ fn test_regular() {
 #[test]
 fn test_custom_type() {
     #[derive(Debug, DekuRead, PartialEq, DekuWrite)]
-    #[deku(type = "u8")]
+    #[deku(id_type = "u8")]
     enum Request2 {
         #[deku(id = "0x01")]
         Cats,
@@ -29,7 +29,7 @@ fn test_custom_type() {
     }
 
     #[derive(Debug, DekuRead, DekuWrite)]
-    #[deku(type = "Request2")]
+    #[deku(id_type = "Request2")]
     enum Request3 {
         #[deku(id = "Request2::Cats")]
         Cats,
@@ -56,7 +56,7 @@ fn test_ctx() {
     assert_eq!(Ok(1), EnumId::VarA(0).deku_id());
 
     #[derive(Copy, Clone, PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "u8")]
+    #[deku(id_type = "u8")]
     enum Nice {
         True = 0x00,
         False = 0x01,
@@ -78,7 +78,7 @@ fn test_ctx() {
 #[test]
 fn test_ctx_and_type() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "u8", ctx = "_a: u8, _b: u8")]
+    #[deku(id_type = "u8", ctx = "_a: u8, _b: u8")]
     enum TopLevelCtxEnum {
         #[deku(id = "1")]
         VariantA(u8),
@@ -90,7 +90,7 @@ fn test_ctx_and_type() {
 #[test]
 fn test_litbytestr() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "[u8; 3]")]
+    #[deku(id_type = "[u8; 3]")]
     enum TestEnumArray {
         #[deku(id = b"123")]
         VarA,
@@ -105,7 +105,7 @@ fn test_litbytestr() {
 #[should_panic(expected = "called `Result::unwrap()` on an `Err` value: IdVariantNotFound")]
 fn test_no_id_discriminant() {
     #[derive(Debug, DekuRead, PartialEq, DekuWrite)]
-    #[deku(type = "u8")]
+    #[deku(id_type = "u8")]
     enum Discriminant {
         Cats = 0x01,
         Dogs,

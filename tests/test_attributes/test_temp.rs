@@ -104,7 +104,7 @@ fn test_temp_field_unnamed_write() {
 fn test_temp_enum_field() {
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
-    #[deku(type = "u8")]
+    #[deku(id_type = "u8")]
     enum TestEnum {
         #[deku(id = "0xAB")]
         VarA {
@@ -133,7 +133,7 @@ fn test_temp_enum_field() {
 fn test_temp_enum_field_write() {
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
-    #[deku(type = "u8")]
+    #[deku(id_type = "u8")]
     enum TestEnum {
         #[deku(id = "0xAB")]
         VarA {

@@ -38,7 +38,7 @@ fn test_to_bits_correct_over() {
 }
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8", bits = "4")]
+#[deku(id_type = "u8", bits = "4")]
 enum TestEnum {
     #[deku(id = "0b1010")]
     VarA,

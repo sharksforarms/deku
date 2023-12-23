@@ -1,11 +1,11 @@
 use deku::prelude::*;
 
 #[derive(DekuRead)]
-#[deku(type = "u8", bits = "1", bytes = "2")]
+#[deku(id_type = "u8", bits = "1", bytes = "2")]
 enum Test1 {}
 
 #[derive(DekuRead)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum Test2 {
     A(#[deku(bits = "1", bytes = "2")] u8),
     B {

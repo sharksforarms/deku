@@ -173,7 +173,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let variant_is_named = variant
             .fields
             .fields
-            .get(0)
+            .first()
             .and_then(|v| v.ident.as_ref())
             .is_some();
 

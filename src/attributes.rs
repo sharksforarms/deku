@@ -42,6 +42,7 @@ enum DekuEnum {
 | [bits_read](#bits_read) | field | Set the field representing the number of bits to read into a container
 | [bytes_read](#bytes_read) | field | Set the field representing the number of bytes to read into a container
 | [until](#until) | field | Set a predicate returning when to stop reading elements into a container
+| [read_all](#read_all) | field | Read until [reader.end()] returns `true`
 | [update](#update) | field | Apply code over the field when `.update()` is called
 | [temp](#temp) | field | Read the field but exclude it from the struct/enum
 | [temp_value](#temp_value) | field | Write the field but exclude it from the struct/enum
@@ -412,6 +413,43 @@ assert_eq!(
     },
     value
 );
+
+```
+# read_all
+
+Read values into the container until [reader.end()] returns `true`.
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct InnerDekuTest {
+    field_a: u8,
+    field_b: u8
+}
+
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(read_all)]
+    items: Vec<InnerDekuTest>,
+}
+
+let data: &[u8] = &[0xAB, 0xBC, 0xDE, 0xEF];
+
+let value = DekuTest::try_from(data).unwrap();
+
+assert_eq!(
+    DekuTest {
+       items: vec![
+           InnerDekuTest{field_a: 0xAB, field_b: 0xBC},
+           InnerDekuTest{field_a: 0xDE, field_b: 0xEF}],
+    },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(&*data, value);
 ```
 
 
@@ -1201,5 +1239,5 @@ let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
 
-
+[reader.end()]: crate::reader::Reader::end()
 */

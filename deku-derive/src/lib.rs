@@ -387,6 +387,9 @@ struct FieldData {
     /// a predicate to decide when to stop reading elements into the container
     until: Option<TokenStream>,
 
+    /// read until `reader.end()`
+    read_all: bool,
+
     /// apply a function to the field after it's read
     map: Option<TokenStream>,
 
@@ -454,6 +457,7 @@ impl FieldData {
             bits_read: receiver.bits_read?,
             bytes_read: receiver.bytes_read?,
             until: receiver.until?,
+            read_all: receiver.read_all,
             map: receiver.map?,
             ctx,
             update: receiver.update?,
@@ -518,6 +522,18 @@ impl FieldData {
             return Err(cerror(
                 data.default.span(),
                 "`default` attribute cannot be used here",
+            ));
+        }
+
+        // Validate usage of read_all
+        if data.read_all
+            && (data.until.is_some()
+                || data.count.is_some()
+                || (data.bits_read.is_some() || data.bytes_read.is_some()))
+        {
+            return Err(cerror(
+                data.bits.span(),
+                "conflicting: `read_all` cannot be used with `until`, count`, `bits_read`, or `bytes_read`",
             ));
         }
 
@@ -758,6 +774,10 @@ struct DekuFieldReceiver {
     /// a predicate to decide when to stop reading elements into the container
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     until: Result<Option<TokenStream>, ReplacementError>,
+
+    /// read until `reader.end()`
+    #[darling(default)]
+    read_all: bool,
 
     /// apply a function to the field after it's read
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]

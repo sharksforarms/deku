@@ -78,7 +78,8 @@ impl<'a, R: Read> Reader<'a, R> {
         self.leftover.iter().by_vals().collect()
     }
 
-    /// Return true if we are at the end of a reader and there are no cached bits in the reader
+    /// Return true if we are at the end of a reader and there are no cached bits in the reader.
+    /// Since this uses [Read] internally, this will return true when [Read] returns [ErrorKind::UnexpectedEof].
     ///
     /// The byte that was read will be internally buffered
     #[inline]
@@ -106,7 +107,7 @@ impl<'a, R: Read> Reader<'a, R> {
     }
 
     /// Used at the beginning of `from_reader`.
-    /// TODO: maybe send into read_bytes() if amt >= 8
+    // TODO: maybe send into read_bytes() if amt >= 8
     #[inline]
     pub fn skip_bits(&mut self, amt: usize) -> Result<(), DekuError> {
         #[cfg(feature = "logging")]

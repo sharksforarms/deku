@@ -41,6 +41,29 @@ where
     Ok(res)
 }
 
+fn from_reader_with_ctx_hashset_to_end<'a, T, S, Ctx, R: Read>(
+    reader: &mut crate::reader::Reader<R>,
+    capacity: Option<usize>,
+    ctx: Ctx,
+) -> Result<HashSet<T, S>, DekuError>
+where
+    T: DekuReader<'a, Ctx> + Eq + Hash,
+    S: BuildHasher + Default,
+    Ctx: Copy,
+{
+    let mut res = HashSet::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
+
+    loop {
+        if reader.end() {
+            break;
+        }
+        let val = <T>::from_reader_with_ctx(reader, ctx)?;
+        res.insert(val);
+    }
+
+    Ok(res)
+}
+
 impl<'a, T, S, Ctx, Predicate> DekuReader<'a, (Limit<T, Predicate>, Ctx)> for HashSet<T, S>
 where
     T: DekuReader<'a, Ctx> + Eq + Hash,
@@ -131,6 +154,9 @@ where
                     move |read_bits, _| read_bits == bit_size,
                 )
             }
+
+            // Read until `reader.end()` is true
+            Limit::End => from_reader_with_ctx_hashset_to_end(reader, None, inner_ctx),
         }
     }
 }
@@ -190,6 +216,7 @@ mod tests {
         case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Endian::Little, Some(8), 2.into(), vec![0xAA, 0xBB].into_iter().collect(), bits![u8, Msb0;], &[0xcc]),
         case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, None, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
         case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(8).into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
+        case::read_all([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::end(), vec![0xAA, 0xBB].into_iter().collect(), bits![u8, Msb0;], &[]),
         case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), Endian::Little, Some(6), 2.into(), vec![0b00_011010, 0b00_011110].into_iter().collect(), bits![u8, Msb0; 1, 0, 0, 1], &[]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
         case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1.into(), FxHashSet::default(), bits![u8, Msb0;], &[]),

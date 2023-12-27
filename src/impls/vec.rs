@@ -44,6 +44,27 @@ where
     Ok(res)
 }
 
+fn reader_vec_to_end<'a, T, Ctx, R: Read>(
+    reader: &mut crate::reader::Reader<R>,
+    capacity: Option<usize>,
+    ctx: Ctx,
+) -> Result<Vec<T>, DekuError>
+where
+    T: DekuReader<'a, Ctx>,
+    Ctx: Copy,
+{
+    let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
+    loop {
+        if reader.end() {
+            break;
+        }
+        let val = <T>::from_reader_with_ctx(reader, ctx)?;
+        res.push(val);
+    }
+
+    Ok(res)
+}
+
 impl<'a, T, Ctx, Predicate> DekuReader<'a, (Limit<T, Predicate>, Ctx)> for Vec<T>
 where
     T: DekuReader<'a, Ctx>,
@@ -104,6 +125,8 @@ where
                     read_bits == bit_size
                 })
             }
+
+            Limit::End => reader_vec_to_end(reader, None, inner_ctx),
         }
     }
 }
@@ -157,6 +180,8 @@ mod tests {
         case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Endian::Little, Some(8), 2.into(), vec![0xAA, 0xBB], bits![u8, Msb0;], &[0xcc]),
         case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, None, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0], bits![u8, Msb0;], &[0xbb]),
         case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(8).into(), vec![0xAA], bits![u8, Msb0;], &[0xbb]),
+        case::end([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::end(), vec![0xaa, 0xbb], bits![u8, Msb0;], &[]),
+        case::end_bitsize([0xf0, 0xf0].as_ref(), Endian::Little, Some(4), Limit::end(), vec![0xf, 0x0, 0x0f, 0x0], bits![u8, Msb0;], &[]),
         case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), Endian::Little, Some(6), 2.into(), vec![0b00_011010, 0b00_011110], bits![u8, Msb0; 1, 0, 0, 1], &[]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
         case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1.into(), vec![], bits![u8, Msb0;], &[]),

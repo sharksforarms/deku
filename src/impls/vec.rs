@@ -91,7 +91,7 @@ where
                 })
             }
 
-            // Read until a given quantity of bits have been read
+            // Read until a given quantity of bytes have been read
             Limit::ByteSize(size) => {
                 let bit_size = size.0 * 8;
 

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ## Changes
+[#390](https://github.com/sharksforarms/deku/pull/390) added MSRV for `1.67.1`.
 [#352](https://github.com/sharksforarms/deku/pull/352) added a new function `from_reader` that uses `io::Read`.
 `io::Read` is also now used internally, bringing massive performance and usability improvements.
 

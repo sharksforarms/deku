@@ -8,15 +8,18 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
     steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust
-        run: rustup update stable
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: dtolnay/rust-toolchain@be73d7920c329f220ce78e0234b8f96b7ae60248 # master
+        with:
+          toolchain: stable
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+        uses: taiki-e/install-action@e8c64729e2a2a2c3cfa6751fa496b34ca19f390c # cargo-llvm-cov
+
       - name: Generate code coverage
         run: cargo llvm-cov --workspace --codecov --output-path codecov.json
+
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # v3.1.4
         with:
           files: codecov.json
           fail_ci_if_error: true

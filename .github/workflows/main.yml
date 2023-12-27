@@ -3,127 +3,74 @@ on: [push, pull_request]
 name: CI
 
 jobs:
-  check:
-    name: Build
+  build-test-run:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --all
+    strategy:
+      matrix:
+        toolchain:
+          - stable
 
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: dtolnay/rust-toolchain@be73d7920c329f220ce78e0234b8f96b7ae60248 # master
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
+          toolchain: ${{ matrix.toolchain }}
 
-# TODO: Enable Miri
-#  test_miri:
-#    name: Miri Test
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#      - uses: actions-rs/toolchain@v1
-#        with:
-#          toolchain: nightly
-#          override: true
-#          components: miri
-#      - run: cargo miri test
-#
-#  test_miri_big_endian:
-#    name: Miri Test Big Endian
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#      - uses: actions-rs/toolchain@v1
-#        with:
-#          toolchain: nightly
-#          override: true
-#          components: miri
-#          target: armebv7r-none-eabi
-#      - run: cargo miri test --target armebv7r-none-eabi
-
-  examples:
-    name: Examples
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+      # build
+      - run: cargo build --all
+      # test
+      - run: cargo test --all
+      # run examples
       - run: cargo run --example 2>&1 | grep -P '   ' | awk '{print $1}' | xargs -i cargo run --example {}
 
-  fmt:
-    name: Rustfmt
+  # Only build on MSRV, since trybuild will fail on older version
+  build-msrv:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+    strategy:
+      matrix:
+        toolchain:
+            # msrv
+          - 1.67.1
 
-  clippy:
-    name: Clippy
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: dtolnay/rust-toolchain@be73d7920c329f220ce78e0234b8f96b7ae60248 # master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+
+      # build
+      - run: cargo build --all
+
+  fmt-clippy-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: dtolnay/rust-toolchain@be73d7920c329f220ce78e0234b8f96b7ae60248 # master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
-      - run: rustup component add clippy
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+
+      - run: cargo clippy -- -D warnings
+      - run: cargo fmt --all -- --check
 
   ensure_no_std:
     name: Ensure no_std
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: dtolnay/rust-toolchain@be73d7920c329f220ce78e0234b8f96b7ae60248 # master
         with:
           toolchain: nightly
-          override: true
-          target: thumbv7em-none-eabihf
+          targets: thumbv7em-none-eabihf
       - run: cd ensure_no_std && cargo build --release --target thumbv7em-none-eabihf
 
   ensure_wasm:
     name: Ensure wasm
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: dtolnay/rust-toolchain@be73d7920c329f220ce78e0234b8f96b7ae60248 # master
         with:
           toolchain: nightly
-          override: true
       - uses: jetli/wasm-pack-action@v0.3.0
         with:
           version: 'latest'

@@ -472,7 +472,13 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     /// let bytes = s.to_bytes().unwrap();
     /// assert_eq!(bytes, [0x01, 0x02, 0x00, 0x03, 0x00, 0x00, 0x00]);
     /// ````
-    fn to_bytes(&self) -> Result<Vec<u8>, DekuError>;
+    fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
+        let mut out_buf = Vec::new();
+        let mut __deku_writer = Writer::new(&mut out_buf);
+        DekuWriter::to_writer(self, &mut __deku_writer, ())?;
+        __deku_writer.finalize()?;
+        Ok(out_buf)
+    }
 
     /// Write struct/enum to BitVec
     ///
@@ -495,7 +501,15 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     /// let bits = test.to_bits().unwrap();
     /// assert_eq!(deku::bitvec::bitvec![1, 1, 1, 1, 0, 0, 0, 1, 1], bits);
     /// ```
-    fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError>;
+    fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError> {
+        let mut out_buf = Vec::new();
+        let mut __deku_writer = Writer::new(&mut out_buf);
+        DekuWriter::to_writer(self, &mut __deku_writer, ())?;
+        let mut leftover = __deku_writer.leftover;
+        let mut bv = bitvec::BitVec::from_slice(&out_buf);
+        bv.append(&mut leftover);
+        Ok(bv)
+    }
 }
 
 /// "Updater" trait: apply mutations to a type

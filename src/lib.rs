@@ -238,7 +238,7 @@ using `no_std`.
 # use std::io::{Seek, SeekFrom, Read};
 # use std::fs::File;
 # use deku::prelude::*;
-#[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone)]
 #[deku(endian = "big")]
 struct EcHdr {
     magic: [u8; 4],
@@ -248,6 +248,23 @@ struct EcHdr {
 
 let mut file = File::options().read(true).open("file").unwrap();
 let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
+```
+
+# `Write` enabled
+Parsers can be created that directly write to a source implementing [Write](crate::no_std_io::Write).
+
+```rust, no_run
+# use std::io::{Seek, SeekFrom, Read};
+# use std::fs::File;
+# use deku::prelude::*;
+#[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone)]
+#[deku(endian = "big")]
+struct Hdr {
+    version: u8,
+}
+let hdr = Hdr { version: 0xf0 };
+let mut file = File::options().write(true).open("file").unwrap();
+hdr.to_writer(&mut Writer::new(file), ());
 ```
 
 # Internal variables and previously read fields
@@ -273,8 +290,8 @@ tokens such as `reader`, `writer`, `map`, `count`, etc.
 These are provided as a convenience to the user.
 
 Always included:
-- `deku::reader: &mut Reader` - Current [Reader](crate::reader::Reader)
-- `deku::output: &mut BitSlice<u8, Msb0>` - The output bit stream
+- `deku::reader: &mut Reader` - Current [Reader]
+- `deku::writer: &mut Writer` - Current [Writer]
 
 Conditionally included if referenced:
 - `deku::bit_offset: usize` - Current bit offset from the input
@@ -351,6 +368,7 @@ pub mod reader;
 pub mod writer;
 
 pub use crate::error::DekuError;
+use crate::reader::Reader;
 use crate::writer::Writer;
 
 /// "Reader" trait: read bytes and bits from [`no_std_io::Read`]er
@@ -363,7 +381,7 @@ pub trait DekuReader<'a, Ctx = ()> {
     /// # use std::fs::File;
     /// # use deku::prelude::*;
     /// # use deku::ctx::Endian;
-    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone)]
     /// #[deku(endian = "ctx_endian", ctx = "ctx_endian: Endian")]
     /// struct EcHdr {
     ///     magic: [u8; 4],
@@ -376,7 +394,7 @@ pub trait DekuReader<'a, Ctx = ()> {
     /// let ec = EcHdr::from_reader_with_ctx(&mut reader, Endian::Big).unwrap();
     /// ```
     fn from_reader_with_ctx<R: no_std_io::Read>(
-        reader: &mut crate::reader::Reader<R>,
+        reader: &mut Reader<R>,
         ctx: Ctx,
     ) -> Result<Self, DekuError>
     where
@@ -399,7 +417,7 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     /// # use std::io::{Seek, SeekFrom, Read};
     /// # use std::fs::File;
     /// # use deku::prelude::*;
-    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone)]
     /// #[deku(endian = "big")]
     /// struct EcHdr {
     ///     magic: [u8; 4],

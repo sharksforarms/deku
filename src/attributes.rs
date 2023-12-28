@@ -1057,7 +1057,7 @@ Example:
 # use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     #[deku(id = 0x01)]
     VariantA(u8),
@@ -1095,7 +1095,7 @@ Example discriminant
 # use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     VariantA = 0x01,
     VariantB,
@@ -1137,7 +1137,7 @@ Example:
 # use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     #[deku(id = 0x01)]
     VariantA(u8),
@@ -1189,7 +1189,7 @@ Example:
 # use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8", bits = 4)]
+#[deku(id_type = "u8", bits = 4)]
 enum DekuTest {
     #[deku(id = 0b1001)]
     VariantA( #[deku(bits = 4)] u8, u8),
@@ -1220,7 +1220,7 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u32", bytes = 2)]
+#[deku(id_type = "u32", bytes = 2)]
 enum DekuTest {
     #[deku(id = 0xBEEF)]
     VariantA(u8),

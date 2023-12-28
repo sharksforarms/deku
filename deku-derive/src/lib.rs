@@ -12,7 +12,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::AttributeArgs;
 
 use crate::macros::deku_read::emit_deku_read;
 use crate::macros::deku_write::emit_deku_write;
@@ -208,7 +207,10 @@ impl DekuData {
             ast::Data::Struct(_) => {
                 // Validate id_* attributes are being used on an enum
                 if data.id_type.is_some() {
-                    Err(cerror(data.id_type.span(), "`type` only supported on enum"))
+                    Err(cerror(
+                        data.id_type.span(),
+                        "`id_type` only supported on enum",
+                    ))
                 } else if data.id.is_some() {
                     Err(cerror(data.id.span(), "`id` only supported on enum"))
                 } else if data.bytes.is_some() {
@@ -220,19 +222,19 @@ impl DekuData {
                 }
             }
             ast::Data::Enum(_) => {
-                // Validate `type` or `id` is specified
+                // Validate `id_type` or `id` is specified
                 if data.id_type.is_none() && data.id.is_none() {
                     return Err(cerror(
                         data.ident.span(),
-                        "`type` or `id` must be specified on enum",
+                        "`id_type` or `id` must be specified on enum",
                     ));
                 }
 
-                // Validate either `type` or `id` is specified
+                // Validate either `id_type` or `id` is specified
                 if data.id_type.is_some() && data.id.is_some() {
                     return Err(cerror(
                         data.ident.span(),
-                        "conflicting: both `type` and `id` specified on enum",
+                        "conflicting: both `id_type` and `id` specified on enum",
                     ));
                 }
 
@@ -654,11 +656,7 @@ struct DekuReceiver {
     id: Option<Id>,
 
     /// enum only: type of the enum `id`
-    #[darling(
-        rename = "type",
-        default = "default_res_opt",
-        map = "map_litstr_as_tokenstream"
-    )]
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     id_type: Result<Option<TokenStream>, ReplacementError>,
 
     /// enum only: bit size of the enum `id`
@@ -898,7 +896,7 @@ pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 }
 
 fn is_not_deku(attr: &syn::Attribute) -> bool {
-    attr.path
+    attr.path()
         .get_ident()
         .map(|ident| ident != "deku" && ident != "deku_derive")
         .unwrap_or(true)
@@ -962,8 +960,8 @@ pub fn deku_derive(
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     // Parse `deku_derive` attribute
-    let attr_args = syn::parse_macro_input!(attr as AttributeArgs);
-    let args = match DekuDerive::from_list(&attr_args) {
+    let nested_meta = darling::ast::NestedMeta::parse_meta_list(attr.into()).unwrap();
+    let args = match DekuDerive::from_list(&nested_meta) {
         Ok(v) => v,
         Err(e) => {
             return proc_macro::TokenStream::from(e.write_errors());
@@ -1062,9 +1060,9 @@ mod tests {
         }"#),
 
         // Valid Enum
-        case::enum_empty(r#"#[deku(type = "u8")] enum Test {}"#),
+        case::enum_empty(r#"#[deku(id_type = "u8")] enum Test {}"#),
         case::enum_all(r#"
-        #[deku(type = "u8")]
+        #[deku(id_type = "u8")]
         enum Test {
             #[deku(id = "1")]
             A,

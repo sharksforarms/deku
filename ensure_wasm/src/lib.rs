@@ -25,9 +25,9 @@ use deku::prelude::*;
 #[wasm_bindgen]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 pub struct DekuTest {
-    #[deku(bits = "5")]
+    #[deku(bits = 5)]
     pub field_a: u8,
-    #[deku(bits = "3")]
+    #[deku(bits = 3)]
     pub field_b: u8,
     pub field_c: u8,
 }

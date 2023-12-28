@@ -183,6 +183,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             match variant_id {
                 Id::TokenStream(v) => (false, quote! {&#v}.into_token_stream()),
                 Id::LitByteStr(v) => (false, v.into_token_stream()),
+                Id::Int(v) => (false, v.into_token_stream()),
             }
         } else if let Some(variant_id_pat) = &variant.id_pat {
             // If user has supplied an id, then we have an id_pat that and the id variant doesn't
@@ -234,6 +235,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             if let Some(variant_id) = &variant.id {
                 let deref = match variant_id {
                     Id::TokenStream(_) => quote! {},
+                    Id::Int(_) => quote! {},
                     Id::LitByteStr(_) => quote! {*},
                 };
 

@@ -11,7 +11,7 @@ use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct FieldF {
-    #[deku(bits = "6")]
+    #[deku(bits = 6)]
     #[deku(assert_eq = "6")]
     data: u8,
 }
@@ -26,13 +26,13 @@ struct FieldF {
 // #[deku(endian = "little")] // By default it uses the system endianness, but can be overwritten
 struct DekuTest {
     field_a: u8,
-    #[deku(bits = "7")]
+    #[deku(bits = 7)]
     field_b: u8,
-    #[deku(bits = "1")]
+    #[deku(bits = 1)]
     field_c: u8,
     #[deku(endian = "big")]
     field_d: u16,
-    #[deku(bits = "2")]
+    #[deku(bits = 2)]
     field_e: u8,
     field_f: FieldF,
     num_items: u8,

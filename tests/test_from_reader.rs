@@ -37,12 +37,12 @@ fn test_from_reader_struct() {
 #[test]
 fn test_from_reader_enum() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-    #[deku(type = "u8", bits = "4")]
+    #[deku(type = "u8", bits = 4)]
     enum TestDeku {
         #[deku(id = "0b0110")]
-        VariantA(#[deku(bits = "4")] u8),
+        VariantA(#[deku(bits = 4)] u8),
         #[deku(id = "0b0101")]
-        VariantB(#[deku(bits = "2")] u8),
+        VariantB(#[deku(bits = 2)] u8),
     }
 
     let test_data = [0b0110_0110u8, 0b0101_1010u8];

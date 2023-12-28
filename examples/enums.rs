@@ -3,25 +3,33 @@ use std::io::Cursor;
 use deku::{prelude::*, reader::Reader};
 use hexlit::hex;
 
+const THREE: u8 = 3;
+
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
 enum DekuTest {
-    #[deku(id = "0")]
+    #[deku(id = 0)]
     Var1,
-    #[deku(id = "1")]
-    Var2(#[deku(bytes = "2")] u32),
-    #[deku(id = "2")]
+
+    #[deku(id = 1)]
+    Var2(#[deku(bytes = 2)] u32),
+
+    #[deku(id = 0x02)]
     Var3(u8, u8),
-    #[deku(id = "3")]
+
+    #[deku(id = "THREE")]
     Var4 {
         field_a: u8,
         #[deku(count = "field_a")]
         field_b: Vec<u8>,
     },
+
     #[deku(id_pat = "4..=6")]
     Var5 { id: u8 },
+
     #[deku(id_pat = "&id if id > 6")]
     Var6 { id: u8 },
+
     #[deku(id_pat = "_")]
     VarDefault { id: u8, value: u8 },
 }

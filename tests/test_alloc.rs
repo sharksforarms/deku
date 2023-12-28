@@ -21,7 +21,7 @@ enum NestedEnum {
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(type = "u32", bytes = "2", ctx = "_endian: Endian")]
+#[deku(type = "u32", bytes = 2, ctx = "_endian: Endian")]
 enum NestedEnum2 {
     #[deku(id = "0x01")]
     VarA(u8),
@@ -37,9 +37,9 @@ struct TestDeku {
     #[deku(count = "1")]
     field_e: Vec<u8>, // 1 alloc
     field_f: [u8; 3],
-    #[deku(bits = "3")]
+    #[deku(bits = 3)]
     field_g: u8, // 3 allocs (read_bits(Ordering::Greater))
-    #[deku(bits = "5")]
+    #[deku(bits = 5)]
     field_h: u8, // 1 alloc (read_bits(Ordering::Equal))
                  //field_i: NestedEnum2,
 }

@@ -232,8 +232,8 @@ fn gen_type_from_ctx_id(
 }
 
 /// Generate argument for `id`:
-/// `#deku(endian = "big", bits = "1")` -> `Endian::Big, BitSize(1)`
-/// `#deku(endian = "big", bytes = "1")` -> `Endian::Big, ByteSize(1)`
+/// `#deku(endian = "big", bits = 1)` -> `Endian::Big, BitSize(1)`
+/// `#deku(endian = "big", bytes = 1)` -> `Endian::Big, ByteSize(1)`
 pub(crate) fn gen_id_args(
     endian: Option<&syn::LitStr>,
     bits: Option<&Num>,
@@ -258,8 +258,8 @@ pub(crate) fn gen_id_args(
 
 /// Generate argument for fields:
 ///
-/// `#deku(endian = "big", bits = "1", ctx = "a")` -> `Endian::Big, BitSize(1), a`
-/// `#deku(endian = "big", bytes = "1", ctx = "a")` -> `Endian::Big, ByteSize(1), a`
+/// `#deku(endian = "big", bits = 1, ctx = "a")` -> `Endian::Big, BitSize(1), a`
+/// `#deku(endian = "big", bytes = 1, ctx = "a")` -> `Endian::Big, ByteSize(1), a`
 fn gen_field_args(
     endian: Option<&syn::LitStr>,
     bits: Option<&Num>,

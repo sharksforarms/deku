@@ -887,7 +887,7 @@ assert_eq!(value.sub.b, 0x01 + 0x02)
 Example:
 ```ignore
 struct Type1 {
-    #[deku(endian = "big", bits = "1")]
+    #[deku(endian = "big", bits = 1)]
     field: u8,
 }
 
@@ -904,7 +904,7 @@ Example: Adding context
 #[deku(endian = "big")]
 struct Type1 {
     field_a: u16,
-    #[deku(bits = "5", ctx = "*field_a")]
+    #[deku(bits = 5, ctx = "*field_a")]
     field_b: SubType,
 }
 
@@ -982,9 +982,9 @@ struct DekuTest {
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(ctx = "my_id: u8", id = "my_id")]
 enum MyEnum {
-    #[deku(id = "1")]
+    #[deku(id = 1)]
     VariantA(u8),
-    #[deku(id = "2")]
+    #[deku(id = 2)]
     VariantB,
 }
 
@@ -1021,9 +1021,9 @@ Example:
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
 enum DekuTest {
-    #[deku(id = "0x01")]
+    #[deku(id = 0x01)]
     VariantA(u8),
-    #[deku(id = "0x02")]
+    #[deku(id = 0x02)]
     VariantB(u8, u16),
 }
 
@@ -1101,7 +1101,7 @@ Example:
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
 enum DekuTest {
-    #[deku(id = "0x01")]
+    #[deku(id = 0x01)]
     VariantA(u8),
     #[deku(id_pat = "0x02..=0x06")]
     VariantB {
@@ -1151,10 +1151,10 @@ Example:
 # use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8", bits = "4")]
+#[deku(type = "u8", bits = 4)]
 enum DekuTest {
-    #[deku(id = "0b1001")]
-    VariantA( #[deku(bits = "4")] u8, u8),
+    #[deku(id = 0b1001)]
+    VariantA( #[deku(bits = 4)] u8, u8),
 }
 
 let data: &[u8] = &[0b1001_0110, 0xFF];
@@ -1182,9 +1182,9 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u32", bytes = "2")]
+#[deku(type = "u32", bytes = 2)]
 enum DekuTest {
-    #[deku(id = "0xBEEF")]
+    #[deku(id = 0xBEEF)]
     VariantA(u8),
 }
 

@@ -18,9 +18,9 @@ pub struct DoubleNestedDeku {
 // Common struct to test nesting
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 pub struct NestedDeku {
-    #[deku(bits = "6")]
+    #[deku(bits = 6)]
     pub nest_a: u8,
-    #[deku(bits = "2")]
+    #[deku(bits = 2)]
     pub nest_b: u8,
 
     pub inner: DoubleNestedDeku,
@@ -31,7 +31,7 @@ pub struct NestedDeku {
 fn test_read_too_much_data() {
     #[derive(DekuRead)]
     pub struct TestStruct {
-        #[deku(bits = "6")]
+        #[deku(bits = 6)]
         pub field_a: u8,
     }
 
@@ -44,9 +44,9 @@ fn test_unnamed_struct() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     pub struct TestUnamedStruct(
         pub u8,
-        #[deku(bits = "2")] pub u8,
-        #[deku(bits = "6")] pub u8,
-        #[deku(bytes = "2")] pub u16,
+        #[deku(bits = 2)] pub u8,
+        #[deku(bits = 6)] pub u8,
+        #[deku(bytes = 2)] pub u16,
         #[deku(endian = "big")] pub u16,
         pub NestedDeku,
         #[deku(update = "self.7.len()")] pub u8,
@@ -101,11 +101,11 @@ fn test_named_struct() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     pub struct TestStruct {
         pub field_a: u8,
-        #[deku(bits = "2")]
+        #[deku(bits = 2)]
         pub field_b: u8,
-        #[deku(bits = "6")]
+        #[deku(bits = 6)]
         pub field_c: u8,
-        #[deku(bytes = "2")]
+        #[deku(bytes = 2)]
         pub field_d: u16,
         #[deku(update = "1+self.field_d")]
         #[deku(endian = "big")]

@@ -38,9 +38,9 @@ use deku::prelude::*;
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
 struct DekuTest {
-    #[deku(bits = "4")]
+    #[deku(bits = 4)]
     field_a: u8,
-    #[deku(bits = "4")]
+    #[deku(bits = 4)]
     field_b: u8,
     field_c: u16,
 }
@@ -176,9 +176,9 @@ use deku::prelude::*;
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(type = "u8")]
 enum DekuTest {
-    #[deku(id = "0x01")]
+    #[deku(id = 0x01)]
     VariantA,
-    #[deku(id = "0x02")]
+    #[deku(id = 0x02)]
     VariantB(u16),
 }
 

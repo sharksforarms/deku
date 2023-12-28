@@ -41,7 +41,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     // check if the first field has an ident, if not, it's a unnamed struct
     let is_named_struct = fields
         .fields
-        .get(0)
+        .first()
         .and_then(|v| v.ident.as_ref())
         .is_some();
 
@@ -175,7 +175,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let variant_is_named = variant
             .fields
             .fields
-            .get(0)
+            .first()
             .and_then(|v| v.ident.as_ref())
             .is_some();
 

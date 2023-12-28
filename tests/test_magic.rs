@@ -58,7 +58,7 @@ fn test_magic_struct(input: &[u8]) {
 )]
 fn test_magic_enum(input: &[u8]) {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(magic = b"deku", type = "u8")]
+    #[deku(magic = b"deku", id_type = "u8")]
     enum TestEnum {
         #[deku(id = "0")]
         Variant,

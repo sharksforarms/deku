@@ -14,14 +14,14 @@ struct NestedStruct {
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(type = "u8", ctx = "_endian: Endian")]
+#[deku(id_type = "u8", ctx = "_endian: Endian")]
 enum NestedEnum {
     #[deku(id = "0x01")]
     VarA(u8),
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(type = "u32", bytes = 2, ctx = "_endian: Endian")]
+#[deku(id_type = "u32", bytes = 2, ctx = "_endian: Endian")]
 enum NestedEnum2 {
     #[deku(id = "0x01")]
     VarA(u8),

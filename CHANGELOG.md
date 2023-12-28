@@ -111,7 +111,7 @@ This also disallows using tuples for storing the id:
 old:
 ```rust
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     #[deku(id_pat = "_")]
     VariantC((u8, u8)),
@@ -121,7 +121,7 @@ enum DekuTest {
 new:
 ```rust
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     #[deku(id_pat = "_")]
     VariantC {

@@ -18,7 +18,7 @@ fn issue_224() {
     }
 
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-    #[deku(type = "u8", bits = 2)]
+    #[deku(id_type = "u8", bits = 2)]
     pub enum One {
         Start = 0,
         Go = 1,
@@ -26,7 +26,7 @@ fn issue_224() {
     }
 
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-    #[deku(type = "u8", bits = 4)]
+    #[deku(id_type = "u8", bits = 4)]
     pub enum Two {
         #[deku(id = "0b0000")]
         Put(Op1),

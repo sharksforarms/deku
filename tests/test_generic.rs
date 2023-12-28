@@ -24,7 +24,7 @@ fn test_generic_struct() {
 #[test]
 fn test_generic_enum() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "u8")]
+    #[deku(id_type = "u8")]
     enum TestEnum<T>
     where
         T: deku::DekuWriter + for<'a> deku::DekuReader<'a>,

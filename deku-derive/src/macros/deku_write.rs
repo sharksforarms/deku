@@ -64,26 +64,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 }
             }
 
-            impl #imp DekuContainerWrite for #ident #wher {
-                fn to_bytes(&self) -> core::result::Result<Vec<u8>, ::#crate_::DekuError> {
-                    let mut out_buf = vec![];
-                    let mut __deku_writer = ::#crate_::writer::Writer::new(&mut out_buf);
-                    ::#crate_::DekuWriter::to_writer(self, &mut __deku_writer, ())?;
-                    __deku_writer.finalize()?;
-                    Ok(out_buf)
-                }
-
-                #[allow(unused_variables)]
-                fn to_bits(&self) -> core::result::Result<::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0>, ::#crate_::DekuError> {
-                    let mut out_buf = vec![];
-                    let mut __deku_writer = ::#crate_::writer::Writer::new(&mut out_buf);
-                    ::#crate_::DekuWriter::to_writer(self, &mut __deku_writer, ())?;
-                    let mut leftover = __deku_writer.leftover;
-                    let mut bv = ::#crate_::bitvec::BitVec::from_slice(&out_buf);
-                    bv.append(&mut leftover);
-                    Ok(bv)
-                }
-            }
+            impl #imp DekuContainerWrite for #ident #wher {}
         });
     }
 
@@ -274,26 +255,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 }
             }
 
-            impl #imp DekuContainerWrite for #ident #wher {
-                fn to_bytes(&self) -> core::result::Result<Vec<u8>, ::#crate_::DekuError> {
-                    let mut out_buf = vec![];
-                    let mut __deku_writer = ::#crate_::writer::Writer::new(&mut out_buf);
-                    ::#crate_::DekuWriter::to_writer(self, &mut __deku_writer, ())?;
-                    __deku_writer.finalize()?;
-                    Ok(out_buf)
-                }
-
-                #[allow(unused_variables)]
-                fn to_bits(&self) -> core::result::Result<::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0>, ::#crate_::DekuError> {
-                    let mut out_buf = vec![];
-                    let mut __deku_writer = ::#crate_::writer::Writer::new(&mut out_buf);
-                    ::#crate_::DekuWriter::to_writer(self, &mut __deku_writer, ())?;
-                    let mut leftover = __deku_writer.leftover;
-                    let mut bv = ::#crate_::bitvec::BitVec::from_slice(&out_buf);
-                    bv.append(&mut leftover);
-                    Ok(bv)
-                }
-            }
+            impl #imp DekuContainerWrite for #ident #wher {}
         })
     }
 

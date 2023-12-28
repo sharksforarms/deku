@@ -377,7 +377,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     tokens.extend(quote! {
         #[allow(non_snake_case)]
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
-                #[inline(always)]
+            #[inline(always)]
             fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
@@ -410,6 +410,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if let Some(deku_id_type) = deku_id_type {
         tokens.extend(quote! {
             impl #imp DekuEnumExt<#lifetime, (#deku_id_type)> for #ident #wher {
+                #[inline(always)]
                 fn deku_id(&self) -> core::result::Result<(#deku_id_type), DekuError> {
                     match self {
                         #(#deku_ids ,)*
@@ -781,11 +782,13 @@ pub fn emit_container_read(
     quote! {
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
+            #[inline(always)]
             fn from_reader<'a, R: ::#crate_::no_std_io::Read>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #from_reader_body
             }
 
             #[allow(non_snake_case)]
+            #[inline(always)]
             fn from_bytes(__deku_input: (&#lifetime [u8], usize)) -> core::result::Result<((&#lifetime [u8], usize), Self), ::#crate_::DekuError> {
                 #from_bytes_body
             }
@@ -805,6 +808,7 @@ pub fn emit_try_from(
         impl #imp core::convert::TryFrom<&#lifetime [u8]> for #ident #wher {
             type Error = ::#crate_::DekuError;
 
+            #[inline(always)]
             fn try_from(input: &#lifetime [u8]) -> core::result::Result<Self, Self::Error> {
                 let total_len = input.len();
                 let mut cursor = ::#crate_::no_std_io::Cursor::new(input);

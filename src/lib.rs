@@ -531,6 +531,7 @@ where
     T: DekuWriter<Ctx>,
     Ctx: Copy,
 {
+    #[inline(always)]
     fn to_writer<W: no_std_io::Write>(
         &self,
         writer: &mut Writer<W>,

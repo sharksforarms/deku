@@ -51,6 +51,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
              impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
 
+                #[inline(always)]
                 fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
                     input.to_bits()
                 }
@@ -59,6 +60,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
                 type Error = ::#crate_::DekuError;
 
+                #[inline(always)]
                 fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
                     ::#crate_::DekuContainerWrite::to_bytes(&input)
                 }
@@ -86,6 +88,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp DekuUpdate for #ident #wher {
+            #[inline(always)]
             fn update(&mut self) -> core::result::Result<(), ::#crate_::DekuError> {
                 #update_use
                 #(#field_updates)*
@@ -96,6 +99,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         impl #imp ::#crate_::DekuWriter<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
+            #[inline(always)]
             fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
                 #write_body
             }
@@ -108,6 +112,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuWriter for #ident #wher {
                 #[allow(unused_variables)]
+                #[inline(always)]
                 fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
                     #write_body
                 }
@@ -242,6 +247,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
              impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
 
+                #[inline(always)]
                 fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
                     input.to_bits()
                 }
@@ -250,6 +256,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
                 type Error = ::#crate_::DekuError;
 
+                #[inline(always)]
                 fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
                     ::#crate_::DekuContainerWrite::to_bytes(&input)
                 }
@@ -276,6 +283,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp DekuUpdate for #ident #wher {
+            #[inline(always)]
             fn update(&mut self) -> core::result::Result<(), ::#crate_::DekuError> {
                 #update_use
 
@@ -289,6 +297,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         impl #imp ::#crate_::DekuWriter<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
+            #[inline(always)]
             fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
                 #write_body
             }
@@ -301,6 +310,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuWriter for #ident #wher {
                 #[allow(unused_variables)]
+                #[inline(always)]
                 fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
                     #write_body
                 }

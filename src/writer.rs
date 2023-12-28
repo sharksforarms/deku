@@ -39,7 +39,10 @@ impl<W: Write> Writer<W> {
         self.leftover.iter().by_vals().collect()
     }
 
-    /// Write all bits to `Writer` buffer if bits can fit into a byte buffer
+    /// Write all `bits` to `Writer` buffer if bits can fit into a byte buffer.
+    ///
+    /// Any leftover bits will be written before `bits`, and non-written bits will
+    /// be stored in `self.leftover`.
     #[inline]
     pub fn write_bits(&mut self, bits: &BitSlice<u8, Msb0>) -> Result<(), DekuError> {
         #[cfg(feature = "logging")]
@@ -91,6 +94,9 @@ impl<W: Write> Writer<W> {
     }
 
     /// Write `buf` into `Writer`
+    ///
+    /// If no `self.leftover`, this will write directly into `Writer`, and if not will write
+    /// `buf` using `Self::write_bits()`.
     // The following inline(always) helps performance significantly
     #[inline(always)]
     pub fn write_bytes(&mut self, buf: &[u8]) -> Result<(), DekuError> {

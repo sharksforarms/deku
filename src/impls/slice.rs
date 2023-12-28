@@ -1,7 +1,5 @@
 //! Implementations of DekuRead and DekuWrite for [T; N] where 0 < N <= 32
 
-pub use deku_derive::*;
-
 use crate::reader::Reader;
 use crate::writer::Writer;
 use crate::{DekuError, DekuReader, DekuWriter};

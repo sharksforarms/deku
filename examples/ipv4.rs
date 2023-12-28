@@ -25,19 +25,19 @@ use hexlit::hex;
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
 pub struct Ipv4Header {
-    #[deku(bits = "4")]
+    #[deku(bits = 4)]
     pub version: u8, // Version
-    #[deku(bits = "4")]
+    #[deku(bits = 4)]
     pub ihl: u8, // Internet Header Length
-    #[deku(bits = "6")]
+    #[deku(bits = 6)]
     pub dscp: u8, // Differentiated Services Code Point
-    #[deku(bits = "2")]
+    #[deku(bits = 2)]
     pub ecn: u8, // Explicit Congestion Notification
     pub length: u16,         // Total Length
     pub identification: u16, // Identification
-    #[deku(bits = "3")]
+    #[deku(bits = 3)]
     pub flags: u8, // Flags
-    #[deku(bits = "13")]
+    #[deku(bits = 13)]
     pub offset: u16, // Fragment Offset
     pub ttl: u8,             // Time To Live
     pub protocol: u8,        // Protocol

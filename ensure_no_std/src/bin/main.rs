@@ -17,9 +17,9 @@ use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
-    #[deku(bits = "5")]
+    #[deku(bits = 5)]
     field_a: u8,
-    #[deku(bits = "3")]
+    #[deku(bits = 3)]
     field_b: u8,
     count: u8,
     #[deku(count = "count")]

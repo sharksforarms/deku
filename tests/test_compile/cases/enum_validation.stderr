@@ -13,53 +13,53 @@ error: conflicting: both `type` and `id` specified on enum
 error: conflicting: both `id` and `id_pat` specified on variant
   --> $DIR/enum_validation.rs:16:17
    |
-16 |     #[deku(id = "1", id_pat = "2..=3")] A(u8),
+16 |     #[deku(id = "1", id_pat = "2..=3")]
    |                 ^^^
 
 error: `type` only supported on enum
-  --> $DIR/enum_validation.rs:21:15
+  --> $DIR/enum_validation.rs:22:15
    |
-21 | #[deku(type = "u8")]
+22 | #[deku(type = "u8")]
    |               ^^^^
 
 error: `bits` only supported on enum
-  --> $DIR/enum_validation.rs:28:15
+  --> $DIR/enum_validation.rs:29:15
    |
-28 | #[deku(bits = "1")]
-   |               ^^^
+29 | #[deku(bits = 1)]
+   |               ^
 
 error: `bits` only supported on enum
-  --> $DIR/enum_validation.rs:35:15
+  --> $DIR/enum_validation.rs:36:15
    |
-35 | #[deku(bits = "1")]
-   |               ^^^
+36 | #[deku(bits = 1)]
+   |               ^
 
 error: `id` only supported on enum
-  --> $DIR/enum_validation.rs:42:13
+  --> $DIR/enum_validation.rs:43:13
    |
-42 | #[deku(id = "test")]
+43 | #[deku(id = "test")]
    |             ^^^^^^
 
 error: error: cannot use `bits` with `id`
-  --> $DIR/enum_validation.rs:50:6
+  --> $DIR/enum_validation.rs:51:6
    |
-50 | enum Test8 {
+51 | enum Test8 {
    |      ^^^^^
 
 error: error: cannot use `bytes` with `id`
-  --> $DIR/enum_validation.rs:57:6
+  --> $DIR/enum_validation.rs:58:6
    |
-57 | enum Test9 {
+58 | enum Test9 {
    |      ^^^^^
 
 error: error: `id_pat` should be used for `_`
-  --> $DIR/enum_validation.rs:66:5
+  --> $DIR/enum_validation.rs:67:5
    |
-66 |     A
+67 |     A,
    |     ^
 
 error: DekuRead: `id` must be specified on non-unit variants
-  --> $DIR/enum_validation.rs:75:5
+  --> $DIR/enum_validation.rs:76:5
    |
-75 |     B(u8)
+76 |     B(u8),
    |     ^

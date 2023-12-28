@@ -136,7 +136,7 @@ fn test_struct_enum_ctx_id() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct StructEnumId {
         my_id: u8,
-        #[deku(bytes = "1")]
+        #[deku(bytes = 1)]
         data: usize,
         #[deku(ctx = "*my_id, *data")]
         enum_from_id: EnumId,

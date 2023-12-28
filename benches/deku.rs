@@ -5,11 +5,11 @@ use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuBits {
-    #[deku(bits = "1")]
+    #[deku(bits = 1)]
     data_01: u8,
-    #[deku(bits = "2")]
+    #[deku(bits = 2)]
     data_02: u8,
-    #[deku(bits = "5")]
+    #[deku(bits = 5)]
     data_03: u8,
 }
 

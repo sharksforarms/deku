@@ -55,9 +55,9 @@ impl<'a, R: Read> Reader<'a, R> {
     /// #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
     /// #[deku(endian = "big")]
     /// struct DekuTest {
-    ///     #[deku(bits = "4")]
+    ///     #[deku(bits = 4)]
     ///     field_a: u8,
-    ///     #[deku(bits = "2")]
+    ///     #[deku(bits = 2)]
     ///     field_b: u8,
     /// }
     /// //                       |         | <= this entire byte is Read

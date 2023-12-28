@@ -1,23 +1,23 @@
 error: conflicting: both `bits` and `bytes` specified on enum
  --> $DIR/bits_bytes_conflict.rs:4:28
   |
-4 | #[deku(type = "u8", bits = "1", bytes = "2")]
-  |                            ^^^
+4 | #[deku(type = "u8", bits = 1, bytes = 2)]
+  |                            ^
 
 error: conflicting: both `bits` and `bytes` specified on field
   --> $DIR/bits_bytes_conflict.rs:10:21
    |
-10 |     A(#[deku(bits = "1", bytes = "2")] u8),
-   |                     ^^^
+10 |     A(#[deku(bits = 1, bytes = 2)] u8),
+   |                     ^
 
 error: conflicting: both `bits` and `bytes` specified on field
   --> $DIR/bits_bytes_conflict.rs:19:19
    |
-19 |     #[deku(bits = "5", bytes = "6")]
-   |                   ^^^
+19 |     #[deku(bits = 5, bytes = 6)]
+   |                   ^
 
 error: conflicting: both `bits` and `bytes` specified on field
   --> $DIR/bits_bytes_conflict.rs:24:28
    |
-24 | struct Test4(#[deku(bits = "7", bytes = "8")] u8);
-   |                            ^^^
+24 | struct Test4(#[deku(bits = 7, bytes = 8)] u8);
+   |                            ^

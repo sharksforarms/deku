@@ -203,6 +203,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                             __deku_variant_id.write(__deku_output, (#id_args))?;
                         }
                     }
+                    Id::Int(v) => {
+                        quote! {
+                            let mut __deku_variant_id: #id_type = #v;
+                            __deku_variant_id.write(__deku_output, (#id_args))?;
+                        }
+                    }
                     Id::LitByteStr(v) => {
                         quote! {
                             let mut __deku_variant_id: #id_type = *#v;

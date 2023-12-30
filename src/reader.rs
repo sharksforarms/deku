@@ -39,6 +39,12 @@ impl<R: Read + Seek> Seek for Reader<'_, R> {
     }
 }
 
+impl<R: Read + Seek> AsMut<R> for Reader<'_, R> {
+    fn as_mut(&mut self) -> &mut R {
+        self.inner
+    }
+}
+
 impl<'a, R: Read + Seek> Reader<'a, R> {
     /// Create a new `Reader`
     #[inline]

@@ -50,6 +50,12 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
         }
     }
 
+    /// Mutable reference to inner `Read`er
+    #[inline]
+    pub fn as_mut(&mut self) -> &mut R {
+        self.inner
+    }
+
     /// Return the unused bits
     ///
     /// Once the parsing is complete for a struct, if the total size of the field using the `bits` attribute

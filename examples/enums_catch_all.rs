@@ -4,18 +4,18 @@ use deku::prelude::*;
 use hexlit::hex;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, DekuWrite, DekuRead)]
-#[deku(id_type = "u8")]
+#[deku(id_type = u8)]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum DekuTest {
     /// A
-    #[deku(id = "1")]
+    #[deku(id = 1)]
     A = 0,
     /// B
-    #[deku(id = "2")]
+    #[deku(id = 2)]
     B = 1,
     /// C
-    #[deku(id = "3", default)]
+    #[deku(id = 3, default)]
     C = 2,
 }
 

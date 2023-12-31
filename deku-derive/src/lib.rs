@@ -12,6 +12,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
+use syn::{parse_quote, Expr, Lit, LitStr};
 
 use crate::macros::deku_read::emit_deku_read;
 use crate::macros::deku_write::emit_deku_write;
@@ -640,7 +641,7 @@ struct DekuReceiver {
     id: Option<Id>,
 
     /// enum only: type of the enum `id`
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     id_type: Result<Option<TokenStream>, ReplacementError>,
 
     /// enum only: bit size of the enum `id`
@@ -671,7 +672,11 @@ fn apply_replacements(input: &syn::LitStr) -> Result<Cow<'_, syn::LitStr>, Repla
         .replace("deku::reader", "__deku_reader")
         .replace("deku::writer", "__deku_writer")
         .replace("deku::bit_offset", "__deku_bit_offset")
-        .replace("deku::byte_offset", "__deku_byte_offset");
+        .replace("deku::byte_offset", "__deku_byte_offset")
+        .replace("deku :: reader", "__deku_reader")
+        .replace("deku :: writer", "__deku_writer")
+        .replace("deku :: bit_offset", "__deku_bit_offset")
+        .replace("deku :: byte_offset", "__deku_byte_offset");
 
     Ok(Cow::Owned(syn::LitStr::new(&input_str, input.span())))
 }
@@ -686,7 +691,7 @@ fn map_option_litstr(input: Option<syn::LitStr>) -> Result<Option<syn::LitStr>, 
 
 /// Parse a TokenStream from an Option<LitStr>
 /// Also replaces any namespaced variables to internal variables found in `input`
-fn map_litstr_as_tokenstream(
+fn map_litstr_as_tokenstream_id_pat(
     input: Option<syn::LitStr>,
 ) -> Result<Option<TokenStream>, ReplacementError> {
     Ok(match input {
@@ -699,6 +704,161 @@ fn map_litstr_as_tokenstream(
         }
         None => None,
     })
+}
+
+/// Parse a TokenStream from an Option<LitStr>
+/// Also replaces any namespaced variables to internal variables found in `input`
+fn map_litstr_as_tokenstream(
+    input: Option<syn::Expr>,
+) -> Result<Option<TokenStream>, ReplacementError> {
+    let r = match input {
+        Some(Expr::Call(expr_call)) => {
+            let span = expr_call.span();
+            let value = expr_call.to_token_stream().to_string();
+            let lit = LitStr::new(&value, span);
+
+            let v = apply_replacements(&lit)?;
+            let v = v
+                .parse::<TokenStream>()
+                .expect("could not parse token stream");
+            Some(v)
+        }
+        Some(Expr::Path(expr_path)) => {
+            let span = expr_path.span();
+            let value = expr_path.to_token_stream().to_string();
+            let lit = LitStr::new(&value, span);
+
+            let v = apply_replacements(&lit)?;
+            let v = v
+                .parse::<TokenStream>()
+                .expect("could not parse token stream");
+            Some(v)
+        }
+        Some(Expr::Lit(expr_lit)) => match expr_lit.lit {
+            Lit::Str(s) => {
+                let v = apply_replacements(&s)?;
+                let v = v
+                    .parse::<TokenStream>()
+                    .expect("could not parse token stream");
+                Some(v)
+            }
+            // TODO: preserve hex!
+            Lit::Int(i) => {
+                let digit = i.base10_digits();
+                let span = i.span();
+                let lit = LitStr::new(&digit, span);
+                let v = apply_replacements(&lit)?;
+                let v = v
+                    .parse::<TokenStream>()
+                    .expect("could not parse token stream");
+                Some(v)
+            }
+            _ => todo!("not a Lit::Str or Lit::Int: {:?}", expr_lit.lit),
+        },
+        Some(Expr::Binary(expr_binary)) => {
+            let span = expr_binary.span();
+            let value = expr_binary.to_token_stream().to_string();
+            let lit = LitStr::new(&value, span);
+
+            let v = apply_replacements(&lit)?;
+            let v = v
+                .parse::<TokenStream>()
+                .expect("could not parse token stream");
+            Some(v)
+        }
+        Some(Expr::MethodCall(expr_method)) => {
+            let span = expr_method.span();
+            let value = expr_method.to_token_stream().to_string();
+            let lit = LitStr::new(&value, span);
+
+            let v = apply_replacements(&lit)?;
+            let v = v
+                .parse::<TokenStream>()
+                .expect("could not parse token stream");
+            Some(v)
+        }
+        Some(Expr::Paren(expr_paren)) => {
+            let span = expr_paren.span();
+            let value = expr_paren.to_token_stream().to_string();
+            let lit = LitStr::new(&value, span);
+
+            let v = apply_replacements(&lit)?;
+            let v = v
+                .parse::<TokenStream>()
+                .expect("could not parse token stream");
+            Some(v)
+        }
+        Some(Expr::Closure(expr_closure)) => {
+            let span = expr_closure.span();
+            let value = expr_closure.to_token_stream().to_string();
+            let lit = LitStr::new(&value, span);
+
+            let v = apply_replacements(&lit)?;
+            let v = v
+                .parse::<TokenStream>()
+                .expect("could not parse token stream");
+            Some(v)
+        }
+        Some(Expr::Range(expr_range)) => {
+            let span = expr_range.span();
+            let value = expr_range.to_token_stream().to_string();
+            let lit = LitStr::new(&value, span);
+
+            let v = apply_replacements(&lit)?;
+            let v = v
+                .parse::<TokenStream>()
+                .expect("could not parse token stream");
+            Some(v)
+        }
+        Some(Expr::Unary(expr_unary)) => {
+            let span = expr_unary.span();
+            let value = expr_unary.to_token_stream().to_string();
+            let lit = LitStr::new(&value, span);
+
+            let v = apply_replacements(&lit)?;
+            let v = v
+                .parse::<TokenStream>()
+                .expect("could not parse token stream");
+            Some(v)
+        }
+        Some(Expr::Cast(expr_cast)) => {
+            let span = expr_cast.span();
+            let value = expr_cast.to_token_stream().to_string();
+            let lit = LitStr::new(&value, span);
+
+            let v = apply_replacements(&lit)?;
+            let v = v
+                .parse::<TokenStream>()
+                .expect("could not parse token stream");
+            Some(v)
+        }
+        Some(Expr::Infer(expr_infer)) => {
+            let span = expr_infer.span();
+            let value = expr_infer.to_token_stream().to_string();
+            let lit = LitStr::new(&value, span);
+
+            let v = apply_replacements(&lit)?;
+            let v = v
+                .parse::<TokenStream>()
+                .expect("could not parse token stream");
+            Some(v)
+        }
+        Some(Expr::Repeat(expr_repeat)) => {
+            let span = expr_repeat.span();
+            let value = expr_repeat.to_token_stream().to_string();
+            let lit = LitStr::new(&value, span);
+
+            let v = apply_replacements(&lit)?;
+            let v = v
+                .parse::<TokenStream>()
+                .expect("could not parse token stream");
+            Some(v)
+        }
+        Some(_) => todo!("{:?}", input),
+        None => None,
+    };
+
+    return Ok(r);
 }
 
 /// Generate field name which supports both un-named/named structs/enums
@@ -745,42 +905,42 @@ struct DekuFieldReceiver {
     bytes: Option<Num>,
 
     /// tokens providing the length of the container
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     count: Result<Option<TokenStream>, ReplacementError>,
 
     /// tokens providing the number of bits for the length of the container
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     bits_read: Result<Option<TokenStream>, ReplacementError>,
 
     /// tokens providing the number of bytes for the length of the container
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     bytes_read: Result<Option<TokenStream>, ReplacementError>,
 
     /// a predicate to decide when to stop reading elements into the container
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     until: Result<Option<TokenStream>, ReplacementError>,
 
     /// apply a function to the field after it's read
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     map: Result<Option<TokenStream>, ReplacementError>,
 
     /// context passed to the field.
     /// A comma separated argument list.
     // TODO: The type of it should be `Punctuated<Expr, Comma>`
     //       https://github.com/TedDriggs/darling/pull/98
-    #[darling(default = "default_res_opt", map = "map_option_litstr")]
+    #[darling(default = "default_res_opt", map = map_option_litstr)]
     ctx: Result<Option<syn::LitStr>, ReplacementError>,
 
     /// map field when updating struct
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     update: Result<Option<TokenStream>, ReplacementError>,
 
     /// custom field reader code
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     reader: Result<Option<TokenStream>, ReplacementError>,
 
     /// custom field writer code
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     writer: Result<Option<TokenStream>, ReplacementError>,
 
     /// skip field reading/writing
@@ -788,19 +948,19 @@ struct DekuFieldReceiver {
     skip: bool,
 
     /// pad a number of bits before
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     pad_bits_before: Result<Option<TokenStream>, ReplacementError>,
 
     /// pad a number of bytes before
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     pad_bytes_before: Result<Option<TokenStream>, ReplacementError>,
 
     /// pad a number of bits after
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     pad_bits_after: Result<Option<TokenStream>, ReplacementError>,
 
     /// pad a number of bytes after
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     pad_bytes_after: Result<Option<TokenStream>, ReplacementError>,
 
     /// read field as temporary value, isn't stored
@@ -808,23 +968,23 @@ struct DekuFieldReceiver {
     temp: bool,
 
     /// write given value of temp field
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream_id_pat)]
     temp_value: Result<Option<TokenStream>, ReplacementError>,
 
     /// default value code when used with skip
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     default: Result<Option<TokenStream>, ReplacementError>,
 
     /// condition to parse field
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     cond: Result<Option<TokenStream>, ReplacementError>,
 
     // assertion on field
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     assert: Result<Option<TokenStream>, ReplacementError>,
 
     // assert value of field
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     assert_eq: Result<Option<TokenStream>, ReplacementError>,
 }
 
@@ -837,11 +997,11 @@ struct DekuVariantReceiver {
     discriminant: Option<syn::Expr>,
 
     /// custom variant reader code
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     reader: Result<Option<TokenStream>, ReplacementError>,
 
     /// custom variant reader code
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream)]
     writer: Result<Option<TokenStream>, ReplacementError>,
 
     /// variant `id` value
@@ -849,7 +1009,7 @@ struct DekuVariantReceiver {
     id: Option<Id>,
 
     /// variant `id_pat` value
-    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    #[darling(default = "default_res_opt", map = map_litstr_as_tokenstream_id_pat)]
     id_pat: Result<Option<TokenStream>, ReplacementError>,
 
     /// variant `id` value

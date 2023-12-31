@@ -36,7 +36,7 @@ struct DekuTest {
     field_e: u8,
     field_f: FieldF,
     num_items: u8,
-    #[deku(count = "num_items", endian = "big")]
+    #[deku(count = num_items, endian = "big")]
     items: Vec<u16>,
 }
 

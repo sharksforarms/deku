@@ -199,7 +199,9 @@ fn gen_type_from_ctx_id(
     id: &crate::Id,
 ) -> Option<TokenStream> {
     let parser = Punctuated::<Ident, Comma>::parse_terminated;
-    let s = parser.parse(id.to_token_stream().into()).unwrap();
+    let Ok(s) = parser.parse(id.to_token_stream().into()) else {
+        return None;
+    };
     let mut matching_types = quote! {};
     for s in s {
         let id = syn::Ident::new(&s.to_string(), id.span());

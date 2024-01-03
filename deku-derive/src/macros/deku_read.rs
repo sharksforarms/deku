@@ -397,12 +397,11 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let deku_id_type = if let Some(id_type) = id_type {
         Some(quote! {#id_type})
     } else if let (Some(ctx), Some(id)) = (input.ctx.as_ref(), input.id.as_ref()) {
-        Some(gen_type_from_ctx_id(ctx, id).ok_or_else(|| {
-            syn::Error::new(
-                id.span(),
-                "DekuReader: cannot determine `id` type from `ctx`",
-            )
-        })?)
+        if let Some(r) = gen_type_from_ctx_id(ctx, id) {
+            Some(r)
+        } else {
+            None
+        }
     } else {
         None
     };

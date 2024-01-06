@@ -4,7 +4,6 @@ use darling::ast::{Data, Fields};
 use darling::ToTokens;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::spanned::Spanned;
 
 use crate::macros::{
     gen_ctx_types_and_arg, gen_field_args, gen_internal_field_ident, gen_internal_field_idents,
@@ -397,11 +396,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let deku_id_type = if let Some(id_type) = id_type {
         Some(quote! {#id_type})
     } else if let (Some(ctx), Some(id)) = (input.ctx.as_ref(), input.id.as_ref()) {
-        if let Some(r) = gen_type_from_ctx_id(ctx, id) {
-            Some(r)
-        } else {
-            None
-        }
+        gen_type_from_ctx_id(ctx, id)
     } else {
         None
     };

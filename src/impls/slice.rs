@@ -104,4 +104,61 @@ mod tests {
         input.to_writer(&mut writer, endian).unwrap();
         assert_eq!(expected, writer.inner);
     }
+
+    #[rstest(input,endian,expected,expected_rest,
+        case::normal_le(
+            [0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66].as_ref(),
+            Endian::Little,
+            [[0xCCDD, 0xAABB], [0x8899, 0x6677]],
+            bits![u8, Msb0;],
+        ),
+        case::normal_le(
+            [0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66].as_ref(),
+            Endian::Big,
+            [[0xDDCC, 0xBBAA], [0x9988, 0x7766]],
+            bits![u8, Msb0;],
+        ),
+    )]
+    fn test_nested_array_bit_read(
+        input: &[u8],
+        endian: Endian,
+        expected: [[u16; 2]; 2],
+        expected_rest: &BitSlice<u8, Msb0>,
+    ) {
+        use no_std_io::io::Cursor;
+
+        use crate::reader::Reader;
+
+        let bit_slice = input.view_bits::<Msb0>();
+
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = <[[u16; 2]; 2]>::from_reader_with_ctx(&mut reader, endian).unwrap();
+        assert_eq!(expected, res_read);
+    }
+
+    #[rstest(input,endian,expected,
+        case::normal_le(
+            [[0xCCDD, 0xAABB], [0x8899, 0x6677]],
+            Endian::Little,
+            vec![0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66],
+        ),
+        case::normal_be(
+            [[0xDDCC, 0xBBAA], [0x9988, 0x7766]],
+            Endian::Big,
+            vec![0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66],
+        ),
+    )]
+    fn test_nested_array_bit_write(input: [[u16; 2]; 2], endian: Endian, expected: Vec<u8>) {
+        // test writer
+        let mut writer = Writer::new(vec![]);
+        input.to_writer(&mut writer, endian).unwrap();
+        assert_eq!(expected, writer.inner);
+
+        // test &slice
+        let input = input.as_ref();
+        let mut writer = Writer::new(vec![]);
+        input.to_writer(&mut writer, endian).unwrap();
+        assert_eq!(expected, writer.inner);
+    }
 }

@@ -40,9 +40,8 @@ mod tests {
         let res_read = <()>::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!((), res_read);
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         res_read.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(0, out_buf.len());
+        assert!(writer.inner.is_empty());
     }
 }

@@ -87,10 +87,9 @@ mod tests {
         let res_read = <Box<u16>>::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         res_read.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(input.to_vec(), out_buf.to_vec());
+        assert_eq!(input.to_vec(), writer.inner);
     }
 
     // Note: Copied tests from vec.rs impl
@@ -131,12 +130,11 @@ mod tests {
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         res_read
             .to_writer(&mut writer, (endian, BitSize(bit_size)))
             .unwrap();
-        assert_eq!(expected_write, out_buf.to_vec());
+        assert_eq!(expected_write, writer.inner);
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
     }

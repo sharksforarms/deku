@@ -83,10 +83,9 @@ mod tests {
         let res_read = Ipv4Addr::from_reader_with_ctx(&mut reader, endian).unwrap();
         assert_eq!(expected, res_read);
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         res_read.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(input.to_vec(), out_buf.to_vec());
+        assert_eq!(input.to_vec(), writer.inner);
     }
 
     #[rstest(input, endian, expected,
@@ -99,31 +98,28 @@ mod tests {
         let res_read = Ipv6Addr::from_reader_with_ctx(&mut reader, endian).unwrap();
         assert_eq!(expected, res_read);
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         res_read.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(input.to_vec(), out_buf.to_vec());
+        assert_eq!(input.to_vec(), writer.inner);
     }
 
     #[test]
     fn test_ip_addr_write() {
         let ip_addr = IpAddr::V4(Ipv4Addr::new(145, 254, 160, 237));
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         ip_addr.to_writer(&mut writer, Endian::Little).unwrap();
-        assert_eq!(vec![237, 160, 254, 145], out_buf.to_vec());
+        assert_eq!(vec![237, 160, 254, 145], writer.inner);
 
         let ip_addr = IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x02ff));
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         ip_addr.to_writer(&mut writer, Endian::Little).unwrap();
         assert_eq!(
             vec![
                 0xff, 0x02, 0x0a, 0xc0, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00
             ],
-            out_buf.to_vec()
+            writer.inner
         );
     }
 }

@@ -94,16 +94,14 @@ mod tests {
     )]
     fn test_bit_write(input: [u16; 2], endian: Endian, expected: Vec<u8>) {
         // test writer
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         input.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(expected, out_buf.to_vec());
+        assert_eq!(expected, writer.inner);
 
         // test &slice
         let input = input.as_ref();
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         input.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(expected, out_buf.to_vec());
+        assert_eq!(expected, writer.inner);
     }
 }

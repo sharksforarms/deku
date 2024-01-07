@@ -624,10 +624,9 @@ mod tests {
                 let res_read = <$typ>::from_reader_with_ctx(&mut reader, ENDIAN).unwrap();
                 assert_eq!($expected, res_read);
 
-                let mut out_buf = vec![];
-                let mut writer = Writer::new(&mut out_buf);
+                let mut writer = Writer::new(vec![]);
                 res_read.to_writer(&mut writer, ENDIAN).unwrap();
-                assert_eq!($input, out_buf);
+                assert_eq!($input, writer.inner);
             }
         };
     }
@@ -816,8 +815,7 @@ mod tests {
         expected: Vec<u8>,
         expected_leftover: Vec<bool>,
     ) {
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         match bit_size {
             Some(bit_size) => input
                 .to_writer(&mut writer, (endian, BitSize(bit_size)))
@@ -825,7 +823,7 @@ mod tests {
             None => input.to_writer(&mut writer, endian).unwrap(),
         };
         assert_eq!(expected_leftover, writer.rest());
-        assert_eq!(expected, out_buf);
+        assert_eq!(expected, writer.inner);
     }
 
     #[rstest(input, endian, byte_size, expected,
@@ -837,15 +835,14 @@ mod tests {
         case::byte_size_le_bigger(0x03AB, Endian::Little, Some(10), vec![0xAB, 0b11_000000]),
     )]
     fn test_byte_writer(input: u32, endian: Endian, byte_size: Option<usize>, expected: Vec<u8>) {
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         match byte_size {
             Some(byte_size) => input
                 .to_writer(&mut writer, (endian, ByteSize(byte_size)))
                 .unwrap(),
             None => input.to_writer(&mut writer, endian).unwrap(),
         };
-        assert_hex::assert_eq_hex!(expected, out_buf);
+        assert_hex::assert_eq_hex!(expected, writer.inner);
     }
 
     #[rstest(input, endian, bit_size, expected, expected_write,
@@ -869,15 +866,14 @@ mod tests {
         };
         assert_eq!(expected, res_read);
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         match bit_size {
             Some(bit_size) => res_read
                 .to_writer(&mut writer, (endian, BitSize(bit_size)))
                 .unwrap(),
             None => res_read.to_writer(&mut writer, endian).unwrap(),
         };
-        assert_hex::assert_eq_hex!(expected_write, out_buf);
+        assert_hex::assert_eq_hex!(expected_write, writer.inner);
     }
 
     macro_rules! TestSignExtending {

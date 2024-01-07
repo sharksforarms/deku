@@ -97,9 +97,8 @@ mod tests {
     where
         T: DekuWriter,
     {
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         input.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(expected, out_buf);
+        assert_eq!(expected, writer.inner);
     }
 }

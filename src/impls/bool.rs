@@ -76,19 +76,16 @@ mod tests {
 
     #[test]
     fn test_writer() {
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         true.to_writer(&mut writer, BitSize(1)).unwrap();
         assert_eq!(vec![true], writer.rest());
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         true.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![1], out_buf);
+        assert_eq!(vec![1], writer.inner);
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         false.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![0], out_buf);
+        assert_eq!(vec![0], writer.inner);
     }
 }

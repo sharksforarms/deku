@@ -52,6 +52,18 @@ where
     }
 }
 
+impl<T, Ctx> DekuWriter<Ctx> for Box<T>
+where
+    T: DekuWriter<Ctx>,
+    Ctx: Copy,
+{
+    /// Write all `T`s to bits
+    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
+        self.as_ref().to_writer(writer, ctx)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use no_std_io::io::Cursor;

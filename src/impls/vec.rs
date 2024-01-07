@@ -256,10 +256,9 @@ mod tests {
         case::normal(vec![0xAABB, 0xCCDD], Endian::Little, vec![0xBB, 0xAA, 0xDD, 0xCC]),
     )]
     fn test_vec_write(input: Vec<u16>, endian: Endian, expected: Vec<u8>) {
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         input.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(expected, out_buf.to_vec());
+        assert_eq!(expected, writer.inner);
     }
 
     // Note: These tests also exist in boxed.rs
@@ -298,12 +297,11 @@ mod tests {
         input.read_to_end(&mut buf).unwrap();
         assert_eq!(expected_rest_bytes, buf);
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         res_read
             .to_writer(&mut writer, (endian, BitSize(bit_size)))
             .unwrap();
-        assert_eq!(expected_write, out_buf.to_vec());
+        assert_eq!(expected_write, writer.inner);
 
         assert_eq!(input_clone[..expected_write.len()].to_vec(), expected_write);
     }

@@ -27,12 +27,19 @@ mod tests {
     use crate::reader::Reader;
 
     #[test]
-    fn test_option() {
+    fn test_option_read() {
         use crate::ctx::*;
         let input = &[1u8, 2, 3, 4];
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let v = Option::<u32>::from_reader_with_ctx(&mut reader, Endian::Little).unwrap();
         assert_eq!(v, Some(0x04030201))
+    }
+
+    #[test]
+    fn test_option_write() {
+        let mut writer = Writer::new(vec![]);
+        Some(true).to_writer(&mut writer, ()).unwrap();
+        assert_eq!(vec![1], writer.inner);
     }
 }

@@ -51,9 +51,8 @@ mod tests {
         let res_read = <Cow<u16>>::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         res_read.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(input.to_vec(), out_buf.to_vec());
+        assert_eq!(input.to_vec(), writer.inner);
     }
 }

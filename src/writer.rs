@@ -75,12 +75,11 @@ impl<W: Write> Writer<W> {
                 count += 1;
             });
 
-        // SAFETY: This does noto have a safety comment in bitvec. But this is safe
+        // SAFETY: This does not have a safety comment in bitvec. But this is safe
         // because of `count` here will always still be within the bounds
         // of `bits`
         bits = unsafe { bits.get_unchecked(count * bits_of::<u8>()..) };
 
-        // TODO: with_capacity?
         self.leftover = bits.to_bitvec();
         if self.inner.write_all(&buf).is_err() {
             return Err(DekuError::Write);
@@ -107,8 +106,8 @@ impl<W: Write> Writer<W> {
             #[cfg(feature = "logging")]
             log::trace!("leftover exists");
 
-            // TODO: we could check here and only send the required bits to finish the byte?
-            // (instead of sending the entire thing)
+            // TODO(perf): we could check here and only send the required bits to finish the byte,
+            // instead of sending the entire thing. The rest would be through self.inner.write.
             self.write_bits(&BitVec::from_slice(buf))?;
         } else {
             if self.inner.write_all(buf).is_err() {
@@ -133,8 +132,8 @@ impl<W: Write> Writer<W> {
                 .extend_from_bitslice(&bitvec![u8, Msb0; 0; 8 - self.leftover.len()]);
             let mut buf = alloc::vec![0x00; self.leftover.len() / 8];
 
-            // write as many leftover to the buffer (as we can, can't write bits just bytes)
-            // TODO: error if bits are leftover? (not bytes aligned)
+            // write as many leftover to the buffer. Because of the previous extend,
+            // this will include all the bits in self.leftover
             self.leftover
                 .chunks_exact(bits_of::<u8>())
                 .zip(buf.iter_mut())

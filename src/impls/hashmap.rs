@@ -302,9 +302,8 @@ mod tests {
         case::normal(fxhashmap!{0x11u8 => 0xAABBu16, 0x23u8 => 0xCCDDu16}, Endian::Little, vec![0x11, 0xBB, 0xAA, 0x23, 0xDD, 0xCC]),
     )]
     fn test_hashmap_write(input: FxHashMap<u8, u16>, endian: Endian, expected: Vec<u8>) {
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         input.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(expected, out_buf);
+        assert_eq!(expected, writer.inner);
     }
 }

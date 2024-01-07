@@ -67,9 +67,8 @@ mod tests {
         cursor.read_to_end(&mut buf).unwrap();
         assert_eq!(expected_rest, buf);
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         res_read.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![b't', b'e', b's', b't', b'\0'], out_buf.to_vec());
+        assert_eq!(vec![b't', b'e', b's', b't', b'\0'], writer.inner);
     }
 }

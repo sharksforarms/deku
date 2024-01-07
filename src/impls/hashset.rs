@@ -271,10 +271,9 @@ mod tests {
         case::normal(vec![0xAABB, 0xCCDD].into_iter().collect(), Endian::Little, vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
     fn test_hashset_write(input: FxHashSet<u16>, endian: Endian, expected: Vec<u8>) {
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         input.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(expected, out_buf);
+        assert_eq!(expected, writer.inner);
     }
 
     // Note: These tests also exist in boxed.rs
@@ -315,11 +314,10 @@ mod tests {
         cursor.read_to_end(&mut buf).unwrap();
         assert_eq!(expected_rest_bytes, buf);
 
-        let mut out_buf = vec![];
-        let mut writer = Writer::new(&mut out_buf);
+        let mut writer = Writer::new(vec![]);
         res_read
             .to_writer(&mut writer, (endian, BitSize(bit_size)))
             .unwrap();
-        assert_eq!(expected_write, out_buf);
+        assert_eq!(expected_write, writer.inner);
     }
 }

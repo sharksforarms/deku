@@ -3,7 +3,7 @@
 use core::cmp::Ordering;
 
 use bitvec::prelude::*;
-use no_std_io::io::{ErrorKind, Read};
+use no_std_io::io::{ErrorKind, Read, Seek, SeekFrom};
 
 use crate::{prelude::NeedSize, DekuError};
 use alloc::vec::Vec;
@@ -20,7 +20,7 @@ pub enum ReaderRet {
 }
 
 /// Reader to use with `from_reader_with_ctx`
-pub struct Reader<'a, R: Read> {
+pub struct Reader<'a, R: Read + Seek> {
     inner: &'a mut R,
     /// bits stored from previous reads that didn't read to the end of a byte size
     leftover: BitVec<u8, Msb0>,
@@ -31,7 +31,15 @@ pub struct Reader<'a, R: Read> {
 /// Max bits requested from [`Reader::read_bits`] during one call
 pub const MAX_BITS_AMT: usize = 128;
 
-impl<'a, R: Read> Reader<'a, R> {
+impl<R: Read + Seek> Seek for Reader<'_, R> {
+    fn seek(&mut self, pos: SeekFrom) -> no_std_io::io::Result<u64> {
+        // clear leftover
+        self.leftover = BitVec::new();
+        self.inner.seek(pos)
+    }
+}
+
+impl<'a, R: Read + Seek> Reader<'a, R> {
     /// Create a new `Reader`
     #[inline]
     pub fn new(inner: &'a mut R) -> Self {
@@ -40,6 +48,12 @@ impl<'a, R: Read> Reader<'a, R> {
             leftover: BitVec::new(), // with_capacity 8?
             bits_read: 0,
         }
+    }
+
+    /// Mutable reference to inner `Read`er
+    #[inline]
+    pub fn as_mut(&mut self) -> &mut R {
+        self.inner
     }
 
     /// Return the unused bits

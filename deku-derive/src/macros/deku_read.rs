@@ -116,7 +116,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
-            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -127,7 +127,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
-                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -375,7 +375,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     tokens.extend(quote! {
         #[allow(non_snake_case)]
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
-            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -387,7 +387,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             #[allow(non_snake_case)]
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
-                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -555,6 +555,17 @@ fn emit_field_read(
         &f.assert,
         &f.assert_eq,
     ];
+
+    let seek = if let Some(num) = &f.seek_from_current {
+        quote! {
+            use ::#crate_::no_std_io::Seek;
+            use ::#crate_::no_std_io::SeekFrom;
+            // TODO: use ?
+            __deku_reader.seek(SeekFrom::Current(i64::try_from(#num).unwrap())).unwrap();
+        }
+    } else {
+        quote! {}
+    };
 
     let (bit_offset, byte_offset) = emit_bit_byte_offsets(&field_check_vars);
 
@@ -750,6 +761,7 @@ fn emit_field_read(
     };
 
     let field_read = quote! {
+        #seek
         #pad_bits_before
 
         #bit_offset
@@ -783,7 +795,7 @@ pub fn emit_container_read(
     quote! {
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
-            fn from_reader<'a, R: ::#crate_::no_std_io::Read>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
+            fn from_reader<'a, R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #from_reader_body
             }
 

@@ -1,4 +1,4 @@
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 use std::ffi::CString;
 
 use crate::reader::Reader;
@@ -20,7 +20,7 @@ impl<'a, Ctx: Copy> DekuReader<'a, Ctx> for CString
 where
     u8: DekuReader<'a, Ctx>,
 {
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {

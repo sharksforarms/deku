@@ -399,3 +399,39 @@ fn test_bit_order_little() {
     let bytes = bit_order_little.to_bytes().unwrap();
     assert_eq_hex!(bytes, data);
 }
+
+#[test]
+fn test_bit_order_13() {
+    #[derive(DekuRead, PartialEq, Debug)]
+    #[deku(bit_order = "lsb")]
+    pub struct BitTest {
+        #[deku(bits = "13")]
+        raw_value1: u16,
+        #[deku(bits = "13")]
+        raw_value2: u16,
+        #[deku(bits = "6")]
+        raw_value3: u16,
+    }
+
+    let data = vec![0b00000000, 0b00000010, 0b01000000, 0b00000000];
+
+    let string_data = data
+        .iter()
+        .map(|f| (format!("{:08b}", f).chars().rev().collect()))
+        .collect::<Vec<String>>()
+        .join("");
+
+    println!("string_data: {}", string_data);
+
+    assert_eq!(string_data[0..13], string_data[13..26]);
+    assert_eq!(string_data.chars().nth(9).unwrap(), '1');
+
+    assert_eq!(
+        BitTest {
+            raw_value1: 2_u16.pow(9),
+            raw_value2: 2_u16.pow(9),
+            raw_value3: 0
+        },
+        BitTest::try_from(data.as_slice()).unwrap()
+    );
+}

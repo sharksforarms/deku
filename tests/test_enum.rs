@@ -8,7 +8,7 @@ use rstest::*;
 /// TODO: These should be divided into smaller tests
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum TestEnum {
     #[deku(id = "1")]
     VarA(u8),
@@ -54,7 +54,7 @@ fn test_enum(input: &[u8], expected: TestEnum) {
 #[should_panic(expected = "Parse(\"Could not match enum variant id = 2 on enum `TestEnum`\")")]
 fn test_enum_error() {
     #[derive(DekuRead)]
-    #[deku(type = "u8")]
+    #[deku(id_type = "u8")]
     enum TestEnum {
         #[deku(id = "1")]
         VarA(u8),
@@ -65,7 +65,7 @@ fn test_enum_error() {
 }
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum TestEnumDiscriminant {
     VarA = 0x00,
     VarB,
@@ -92,7 +92,7 @@ fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
 #[test]
 fn test_enum_array_type() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "[u8; 3]")]
+    #[deku(id_type = "[u8; 3]")]
     enum TestEnumArray {
         #[deku(id = b"123")]
         VarA,

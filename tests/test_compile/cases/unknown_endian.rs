@@ -13,11 +13,11 @@ struct Test2 {
 }
 
 #[derive(DekuRead)]
-#[deku(type = "u8", endian = "variable")]
+#[deku(id_type = "u8", endian = "variable")]
 enum Test3 {}
 
 #[derive(DekuRead)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum Test4 {
     #[deku(id = "1")]
     A(#[deku(endian = "variable")] u8),

@@ -179,3 +179,28 @@ fn test_raw_identifiers_struct() {
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(test_data, ret_write);
 }
+
+#[test]
+fn test_big_endian() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    pub struct A {
+        #[deku(bytes = "3", endian = "big")]
+        address: u32,
+    }
+
+    let bytes = [0x11, 0x22, 0x33];
+    let a = A::from_bytes((&bytes, 0)).unwrap().1;
+    let new_bytes = a.to_bytes().unwrap();
+    assert_eq!(bytes, &*new_bytes);
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    pub struct B {
+        #[deku(bytes = "2", endian = "big")]
+        address: u32,
+    }
+
+    let bytes = [0x00, 0xff, 0xab, 0xaa];
+    let a = B::from_bytes((&bytes, 0)).unwrap().1;
+    let new_bytes = a.to_bytes().unwrap();
+    assert_eq!(&bytes[..2], &*new_bytes);
+}

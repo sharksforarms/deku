@@ -5,7 +5,7 @@ use hexlit::hex;
 use rstest::*;
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum TestEnum {
     #[deku(id = "1")]
     VarA((u8, u16)),

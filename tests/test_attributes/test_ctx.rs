@@ -5,6 +5,7 @@ use bitvec::bitvec;
 use deku::bitvec::Msb0;
 use deku::prelude::*;
 use deku::reader::Reader;
+use deku::writer::Writer;
 
 /// General smoke tests for ctx
 /// TODO: These should be divided into smaller units
@@ -16,7 +17,7 @@ fn test_ctx_struct() {
     struct SubTypeNeedCtx {
         #[deku(
             reader = "(u8::from_reader_with_ctx(deku::reader,()).map(|c|(a+b+c) as usize))",
-            writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(self.i as u8)"
+            writer = "(|c|{u8::to_writer(&(c-a-b), deku::writer, ())})(self.i as u8)"
         )]
         i: usize,
     }
@@ -50,13 +51,13 @@ fn test_ctx_struct() {
 #[test]
 fn test_top_level_ctx_enum() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "u8", ctx = "a: u8, b: u8")]
+    #[deku(id_type = "u8", ctx = "a: u8, b: u8")]
     enum TopLevelCtxEnum {
         #[deku(id = "1")]
         VariantA(
             #[deku(
                 reader = "(u8::from_reader_with_ctx(deku::reader,()).map(|c|(a+b+c)))",
-                writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
+                writer = "(|c|{u8::to_writer(&(c-a-b), deku::writer, ())})(field_0)"
             )]
             u8,
         ),
@@ -70,21 +71,22 @@ fn test_top_level_ctx_enum() {
     .unwrap();
     assert_eq!(ret_read, TopLevelCtxEnum::VariantA(0x06));
 
-    let mut ret_write = bitvec![u8, Msb0;];
-    ret_read.write(&mut ret_write, (1, 2)).unwrap();
-    assert_eq!(ret_write.into_vec(), &test_data[..]);
+    let mut out_buf = vec![];
+    let mut writer = Writer::new(&mut out_buf);
+    ret_read.to_writer(&mut writer, (1, 2)).unwrap();
+    assert_eq!(out_buf.to_vec(), &test_data[..]);
 }
 
 #[test]
 fn test_top_level_ctx_enum_default() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "u8", ctx = "a: u8, b: u8", ctx_default = "1,2")]
+    #[deku(id_type = "u8", ctx = "a: u8, b: u8", ctx_default = "1,2")]
     enum TopLevelCtxEnumDefault {
         #[deku(id = "1")]
         VariantA(
             #[deku(
                 reader = "(u8::from_reader_with_ctx(deku::reader, ()).map(|c|(a+b+c)))",
-                writer = "(|c|{u8::write(&(c-a-b), deku::output, ())})(field_0)"
+                writer = "(|c|{u8::to_writer(&(c-a-b), deku::writer, ())})(field_0)"
             )]
             u8,
         ),
@@ -106,9 +108,10 @@ fn test_top_level_ctx_enum_default() {
     )
     .unwrap();
     assert_eq!(ret_read, TopLevelCtxEnumDefault::VariantA(0x06));
-    let mut ret_write = bitvec![u8, Msb0;];
-    ret_read.write(&mut ret_write, (1, 2)).unwrap();
-    assert_eq!(test_data.to_vec(), ret_write.into_vec());
+    let mut out_buf = vec![];
+    let mut writer = Writer::new(&mut out_buf);
+    ret_read.to_writer(&mut writer, (1, 2)).unwrap();
+    assert_eq!(test_data.to_vec(), out_buf.to_vec());
 }
 
 #[test]
@@ -228,14 +231,16 @@ fn test_ctx_default_struct() {
     .unwrap();
     assert_eq!(expected, ret_read);
     let mut ret_write = bitvec![u8, Msb0;];
-    ret_read.write(&mut ret_write, (1, 2)).unwrap();
-    assert_eq!(test_data.to_vec(), ret_write.into_vec());
+    let mut out_buf = vec![];
+    let mut writer = Writer::new(&mut out_buf);
+    ret_read.to_writer(&mut writer, (1, 2)).unwrap();
+    assert_eq!(test_data.to_vec(), out_buf.to_vec());
 }
 
 #[test]
 fn test_enum_endian_ctx() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "u32", endian = "endian", ctx = "endian: deku::ctx::Endian")]
+    #[deku(id_type = "u32", endian = "endian", ctx = "endian: deku::ctx::Endian")]
     enum EnumTypeEndianCtx {
         #[deku(id = "0xDEADBEEF")]
         VarA(u8),

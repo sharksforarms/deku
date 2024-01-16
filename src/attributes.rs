@@ -803,7 +803,7 @@ use deku::prelude::*;
 struct DekuTest {
     #[deku(
         reader = "DekuTest::read(deku::reader)",
-        writer = "DekuTest::write(deku::output, &self.field_a)"
+        writer = "DekuTest::write(deku::writer, &self.field_a)"
     )]
     field_a: String,
 }
@@ -818,9 +818,9 @@ impl DekuTest {
     }
 
     /// Parse from String to u8 and write
-    fn write(output: &mut BitVec<u8, Msb0>, field_a: &str) -> Result<(), DekuError> {
+    fn write<W: std::io::Write>(writer: &mut Writer<W>, field_a: &str) -> Result<(), DekuError> {
         let value = field_a.parse::<u8>().unwrap();
-        value.write(output, ())
+        value.to_writer(writer, ())
     }
 }
 
@@ -1019,7 +1019,7 @@ Example:
 # use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     #[deku(id = 0x01)]
     VariantA(u8),
@@ -1057,7 +1057,7 @@ Example discriminant
 # use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     VariantA = 0x01,
     VariantB,
@@ -1099,7 +1099,7 @@ Example:
 # use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     #[deku(id = 0x01)]
     VariantA(u8),
@@ -1151,7 +1151,7 @@ Example:
 # use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8", bits = 4)]
+#[deku(id_type = "u8", bits = 4)]
 enum DekuTest {
     #[deku(id = 0b1001)]
     VariantA( #[deku(bits = 4)] u8, u8),
@@ -1182,7 +1182,7 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u32", bytes = 2)]
+#[deku(id_type = "u32", bytes = 2)]
 enum DekuTest {
     #[deku(id = 0xBEEF)]
     VariantA(u8),

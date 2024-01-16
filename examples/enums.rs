@@ -6,7 +6,7 @@ use hexlit::hex;
 const THREE: u8 = 3;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     #[deku(id = 0)]
     Var1,

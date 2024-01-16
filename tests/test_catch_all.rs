@@ -6,7 +6,7 @@ mod test {
 
     /// Basic test struct
     #[derive(Clone, Copy, PartialEq, Eq, Debug, DekuWrite, DekuRead)]
-    #[deku(type = "u8")]
+    #[deku(id_type = "u8")]
     #[non_exhaustive]
     #[repr(u8)]
     pub enum BasicMapping {
@@ -21,7 +21,7 @@ mod test {
 
     /// Advanced test struct
     #[derive(Clone, Copy, PartialEq, Eq, Debug, DekuWrite, DekuRead)]
-    #[deku(type = "u8")]
+    #[deku(id_type = "u8")]
     #[non_exhaustive]
     #[repr(u8)]
     pub enum AdvancedRemapping {

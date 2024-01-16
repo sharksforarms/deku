@@ -1,8 +1,8 @@
 error: conflicting: both `bits` and `bytes` specified on enum
- --> $DIR/bits_bytes_conflict.rs:4:28
+ --> $DIR/bits_bytes_conflict.rs:4:31
   |
-4 | #[deku(type = "u8", bits = 1, bytes = 2)]
-  |                            ^
+4 | #[deku(id_type = "u8", bits = 1, bytes = 2)]
+  |                               ^
 
 error: conflicting: both `bits` and `bytes` specified on field
   --> $DIR/bits_bytes_conflict.rs:10:21

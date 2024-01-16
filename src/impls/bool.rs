@@ -1,11 +1,11 @@
-use no_std_io::io::Read;
+use no_std_io::io::{Read, Write};
 
 #[cfg(feature = "alloc")]
 use alloc::format;
 
-use bitvec::prelude::*;
-
-use crate::{DekuError, DekuReader, DekuWrite};
+use crate::reader::Reader;
+use crate::writer::Writer;
+use crate::{DekuError, DekuReader, DekuWriter};
 
 impl<'a, Ctx> DekuReader<'a, Ctx> for bool
 where
@@ -13,7 +13,7 @@ where
     u8: DekuReader<'a, Ctx>,
 {
     fn from_reader_with_ctx<R: Read>(
-        reader: &mut crate::reader::Reader<R>,
+        reader: &mut Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<bool, DekuError> {
         let val = u8::from_reader_with_ctx(reader, inner_ctx)?;
@@ -28,15 +28,15 @@ where
     }
 }
 
-impl<Ctx> DekuWrite<Ctx> for bool
+impl<Ctx> DekuWriter<Ctx> for bool
 where
-    u8: DekuWrite<Ctx>,
+    u8: DekuWriter<Ctx>,
 {
     /// wrapper around u8::write with consideration to context, such as bit size
-    fn write(&self, output: &mut BitVec<u8, Msb0>, inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, inner_ctx: Ctx) -> Result<(), DekuError> {
         match self {
-            true => (0x01u8).write(output, inner_ctx),
-            false => (0x00u8).write(output, inner_ctx),
+            true => (0x01u8).to_writer(writer, inner_ctx),
+            false => (0x00u8).to_writer(writer, inner_ctx),
         }
     }
 }
@@ -47,7 +47,7 @@ mod tests {
     use no_std_io::io::Cursor;
     use rstest::rstest;
 
-    use crate::reader::Reader;
+    use crate::{ctx::BitSize, reader::Reader};
 
     use super::*;
 
@@ -72,9 +72,20 @@ mod tests {
         let mut reader = Reader::new(&mut cursor);
         let res_read = bool::from_reader_with_ctx(&mut reader, crate::ctx::BitSize(2)).unwrap();
         assert!(res_read);
+    }
 
-        let mut res_write = bitvec![u8, Msb0;];
-        res_read.write(&mut res_write, ()).unwrap();
-        assert_eq!(vec![0b01], res_write.into_vec());
+    #[test]
+    fn test_writer() {
+        let mut writer = Writer::new(vec![]);
+        true.to_writer(&mut writer, BitSize(1)).unwrap();
+        assert_eq!(vec![true], writer.rest());
+
+        let mut writer = Writer::new(vec![]);
+        true.to_writer(&mut writer, ()).unwrap();
+        assert_eq!(vec![1], writer.inner);
+
+        let mut writer = Writer::new(vec![]);
+        false.to_writer(&mut writer, ()).unwrap();
+        assert_eq!(vec![0], writer.inner);
     }
 }

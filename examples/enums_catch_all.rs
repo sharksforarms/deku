@@ -4,7 +4,7 @@ use deku::prelude::*;
 use hexlit::hex;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, DekuWrite, DekuRead)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum DekuTest {

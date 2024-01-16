@@ -359,3 +359,35 @@ fn issue_310() {
     #[derive(DekuRead, DekuWrite)]
     struct Test {}
 }
+
+#[test]
+fn issue_397() {
+    use deku::prelude::*;
+
+    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite)]
+    struct Header {
+        kind: PacketType,
+    }
+
+    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite)]
+    #[deku(type = "u8", endian = "big")]
+    enum PacketType {
+        #[deku(id = 0)]
+        Zero,
+    }
+
+    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite)]
+    struct Packet {
+        header: Header,
+        #[deku(ctx = "header")]
+        payload: Payload,
+    }
+
+    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite)]
+    #[deku(ctx = "header: &Header", id = "header.kind")]
+    enum Payload {
+        #[deku(id = "PacketType::Zero")]
+        Zero(u8),
+    }
+    let _ = Packet::from_bytes((&[0x00, 0x01], 0));
+}

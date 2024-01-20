@@ -95,6 +95,9 @@ pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
 
     /// Read until a given quantity of bits have been read
     BitSize(BitSize),
+
+    /// Read until `reader.end()` is true. Used for `read_all` attribute.
+    End,
 }
 
 impl<T> From<usize> for Limit<T, fn(&T) -> bool> {
@@ -132,6 +135,14 @@ impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> Limit<T, Predicate> {
     #[inline]
     pub fn new_until(predicate: Predicate) -> Self {
         predicate.into()
+    }
+}
+
+impl<T> Limit<T, fn(&T) -> bool> {
+    /// Read until `reader.end()` is true
+    #[inline]
+    pub fn end() -> Self {
+        Self::End
     }
 }
 

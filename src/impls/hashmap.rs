@@ -42,6 +42,30 @@ where
     Ok(res)
 }
 
+fn from_reader_with_ctx_hashmap_to_end<'a, K, V, S, Ctx, R: Read>(
+    reader: &mut crate::reader::Reader<R>,
+    capacity: Option<usize>,
+    ctx: Ctx,
+) -> Result<HashMap<K, V, S>, DekuError>
+where
+    K: DekuReader<'a, Ctx> + Eq + Hash,
+    V: DekuReader<'a, Ctx>,
+    S: BuildHasher + Default,
+    Ctx: Copy,
+{
+    let mut res = HashMap::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
+
+    loop {
+        if reader.end() {
+            break;
+        }
+        let val = <(K, V)>::from_reader_with_ctx(reader, ctx)?;
+        res.insert(val.0, val.1);
+    }
+
+    Ok(res)
+}
+
 impl<'a, K, V, S, Ctx, Predicate> DekuReader<'a, (Limit<(K, V), Predicate>, Ctx)>
     for HashMap<K, V, S>
 where
@@ -136,6 +160,9 @@ where
                     move |read_bits, _| read_bits == bit_size,
                 )
             }
+
+            // Read until `reader.end()` is true
+            Limit::End => from_reader_with_ctx_hashmap_to_end(reader, None, inner_ctx),
         }
     }
 }
@@ -218,6 +245,7 @@ mod tests {
         case::count_2([0x01, 0xAA, 0x02, 0xBB, 0xBB].as_ref(), Endian::Little, Some(8), 2.into(), fxhashmap!{0x01 => 0xAA, 0x02 => 0xBB}, bits![u8, Msb0;], &[0xbb]),
         case::until_null([0x01, 0xAA, 0, 0, 0xBB].as_ref(), Endian::Little, None, (|kv: &(u8, u8)| kv.0 == 0u8 && kv.1 == 0u8).into(), fxhashmap!{0x01 => 0xAA, 0 => 0}, bits![u8, Msb0;], &[0xbb]),
         case::until_bits([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(16).into(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0xbb]),
+        case::read_all([0x01, 0xAA].as_ref(), Endian::Little, None, Limit::end(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[]),
         case::bits_6([0b0000_0100, 0b1111_0000, 0b1000_0000].as_ref(), Endian::Little, Some(6), 2.into(), fxhashmap!{0x01 => 0x0F, 0x02 => 0}, bits![u8, Msb0;], &[]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
         case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1.into(), FxHashMap::default(), bits![u8, Msb0;], &[]),

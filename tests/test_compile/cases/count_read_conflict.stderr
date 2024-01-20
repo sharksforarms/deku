@@ -21,3 +21,27 @@ error: conflicting: both `count` and `bytes_read` specified on field
    |
 23 |     #[deku(count = "1", bytes_read = "2")]
    |                    ^^^
+
+error: conflicting: `read_all` cannot be used with `until`, count`, `bits_read`, or `bytes_read`
+  --> $DIR/count_read_conflict.rs:27:10
+   |
+27 | #[derive(DekuRead)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: conflicting: `read_all` cannot be used with `until`, count`, `bits_read`, or `bytes_read`
+  --> $DIR/count_read_conflict.rs:33:10
+   |
+33 | #[derive(DekuRead)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: conflicting: `read_all` cannot be used with `until`, count`, `bits_read`, or `bytes_read`
+  --> $DIR/count_read_conflict.rs:39:10
+   |
+39 | #[derive(DekuRead)]
+   |          ^^^^^^^^
+   |
+   = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)

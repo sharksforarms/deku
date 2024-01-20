@@ -679,6 +679,17 @@ fn emit_field_read(
                     (::#crate_::ctx::Limit::new_until(#field_until), (#read_args))
                 )?
             }
+        } else if f.read_all {
+            quote! {
+                {
+                    use core::borrow::Borrow;
+                    #type_as_deku_read::from_reader_with_ctx
+                    (
+                        __deku_reader,
+                        (::#crate_::ctx::Limit::end(), (#read_args))
+                    )?
+                }
+            }
         } else {
             quote! {
                 #type_as_deku_read::from_reader_with_ctx

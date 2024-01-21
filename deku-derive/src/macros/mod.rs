@@ -4,6 +4,7 @@ use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
+use syn::Lifetime;
 
 use crate::Num;
 
@@ -211,6 +212,10 @@ fn gen_type_from_ctx_id(
             if let syn::FnArg::Typed(pat_type) = arg {
                 if let syn::Pat::Ident(ident) = &*pat_type.pat {
                     if id == ident.ident {
+                        let mut pat_type = pat_type.clone();
+                        if let syn::Type::Reference(r) = pat_type.ty.as_mut() {
+                            r.lifetime = Some(Lifetime::new("'__deku", Span::call_site()));
+                        }
                         let ty = &pat_type.ty;
                         t = Some(quote! {#ty});
                     }

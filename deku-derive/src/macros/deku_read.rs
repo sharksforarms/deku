@@ -409,8 +409,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuEnumExt`
     if let Some(deku_id_type) = deku_id_type {
-        tokens.extend(quote! {
-            impl #imp DekuEnumExt<#lifetime, (#deku_id_type)> for #ident #wher {
+        if !imp.to_token_stream().is_empty() {
+            // Generics (#imp) are not supported, as our __deku
+            // would need to be appended to #imp
+        } else {
+            tokens.extend(quote! {
+            impl<'__deku> #imp ::#crate_::DekuEnumExt<#lifetime, (#deku_id_type)> for #ident #wher {
                 #[inline]
                 fn deku_id(&self) -> core::result::Result<(#deku_id_type), DekuError> {
                     match self {
@@ -420,6 +424,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 }
             }
         });
+        }
     }
 
     // println!("{}", tokens.to_string());

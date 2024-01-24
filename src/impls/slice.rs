@@ -70,6 +70,18 @@ where
     }
 }
 
+impl<Ctx: Copy, T> DekuWrite<Ctx> for [T]
+where
+    T: DekuWrite<Ctx>,
+{
+    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
+        for v in self {
+            v.write(output, ctx)?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::DekuWrite;
@@ -106,7 +118,6 @@ mod tests {
         assert_eq!(expected, res_write.into_vec());
     }
 
-    #[cfg(feature = "const_generics")]
     #[rstest(input,endian,expected,expected_rest,
         case::normal_le(
             [0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66].as_ref(),
@@ -139,7 +150,6 @@ mod tests {
         assert_eq!(expected, res_read);
     }
 
-    #[cfg(feature = "const_generics")]
     #[rstest(input,endian,expected,
         case::normal_le(
             [[0xCCDD, 0xAABB], [0x8899, 0x6677]],
@@ -162,5 +172,14 @@ mod tests {
         let mut res_write = bitvec![u8, Msb0;];
         input.write(&mut res_write, endian).unwrap();
         assert_eq!(expected, res_write.into_vec());
+    }
+
+    #[test]
+    fn test_issue270() {
+        let num = [1, 1];
+        let mut res_write = bitvec![u8, Msb0;];
+        num.write(&mut res_write, ()).unwrap();
+        <[u8]>::write(num.as_ref(), &mut res_write, ()).unwrap();
+        <&[u8]>::write(&num.as_ref(), &mut res_write, ()).unwrap();
     }
 }

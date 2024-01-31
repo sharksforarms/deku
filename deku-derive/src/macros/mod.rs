@@ -344,3 +344,35 @@ fn pad_bits(
         (None, None) => quote!(),
     }
 }
+
+/// assertion is false, raise error
+fn assertion_failed(
+    v: &TokenStream,
+    ident: &str,
+    field_ident_str: &str,
+    field_ident: Option<&TokenStream>,
+) -> TokenStream {
+    let crate_ = get_crate_name();
+    let stringify = if let Some(field_ident) = field_ident {
+        quote! { stringify!(#field_ident == #v) }
+    } else {
+        quote! { stringify!(#v) }
+    };
+    #[cfg(feature = "no-assert-string")]
+    {
+        quote! {
+            return Err(::#crate_::DekuError::AssertionNoStr);
+        }
+    }
+    #[cfg(not(feature = "no-assert-string"))]
+    {
+        quote! {
+            return Err(::#crate_::DekuError::Assertion(format!(
+                "{}.{} field failed assertion: {}",
+                #ident,
+                #field_ident_str,
+                #stringify,
+            )));
+        }
+    }
+}

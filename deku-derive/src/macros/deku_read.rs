@@ -11,6 +11,8 @@ use crate::macros::{
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
+use super::assertion_failed;
+
 pub(crate) fn emit_deku_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
     match &input.data {
         Data::Enum(_) => emit_enum(input),
@@ -566,31 +568,19 @@ fn emit_field_read(
     let internal_field_ident = gen_internal_field_ident(&field_ident);
 
     let field_assert = f.assert.as_ref().map(|v| {
+        let return_error = assertion_failed(v, &ident, &field_ident_str, None);
         quote! {
             if (!(#v)) {
-                // assertion is false, raise error
-                return Err(::#crate_::DekuError::Assertion(format!(
-                            "{}.{} field failed assertion: {}",
-                            #ident,
-                            #field_ident_str,
-                            stringify!(#v)
-                        )));
-            } else {
-                // do nothing
+                #return_error
             }
         }
     });
 
     let field_assert_eq = f.assert_eq.as_ref().map(|v| {
+        let return_error = assertion_failed(v, &ident, &field_ident_str, Some(&field_ident));
         quote! {
             if (!(#internal_field_ident == (#v))) {
-                // assertion is false, raise error
-                return Err(::#crate_::DekuError::Assertion(format!(
-                            "{}.{} field failed assertion: {}",
-                            #ident,
-                            #field_ident_str,
-                            stringify!(#field_ident == #v)
-                        )));
+                #return_error
             } else {
                 // do nothing
             }

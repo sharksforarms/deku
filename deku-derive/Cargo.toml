@@ -15,6 +15,7 @@ proc-macro = true
 [features]
 std = ["proc-macro-crate"]
 logging = []
+no-assert-string = []
 
 [dependencies]
 quote = "1.0"

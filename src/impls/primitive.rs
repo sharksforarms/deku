@@ -32,32 +32,6 @@ trait DekuRead<'a, Ctx = ()> {
         Self: Sized;
 }
 
-/// "Writer" trait: write from type to bits
-trait DekuWrite<Ctx = ()> {
-    /// Write type to bits
-    /// * **output** - Sink to store resulting bits
-    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
-    /// needed.
-    fn write(
-        &self,
-        output: &mut crate::bitvec::BitVec<u8, crate::bitvec::Msb0>,
-        ctx: Ctx,
-    ) -> Result<(), DekuError>;
-}
-
-/// Implements DekuWrite for references of types that implement DekuWrite
-impl<T, Ctx> DekuWrite<Ctx> for &T
-where
-    T: DekuWrite<Ctx>,
-    Ctx: Copy,
-{
-    /// Write value of type to bits
-    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
-        <T>::write(self, output, ctx)?;
-        Ok(())
-    }
-}
-
 // specialize u8 for ByteSize
 impl DekuRead<'_, (Endian, ByteSize)> for u8 {
     #[inline]

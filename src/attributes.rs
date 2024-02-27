@@ -1049,7 +1049,7 @@ or [id (top-level)](#id-top-level)
 
 **Note**:
     - If no `id` is specified, it is defaulted to the discriminant value.
-    - The discriminant value is retreived using the `as` keyword.
+    - The discriminant value is retrieved using the `as` keyword.
 
 Example:
 ```rust

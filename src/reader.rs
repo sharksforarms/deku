@@ -42,6 +42,12 @@ impl<'a, R: Read> Reader<'a, R> {
         }
     }
 
+    /// Consume self, returning inner Reader
+    #[inline]
+    pub fn into_inner(self) -> &'a mut R {
+        self.inner
+    }
+
     /// Return the unused bits
     ///
     /// Once the parsing is complete for a struct, if the total size of the field using the `bits` attribute

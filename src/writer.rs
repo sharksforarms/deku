@@ -43,7 +43,7 @@ impl<W: Write> Writer<W> {
     ///
     /// Any leftover bits will be written before `bits`, and non-written bits will
     /// be stored in `self.leftover`.
-    #[inline]
+    #[inline(never)]
     pub fn write_bits(&mut self, bits: &BitSlice<u8, Msb0>) -> Result<(), DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("attempting {} bits", bits.len());

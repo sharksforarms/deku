@@ -32,7 +32,7 @@ log = { version = "0.4.17", optional = true }
 no_std_io = { version = "0.5.0", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
-rstest = "0.16.0"
+rstest = "0.19.0"
 hexlit = "0.5.5"
 criterion = "0.4.0"
 alloc_counter = "0.0.4"

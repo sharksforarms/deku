@@ -155,8 +155,8 @@ the incoming data.
 First the "type" is read using the `type`, then is matched against the
 variants given `id`. What happens after is the same as structs!
 
-This is implemented with the [id](/attributes/index.html#id),
-[id_pat](/attributes/index.html#id_pat), [default](/attributes/index.html#default) and
+This is implemented with the [id](attributes#id),
+[id_pat](attributes#id_pat), [default](attributes#default) and
 [type](attributes#type) attributes. See these for more examples.
 
 If no `id` is specified, the variant will default to it's discriminant value.

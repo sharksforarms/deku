@@ -63,4 +63,19 @@ mod tests {
             (5, 0, 5)
         );
     }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_simple_write() {
+        let input = hex!("aa_bbbb_cc_0102_dd_ffffff_aa_0100ff");
+        let t = TestDeku::from_reader((&mut input.as_slice(), 0)).unwrap().1;
+
+        assert_eq!(
+            count_alloc(|| {
+                t.to_bytes().unwrap();
+            })
+            .0,
+            (2, 1, 2)
+        );
+    }
 }

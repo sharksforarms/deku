@@ -13,6 +13,9 @@ const fn bits_of<T>() -> usize {
     core::mem::size_of::<T>().saturating_mul(<u8>::BITS as usize)
 }
 
+/// Max bits written to [`Reader::write_bits`] during one call
+pub const MAX_BITS_AMT: usize = 128;
+
 /// Container to use with `to_writer`
 pub struct Writer<W: Write> {
     pub(crate) inner: W,
@@ -43,6 +46,9 @@ impl<W: Write> Writer<W> {
     ///
     /// Any leftover bits will be written before `bits`, and non-written bits will
     /// be stored in `self.leftover`.
+    ///
+    /// # Params
+    /// `bits`    - Amount of bits that will be written. length must be <= [`MAX_BITS_AMT`].
     #[inline(never)]
     pub fn write_bits(&mut self, bits: &BitSlice<u8, Msb0>) -> Result<(), DekuError> {
         #[cfg(feature = "logging")]
@@ -66,7 +72,8 @@ impl<W: Write> Writer<W> {
         };
 
         // one shot impl of BitSlice::read(no read_exact), but for no_std
-        let mut buf = alloc::vec![0x00; bits.len() / 8];
+        let mut buf = [0; MAX_BITS_AMT];
+        let buf = &mut buf[..bits.len() / 8];
         let mut count = 0;
         bits.chunks_exact(bits_of::<u8>())
             .zip(buf.iter_mut())
@@ -81,7 +88,7 @@ impl<W: Write> Writer<W> {
         bits = unsafe { bits.get_unchecked(count * bits_of::<u8>()..) };
 
         self.leftover = bits.to_bitvec();
-        if self.inner.write_all(&buf).is_err() {
+        if self.inner.write_all(buf).is_err() {
             return Err(DekuError::Write);
         }
 

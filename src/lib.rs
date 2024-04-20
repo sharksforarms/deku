@@ -227,7 +227,7 @@ assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
 
-# `Read` enabled
+# `Read` supported
 Parsers can be created that directly read from a source implementing [Read](crate::no_std_io::Read).
 
 The crate [no_std_io] is re-exported for use in `no_std` environments.
@@ -250,7 +250,7 @@ let mut file = File::options().read(true).open("file").unwrap();
 let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
 ```
 
-# `Write` enabled
+# `Write` supported
 Parsers can be created that directly write to a source implementing [Write](crate::no_std_io::Write).
 
 ```rust, no_run

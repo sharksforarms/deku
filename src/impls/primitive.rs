@@ -79,8 +79,9 @@ impl DekuReader<'_, (Endian, ByteSize)> for u8 {
         reader: &mut Reader<R>,
         (endian, size): (Endian, ByteSize),
     ) -> Result<u8, DekuError> {
-        let mut buf = [0; core::mem::size_of::<u8>()];
-        let ret = reader.read_bytes(size.0, &mut buf)?;
+        const MAX_TYPE_BYTES: usize = core::mem::size_of::<u8>();
+        let mut buf = [0; MAX_TYPE_BYTES];
+        let ret = reader.read_bytes_const::<MAX_TYPE_BYTES>(&mut buf)?;
         let a = match ret {
             ReaderRet::Bytes => <u8>::from_be_bytes(buf),
             ReaderRet::Bits(bits) => {
@@ -357,20 +358,35 @@ macro_rules! ImplDekuReadSignExtend {
     };
 }
 
-// TODO: these forward types should forward on a ContainerCanHoldSize or something if ByteSize or
-// BitSize wasn't defined
 macro_rules! ForwardDekuRead {
     ($typ:ty) => {
-        // Only have `endian`, set `bit_size` to `Size::of::<Type>()`
+        // Only have `endian`, specialize and use read_bytes_const
         impl DekuReader<'_, Endian> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
                 endian: Endian,
             ) -> Result<$typ, DekuError> {
-                const BYTE_SIZE: usize = core::mem::size_of::<$typ>();
-
-                <$typ>::from_reader_with_ctx(reader, (endian, ByteSize(BYTE_SIZE)))
+                const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
+                let mut buf = [0; MAX_TYPE_BYTES];
+                let ret = reader.read_bytes_const::<MAX_TYPE_BYTES>(&mut buf)?;
+                let a = match ret {
+                    ReaderRet::Bytes => {
+                        if endian.is_le() {
+                            <$typ>::from_le_bytes(buf)
+                        } else {
+                            <$typ>::from_be_bytes(buf)
+                        }
+                    }
+                    ReaderRet::Bits(Some(bits)) => {
+                        let a = <$typ>::read(&bits, (endian, ByteSize(MAX_TYPE_BYTES)))?;
+                        a.1
+                    }
+                    ReaderRet::Bits(None) => {
+                        return Err(DekuError::Parse(format!("no bits read from reader")));
+                    }
+                };
+                Ok(a)
             }
         }
 

@@ -206,6 +206,7 @@ impl<'a, R: Read> Reader<'a, R> {
     ///
     /// # Params
     /// `amt`    - Amount of bytes that will be read
+    /// `buf`    - result bytes
     #[inline(always)]
     pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> Result<ReaderRet, DekuError> {
         #[cfg(feature = "logging")]
@@ -232,6 +233,38 @@ impl<'a, R: Read> Reader<'a, R> {
             Ok(ReaderRet::Bits(self.read_bits(amt * 8)?))
         }
     }
+
+    /// Attempt to read bytes from `Reader`. This will return `ReaderRet::Bytes` with a valid
+    /// `buf` of bytes if we have no "leftover" bytes and thus are byte aligned. If we are not byte
+    /// aligned, this will call `read_bits` and return `ReaderRet::Bits(_)` of size `N` * 8.
+    ///
+    /// # Params
+    /// `buf`    - result bytes
+    #[inline(always)]
+    pub fn read_bytes_const<const N: usize>(
+        &mut self,
+        buf: &mut [u8; N],
+    ) -> Result<ReaderRet, DekuError> {
+        #[cfg(feature = "logging")]
+        log::trace!("read_bytes: requesting {N} bytes");
+        if self.leftover.is_empty() {
+            if let Err(e) = self.inner.read_exact(buf) {
+                if e.kind() == ErrorKind::UnexpectedEof {
+                    return Err(DekuError::Incomplete(NeedSize::new(N * 8)));
+                }
+                return Err(DekuError::Io(e.kind()));
+            }
+
+            self.bits_read += N * 8;
+
+            #[cfg(feature = "logging")]
+            log::trace!("read_bytes: returning {:02x?}", &buf);
+
+            Ok(ReaderRet::Bytes)
+        } else {
+            Ok(ReaderRet::Bits(self.read_bits(N * 8)?))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -242,12 +275,12 @@ mod tests {
 
     #[test]
     fn test_end() {
-        let input = hex!("aa");
+        let input = hex!("aabb");
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         assert!(!reader.end());
-        let mut buf = [0; 1];
-        let _ = reader.read_bytes(1, &mut buf);
+        let mut buf = [0; 2];
+        let _ = reader.read_bytes_const::<2>(&mut buf).unwrap();
         assert!(reader.end());
 
         let input = hex!("aa");

@@ -1,18 +1,18 @@
-use no_std_io::io::Read;
+use no_std_io::io::{Read, Write};
 use std::ffi::CString;
 
-use bitvec::prelude::*;
-
+use crate::reader::Reader;
+use crate::writer::Writer;
 use crate::{ctx::*, DekuReader};
-use crate::{DekuError, DekuWrite};
+use crate::{DekuError, DekuWriter};
 
-impl<Ctx: Copy> DekuWrite<Ctx> for CString
+impl<Ctx: Copy> DekuWriter<Ctx> for CString
 where
-    u8: DekuWrite<Ctx>,
+    u8: DekuWriter<Ctx>,
 {
-    fn write(&self, output: &mut BitVec<u8, Msb0>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
         let bytes = self.as_bytes_with_nul();
-        bytes.write(output, ctx)
+        bytes.to_writer(writer, ctx)
     }
 }
 
@@ -21,7 +21,7 @@ where
     u8: DekuReader<'a, Ctx>,
 {
     fn from_reader_with_ctx<R: Read>(
-        reader: &mut crate::reader::Reader<R>,
+        reader: &mut Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
         let bytes =
@@ -67,8 +67,8 @@ mod tests {
         cursor.read_to_end(&mut buf).unwrap();
         assert_eq!(expected_rest, buf);
 
-        let mut res_write = bitvec![u8, Msb0;];
-        res_read.write(&mut res_write, ()).unwrap();
-        assert_eq!(vec![b't', b'e', b's', b't', b'\0'], res_write.into_vec());
+        let mut writer = Writer::new(vec![]);
+        res_read.to_writer(&mut writer, ()).unwrap();
+        assert_eq!(vec![b't', b'e', b's', b't', b'\0'], writer.inner);
     }
 }

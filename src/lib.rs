@@ -174,7 +174,7 @@ Example:
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     #[deku(id = 0x01)]
     VariantA,
@@ -238,7 +238,7 @@ using `no_std`.
 # use std::io::{Seek, SeekFrom, Read};
 # use std::fs::File;
 # use deku::prelude::*;
-#[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone)]
 #[deku(endian = "big")]
 struct EcHdr {
     magic: [u8; 4],
@@ -248,6 +248,23 @@ struct EcHdr {
 
 let mut file = File::options().read(true).open("file").unwrap();
 let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
+```
+
+# `Write` enabled
+Parsers can be created that directly write to a source implementing [Write](crate::no_std_io::Write).
+
+```rust, no_run
+# use std::io::{Seek, SeekFrom, Read};
+# use std::fs::File;
+# use deku::prelude::*;
+#[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone)]
+#[deku(endian = "big")]
+struct Hdr {
+    version: u8,
+}
+let hdr = Hdr { version: 0xf0 };
+let mut file = File::options().write(true).open("file").unwrap();
+hdr.to_writer(&mut Writer::new(file), ());
 ```
 
 # Internal variables and previously read fields
@@ -273,8 +290,8 @@ tokens such as `reader`, `writer`, `map`, `count`, etc.
 These are provided as a convenience to the user.
 
 Always included:
-- `deku::reader: &mut Reader` - Current [Reader](crate::reader::Reader)
-- `deku::output: &mut BitSlice<u8, Msb0>` - The output bit stream
+- `deku::reader: &mut Reader` - Current [Reader]
+- `deku::writer: &mut Writer` - Current [Writer]
 
 Conditionally included if referenced:
 - `deku::bit_offset: usize` - Current bit offset from the input
@@ -331,6 +348,7 @@ pub mod no_std_io {
     pub use no_std_io::io::Cursor;
     pub use no_std_io::io::Read;
     pub use no_std_io::io::Result;
+    pub use no_std_io::io::Write;
 }
 
 /// re-export of bitvec
@@ -347,8 +365,11 @@ pub mod error;
 mod impls;
 pub mod prelude;
 pub mod reader;
+pub mod writer;
 
 pub use crate::error::DekuError;
+use crate::reader::Reader;
+use crate::writer::Writer;
 
 /// "Reader" trait: read bytes and bits from [`no_std_io::Read`]er
 pub trait DekuReader<'a, Ctx = ()> {
@@ -360,7 +381,7 @@ pub trait DekuReader<'a, Ctx = ()> {
     /// # use std::fs::File;
     /// # use deku::prelude::*;
     /// # use deku::ctx::Endian;
-    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone)]
     /// #[deku(endian = "ctx_endian", ctx = "ctx_endian: Endian")]
     /// struct EcHdr {
     ///     magic: [u8; 4],
@@ -373,7 +394,7 @@ pub trait DekuReader<'a, Ctx = ()> {
     /// let ec = EcHdr::from_reader_with_ctx(&mut reader, Endian::Big).unwrap();
     /// ```
     fn from_reader_with_ctx<R: no_std_io::Read>(
-        reader: &mut crate::reader::Reader<R>,
+        reader: &mut Reader<R>,
         ctx: Ctx,
     ) -> Result<Self, DekuError>
     where
@@ -396,7 +417,7 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     /// # use std::io::{Seek, SeekFrom, Read};
     /// # use std::fs::File;
     /// # use deku::prelude::*;
-    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone, Hash)]
+    /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone)]
     /// #[deku(endian = "big")]
     /// struct EcHdr {
     ///     magic: [u8; 4],
@@ -422,27 +443,73 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
         Self: Sized;
 }
 
-/// "Writer" trait: write from type to bits
-pub trait DekuWrite<Ctx = ()> {
-    /// Write type to bits
-    /// * **output** - Sink to store resulting bits
-    /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
-    /// needed.
-    fn write(
+/// "Writer" trait: write from type to bytes
+pub trait DekuWriter<Ctx = ()> {
+    /// Write type to bytes
+    fn to_writer<W: no_std_io::Write>(
         &self,
-        output: &mut bitvec::BitVec<u8, bitvec::Msb0>,
+        writer: &mut Writer<W>,
         ctx: Ctx,
     ) -> Result<(), DekuError>;
 }
 
 /// "Writer" trait: implemented on DekuWrite struct and enum containers. A `container` is a type which
 /// doesn't need any context information.
-pub trait DekuContainerWrite: DekuWrite<()> {
+pub trait DekuContainerWrite: DekuWriter<()> {
     /// Write struct/enum to Vec<u8>
-    fn to_bytes(&self) -> Result<Vec<u8>, DekuError>;
+    ///
+    /// ```rust
+    /// # use deku::prelude::*;
+    /// #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    /// #[deku(endian = "little")]
+    /// struct S {
+    ///    data_00: u8,
+    ///    data_01: u16,
+    ///    data_02: u32,
+    /// }
+    ///
+    /// let s = S { data_00: 0x01, data_01: 0x02, data_02: 0x03 };
+    /// let bytes = s.to_bytes().unwrap();
+    /// assert_eq!(bytes, [0x01, 0x02, 0x00, 0x03, 0x00, 0x00, 0x00]);
+    /// ````
+    fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
+        let mut out_buf = Vec::new();
+        let mut __deku_writer = Writer::new(&mut out_buf);
+        DekuWriter::to_writer(self, &mut __deku_writer, ())?;
+        __deku_writer.finalize()?;
+        Ok(out_buf)
+    }
 
     /// Write struct/enum to BitVec
-    fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError>;
+    ///
+    /// ```rust
+    /// # use deku::prelude::*;
+    /// # use deku::bitvec::Lsb0;
+    /// #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    /// #[deku(endian = "little")]
+    /// pub struct TestOver {
+    ///     #[deku(bits = "4")]
+    ///     pub a: u8,
+    ///     #[deku(bits = "4")]
+    ///     pub b: u8,
+    ///     #[deku(bits = "1")]
+    ///     pub c: u8,
+    /// }
+    ///
+    /// let test_data: &[u8] = &[0xf1, 0x80];
+    /// let test = TestOver::from_bytes((test_data, 0)).unwrap().1;
+    /// let bits = test.to_bits().unwrap();
+    /// assert_eq!(deku::bitvec::bitvec![1, 1, 1, 1, 0, 0, 0, 1, 1], bits);
+    /// ```
+    fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError> {
+        let mut out_buf = Vec::new();
+        let mut __deku_writer = Writer::new(&mut out_buf);
+        DekuWriter::to_writer(self, &mut __deku_writer, ())?;
+        let mut leftover = __deku_writer.leftover;
+        let mut bv = bitvec::BitVec::from_slice(&out_buf);
+        bv.append(&mut leftover);
+        Ok(bv)
+    }
 }
 
 /// "Updater" trait: apply mutations to a type
@@ -457,19 +524,17 @@ pub trait DekuEnumExt<'a, T> {
     fn deku_id(&self) -> Result<T, DekuError>;
 }
 
-/// Implements DekuWrite for references of types that implement DekuWrite
-impl<T, Ctx> DekuWrite<Ctx> for &T
+impl<T, Ctx> DekuWriter<Ctx> for &T
 where
-    T: DekuWrite<Ctx>,
+    T: DekuWriter<Ctx>,
     Ctx: Copy,
 {
-    /// Write value of type to bits
-    fn write(
+    fn to_writer<W: no_std_io::Write>(
         &self,
-        output: &mut bitvec::BitVec<u8, bitvec::Msb0>,
+        writer: &mut Writer<W>,
         ctx: Ctx,
     ) -> Result<(), DekuError> {
-        <T>::write(self, output, ctx)?;
+        <T>::to_writer(self, writer, ctx)?;
         Ok(())
     }
 }

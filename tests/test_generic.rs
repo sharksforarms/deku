@@ -7,7 +7,7 @@ fn test_generic_struct() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct TestStruct<T>
     where
-        T: deku::DekuWrite + for<'a> deku::DekuReader<'a>,
+        T: deku::DekuWriter + for<'a> deku::DekuReader<'a>,
     {
         field_a: T,
     }
@@ -24,10 +24,10 @@ fn test_generic_struct() {
 #[test]
 fn test_generic_enum() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(type = "u8")]
+    #[deku(id_type = "u8")]
     enum TestEnum<T>
     where
-        T: deku::DekuWrite + for<'a> deku::DekuReader<'a>,
+        T: deku::DekuWriter + for<'a> deku::DekuReader<'a>,
     {
         #[deku(id = "1")]
         VariantT(T),

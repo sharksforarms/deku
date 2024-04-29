@@ -3,12 +3,25 @@
 ## [Unreleased]
 
 ## Changes
-[#390](https://github.com/sharksforarms/deku/pull/390) added MSRV for `1.67.1`.
-[#389](https://github.com/sharksforarms/deku/pull/389) changed edition to 2021
-[#352](https://github.com/sharksforarms/deku/pull/352) added a new function `from_reader` that uses `io::Read`.
-`io::Read` is also now used internally, bringing massive performance and usability improvements.
+- Added MSRV for `1.67.1` ([#390](https://github.com/sharksforarms/deku/pull/390))
+- Changed edition to 2021 ([#389](https://github.com/sharksforarms/deku/pull/389))
+- Refactored `logging` feature with massive usability increases ([#352](https://github.com/sharksforarms/deku/pull/352)), ([#355](https://github.com/sharksforarms/deku/pull/355))
+- Bumped the `syn` library to 2.0, which required replacing `type` for Enums with `id_type` ([#386](https://github.com/sharksforarms/deku/pull/386))
+```diff,rust
+ #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+-#[deku(type = "u8")]
++#[deku(id_type = "u8")]
+ enum DekuTest {
+     #[deku(id_pat = "_")]
+     VariantC((u8, u8)),
+ }
+```
 
-### New `from_reader`
+### Updated Reader API
+- Changed API of reading to use `io::Read`, bringing massive performance and usability improvements ([#352](https://github.com/sharksforarms/deku/pull/352))
+- Changed the trait `DekuRead` to `DekuReader`
+
+For example:
 ```rust
 use std::io::{Seek, SeekFrom, Read};
 use std::fs::File;
@@ -31,7 +44,7 @@ With the switch to internal streaming, the variables `deku::input`, `deku::input
 `deku::reader` is a replacement for some of the functionality.
 See [examples/deku_input.rs](examples/deku_input.rs) for a new example of caching all reads.
 
-old:
+Old:
 ```rust
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
@@ -56,7 +69,7 @@ fn custom_read(
 }
 ```
 
-new:
+New:
 ```rust
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
@@ -83,7 +96,7 @@ fn custom_read<R: std::io::Read>(
 
 - With the addition of using `Read`, containing a byte slice with a reference is not supported:
 
-old
+Old
 ```rust
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct TestStruct<'a> {
@@ -94,7 +107,7 @@ struct TestStruct<'a> {
 }
 ```
 
-new
+New
 ```rust
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct TestStruct {
@@ -108,20 +121,20 @@ struct TestStruct {
 - `id_pat` is now required to be the same type as stored id.
 This also disallows using tuples for storing the id:
 
-old:
+Old:
 ```rust
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     #[deku(id_pat = "_")]
     VariantC((u8, u8)),
 }
 ```
 
-new:
+New:
 ```rust
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-#[deku(type = "u8")]
+#[deku(id_type = "u8")]
 enum DekuTest {
     #[deku(id_pat = "_")]
     VariantC {
@@ -132,6 +145,81 @@ enum DekuTest {
 ```
 
 - The feature `const_generics` was removed and is enabled by default.
+
+### Updated Writer API
+- Changed API of writing to use `io::Write`, bringing massive performance and usability improvements ([#355](https://github.com/sharksforarms/deku/pull/355))
+- Changed the trait `DekuWrite` to `DekuWriter`
+- The more internal (with context) `write(..)` was replaced with `to_writer(..)`.
+With the switch to internal streaming, the variables `deku::output` are now not possible and were removed. `deku::writer` is a replacement for some of the functionality.
+
+Old:
+```rust
+fn bit_flipper_write(
+    field_a: u8,
+    field_b: u8,
+    output: &mut BitVec<u8, Msb0>,
+    bit_size: BitSize,
+) -> Result<(), DekuError> {
+    // Access to previously written fields
+    println!("field_a = 0x{:X}", field_a);
+
+    // value of field_b
+    println!("field_b = 0x{:X}", field_b);
+
+    // Size of the current field
+    println!("bit_size: {:?}", bit_size);
+
+    // flip the bits on value if field_a is 0x01
+    let value = if field_a == 0x01 { !field_b } else { field_b };
+
+    value.write(output, bit_size)
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    field_a: u8,
+
+    #[deku(
+        writer = "bit_flipper_write(*field_a, *field_b, deku::output, BitSize(8))"
+    )]
+    field_b: u8,
+}
+````
+
+New:
+```rust
+fn bit_flipper_write<W: Write>(
+    field_a: u8,
+    field_b: u8,
+    writer: &mut Writer<W>,
+    bit_size: BitSize,
+) -> Result<(), DekuError> {
+    // Access to previously written fields
+    println!("field_a = 0x{:X}", field_a);
+
+    // value of field_b
+    println!("field_b = 0x{:X}", field_b);
+
+    // Size of the current field
+    println!("bit_size: {:?}", bit_size);
+
+    // flip the bits on value if field_a is 0x01
+    let value = if field_a == 0x01 { !field_b } else { field_b };
+
+    value.to_writer(writer, bit_size)
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    field_a: u8,
+
+    #[deku(
+        writer = "bit_flipper_write(*field_a, *field_b, deku::writer, BitSize(8))"
+    )]
+    field_b: u8,
+}
+```
+- Added `DekuError::Write` to denote `io::Write` errors
 
 ## [0.16.0] - 2023-02-28
 

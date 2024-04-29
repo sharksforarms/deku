@@ -5,8 +5,8 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::macros::{
-    gen_ctx_types_and_arg, gen_field_args, gen_struct_destruction, pad_bits, token_contains_string,
-    wrap_default_ctx,
+    assertion_failed, gen_ctx_types_and_arg, gen_field_args, gen_struct_destruction, pad_bits,
+    token_contains_string, wrap_default_ctx,
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
@@ -442,15 +442,10 @@ fn emit_field_write(
     let field_ident_str = field_ident.to_string();
 
     let field_assert = f.assert.as_ref().map(|v| {
+        let return_error = assertion_failed(v, ident, &field_ident_str, None);
         quote! {
             if (!(#v)) {
-                // assertion is false, raise error
-                return Err(::#crate_::DekuError::Assertion(format!(
-                            "{}.{} field failed assertion: {}",
-                            #ident,
-                            #field_ident_str,
-                            stringify!(#v)
-                        )));
+                #return_error
             } else {
                 // do nothing
             }
@@ -458,15 +453,10 @@ fn emit_field_write(
     });
 
     let field_assert_eq = f.assert_eq.as_ref().map(|v| {
+        let return_error = assertion_failed(v, ident, &field_ident_str, Some(&field_ident));
         quote! {
             if (!(*(#field_ident) == (#v))) {
-                // assertion is false, raise error
-                return Err(::#crate_::DekuError::Assertion(format!(
-                            "{}.{} field failed assertion: {}",
-                            #ident,
-                            #field_ident_str,
-                            stringify!(#field_ident == #v)
-                        )));
+                #return_error
             } else {
                 // do nothing
             }

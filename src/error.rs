@@ -1,9 +1,9 @@
 //! Error module
 
 #![cfg(feature = "alloc")]
+use alloc::borrow::Cow;
 
 use alloc::format;
-use alloc::string::String;
 
 /// Number of bits needed to retry parsing
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,13 +38,13 @@ pub enum DekuError {
     /// Parsing error when reading
     Incomplete(NeedSize),
     /// Parsing error when reading
-    Parse(String),
+    Parse(Cow<'static, str>),
     /// Invalid parameter
-    InvalidParam(String),
     /// Unexpected error
     Unexpected(String),
+    InvalidParam(Cow<'static, str>),
     /// Assertion error from `assert` or `assert_eq` attributes
-    Assertion(String),
+    Assertion(Cow<'static, str>),
     /// Assertion error from `assert` or `assert_eq` attributes, without string
     AssertionNoStr,
     /// Could not resolve `id` for variant
@@ -55,13 +55,13 @@ pub enum DekuError {
 
 impl From<core::num::TryFromIntError> for DekuError {
     fn from(e: core::num::TryFromIntError) -> DekuError {
-        DekuError::Parse(format!("error parsing int: {e}"))
+        DekuError::Parse(Cow::from(format!("error parsing int: {e}")))
     }
 }
 
 impl From<core::array::TryFromSliceError> for DekuError {
     fn from(e: core::array::TryFromSliceError) -> DekuError {
-        DekuError::Parse(format!("error parsing from slice: {e}"))
+        DekuError::Parse(Cow::from(format!("error parsing from slice: {e}")))
     }
 }
 

@@ -372,12 +372,14 @@ fn assertion_failed(
     #[cfg(not(feature = "no-assert-string"))]
     {
         quote! {
-            return Err(::#crate_::DekuError::Assertion(format!(
+            extern crate alloc;
+            use alloc::borrow::Cow;
+            return Err(::#crate_::DekuError::Assertion(Cow::from(format!(
                 "{}.{} field failed assertion: {}",
                 #ident,
                 #field_ident_str,
                 #stringify,
-            )));
+            ))));
         }
     }
 }

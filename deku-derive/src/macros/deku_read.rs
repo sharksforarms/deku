@@ -275,12 +275,14 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if !has_default_match && default_reader.is_none() {
         variant_matches.push(quote! {
             _ => {
+                extern crate alloc;
+                use alloc::borrow::Cow;
                 return Err(::#crate_::DekuError::Parse(
-                            format!(
+                            Cow::from(format!(
                                 "Could not match enum variant id = {:?} on enum `{}`",
                                 __deku_variant_id,
                                 #ident_as_string
-                            )
+                            ))
                         ));
             }
         });
@@ -440,7 +442,9 @@ fn emit_magic_read(input: &DekuData) -> TokenStream {
             for __deku_byte in __deku_magic {
                 let __deku_read_byte = u8::from_reader_with_ctx(__deku_reader, ())?;
                 if *__deku_byte != __deku_read_byte {
-                    return Err(::#crate_::DekuError::Parse(format!("Missing magic value {:?}", #magic)));
+                    extern crate alloc;
+                    use alloc::borrow::Cow;
+                    return Err(::#crate_::DekuError::Parse(Cow::from(format!("Missing magic value {:?}", #magic))));
                 }
             }
         }
@@ -514,11 +518,13 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
         {
             use core::convert::TryFrom;
             // TODO: I hope this consts in most cases?
+            extern crate alloc;
+            use alloc::borrow::Cow;
             let __deku_pad = usize::try_from(#bit_size).map_err(|e|
-                ::#crate_::DekuError::InvalidParam(format!(
+                ::#crate_::DekuError::InvalidParam(Cow::from(format!(
                     "Invalid padding param \"({})\": cannot convert to usize",
                     stringify!(#bit_size)
-                ))
+                )))
             )?;
 
 
@@ -820,7 +826,9 @@ pub fn emit_try_from(
                 let mut cursor = ::#crate_::no_std_io::Cursor::new(input);
                 let (amt_read, res) = <Self as ::#crate_::DekuContainerRead>::from_reader((&mut cursor, 0))?;
                 if (amt_read / 8) != total_len {
-                    return Err(::#crate_::DekuError::Parse(format!("Too much data")));
+                    extern crate alloc;
+                    use alloc::borrow::Cow;
+                    return Err(::#crate_::DekuError::Parse(Cow::from("Too much data")));
                 }
                 Ok(res)
             }

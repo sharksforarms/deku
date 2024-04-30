@@ -414,11 +414,13 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
     quote! {
         {
             use core::convert::TryFrom;
+            extern crate alloc;
+            use alloc::borrow::Cow;
             let __deku_pad = usize::try_from(#bit_size).map_err(|e|
-                ::#crate_::DekuError::InvalidParam(format!(
+                ::#crate_::DekuError::InvalidParam(Cow::from(format!(
                     "Invalid padding param \"({})\": cannot convert to usize",
                     stringify!(#bit_size)
-                ))
+                )))
             )?;
             __deku_writer.write_bits(::#crate_::bitvec::bitvec![u8, ::#crate_::bitvec::Msb0; 0; __deku_pad].as_bitslice())?;
         }

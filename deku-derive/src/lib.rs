@@ -1,10 +1,11 @@
 /*!
 Procedural macros that implement `DekuRead` and `DekuWrite` traits
  */
-
 #![warn(missing_docs)]
 
-use std::borrow::Cow;
+extern crate alloc;
+
+use alloc::borrow::Cow;
 use std::convert::TryFrom;
 
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};

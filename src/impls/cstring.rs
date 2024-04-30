@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use no_std_io::io::{Read, Write};
 use std::ffi::CString;
 
@@ -27,8 +28,9 @@ where
         let bytes =
             Vec::from_reader_with_ctx(reader, (Limit::from(|b: &u8| *b == 0x00), inner_ctx))?;
 
-        let value = CString::from_vec_with_nul(bytes)
-            .map_err(|e| DekuError::Parse(format!("Failed to convert Vec to CString: {e}")))?;
+        let value = CString::from_vec_with_nul(bytes).map_err(|e| {
+            DekuError::Parse(Cow::from(format!("Failed to convert Vec to CString: {e}")))
+        })?;
 
         Ok(value)
     }

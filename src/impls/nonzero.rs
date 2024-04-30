@@ -1,4 +1,6 @@
 #[cfg(feature = "alloc")]
+use alloc::borrow::Cow;
+#[cfg(feature = "alloc")]
 use alloc::format;
 use core::num::*;
 use no_std_io::io::{Read, Write};
@@ -19,7 +21,7 @@ macro_rules! ImplDekuTraitsCtx {
                 let value = <$typ>::new(value);
 
                 match value {
-                    None => Err(DekuError::Parse(format!("NonZero assertion"))),
+                    None => Err(DekuError::Parse(Cow::from(format!("NonZero assertion")))),
                     Some(v) => Ok(v),
                 }
             }

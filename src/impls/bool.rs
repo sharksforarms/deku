@@ -1,6 +1,8 @@
 use no_std_io::io::{Read, Write};
 
 #[cfg(feature = "alloc")]
+use alloc::borrow::Cow;
+#[cfg(feature = "alloc")]
 use alloc::format;
 
 use crate::reader::Reader;
@@ -21,7 +23,9 @@ where
         let ret = match val {
             0x01 => Ok(true),
             0x00 => Ok(false),
-            _ => Err(DekuError::Parse(format!("cannot parse bool value: {val}",))),
+            _ => Err(DekuError::Parse(Cow::from(format!(
+                "cannot parse bool value: {val}",
+            )))),
         }?;
 
         Ok(ret)

@@ -40,8 +40,6 @@ pub enum DekuError {
     /// Parsing error when reading
     Parse(Cow<'static, str>),
     /// Invalid parameter
-    /// Unexpected error
-    Unexpected(String),
     InvalidParam(Cow<'static, str>),
     /// Assertion error from `assert` or `assert_eq` attributes
     Assertion(Cow<'static, str>),
@@ -82,7 +80,6 @@ impl core::fmt::Display for DekuError {
             ),
             DekuError::Parse(ref err) => write!(f, "Parse error: {err}"),
             DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {err}"),
-            DekuError::Unexpected(ref err) => write!(f, "Unexpected error: {err}"),
             DekuError::Assertion(ref err) => write!(f, "Assertion error: {err}"),
             DekuError::AssertionNoStr => write!(f, "Assertion error"),
             DekuError::IdVariantNotFound => write!(f, "Could not resolve `id` for variant"),
@@ -106,7 +103,6 @@ impl From<DekuError> for std::io::Error {
             DekuError::Incomplete(_) => io::Error::new(io::ErrorKind::UnexpectedEof, error),
             DekuError::Parse(_) => io::Error::new(io::ErrorKind::InvalidData, error),
             DekuError::InvalidParam(_) => io::Error::new(io::ErrorKind::InvalidInput, error),
-            DekuError::Unexpected(_) => io::Error::new(io::ErrorKind::Other, error),
             DekuError::Assertion(_) => io::Error::new(io::ErrorKind::InvalidData, error),
             DekuError::AssertionNoStr => io::Error::from(io::ErrorKind::InvalidData),
             DekuError::IdVariantNotFound => io::Error::new(io::ErrorKind::NotFound, error),

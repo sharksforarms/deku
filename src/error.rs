@@ -88,7 +88,7 @@ impl core::fmt::Display for DekuError {
             DekuError::Assertion(ref err) => write!(f, "Assertion error: {err}"),
             DekuError::AssertionNoStr => write!(f, "Assertion error"),
             DekuError::IdVariantNotFound => write!(f, "Could not resolve `id` for variant"),
-            DekuError::Io(ref e) => write!(f, "io errorr: {e}"),
+            DekuError::Io(ref e) => write!(f, "io errorr: {e:?}"),
         }
     }
 }

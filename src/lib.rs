@@ -521,7 +521,7 @@ pub trait DekuUpdate {
 }
 
 /// "Extended Enum" trait: obtain additional enum information
-pub trait DekuEnumExt<'a, T> {
+pub trait DekuEnumExt<'__deku, T> {
     /// Obtain `id` of a given enum variant
     fn deku_id(&self) -> Result<T, DekuError>;
 }

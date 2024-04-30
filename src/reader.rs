@@ -134,7 +134,7 @@ impl<'a, R: Read> Reader<'a, R> {
     ///
     /// # Params
     /// `amt`    - Amount of bits that will be read. Must be <= [`MAX_BITS_AMT`].
-    #[inline]
+    #[inline(never)]
     pub fn read_bits(&mut self, amt: usize) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("read_bits: requesting {amt} bits");
@@ -206,7 +206,7 @@ impl<'a, R: Read> Reader<'a, R> {
     ///
     /// # Params
     /// `amt`    - Amount of bytes that will be read
-    #[inline]
+    #[inline(always)]
     pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> Result<ReaderRet, DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("read_bytes: requesting {amt} bytes");

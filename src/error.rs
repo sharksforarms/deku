@@ -13,16 +13,19 @@ pub struct NeedSize {
 
 impl NeedSize {
     /// Create new [NeedSize] from bits
+    #[inline]
     pub fn new(bits: usize) -> Self {
         Self { bits }
     }
 
     /// Number of bits needed
+    #[inline]
     pub fn bit_size(&self) -> usize {
         self.bits
     }
 
     /// Number of bytes needed
+    #[inline]
     pub fn byte_size(&self) -> usize {
         (self.bits + 7) / 8
     }

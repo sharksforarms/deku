@@ -88,8 +88,8 @@ impl<W: Write> Writer<W> {
         bits = unsafe { bits.get_unchecked(count * bits_of::<u8>()..) };
 
         self.leftover = bits.to_bitvec();
-        if self.inner.write_all(buf).is_err() {
-            return Err(DekuError::Write);
+        if let Err(e) = self.inner.write_all(&buf) {
+            return Err(DekuError::Io(e.kind()));
         }
 
         self.bits_written += buf.len() * 8;
@@ -117,8 +117,8 @@ impl<W: Write> Writer<W> {
             // instead of sending the entire thing. The rest would be through self.inner.write.
             self.write_bits(&BitVec::from_slice(buf))?;
         } else {
-            if self.inner.write_all(buf).is_err() {
-                return Err(DekuError::Write);
+            if let Err(e) = self.inner.write_all(buf) {
+                return Err(DekuError::Io(e.kind()));
             }
             self.bits_written += buf.len() * 8;
         }
@@ -148,8 +148,8 @@ impl<W: Write> Writer<W> {
                     *slot = byte.load_be();
                 });
 
-            if self.inner.write_all(&buf).is_err() {
-                return Err(DekuError::Write);
+            if let Err(e) = self.inner.write_all(&buf) {
+                return Err(DekuError::Io(e.kind()));
             }
             self.bits_written += buf.len() * 8;
 

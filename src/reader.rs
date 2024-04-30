@@ -169,8 +169,7 @@ impl<'a, R: Read> Reader<'a, R> {
                     if e.kind() == ErrorKind::UnexpectedEof {
                         return Err(DekuError::Incomplete(NeedSize::new(amt)));
                     }
-
-                    // TODO: other errors?
+                    return Err(DekuError::Io(e.kind()));
                 }
                 let read_buf = &buf[..bytes_len];
 
@@ -219,8 +218,7 @@ impl<'a, R: Read> Reader<'a, R> {
                 if e.kind() == ErrorKind::UnexpectedEof {
                     return Err(DekuError::Incomplete(NeedSize::new(amt * 8)));
                 }
-
-                // TODO: other errors?
+                return Err(DekuError::Io(e.kind()));
             }
 
             self.bits_read += amt * 8;

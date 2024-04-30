@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ## Changes
+- Add DekuWrite impl for `[T]` ([#416](https://github.com/sharksforarms/deku/pull/416))
+- Add `no-assert-string` feature to remove panic string on failed assertion ([#405](https://github.com/sharksforarms/deku/pull/405))
+- Add `read_all` attribute to read until `reader.end()` ([#387](https://github.com/sharksforarms/deku/pull/387))
 - Added MSRV for `1.67.1` ([#390](https://github.com/sharksforarms/deku/pull/390))
 - Changed edition to 2021 ([#389](https://github.com/sharksforarms/deku/pull/389))
 - Refactored `logging` feature with massive usability increases ([#352](https://github.com/sharksforarms/deku/pull/352)), ([#355](https://github.com/sharksforarms/deku/pull/355))
@@ -220,6 +223,9 @@ struct DekuTest {
 }
 ```
 - Added `DekuError::Write` to denote `io::Write` errors
+
+## Bug fix
+- Fix error for invalid deku_id generation on generic enum ([#411](https://github.com/sharksforarms/deku/pull/411))
 
 ## [0.16.0] - 2023-02-28
 

@@ -1,6 +1,6 @@
 [package]
 authors = ["sharks <sharks@sharks>"]
-edition = "2018"
+edition = "2021"
 name = "deku_derive"
 version = "0.16.0"
 license = "MIT OR Apache-2.0"

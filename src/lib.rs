@@ -332,6 +332,12 @@ Then you'd call `env_logger::init()` or `env_logger::try_init()` prior to doing 
 Deku uses the `trace` logging level, so if you run your application with `RUST_LOG=trace` in your
 environment, you will see logging messages as Deku does its deserialising.
 
+# Reducing parser code size
+
+- With the use of the `no-assert-string` feature, you can remove the strings Deku adds to assertion errors.
+- `DekuError` whenever possible will use a `'static str`, to make the errors compile away when following a
+   guide such as [min-sized-rust](https://github.com/johnthagen/min-sized-rust).
+
 */
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]

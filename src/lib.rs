@@ -372,6 +372,13 @@ use crate::reader::Reader;
 use crate::writer::Writer;
 
 /// "Reader" trait: read bytes and bits from [`no_std_io::Read`]er
+#[rustversion::attr(
+    since(1.78),
+    diagnostic::on_unimplemented(
+        note = "implement by adding #[derive(DekuRead)] to `{Self}`",
+        note = "make sure the `ctx` sent into the function matches `{Self}`'s `ctx`",
+    )
+)]
 pub trait DekuReader<'a, Ctx = ()> {
     /// Construct type from `reader` implementing [`no_std_io::Read`], with ctx.
     ///
@@ -403,6 +410,13 @@ pub trait DekuReader<'a, Ctx = ()> {
 
 /// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which
 /// doesn't need any context information.
+#[rustversion::attr(
+    since(1.78),
+    diagnostic::on_unimplemented(
+        note = "implement by adding #[derive(DekuRead)] to `{Self}`",
+        note = "make sure the `ctx` sent into the function matches `{Self}`'s `ctx`",
+    )
+)]
 pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     /// Construct type from Reader implementing [`no_std_io::Read`].
     /// * **input** - Input given as "Reader" and bit offset
@@ -444,6 +458,13 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
 }
 
 /// "Writer" trait: write from type to bytes
+#[rustversion::attr(
+    since(1.78),
+    diagnostic::on_unimplemented(
+        note = "implement by adding #[derive(DekuRead)] to `{Self}`",
+        note = "make sure the `ctx` sent into the function matches `{Self}`'s `ctx`",
+    )
+)]
 pub trait DekuWriter<Ctx = ()> {
     /// Write type to bytes
     fn to_writer<W: no_std_io::Write>(
@@ -455,6 +476,13 @@ pub trait DekuWriter<Ctx = ()> {
 
 /// "Writer" trait: implemented on DekuWrite struct and enum containers. A `container` is a type which
 /// doesn't need any context information.
+#[rustversion::attr(
+    since(1.78),
+    diagnostic::on_unimplemented(
+        note = "implement by adding #[derive(DekuWrite)] to `{Self}`",
+        note = "make sure the `ctx` sent into the function matches `{Self}`'s `ctx`",
+    )
+)]
 pub trait DekuContainerWrite: DekuWriter<()> {
     /// Write struct/enum to Vec<u8>
     ///

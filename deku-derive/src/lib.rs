@@ -7,6 +7,7 @@ extern crate alloc;
 
 use alloc::borrow::Cow;
 use std::convert::TryFrom;
+use std::fmt::Display;
 
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};
 use proc_macro2::TokenStream;
@@ -26,9 +27,9 @@ enum Id {
     Int(syn::LitInt),
 }
 
-impl ToString for Id {
-    fn to_string(&self) -> String {
-        self.to_token_stream().to_string()
+impl Display for Id {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.to_token_stream().to_string())
     }
 }
 
@@ -74,9 +75,9 @@ impl Num {
     }
 }
 
-impl ToString for Num {
-    fn to_string(&self) -> String {
-        self.0.to_token_stream().to_string()
+impl Display for Num {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0.to_token_stream().to_string())
     }
 }
 

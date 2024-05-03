@@ -88,7 +88,7 @@ impl<W: Write> Writer<W> {
         bits = unsafe { bits.get_unchecked(count * bits_of::<u8>()..) };
 
         self.leftover = bits.to_bitvec();
-        if let Err(e) = self.inner.write_all(&buf) {
+        if let Err(e) = self.inner.write_all(buf) {
             return Err(DekuError::Io(e.kind()));
         }
 

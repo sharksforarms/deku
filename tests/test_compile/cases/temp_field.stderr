@@ -13,7 +13,3 @@ error: pattern requires `..` due to inaccessible fields
   |                    ^^^^^^^^^
   |
   = note: this error originates in the derive macro `DekuWrite` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: ignore the inaccessible and unused fields
-  |
-4 | #[derive(DekuRead, DekuWrite { .. } {
-  |                              ~~~~~~

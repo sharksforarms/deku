@@ -3,3 +3,11 @@ error: Unexpected meta-item format `attribute cannot contain `__deku_` these are
    |
 88 |     #[deku(cond = "__deku_bit_offset == *field_a as usize")]
    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `offset`
+  --> tests/test_compile/cases/internal_variables.rs:53:5
+   |
+53 |     offset: usize,
+   |     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_offset`
+   |
+   = note: `#[warn(unused_variables)]` on by default

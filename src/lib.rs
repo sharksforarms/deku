@@ -227,7 +227,7 @@ assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
 ```
 
-# `Read` enabled
+# `Read` supported
 Parsers can be created that directly read from a source implementing [Read](crate::no_std_io::Read).
 
 The crate [no_std_io] is re-exported for use in `no_std` environments.
@@ -250,7 +250,7 @@ let mut file = File::options().read(true).open("file").unwrap();
 let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
 ```
 
-# `Write` enabled
+# `Write` supported
 Parsers can be created that directly write to a source implementing [Write](crate::no_std_io::Write).
 
 ```rust, no_run
@@ -331,6 +331,12 @@ Then you'd call `env_logger::init()` or `env_logger::try_init()` prior to doing 
 
 Deku uses the `trace` logging level, so if you run your application with `RUST_LOG=trace` in your
 environment, you will see logging messages as Deku does its deserialising.
+
+# Reducing parser code size
+
+- With the use of the `no-assert-string` feature, you can remove the strings Deku adds to assertion errors.
+- `DekuError` whenever possible will use a `'static str`, to make the errors compile away when following a
+   guide such as [min-sized-rust](https://github.com/johnthagen/min-sized-rust).
 
 */
 #![warn(missing_docs)]

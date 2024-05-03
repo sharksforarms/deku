@@ -1,7 +1,6 @@
+use alloc::borrow::Cow;
 #[cfg(feature = "alloc")]
 use alloc::format;
-#[cfg(feature = "alloc")]
-use alloc::string::ToString;
 use core::convert::TryInto;
 
 use bitvec::prelude::*;
@@ -79,13 +78,14 @@ impl DekuReader<'_, (Endian, ByteSize)> for u8 {
         reader: &mut Reader<R>,
         (endian, size): (Endian, ByteSize),
     ) -> Result<u8, DekuError> {
-        let mut buf = [0; core::mem::size_of::<u8>()];
-        let ret = reader.read_bytes(size.0, &mut buf)?;
+        const MAX_TYPE_BYTES: usize = core::mem::size_of::<u8>();
+        let mut buf = [0; MAX_TYPE_BYTES];
+        let ret = reader.read_bytes_const::<MAX_TYPE_BYTES>(&mut buf)?;
         let a = match ret {
             ReaderRet::Bytes => <u8>::from_be_bytes(buf),
             ReaderRet::Bits(bits) => {
                 let Some(bits) = bits else {
-                    return Err(DekuError::Parse("no bits read from reader".to_string()));
+                    return Err(DekuError::Parse(Cow::from("no bits read from reader")));
                 };
                 let a = <u8>::read(&bits, (endian, size))?;
                 a.1
@@ -181,14 +181,14 @@ macro_rules! ImplDekuReadBits {
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 if size.0 > MAX_TYPE_BITS {
-                    return Err(DekuError::Parse(format!(
+                    return Err(DekuError::Parse(Cow::from(format!(
                         "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits",
                         size.0
-                    )));
+                    ))));
                 }
                 let bits = reader.read_bits(size.0)?;
                 let Some(bits) = bits else {
-                    return Err(DekuError::Parse(format!("no bits read from reader",)));
+                    return Err(DekuError::Parse(Cow::from("no bits read from reader")));
                 };
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
@@ -230,10 +230,10 @@ macro_rules! ImplDekuReadBytes {
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
                 if size.0 > MAX_TYPE_BYTES {
-                    return Err(DekuError::Parse(format!(
+                    return Err(DekuError::Parse(Cow::from(format!(
                         "too much data: container of {MAX_TYPE_BYTES} bytes cannot hold {} bytes",
                         size.0
-                    )));
+                    ))));
                 }
                 let mut buf = [0; MAX_TYPE_BYTES];
                 let ret = reader.read_bytes(size.0, &mut buf)?;
@@ -255,7 +255,7 @@ macro_rules! ImplDekuReadBytes {
                         a.1
                     }
                     ReaderRet::Bits(None) => {
-                        return Err(DekuError::Parse(format!("no bits read from reader")));
+                        return Err(DekuError::Parse(Cow::from("no bits read from reader")));
                     }
                 };
                 Ok(a)
@@ -301,7 +301,7 @@ macro_rules! ImplDekuReadSignExtend {
                     }
                     ReaderRet::Bits(bits) => {
                         let Some(bits) = bits else {
-                            return Err(DekuError::Parse("no bits read from reader".to_string()));
+                            return Err(DekuError::Parse(Cow::from("no bits read from reader")));
                         };
                         let a = <$typ>::read(&bits, (endian, size))?;
                         a.1
@@ -341,14 +341,14 @@ macro_rules! ImplDekuReadSignExtend {
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 if size.0 > MAX_TYPE_BITS {
-                    return Err(DekuError::Parse(format!(
+                    return Err(DekuError::Parse(Cow::from(format!(
                         "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits",
                         size.0
-                    )));
+                    ))));
                 }
                 let bits = reader.read_bits(size.0)?;
                 let Some(bits) = bits else {
-                    return Err(DekuError::Parse(format!("no bits read from reader",)));
+                    return Err(DekuError::Parse(Cow::from("no bits read from reader")));
                 };
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
@@ -357,20 +357,35 @@ macro_rules! ImplDekuReadSignExtend {
     };
 }
 
-// TODO: these forward types should forward on a ContainerCanHoldSize or something if ByteSize or
-// BitSize wasn't defined
 macro_rules! ForwardDekuRead {
     ($typ:ty) => {
-        // Only have `endian`, set `bit_size` to `Size::of::<Type>()`
+        // Only have `endian`, specialize and use read_bytes_const
         impl DekuReader<'_, Endian> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
                 reader: &mut Reader<R>,
                 endian: Endian,
             ) -> Result<$typ, DekuError> {
-                const BYTE_SIZE: usize = core::mem::size_of::<$typ>();
-
-                <$typ>::from_reader_with_ctx(reader, (endian, ByteSize(BYTE_SIZE)))
+                const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
+                let mut buf = [0; MAX_TYPE_BYTES];
+                let ret = reader.read_bytes_const::<MAX_TYPE_BYTES>(&mut buf)?;
+                let a = match ret {
+                    ReaderRet::Bytes => {
+                        if endian.is_le() {
+                            <$typ>::from_le_bytes(buf)
+                        } else {
+                            <$typ>::from_be_bytes(buf)
+                        }
+                    }
+                    ReaderRet::Bits(Some(bits)) => {
+                        let a = <$typ>::read(&bits, (endian, ByteSize(MAX_TYPE_BYTES)))?;
+                        a.1
+                    }
+                    ReaderRet::Bits(None) => {
+                        return Err(DekuError::Parse(Cow::from("no bits read from reader")));
+                    }
+                };
+                Ok(a)
             }
         }
 
@@ -436,11 +451,11 @@ macro_rules! ImplDekuWrite {
                 let input_bits = input.view_bits::<Msb0>();
 
                 if bit_size > input_bits.len() {
-                    return Err(DekuError::InvalidParam(format!(
+                    return Err(DekuError::InvalidParam(Cow::from(format!(
                         "bit size {} is larger than input {}",
                         bit_size,
                         input_bits.len()
-                    )));
+                    ))));
                 }
 
                 if matches!(endian, Endian::Little) {
@@ -479,10 +494,10 @@ macro_rules! ImplDekuWrite {
 
                 const TYPE_SIZE: usize = core::mem::size_of::<$typ>();
                 if size.0 > TYPE_SIZE {
-                    return Err(DekuError::InvalidParam(format!(
+                    return Err(DekuError::InvalidParam(Cow::from(format!(
                         "byte size {} is larger then input {}",
                         size.0, TYPE_SIZE
-                    )));
+                    ))));
                 }
 
                 let input = if matches!(endian, Endian::Big) {
@@ -906,11 +921,11 @@ mod tests {
                 let res_read =
                     <$typ>::from_reader_with_ctx(&mut reader, (Endian::Little, BitSize($size + 1)));
                 assert_eq!(
-                    DekuError::Parse(format!(
+                    DekuError::Parse(Cow::from(format!(
                         "too much data: container of {} bits cannot hold {} bits",
                         $size,
                         $size + 1
-                    )),
+                    ))),
                     res_read.err().unwrap()
                 );
             }

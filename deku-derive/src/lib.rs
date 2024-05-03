@@ -1,11 +1,13 @@
 /*!
 Procedural macros that implement `DekuRead` and `DekuWrite` traits
  */
-
 #![warn(missing_docs)]
 
-use std::borrow::Cow;
+extern crate alloc;
+
+use alloc::borrow::Cow;
 use std::convert::TryFrom;
+use std::fmt::Display;
 
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};
 use proc_macro2::TokenStream;
@@ -25,9 +27,9 @@ enum Id {
     Int(syn::LitInt),
 }
 
-impl ToString for Id {
-    fn to_string(&self) -> String {
-        self.to_token_stream().to_string()
+impl Display for Id {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.to_token_stream().to_string())
     }
 }
 
@@ -73,9 +75,9 @@ impl Num {
     }
 }
 
-impl ToString for Num {
-    fn to_string(&self) -> String {
-        self.0.to_token_stream().to_string()
+impl Display for Num {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0.to_token_stream().to_string())
     }
 }
 
@@ -267,14 +269,12 @@ impl DekuData {
 
     /// Emit a reader. On error, a compiler error is emitted
     fn emit_reader(&self) -> TokenStream {
-        self.emit_reader_checked()
-            .map_or_else(|e| e.to_compile_error(), |tks| tks)
+        self.emit_reader_checked().unwrap_or_else(|e| e.to_compile_error())
     }
 
     /// Emit a writer. On error, a compiler error is emitted
     fn emit_writer(&self) -> TokenStream {
-        self.emit_writer_checked()
-            .map_or_else(|e| e.to_compile_error(), |tks| tks)
+        self.emit_writer_checked().unwrap_or_else(|e| e.to_compile_error())
     }
 
     /// Same as `emit_reader`, but won't auto convert error to compile error

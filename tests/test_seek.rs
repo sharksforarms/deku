@@ -14,10 +14,14 @@ pub struct Test {
     byte_after_rewind: u8,
     #[deku(seek_from_start = "2")]
     byte_again: u8,
+    #[deku(seek_from_end = "-1")]
+    another: u8,
 }
 
 #[rstest(input, expected,
-    case(&hex!("01002030"), Test{ skip_u8: 1, byte: 0x20, byte_after: 0x30, byte_after_rewind: 0x01, byte_again: 0x20 }),
+    case(&hex!("01002030"), Test{ skip_u8: 1, byte: 0x20, byte_after: 0x30, byte_after_rewind: 0x01, byte_again: 0x20, another: 0x30 }),
+    case(&hex!("0200002030"), Test{ skip_u8: 2, byte: 0x20, byte_after: 0x30, byte_after_rewind: 0x02, byte_again: 0x00, another: 0x30 }),
+    case(&hex!("00ffaa"), Test{ skip_u8: 0, byte: 0xff, byte_after: 0xaa, byte_after_rewind: 0x00, byte_again: 0xaa, another: 0xaa }),
 )]
 fn test_seek(input: &[u8], expected: Test) {
     let input = input.to_vec();

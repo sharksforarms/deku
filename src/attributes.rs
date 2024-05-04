@@ -53,9 +53,6 @@ enum DekuEnum {
 | [pad_bits_after](#pad_bits_after) | field | Skip bits after reading, pad after writing
 | [cond](#cond) | field | Conditional expression for the field
 | [default](#default) | field | Provide default value. Used with [skip](#skip) or [cond](#cond)
-| [seek_from_current](#seek_from_current) | field | Sets the offset of reader to the current position plus the specified number of bytes
-| [seek_from_end](#seek_from_end) | field | Sets the offset to the size of reader plus the specified number of bytes
-| [seek_from_start](#seek_from_start) | field | Sets the offset to provided number of bytes
 | [bits](#bits) | field | Set the bit-size of the field
 | [reader](#readerwriter) | variant, field | Custom reader code
 | [writer](#readerwriter) | variant, field | Custom writer code
@@ -791,89 +788,6 @@ let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
     DekuTest { field_a: 0x01, field_b: Some(0x01), field_c: 0x02 },
-    value
-);
-```
-
-# seek_from_current
-
-Using the internal reader, seek to current position plus offset before reading field.
-
-Example:
-
-```rust
-# use deku::prelude::*;
-# use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
-#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-struct DekuTest {
-    // how many following bytes to skip
-    skip_u8: u8,
-    #[deku(seek_from_current = "*skip_u8")]
-    byte: u8,
-}
-
-let data: &[u8] = &[0x01, 0x00, 0x02];
-let mut cursor = Cursor::new(data);
-
-let (_amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
-
-assert_eq!(
-    DekuTest { skip_u8: 0x01, byte: 0x02 },
-    value
-);
-```
-
-# seek_from_end
-
-Using the internal reader, seek to size of reader plus offset before reading field.
-
-Example:
-
-```rust
-# use deku::prelude::*;
-# use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
-#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-struct DekuTest {
-    #[deku(seek_from_end = "-2")]
-    byte: u8,
-}
-
-let data: &[u8] = &[0x01, 0xff, 0x02];
-let mut cursor = Cursor::new(data);
-
-let (_amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
-
-assert_eq!(
-    DekuTest { byte: 0xff },
-    value
-);
-```
-
-# seek_from_start
-
-Using the internal reader, seek from reader start plus offset before reading field.
-
-Example:
-
-```rust
-# use deku::prelude::*;
-# use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
-#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-struct DekuTest {
-    #[deku(seek_from_start = "2")]
-    byte: u8,
-}
-
-let data: &[u8] = &[0x01, 0xff, 0x02];
-let mut cursor = Cursor::new(data);
-
-let (_amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
-
-assert_eq!(
-    DekuTest { byte: 0x02 },
     value
 );
 ```

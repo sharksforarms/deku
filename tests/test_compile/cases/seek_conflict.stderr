@@ -1,0 +1,7 @@
+error: conflicting: only one `seek` attribute can be used at one time
+ --> tests/test_compile/cases/seek_conflict.rs:3:10
+  |
+3 | #[derive(DekuRead, Debug, PartialEq, Eq)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -570,10 +570,42 @@ fn emit_field_read(
 
     let seek = if let Some(num) = &f.seek_from_current {
         quote! {
-            use ::#crate_::no_std_io::Seek;
-            use ::#crate_::no_std_io::SeekFrom;
-            // TODO: use ?
-            __deku_reader.seek(SeekFrom::Current(i64::try_from(#num).unwrap())).unwrap();
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::Current(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &f.seek_from_end {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::End(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &f.seek_from_start {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::Start(u64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if f.seek_rewind {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                if let Err(e) = __deku_reader.rewind() {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
         }
     } else {
         quote! {}

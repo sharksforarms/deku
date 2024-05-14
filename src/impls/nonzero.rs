@@ -28,7 +28,7 @@ macro_rules! ImplDekuTraitsCtx {
         }
 
         impl DekuWriter<$ctx_type> for $typ {
-            fn to_writer<W: Write>(
+            fn to_writer<W: Write + Seek>(
                 &self,
                 writer: &mut Writer<W>,
                 $ctx_arg: $ctx_type,
@@ -66,6 +66,7 @@ ImplDekuTraits!(NonZeroIsize, isize);
 mod tests {
     use hexlit::hex;
     use rstest::rstest;
+    use std::io::Cursor;
 
     use crate::reader::Reader;
 
@@ -84,8 +85,8 @@ mod tests {
         let res_read = NonZeroU8::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
 
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         res_read.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(input.to_vec(), writer.inner);
+        assert_eq!(input.to_vec(), writer.inner.into_inner());
     }
 }

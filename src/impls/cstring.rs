@@ -11,7 +11,11 @@ impl<Ctx: Copy> DekuWriter<Ctx> for CString
 where
     u8: DekuWriter<Ctx>,
 {
-    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write + Seek>(
+        &self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
         let bytes = self.as_bytes_with_nul();
         bytes.to_writer(writer, ctx)
     }
@@ -69,8 +73,11 @@ mod tests {
         cursor.read_to_end(&mut buf).unwrap();
         assert_eq!(expected_rest, buf);
 
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         res_read.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![b't', b'e', b's', b't', b'\0'], writer.inner);
+        assert_eq!(
+            vec![b't', b'e', b's', b't', b'\0'],
+            writer.inner.into_inner()
+        );
     }
 }

@@ -34,6 +34,10 @@ enum DekuEnum {
 |-----------|------------------|------------
 | [endian](#endian) | top-level, field | Set the endianness
 | [magic](#magic) | top-level | A magic value that must be present at the start of this struct/enum
+| [seek_from_current](#seek_from_current) | top-level, field | Sets the offset of reader and writer to the current position plus the specified number of bytes
+| [seek_from_end](#seek_from_end) | top-level, field | Sets the offset to the size of reader and writer plus the specified number of bytes
+| [seek_from_start](#seek_from_start) | top-level, field | Sets the offset of reader and writer to provided number of bytes
+| [seek_rewind](#seek_rewind) | top-level, field | Rewind the reader and writer to the beginning
 | [assert](#assert) | field | Assert a condition
 | [assert_eq](#assert_eq) | field | Assert equals on the field
 | [bits](#bits) | field | Set the bit-size of the field
@@ -171,6 +175,256 @@ assert_eq!(
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
 ```
+
+# seek_from_current
+
+Using the internal reader, seek to current position plus offset before reading field.
+
+Field Example:
+
+```rust
+# use deku::prelude::*;
+# use std::io::Cursor;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+struct DekuTest {
+    // how many following bytes to skip
+    skip_u8: u8,
+    #[deku(seek_from_current = "*skip_u8")]
+    byte: u8,
+}
+
+let data: &[u8] = &[0x01, 0x00, 0x02];
+let mut cursor = Cursor::new(data);
+
+let (_amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
+
+assert_eq!(
+    DekuTest { skip_u8: 0x01, byte: 0x02 },
+    value
+);
+
+let bytes = value.to_bytes().unwrap();
+assert_eq!(bytes, data);
+```
+
+Top-Level Example (with ctx usage):
+
+```rust
+# use deku::prelude::*;
+# use std::io::Cursor;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(seek_from_current = "skip", ctx = "skip: usize")]
+struct DekuTest {
+    byte: u8,
+}
+
+let data: &[u8] = &[0x00, 0x02];
+let mut cursor = Cursor::new(data);
+let mut reader = Reader::new(&mut cursor);
+
+let value = DekuTest::from_reader_with_ctx(&mut reader, 1).unwrap();
+
+assert_eq!(
+    DekuTest { byte: 0x02 },
+    value
+);
+
+let mut buf = vec![];
+let mut cursor = Cursor::new(&mut buf);
+let mut writer = Writer::new(&mut cursor);
+let bytes = value.to_writer(&mut writer, 1).unwrap();
+assert_eq!(buf, data);
+```
+
+# seek_from_end
+
+Using the internal reader, seek to size of reader plus offset before reading field.
+
+Field Example:
+
+```rust
+# use deku::prelude::*;
+# use std::io::Cursor;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(seek_from_end = "-2")]
+    byte: u8,
+}
+
+let data: &[u8] = &[0x01, 0xff, 0x02];
+let mut cursor = Cursor::new(data);
+
+let (_amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
+
+assert_eq!(
+    DekuTest { byte: 0xff },
+    value
+);
+
+// NOTE: to_bytes() doesn't work, because we need `seek_from_end` to already
+// have a correct allocated buffer length!
+let mut buf = vec![0x01, 0x00, 0x02];
+let mut cursor = Cursor::new(&mut buf);
+let mut writer = Writer::new(&mut cursor);
+let _ = value.to_writer(&mut writer, ()).unwrap();
+assert_eq!(buf, data);
+```
+
+Top-Level Example:
+
+```rust
+# use deku::prelude::*;
+# use std::io::Cursor;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(seek_from_end = "-2")]
+struct DekuTest {
+    byte: u8,
+}
+
+let data: &[u8] = &[0x01, 0xff, 0x02];
+let mut cursor = Cursor::new(data);
+
+let (_amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
+
+assert_eq!(
+    DekuTest { byte: 0xff },
+    value
+);
+
+// NOTE: to_bytes() doesn't work, because we need `seek_from_end` to already
+// have a correct allocated buffer length!
+let mut buf = vec![0x01, 0x00, 0x02];
+let mut cursor = Cursor::new(&mut buf);
+let mut writer = Writer::new(&mut cursor);
+let _ = value.to_writer(&mut writer, ()).unwrap();
+assert_eq!(buf, data);
+```
+
+# seek_from_start
+
+Using the internal reader, seek from reader start plus offset before reading field.
+
+Field Example:
+
+```rust
+# use deku::prelude::*;
+# use std::io::Cursor;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(seek_from_start = "2")]
+    byte: u8,
+}
+
+let data: &[u8] = &[0x01, 0xff, 0x02];
+let mut cursor = Cursor::new(data);
+
+let (_amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
+
+assert_eq!(
+    DekuTest { byte: 0x02 },
+    value
+);
+
+// NOTE: to_bytes() doesn't work, because we need `seek_from_start` to already
+// have a correct allocated buffer length!
+let mut buf = vec![0x01, 0xff, 0x00];
+let mut cursor = Cursor::new(&mut buf);
+let mut writer = Writer::new(&mut cursor);
+let _ = value.to_writer(&mut writer, ()).unwrap();
+assert_eq!(buf, data);
+```
+
+Top-Leve Example:
+
+```rust
+# use deku::prelude::*;
+# use std::io::Cursor;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(seek_from_start = "2")]
+struct DekuTest {
+    byte: u8,
+}
+
+let data: &[u8] = &[0x01, 0xff, 0x02];
+let mut cursor = Cursor::new(data);
+
+let (_amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
+
+assert_eq!(
+    DekuTest { byte: 0x02 },
+    value
+);
+
+// NOTE: to_bytes() doesn't work, because we need `seek_from_start` to already
+// have a correct allocated buffer length!
+let mut buf = vec![0x01, 0xff, 0x00];
+let mut cursor = Cursor::new(&mut buf);
+let mut writer = Writer::new(&mut cursor);
+let _ = value.to_writer(&mut writer, ()).unwrap();
+assert_eq!(buf, data);
+```
+
+# seek_rewind
+
+Rewind the internal reader to starting position.
+
+Field Example:
+
+```rust
+# use deku::prelude::*;
+# use std::io::Cursor;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+struct DekuTest {
+    byte_01: u8,
+    #[deku(seek_rewind)]
+    byte_02: u8,
+}
+
+let data: &[u8] = &[0xff];
+let mut cursor = Cursor::new(data);
+
+let (_amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
+
+assert_eq!(
+    DekuTest { byte_01: 0xff, byte_02: 0xff },
+    value
+);
+let bytes = value.to_bytes().unwrap();
+assert_eq!(bytes, data);
+```
+
+Top-Level Example:
+
+```rust
+# use deku::prelude::*;
+# use std::io::Cursor;
+# use std::convert::{TryInto, TryFrom};
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(seek_rewind)]
+struct DekuTest {
+    byte: u8,
+}
+
+let data: &[u8] = &[0xff];
+let mut cursor = Cursor::new(data);
+
+let (_amt_read, value) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
+
+assert_eq!(
+    DekuTest { byte: 0xff},
+    value
+);
+let bytes = value.to_bytes().unwrap();
+assert_eq!(bytes, data);
+```
+
 
 # assert
 
@@ -856,7 +1110,7 @@ impl DekuTest {
     }
 
     /// Parse from String to u8 and write
-    fn write<W: std::io::Write>(writer: &mut Writer<W>, field_a: &str) -> Result<(), DekuError> {
+    fn write<W: std::io::Write + std::io::Seek>(writer: &mut Writer<W>, field_a: &str) -> Result<(), DekuError> {
         let value = field_a.parse::<u8>().unwrap();
         value.to_writer(writer, ())
     }

@@ -37,6 +37,49 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         fields,
     } = DekuDataStruct::try_from(input)?;
 
+    let seek = if let Some(num) = &input.seek_from_current {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::Current(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &input.seek_from_end {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::End(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &input.seek_from_start {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::Start(u64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if input.seek_rewind {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                if let Err(e) = __deku_reader.rewind() {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let magic_read = emit_magic_read(input);
 
     // check if the first field has an ident, if not, it's a unnamed struct
@@ -106,6 +149,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let read_body = quote! {
         use core::convert::TryFrom;
+
+        #seek
 
         #magic_read
 

@@ -4,6 +4,22 @@ error: Unexpected meta-item format `attribute cannot contain `__deku_` these are
 88 |     #[deku(cond = "__deku_bit_offset == *field_a as usize")]
    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+error[E0277]: the trait bound `W: Seek` is not satisfied
+  --> tests/test_compile/cases/internal_variables.rs:75:66
+   |
+75 | fn dummy_writer<W: std::io::Write>(_offset: usize, _writer: &mut deku::writer::Writer<W>) -> Result<(), DekuError> {
+   |                                                                  ^^^^^^^^^^^^^^^^^^^^^^^ the trait `Seek` is not implemented for `W`
+   |
+note: required by a bound in `Writer`
+  --> src/writer.rs
+   |
+   | pub struct Writer<W: Write + Seek> {
+   |                              ^^^^ required by this bound in `Writer`
+help: consider further restricting this bound
+   |
+75 | fn dummy_writer<W: std::io::Write + std::io::Seek>(_offset: usize, _writer: &mut deku::writer::Writer<W>) -> Result<(), DekuError> {
+   |                                   +++++++++++++++
+
 warning: unused variable: `offset`
   --> tests/test_compile/cases/internal_variables.rs:53:5
    |

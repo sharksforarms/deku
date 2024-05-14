@@ -44,7 +44,11 @@ where
     Ctx: Copy,
 {
     /// Write all `T`s to bits
-    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write + Seek>(
+        &self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
         for v in self.as_ref() {
             v.to_writer(writer, ctx)?;
         }
@@ -58,7 +62,11 @@ where
     Ctx: Copy,
 {
     /// Write all `T`s to bits
-    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write + Seek>(
+        &self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
         self.as_ref().to_writer(writer, ctx)?;
         Ok(())
     }
@@ -87,9 +95,9 @@ mod tests {
         let res_read = <Box<u16>>::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
 
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         res_read.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(input.to_vec(), writer.inner);
+        assert_eq!(input.to_vec(), writer.inner.into_inner());
     }
 
     // Note: Copied tests from vec.rs impl
@@ -130,11 +138,11 @@ mod tests {
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
 
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         res_read
             .to_writer(&mut writer, (endian, BitSize(bit_size)))
             .unwrap();
-        assert_eq!(expected_write, writer.inner);
+        assert_eq!(expected_write, writer.inner.into_inner());
 
         assert_eq!(input[..expected_write.len()].to_vec(), expected_write);
     }

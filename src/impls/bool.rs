@@ -37,7 +37,11 @@ where
     u8: DekuWriter<Ctx>,
 {
     /// wrapper around u8::write with consideration to context, such as bit size
-    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write + Seek>(
+        &self,
+        writer: &mut Writer<W>,
+        inner_ctx: Ctx,
+    ) -> Result<(), DekuError> {
         match self {
             true => (0x01u8).to_writer(writer, inner_ctx),
             false => (0x00u8).to_writer(writer, inner_ctx),
@@ -81,16 +85,16 @@ mod tests {
 
     #[test]
     fn test_writer() {
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         true.to_writer(&mut writer, BitSize(1)).unwrap();
         assert_eq!(vec![true], writer.rest());
 
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         true.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![1], writer.inner);
+        assert_eq!(vec![1], writer.inner.into_inner());
 
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         false.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![0], writer.inner);
+        assert_eq!(vec![0], writer.inner.into_inner());
     }
 }

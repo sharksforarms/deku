@@ -26,7 +26,11 @@ where
     Ctx: Copy,
 {
     /// Write T from Cow<T>
-    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write + Seek>(
+        &self,
+        writer: &mut Writer<W>,
+        inner_ctx: Ctx,
+    ) -> Result<(), DekuError> {
         (self.borrow() as &T).to_writer(writer, inner_ctx)
     }
 }
@@ -51,8 +55,8 @@ mod tests {
         let res_read = <Cow<u16>>::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
 
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         res_read.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(input.to_vec(), writer.inner);
+        assert_eq!(input.to_vec(), writer.inner.into_inner());
     }
 }

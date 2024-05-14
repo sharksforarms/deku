@@ -454,7 +454,7 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
 /// "Writer" trait: write from type to bytes
 pub trait DekuWriter<Ctx = ()> {
     /// Write type to bytes
-    fn to_writer<W: no_std_io::Write>(
+    fn to_writer<W: no_std_io::Write + no_std_io::Seek>(
         &self,
         writer: &mut Writer<W>,
         ctx: Ctx,
@@ -483,7 +483,8 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     #[inline(always)]
     fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
         let mut out_buf = Vec::new();
-        let mut __deku_writer = Writer::new(&mut out_buf);
+        let mut cursor = no_std_io::Cursor::new(&mut out_buf);
+        let mut __deku_writer = Writer::new(&mut cursor);
         DekuWriter::to_writer(self, &mut __deku_writer, ())?;
         __deku_writer.finalize()?;
         Ok(out_buf)
@@ -513,7 +514,8 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     #[inline(always)]
     fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError> {
         let mut out_buf = Vec::new();
-        let mut __deku_writer = Writer::new(&mut out_buf);
+        let mut cursor = no_std_io::Cursor::new(&mut out_buf);
+        let mut __deku_writer = Writer::new(&mut cursor);
         DekuWriter::to_writer(self, &mut __deku_writer, ())?;
         let mut leftover = __deku_writer.leftover;
         let mut bv = bitvec::BitVec::from_slice(&out_buf);
@@ -540,7 +542,7 @@ where
     Ctx: Copy,
 {
     #[inline(always)]
-    fn to_writer<W: no_std_io::Write>(
+    fn to_writer<W: no_std_io::Write + no_std_io::Seek>(
         &self,
         writer: &mut Writer<W>,
         ctx: Ctx,

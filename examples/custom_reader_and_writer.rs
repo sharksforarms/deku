@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use deku::ctx::BitSize;
 use deku::writer::Writer;
 use deku::{prelude::*, DekuWriter};
-use no_std_io::io::Write;
+use no_std_io::io::{Seek, Write};
 
 fn bit_flipper_read<R: std::io::Read + std::io::Seek>(
     field_a: u8,
@@ -25,7 +25,7 @@ fn bit_flipper_read<R: std::io::Read + std::io::Seek>(
     Ok(value)
 }
 
-fn bit_flipper_write<W: Write>(
+fn bit_flipper_write<W: Write + Seek>(
     field_a: u8,
     field_b: u8,
     writer: &mut Writer<W>,

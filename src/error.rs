@@ -33,12 +33,29 @@ impl NeedSize {
     }
 }
 
+/// Magic needed to frame message
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NeedMagic {
+    magic: Vec<u8>,
+}
+
+impl NeedMagic where {
+    /// Create new [NeedSize] from bits
+    #[inline]
+    pub fn new(magic: &[u8]) -> Self {
+        Self { magic: magic.to_vec() }
+    }
+
+}
+
 /// Deku errors
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum DekuError {
     /// Parsing error when reading
     Incomplete(NeedSize),
+    /// Failed to find magic
+    Framing(NeedMagic),
     /// Parsing error when reading
     Parse(Cow<'static, str>),
     /// Invalid parameter
@@ -80,6 +97,7 @@ impl core::fmt::Display for DekuError {
                 size.bit_size(),
                 size.byte_size()
             ),
+            DekuError::Framing(ref framing) => write!(f, "Missing magic framing bytes: {:?}", framing.magic),
             DekuError::Parse(ref err) => write!(f, "Parse error: {err}"),
             DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {err}"),
             DekuError::Assertion(ref err) => write!(f, "Assertion error: {err}"),
@@ -103,6 +121,7 @@ impl From<DekuError> for std::io::Error {
         use std::io;
         match error {
             DekuError::Incomplete(_) => io::Error::new(io::ErrorKind::UnexpectedEof, error),
+            DekuError::Framing(_) => io::Error::new(io::ErrorKind::InvalidData, error),
             DekuError::Parse(_) => io::Error::new(io::ErrorKind::InvalidData, error),
             DekuError::InvalidParam(_) => io::Error::new(io::ErrorKind::InvalidInput, error),
             DekuError::Assertion(_) => io::Error::new(io::ErrorKind::InvalidData, error),

@@ -5,7 +5,7 @@ use core::cmp::Ordering;
 use bitvec::prelude::*;
 use no_std_io::io::{ErrorKind, Read};
 
-use crate::{prelude::NeedSize, DekuError};
+use crate::{prelude::NeedSize, prelude::NeedMagic, DekuError};
 use alloc::vec::Vec;
 
 #[cfg(feature = "logging")]

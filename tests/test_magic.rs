@@ -7,16 +7,16 @@ use rstest::rstest;
 #[rstest(input,
     case(&hex!("64656b75")),
 
-    #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
+    #[should_panic(expected = "Framing(NeedMagic { magic: [100, 101, 107, 117] })")]
     case(&hex!("64656bde")),
 
-    #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
+    #[should_panic(expected = "Framing(NeedMagic { magic: [100, 101, 107, 117] })")]
     case(&hex!("6465ad75")),
 
-    #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
+    #[should_panic(expected = "Framing(NeedMagic { magic: [100, 101, 107, 117] })")]
     case(&hex!("64be6b75")),
 
-    #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
+    #[should_panic(expected = "Framing(NeedMagic { magic: [100, 101, 107, 117] })")]
     case(&hex!("ef656b75")),
 
     #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
@@ -38,19 +38,19 @@ fn test_magic_struct(input: &[u8]) {
 #[rstest(input,
     case(&hex!("64656b7500")),
 
-    #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
+    #[should_panic(expected = "Framing(NeedMagic { magic: [100, 101, 107, 117] })")]
     case(&hex!("64656bde00")),
 
-    #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
+    #[should_panic(expected = "Framing(NeedMagic { magic: [100, 101, 107, 117] })")]
     case(&hex!("6465ad7500")),
 
-    #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
+    #[should_panic(expected = "Framing(NeedMagic { magic: [100, 101, 107, 117] })")]
     case(&hex!("64be6b7500")),
 
-    #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
+    #[should_panic(expected = "Framing(NeedMagic { magic: [100, 101, 107, 117] })")]
     case(&hex!("ef656b7500")),
 
-    #[should_panic(expected = "Parse(\"Missing magic value [100, 101, 107, 117]\")")]
+    #[should_panic(expected = "Framing(NeedMagic { magic: [100, 101, 107, 117] })")]
     case(&hex!("64656b00")),
 
     #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]

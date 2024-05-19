@@ -40,7 +40,7 @@ pub struct NeedMagic {
 }
 
 impl NeedMagic where {
-    /// Create new [NeedSize] from bits
+    /// Create new [NeedSize] from magic bytes 
     #[inline]
     pub fn new(magic: &[u8]) -> Self {
         Self { magic: magic.to_vec() }

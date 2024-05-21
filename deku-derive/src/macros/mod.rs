@@ -97,17 +97,18 @@ fn gen_struct_destruction<I: ToTokens, F: ToTokens>(
     named: bool,
     ident: I,
     field_idents: impl Iterator<Item = F>,
+    m: TokenStream,
 ) -> TokenStream {
     if named {
         quote! {
             #ident {
-                #(ref #field_idents),*
+                #(ref #m #field_idents),*
             }
         }
     } else {
         quote! {
             #ident (
-                #(ref #field_idents),*
+                #(ref #m #field_idents),*
             )
         }
     }

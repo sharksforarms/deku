@@ -2,7 +2,7 @@
 
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, DekuWriterMut};
 use core::mem::MaybeUninit;
 use no_std_io::io::{Read, Seek, Write};
 
@@ -88,6 +88,54 @@ where
     ) -> Result<(), DekuError> {
         for v in self {
             v.to_writer(writer, ctx)?;
+        }
+        Ok(())
+    }
+}
+
+impl<Ctx: Copy, T, const N: usize> DekuWriterMut<Ctx> for [T; N]
+where
+    T: DekuWriterMut<Ctx>,
+{
+    fn to_writer_mut<W: Write + Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        for v in self {
+            v.to_writer_mut(writer, ctx)?;
+        }
+        Ok(())
+    }
+}
+
+impl<Ctx: Copy, T> DekuWriterMut<Ctx> for &mut [T]
+where
+    T: DekuWriterMut<Ctx>,
+{
+    fn to_writer_mut<W: Write + Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        for v in self.iter_mut() {
+            v.to_writer_mut(writer, ctx)?;
+        }
+        Ok(())
+    }
+}
+
+impl<Ctx: Copy, T> DekuWriterMut<Ctx> for [T]
+where
+    T: DekuWriterMut<Ctx>,
+{
+    fn to_writer_mut<W: Write + Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        for v in self {
+            v.to_writer_mut(writer, ctx)?;
         }
         Ok(())
     }

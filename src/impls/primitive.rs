@@ -9,7 +9,7 @@ use no_std_io::io::{Read, Seek, Write};
 use crate::ctx::*;
 use crate::reader::{Reader, ReaderRet};
 use crate::writer::Writer;
-use crate::{DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, DekuWriterMut};
 
 /// "Read" trait: read bits and construct type
 trait DekuRead<'a, Ctx = ()> {
@@ -433,11 +433,11 @@ macro_rules! ForwardDekuRead {
 }
 
 macro_rules! ImplDekuWrite {
-    ($typ:ty) => {
-        impl DekuWriter<(Endian, BitSize)> for $typ {
+    ($typ:ty, $trait:tt, $func:tt, $self_arg:ty) => {
+        impl $trait<(Endian, BitSize)> for $typ {
             #[inline(always)]
-            fn to_writer<W: Write + Seek>(
-                &self,
+            fn $func<W: Write + Seek>(
+                self: $self_arg,
                 writer: &mut Writer<W>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<(), DekuError> {
@@ -480,10 +480,10 @@ macro_rules! ImplDekuWrite {
             }
         }
 
-        impl DekuWriter<(Endian, ByteSize)> for $typ {
+        impl $trait<(Endian, ByteSize)> for $typ {
             #[inline(always)]
-            fn to_writer<W: Write + Seek>(
-                &self,
+            fn $func<W: Write + Seek>(
+                self: $self_arg,
                 writer: &mut Writer<W>,
                 (endian, size): (Endian, ByteSize),
             ) -> Result<(), DekuError> {
@@ -511,10 +511,10 @@ macro_rules! ImplDekuWrite {
             }
         }
 
-        impl DekuWriter<Endian> for $typ {
+        impl $trait<Endian> for $typ {
             #[inline(always)]
-            fn to_writer<W: Write + Seek>(
-                &self,
+            fn $func<W: Write + Seek>(
+                self: $self_arg,
                 writer: &mut Writer<W>,
                 endian: Endian,
             ) -> Result<(), DekuError> {
@@ -541,6 +541,16 @@ macro_rules! ForwardDekuWrite {
                 <$typ>::to_writer(self, writer, (Endian::default(), bit_size))
             }
         }
+        impl DekuWriterMut<BitSize> for $typ {
+            #[inline(always)]
+            fn to_writer_mut<W: Write + Seek>(
+                &mut self,
+                writer: &mut Writer<W>,
+                bit_size: BitSize,
+            ) -> Result<(), DekuError> {
+                <$typ>::to_writer_mut(self, writer, (Endian::default(), bit_size))
+            }
+        }
 
         impl DekuWriter<ByteSize> for $typ {
             #[inline(always)]
@@ -552,6 +562,16 @@ macro_rules! ForwardDekuWrite {
                 <$typ>::to_writer(self, writer, (Endian::default(), byte_size))
             }
         }
+        impl DekuWriterMut<ByteSize> for $typ {
+            #[inline(always)]
+            fn to_writer_mut<W: Write + Seek>(
+                &mut self,
+                writer: &mut Writer<W>,
+                byte_size: ByteSize,
+            ) -> Result<(), DekuError> {
+                <$typ>::to_writer_mut(self, writer, (Endian::default(), byte_size))
+            }
+        }
 
         impl DekuWriter for $typ {
             #[inline(always)]
@@ -561,6 +581,16 @@ macro_rules! ForwardDekuWrite {
                 _: (),
             ) -> Result<(), DekuError> {
                 <$typ>::to_writer(self, writer, Endian::default())
+            }
+        }
+        impl DekuWriterMut for $typ {
+            #[inline(always)]
+            fn to_writer_mut<W: Write + Seek>(
+                &mut self,
+                writer: &mut Writer<W>,
+                _: (),
+            ) -> Result<(), DekuError> {
+                <$typ>::to_writer_mut(self, writer, Endian::default())
             }
         }
     };
@@ -579,14 +609,16 @@ macro_rules! ImplDekuTraits {
         ImplDekuReadBits!($typ, $typ);
         ForwardDekuRead!($typ);
 
-        ImplDekuWrite!($typ);
+        ImplDekuWrite!($typ, DekuWriter, to_writer, &Self);
+        ImplDekuWrite!($typ, DekuWriterMut, to_writer_mut, &mut Self);
         ForwardDekuWrite!($typ);
     };
     ($typ:ty, $inner:ty) => {
         ImplDekuReadBits!($typ, $inner);
         ForwardDekuRead!($typ);
 
-        ImplDekuWrite!($typ);
+        ImplDekuWrite!($typ, DekuWriter, to_writer, &Self);
+        ImplDekuWrite!($typ, DekuWriterMut, to_writer_mut, &mut Self);
         ForwardDekuWrite!($typ);
     };
 }
@@ -596,7 +628,8 @@ macro_rules! ImplDekuTraitsSignExtend {
         ImplDekuReadSignExtend!($typ, $inner);
         ForwardDekuRead!($typ);
 
-        ImplDekuWrite!($typ);
+        ImplDekuWrite!($typ, DekuWriter, to_writer, &Self);
+        ImplDekuWrite!($typ, DekuWriterMut, to_writer_mut, &mut Self);
         ForwardDekuWrite!($typ);
     };
 }
@@ -830,7 +863,19 @@ mod tests {
         let mut writer = Writer::new(Cursor::new(vec![]));
         match bit_size {
             Some(bit_size) => input
+                .clone()
                 .to_writer(&mut writer, (endian, BitSize(bit_size)))
+                .unwrap(),
+            None => input.to_writer(&mut writer, endian).unwrap(),
+        };
+        assert_eq!(expected_leftover, writer.rest());
+        assert_eq!(expected, writer.inner.into_inner());
+
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        match bit_size {
+            Some(bit_size) => input
+                .clone()
+                .to_writer_mut(&mut writer, (endian, BitSize(bit_size)))
                 .unwrap(),
             None => input.to_writer(&mut writer, endian).unwrap(),
         };
@@ -850,11 +895,22 @@ mod tests {
         let mut writer = Writer::new(Cursor::new(vec![]));
         match byte_size {
             Some(byte_size) => input
+                .clone()
                 .to_writer(&mut writer, (endian, ByteSize(byte_size)))
                 .unwrap(),
             None => input.to_writer(&mut writer, endian).unwrap(),
         };
         assert_hex::assert_eq_hex!(expected, writer.inner.into_inner());
+
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        match byte_size {
+            Some(byte_size) => input
+                .clone()
+                .to_writer_mut(&mut writer, (endian, ByteSize(byte_size)))
+                .unwrap(),
+            None => input.to_writer(&mut writer, endian).unwrap(),
+        };
+        assert_eq!(expected, writer.inner.into_inner());
     }
 
     #[rstest(input, endian, bit_size, expected, expected_write,
@@ -885,6 +941,15 @@ mod tests {
             None => res_read.to_writer(&mut writer, endian).unwrap(),
         };
         assert_hex::assert_eq_hex!(expected_write, writer.inner.into_inner());
+
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        match bit_size {
+            Some(bit_size) => res_read
+                .clone()
+                .to_writer_mut(&mut writer, (endian, BitSize(bit_size)))
+                .unwrap(),
+            None => res_read.to_writer(&mut writer, endian).unwrap(),
+        };
     }
 
     macro_rules! TestSignExtending {

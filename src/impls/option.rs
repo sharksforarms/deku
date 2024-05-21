@@ -1,6 +1,6 @@
 use no_std_io::io::{Read, Seek, Write};
 
-use crate::{writer::Writer, DekuError, DekuReader, DekuWriter};
+use crate::{writer::Writer, DekuError, DekuReader, DekuWriter, DekuWriterMut};
 
 impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
     fn from_reader_with_ctx<R: Read + Seek>(
@@ -20,6 +20,17 @@ impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Option<T> {
     ) -> Result<(), DekuError> {
         self.as_ref()
             .map_or(Ok(()), |v| v.to_writer(writer, inner_ctx))
+    }
+}
+
+impl<T: DekuWriterMut<Ctx>, Ctx: Copy> DekuWriterMut<Ctx> for Option<T> {
+    fn to_writer_mut<W: Write + Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        inner_ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        self.as_mut()
+            .map_or(Ok(()), |v| v.to_writer_mut(writer, inner_ctx))
     }
 }
 

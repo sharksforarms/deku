@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::Ident;
 
 use crate::macros::{
     assertion_failed, gen_ctx_types_and_arg, gen_field_args, gen_struct_destruction, pad_bits,
@@ -10,16 +11,27 @@ use crate::macros::{
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
-pub(crate) fn emit_deku_write(input: &DekuData) -> Result<TokenStream, syn::Error> {
+pub(crate) fn emit_deku_write(input: &DekuData, m: bool) -> Result<TokenStream, syn::Error> {
     match &input.data {
-        Data::Enum(_) => emit_enum(input),
-        Data::Struct(_) => emit_struct(input),
+        Data::Enum(_) => emit_enum(input, m),
+        Data::Struct(_) => emit_struct(input, m),
     }
 }
 
-fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
+fn emit_struct(input: &DekuData, m: bool) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
     let mut tokens = TokenStream::new();
+    let (
+        writer_trait,
+        to_writer,
+        s_type,
+        impl_try_from,
+        deref_mut,
+        ident_mut,
+        impl_try_from_body,
+        to_bits,
+        container_trait,
+    ) = self_tokens(crate_.clone(), m);
 
     let DekuDataStruct {
         imp,
@@ -71,9 +83,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         quote! {}
     };
 
-    let magic_write = emit_magic_write(input);
+    let magic_write = emit_magic_write(input, writer_trait.clone(), to_writer.clone());
 
-    let field_writes = emit_field_writes(input, &fields, None, &ident)?;
+    let field_writes = emit_field_writes(input, &fields, None, &ident, &writer_trait, &to_writer)?;
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }));
 
     let named = fields.style.is_struct();
@@ -86,30 +98,30 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
     });
 
-    let destructured = gen_struct_destruction(named, &input.ident, field_idents);
+    let destructured = gen_struct_destruction(named, &input.ident, field_idents, deref_mut);
 
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
         tokens.extend(quote! {
-             impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
+             impl #imp core::convert::TryFrom<#ident_mut #ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
 
                 #[inline]
-                fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
-                    input.to_bits()
+                fn try_from(input: #ident_mut #ident) -> core::result::Result<Self, Self::Error> {
+                    #to_bits
                 }
             }
 
-            impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
+            impl #imp core::convert::TryFrom<#ident_mut #ident> for Vec<u8> #wher {
                 type Error = ::#crate_::DekuError;
 
                 #[inline]
-                fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
-                    ::#crate_::DekuContainerWrite::to_bytes(&input)
+                fn try_from(input: #ident_mut #ident) -> core::result::Result<Self, Self::Error> {
+                    #impl_try_from_body
                 }
             }
 
-            impl #imp DekuContainerWrite for #ident #wher {}
+            impl #imp #container_trait for #ident #wher {}
         });
     }
 
@@ -141,10 +153,10 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         }
 
-        impl #imp ::#crate_::DekuWriter<#ctx_types> for #ident #wher {
+        impl #imp #writer_trait<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
             #[inline]
-            fn to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
+            fn #to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(#s_type, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
                 #write_body
             }
         }
@@ -154,10 +166,10 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let write_body = wrap_default_ctx(write_body, &input.ctx, &input.ctx_default);
 
         tokens.extend(quote! {
-            impl #imp ::#crate_::DekuWriter for #ident #wher {
+            impl #imp #writer_trait for #ident #wher {
                 #[allow(unused_variables)]
                 #[inline]
-                fn to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
+                fn #to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(#s_type, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
                     #write_body
                 }
             }
@@ -168,9 +180,20 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     Ok(tokens)
 }
 
-fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
+fn emit_enum(input: &DekuData, m: bool) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
     let mut tokens = TokenStream::new();
+    let (
+        writer_trait,
+        to_writer,
+        s_type,
+        impl_try_from,
+        deref_mut,
+        ident_mut,
+        impl_try_from_body,
+        to_bits,
+        container_trait,
+    ) = self_tokens(crate_.clone(), m);
 
     let DekuDataEnum {
         imp,
@@ -182,7 +205,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         id_args,
     } = DekuDataEnum::try_from(input)?;
 
-    let magic_write = emit_magic_write(input);
+    let magic_write = emit_magic_write(input, writer_trait.clone(), to_writer.clone());
 
     let mut variant_writes = Vec::with_capacity(variants.len());
     let mut variant_updates = Vec::with_capacity(variants.len());
@@ -221,19 +244,19 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     Id::TokenStream(v) => {
                         quote! {
                             let mut __deku_variant_id: #id_type = #v;
-                            __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
+                            __deku_variant_id.#to_writer(__deku_writer, (#id_args))?;
                         }
                     }
                     Id::Int(v) => {
                         quote! {
                             let mut __deku_variant_id: #id_type = #v;
-                            __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
+                            __deku_variant_id.#to_writer(__deku_writer, (#id_args))?;
                         }
                     }
                     Id::LitByteStr(v) => {
                         quote! {
                             let mut __deku_variant_id: #id_type = *#v;
-                            __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
+                            __deku_variant_id.#to_writer(__deku_writer, (#id_args))?;
                         }
                     }
                 }
@@ -242,7 +265,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             } else if has_discriminant {
                 quote! {
                     let mut __deku_variant_id: #id_type = Self::#variant_ident as #id_type;
-                    __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
+                    __deku_variant_id.#to_writer(__deku_writer, (#id_args))?;
                 }
             } else {
                 return Err(syn::Error::new(
@@ -260,7 +283,14 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let variant_write = if variant_writer.is_some() {
             quote! { #variant_writer ?; }
         } else {
-            let field_writes = emit_field_writes(input, &variant.fields.as_ref(), None, &ident)?;
+            let field_writes = emit_field_writes(
+                input,
+                &variant.fields.as_ref(),
+                None,
+                &ident,
+                &writer_trait,
+                &to_writer,
+            )?;
 
             quote! {
                 {
@@ -288,25 +318,25 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
         tokens.extend(quote! {
-             impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
+             impl #imp core::convert::TryFrom<#ident_mut #ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
 
                 #[inline]
-                fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
-                    input.to_bits()
+                fn try_from(input: #ident_mut #ident) -> core::result::Result<Self, Self::Error> {
+                    #to_bits
                 }
             }
 
-            impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
+            impl #imp core::convert::TryFrom<#ident_mut #ident> for Vec<u8> #wher {
                 type Error = ::#crate_::DekuError;
 
                 #[inline]
-                fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
-                    ::#crate_::DekuContainerWrite::to_bytes(&input)
+                fn try_from(input: #ident_mut #ident) -> core::result::Result<Self, Self::Error> {
+                    #impl_try_from_body
                 }
             }
 
-            impl #imp DekuContainerWrite for #ident #wher {}
+            impl #imp #container_trait for #ident #wher {}
         })
     }
 
@@ -339,10 +369,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         }
 
-        impl #imp ::#crate_::DekuWriter<#ctx_types> for #ident #wher {
+        impl #imp #writer_trait<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
             #[inline]
-            fn to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
+            fn #to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(#s_type, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
                 #write_body
             }
         }
@@ -352,10 +382,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let write_body = wrap_default_ctx(write_body, &input.ctx, &input.ctx_default);
 
         tokens.extend(quote! {
-            impl #imp ::#crate_::DekuWriter for #ident #wher {
+            impl #imp #writer_trait for #ident #wher {
                 #[allow(unused_variables)]
                 #[inline]
-                fn to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
+                fn #to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(#s_type, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
                     #write_body
                 }
             }
@@ -366,11 +396,15 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     Ok(tokens)
 }
 
-fn emit_magic_write(input: &DekuData) -> TokenStream {
+fn emit_magic_write(
+    input: &DekuData,
+    writer_trait: TokenStream,
+    to_writer: TokenStream,
+) -> TokenStream {
     let crate_ = super::get_crate_name();
     if let Some(magic) = &input.magic {
         quote! {
-            ::#crate_::DekuWriter::to_writer(#magic, __deku_writer, ())?;
+            #writer_trait :: #to_writer(#magic, __deku_writer, ())?;
         }
     } else {
         quote! {}
@@ -382,11 +416,13 @@ fn emit_field_writes(
     fields: &Fields<&FieldData>,
     object_prefix: Option<TokenStream>,
     ident: &TokenStream,
+    writer_trait: &TokenStream,
+    to_writer: &TokenStream,
 ) -> Result<Vec<TokenStream>, syn::Error> {
     fields
         .iter()
         .enumerate()
-        .map(|(i, f)| emit_field_write(input, i, f, &object_prefix, ident))
+        .map(|(i, f)| emit_field_write(input, i, f, &object_prefix, ident, writer_trait, to_writer))
         .collect()
 }
 
@@ -477,6 +513,8 @@ fn emit_field_write(
     f: &FieldData,
     object_prefix: &Option<TokenStream>,
     ident: &TokenStream,
+    writer_trait: &TokenStream,
+    to_writer: &TokenStream,
 ) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
     let field_endian = f.endian.as_ref().or(input.endian.as_ref());
@@ -585,13 +623,13 @@ fn emit_field_write(
                 let field_type = &f.ty;
                 quote! {
                     let #field_ident: #field_type = #temp_value;
-                    ::#crate_::DekuWriter::to_writer(#object_prefix &#field_ident, __deku_writer, (#write_args))
+                    #writer_trait :: #to_writer(#object_prefix &#field_ident, __deku_writer, (#write_args))
                 }
             } else {
                 quote! { core::result::Result::<(), ::#crate_::DekuError>::Ok(()) }
             }
         } else {
-            quote! { ::#crate_::DekuWriter::to_writer(#object_prefix #field_ident, __deku_writer, (#write_args)) }
+            quote! { #writer_trait :: #to_writer(#object_prefix #field_ident, __deku_writer, (#write_args)) }
         }
     };
 
@@ -669,5 +707,48 @@ fn check_update_use<T>(vec: &[T]) -> TokenStream {
         quote! {use core::convert::TryInto;}
     } else {
         quote! {}
+    }
+}
+
+type Type = Ident;
+
+fn self_tokens(
+    crate_: Type,
+    m: bool,
+) -> (
+    TokenStream,
+    TokenStream,
+    TokenStream,
+    bool,
+    TokenStream,
+    TokenStream,
+    TokenStream,
+    TokenStream,
+    TokenStream,
+) {
+    if m {
+        (
+            quote! {::#crate_::DekuWriterMut},
+            quote! {to_writer_mut},
+            quote! {&mut self},
+            false,
+            quote! { mut },
+            quote! { &mut },
+            quote! { ::deku::DekuContainerWriteMut::to_bytes_mut(input) },
+            quote! { input.to_bits_mut() },
+            quote! { ::deku::DekuContainerWriteMut },
+        )
+    } else {
+        (
+            quote! {::#crate_::DekuWriter},
+            quote! {to_writer},
+            quote! {&self},
+            true,
+            quote! {},
+            quote! {},
+            quote! { ::deku::DekuContainerWrite::to_bytes(&input) },
+            quote! { input.to_bits() },
+            quote! { ::deku::DekuContainerWrite },
+        )
     }
 }

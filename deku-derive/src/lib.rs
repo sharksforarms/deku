@@ -291,7 +291,13 @@ impl DekuData {
 
     /// Emit a writer. On error, a compiler error is emitted
     fn emit_writer(&self) -> TokenStream {
-        self.emit_writer_checked()
+        self.emit_writer_checked(false)
+            .unwrap_or_else(|e| e.to_compile_error())
+    }
+
+    /// Emit a writer mut. On error, a compiler error is emitted
+    fn emit_writer_mut(&self) -> TokenStream {
+        self.emit_writer_checked(true)
             .unwrap_or_else(|e| e.to_compile_error())
     }
 
@@ -301,8 +307,8 @@ impl DekuData {
     }
 
     /// Same as `emit_writer`, but won't auto convert error to compile error
-    fn emit_writer_checked(&self) -> Result<TokenStream, syn::Error> {
-        emit_deku_write(self)
+    fn emit_writer_checked(&self, m: bool) -> Result<TokenStream, syn::Error> {
+        emit_deku_write(self, m)
     }
 }
 
@@ -974,6 +980,15 @@ pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     }
 }
 
+/// Entry function for `DekuWriteMut` proc-macro
+#[proc_macro_derive(DekuWriteMut, attributes(deku))]
+pub fn proc_deku_write_mut(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    match DekuData::from_input(input.into()) {
+        Ok(data) => data.emit_writer_mut().into(),
+        Err(err) => err.into(),
+    }
+}
+
 fn is_not_deku(attr: &syn::Attribute) -> bool {
     attr.path()
         .get_ident()
@@ -1162,7 +1177,7 @@ mod tests {
 
         let data = DekuData::from_input(parsed).unwrap();
         let res_reader = data.emit_reader_checked();
-        let res_writer = data.emit_writer_checked();
+        let res_writer = data.emit_writer_checked(false);
 
         res_reader.unwrap();
         res_writer.unwrap();

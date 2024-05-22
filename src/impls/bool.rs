@@ -7,7 +7,7 @@ use alloc::format;
 
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, DekuWriterMut};
 
 impl<'a, Ctx> DekuReader<'a, Ctx> for bool
 where
@@ -45,6 +45,23 @@ where
         match self {
             true => (0x01u8).to_writer(writer, inner_ctx),
             false => (0x00u8).to_writer(writer, inner_ctx),
+        }
+    }
+}
+
+impl<Ctx> DekuWriterMut<Ctx> for bool
+where
+    u8: DekuWriterMut<Ctx>,
+{
+    /// wrapper around u8::write with consideration to context, such as bit size
+    fn to_writer_mut<W: Write + Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        inner_ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        match self {
+            true => (0x01u8).to_writer_mut(writer, inner_ctx),
+            false => (0x00u8).to_writer_mut(writer, inner_ctx),
         }
     }
 }

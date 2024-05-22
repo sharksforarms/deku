@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 use crate::ctx::Limit;
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, DekuWriterMut};
 
 impl<'a, T, Ctx> DekuReader<'a, Ctx> for Box<T>
 where
@@ -68,6 +68,40 @@ where
         ctx: Ctx,
     ) -> Result<(), DekuError> {
         self.as_ref().to_writer(writer, ctx)?;
+        Ok(())
+    }
+}
+
+impl<T, Ctx> DekuWriterMut<Ctx> for Box<[T]>
+where
+    T: DekuWriterMut<Ctx>,
+    Ctx: Copy,
+{
+    /// Write all `T`s to bits
+    fn to_writer_mut<W: Write + Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        for v in self.as_mut() {
+            v.to_writer_mut(writer, ctx)?;
+        }
+        Ok(())
+    }
+}
+
+impl<T, Ctx> DekuWriterMut<Ctx> for Box<T>
+where
+    T: DekuWriterMut<Ctx>,
+    Ctx: Copy,
+{
+    /// Write all `T`s to bits
+    fn to_writer_mut<W: Write + Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        self.as_mut().to_writer_mut(writer, ctx)?;
         Ok(())
     }
 }

@@ -4,7 +4,7 @@ use crate::writer::Writer;
 
 use no_std_io::io::{Read, Seek, Write};
 
-use crate::{DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, DekuWriterMut};
 
 // Trait to help us build intermediate tuples while DekuRead'ing each element
 // from the tuple
@@ -62,6 +62,18 @@ macro_rules! ImplDekuTupleTraits {
                 let ($(ref $T,)+) = *self;
                 $(
                     $T.to_writer(writer, ctx)?;
+                )+
+                Ok(())
+            }
+        }
+
+        impl<Ctx: Copy, $($T:DekuWriterMut<Ctx>),+> DekuWriterMut<Ctx> for ($($T,)+)
+        {
+            #[allow(non_snake_case)]
+            fn to_writer_mut<W: Write + Seek>(&mut self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
+                let ($(ref mut $T,)+) = *self;
+                $(
+                    $T.to_writer_mut(writer, ctx)?;
                 )+
                 Ok(())
             }

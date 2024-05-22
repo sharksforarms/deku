@@ -4,7 +4,7 @@ use no_std_io::io::{Read, Seek, Write};
 
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, DekuWriterMut};
 
 impl<'a, Ctx> DekuReader<'a, Ctx> for Ipv4Addr
 where
@@ -73,6 +73,37 @@ where
         match self {
             IpAddr::V4(ipv4) => ipv4.to_writer(writer, ctx),
             IpAddr::V6(ipv6) => ipv6.to_writer(writer, ctx),
+        }
+    }
+}
+
+impl<Ctx> DekuWriterMut<Ctx> for Ipv6Addr
+where
+    u128: DekuWriterMut<Ctx>,
+{
+    fn to_writer_mut<W: Write + Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        let mut ip: u128 = (*self).into();
+        ip.to_writer_mut(writer, ctx)
+    }
+}
+
+impl<Ctx> DekuWriterMut<Ctx> for IpAddr
+where
+    Ipv6Addr: DekuWriterMut<Ctx>,
+    Ipv4Addr: DekuWriterMut<Ctx>,
+{
+    fn to_writer_mut<W: Write + Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        match self {
+            IpAddr::V4(ipv4) => ipv4.to_writer_mut(writer, ctx),
+            IpAddr::V6(ipv6) => ipv6.to_writer_mut(writer, ctx),
         }
     }
 }

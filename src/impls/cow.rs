@@ -1,10 +1,10 @@
-use std::borrow::{Borrow, Cow};
+use std::borrow::{Borrow, BorrowMut, Cow};
 
 use no_std_io::io::{Read, Seek, Write};
 
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, DekuWriterMut};
 
 impl<'a, T, Ctx> DekuReader<'a, Ctx> for Cow<'a, T>
 where

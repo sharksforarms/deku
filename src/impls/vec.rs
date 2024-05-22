@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{ctx::*, DekuReader};
+use crate::{ctx::*, DekuReader, DekuWriterMut};
 use crate::{DekuError, DekuWriter};
 
 /// Read `T`s into a vec until a given predicate returns true
@@ -169,6 +169,19 @@ impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Vec<T> {
     ) -> Result<(), DekuError> {
         for v in self {
             v.to_writer(writer, inner_ctx)?;
+        }
+        Ok(())
+    }
+}
+
+impl<T: DekuWriterMut<Ctx>, Ctx: Copy> DekuWriterMut<Ctx> for Vec<T> {
+    fn to_writer_mut<W: Write + Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        inner_ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        for v in self {
+            v.to_writer_mut(writer, inner_ctx)?;
         }
         Ok(())
     }

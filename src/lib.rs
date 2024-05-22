@@ -461,6 +461,16 @@ pub trait DekuWriter<Ctx = ()> {
     ) -> Result<(), DekuError>;
 }
 
+/// "Writer" trait: write from type to bytes
+pub trait DekuWriterMut<Ctx = ()> {
+    /// Write type to bytes
+    fn to_writer_mut<W: no_std_io::Write + no_std_io::Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError>;
+}
+
 /// "Writer" trait: implemented on DekuWrite struct and enum containers. A `container` is a type which
 /// doesn't need any context information.
 pub trait DekuContainerWrite: DekuWriter<()> {
@@ -524,6 +534,32 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     }
 }
 
+/// "Writer" trait: implemented on DekuWrite struct and enum containers. A `container` is a type which
+/// doesn't need any context information.
+pub trait DekuContainerWriteMut: DekuWriterMut<()> {
+    #[inline(always)]
+    fn to_bytes_mut(&mut self) -> Result<Vec<u8>, DekuError> {
+        let mut out_buf = Vec::new();
+        let mut cursor = no_std_io::Cursor::new(&mut out_buf);
+        let mut __deku_writer = Writer::new(&mut cursor);
+        DekuWriterMut::to_writer_mut(self, &mut __deku_writer, ())?;
+        __deku_writer.finalize()?;
+        Ok(out_buf)
+    }
+
+    #[inline(always)]
+    fn to_bits_mut(&mut self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError> {
+        let mut out_buf = Vec::new();
+        let mut cursor = no_std_io::Cursor::new(&mut out_buf);
+        let mut __deku_writer = Writer::new(&mut cursor);
+        DekuWriterMut::to_writer_mut(self, &mut __deku_writer, ())?;
+        let mut leftover = __deku_writer.leftover;
+        let mut bv = bitvec::BitVec::from_slice(&out_buf);
+        bv.append(&mut leftover);
+        Ok(bv)
+    }
+}
+
 /// "Updater" trait: apply mutations to a type
 pub trait DekuUpdate {
     /// Apply updates
@@ -548,6 +584,22 @@ where
         ctx: Ctx,
     ) -> Result<(), DekuError> {
         <T>::to_writer(self, writer, ctx)?;
+        Ok(())
+    }
+}
+
+impl<T, Ctx> DekuWriterMut<Ctx> for &mut T
+where
+    T: DekuWriterMut<Ctx>,
+    Ctx: Copy,
+{
+    #[inline(always)]
+    fn to_writer_mut<W: no_std_io::Write + no_std_io::Seek>(
+        &mut self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
+        <T>::to_writer_mut(self, writer, ctx)?;
         Ok(())
     }
 }

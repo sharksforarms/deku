@@ -8,7 +8,7 @@ use no_std_io::io::{Read, Seek, Write};
 use crate::ctx::*;
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, DekuWriterMut};
 
 macro_rules! ImplDekuTraitsCtx {
     ($typ:ty, $readtype:ty, $ctx_arg:tt, $ctx_type:tt) => {
@@ -35,6 +35,16 @@ macro_rules! ImplDekuTraitsCtx {
             ) -> Result<(), DekuError> {
                 let value = self.get();
                 value.to_writer(writer, $ctx_arg)
+            }
+        }
+        impl DekuWriterMut<$ctx_type> for $typ {
+            fn to_writer_mut<W: Write + Seek>(
+                &mut self,
+                writer: &mut Writer<W>,
+                $ctx_arg: $ctx_type,
+            ) -> Result<(), DekuError> {
+                let mut value = self.get();
+                value.to_writer_mut(writer, $ctx_arg)
             }
         }
     };

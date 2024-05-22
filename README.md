@@ -18,7 +18,7 @@ Avoid the requirement of writing redundant, error-prone parsing and writing code
 for binary structs or network headers
 
 ## Usage
-*Compiler support: requires rustc 1.67.1+*
+*Compiler support: requires rustc 1.71+*
 
 ```toml
 [dependencies]

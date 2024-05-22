@@ -269,12 +269,14 @@ impl DekuData {
 
     /// Emit a reader. On error, a compiler error is emitted
     fn emit_reader(&self) -> TokenStream {
-        self.emit_reader_checked().unwrap_or_else(|e| e.to_compile_error())
+        self.emit_reader_checked()
+            .unwrap_or_else(|e| e.to_compile_error())
     }
 
     /// Emit a writer. On error, a compiler error is emitted
     fn emit_writer(&self) -> TokenStream {
-        self.emit_writer_checked().unwrap_or_else(|e| e.to_compile_error())
+        self.emit_writer_checked()
+            .unwrap_or_else(|e| e.to_compile_error())
     }
 
     /// Same as `emit_reader`, but won't auto convert error to compile error

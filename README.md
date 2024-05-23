@@ -4,7 +4,6 @@
 [![Rust Documentation](https://docs.rs/deku/badge.svg)](https://docs.rs/deku)
 [![Actions Status](https://github.com/sharksforarms/deku/workflows/CI/badge.svg)](https://github.com/sharksforarms/deku/actions)
 [![codecov](https://codecov.io/gh/sharksforarms/deku/branch/master/graph/badge.svg)](https://codecov.io/gh/sharksforarms/deku)
-[![Gitter](https://badges.gitter.im/rust-deku/community.svg)](https://gitter.im/rust-deku/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 Declarative binary reading and writing
 
@@ -22,13 +21,13 @@ for binary structs or network headers
 
 ```toml
 [dependencies]
-deku = "0.16"
+deku = "0.17"
 ```
 
 no_std:
 ```toml
 [dependencies]
-deku = { version = "0.16", default-features = false, features = ["alloc"] }
+deku = { version = "0.17", default-features = false, features = ["alloc"] }
 ```
 
 ## Example

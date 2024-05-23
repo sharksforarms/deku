@@ -1,6 +1,5 @@
 push=false
 publish=false
-dev-version=false
 consolidate-commits=true
 pre-release-commit-message="release: deku and deku-derive release"
 tag=true

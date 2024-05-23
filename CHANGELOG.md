@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.17.0] - 2024-04-23
+
 ## Changes
 - Bumped MSRV to `1.71` ([#438](https://github.com/sharksforarms/deku/pull/438))
 - Add DekuWrite impl for `[T]` ([#416](https://github.com/sharksforarms/deku/pull/416))
@@ -467,7 +469,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.16.0...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.17.0...HEAD
+
+[0.17.0]: https://github.com/sharksforarms/deku/compare/deku-v0.16.0...deku-v0.17.0
 
 [0.16.0]: https://github.com/sharksforarms/deku/compare/deku-v0.15.1...deku-v0.16.0
 

@@ -338,6 +338,11 @@ environment, you will see logging messages as Deku does its deserialising.
 - `DekuError` whenever possible will use a `'static str`, to make the errors compile away when following a
    guide such as [min-sized-rust](https://github.com/johnthagen/min-sized-rust).
 
+# Performance: Compile without `bitvec`
+The feature `bits` enables the `bitvec` crate to use when reading and writing, which is enabled by default.
+This however slows down the reading and writing process if your code doesn't use `bits` and the `bit_offset`
+in `from_bytes`.
+
 */
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]

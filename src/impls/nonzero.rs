@@ -43,6 +43,7 @@ macro_rules! ImplDekuTraitsCtx {
 macro_rules! ImplDekuTraits {
     ($typ:ty, $readtype:ty) => {
         ImplDekuTraitsCtx!($typ, $readtype, (), ());
+        #[cfg(feature = "bits")]
         ImplDekuTraitsCtx!($typ, $readtype, (endian, bitsize), (Endian, BitSize));
         ImplDekuTraitsCtx!($typ, $readtype, (endian, bytesize), (Endian, ByteSize));
         ImplDekuTraitsCtx!($typ, $readtype, endian, Endian);

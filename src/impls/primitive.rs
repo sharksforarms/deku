@@ -3,7 +3,9 @@ use alloc::borrow::Cow;
 use alloc::format;
 use core::convert::TryInto;
 
+#[cfg(feature = "bits")]
 use bitvec::prelude::*;
+
 use no_std_io::io::{Read, Write};
 
 use crate::ctx::*;
@@ -12,6 +14,7 @@ use crate::writer::Writer;
 use crate::{DekuError, DekuReader, DekuWriter};
 
 /// "Read" trait: read bits and construct type
+#[cfg(feature = "bits")]
 trait DekuRead<'a, Ctx = ()> {
     /// Read bits and construct type
     /// * **input** - Input as bits
@@ -32,7 +35,9 @@ trait DekuRead<'a, Ctx = ()> {
 }
 
 // specialize u8 for ByteSize
+#[cfg(feature = "bits")]
 impl DekuRead<'_, (Endian, ByteSize)> for u8 {
+    #[cfg(feature = "bits")]
     #[inline]
     fn read(
         input: &BitSlice<u8, Msb0>,
@@ -57,6 +62,7 @@ impl DekuReader<'_, (Endian, ByteSize)> for u8 {
         let ret = reader.read_bytes_const::<MAX_TYPE_BYTES>(&mut buf)?;
         let a = match ret {
             ReaderRet::Bytes => <u8>::from_be_bytes(buf),
+            #[cfg(feature = "bits")]
             ReaderRet::Bits(bits) => {
                 let Some(bits) = bits else {
                     return Err(DekuError::Parse(Cow::from("no bits read from reader")));
@@ -71,6 +77,7 @@ impl DekuReader<'_, (Endian, ByteSize)> for u8 {
 
 macro_rules! ImplDekuReadBits {
     ($typ:ty, $inner:ty) => {
+        #[cfg(feature = "bits")]
         impl DekuRead<'_, (Endian, BitSize)> for $typ {
             #[inline(never)]
             fn read(
@@ -147,6 +154,7 @@ macro_rules! ImplDekuReadBits {
             }
         }
 
+        #[cfg(feature = "bits")]
         impl DekuReader<'_, (Endian, BitSize)> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
@@ -173,6 +181,7 @@ macro_rules! ImplDekuReadBits {
 
 macro_rules! ImplDekuReadBytes {
     ($typ:ty, $inner:ty) => {
+        #[cfg(feature = "bits")]
         impl DekuRead<'_, (Endian, ByteSize)> for $typ {
             #[inline(never)]
             fn read(
@@ -213,10 +222,12 @@ macro_rules! ImplDekuReadBytes {
                             <$typ>::from_be_bytes(buf.try_into().unwrap())
                         }
                     }
+                    #[cfg(feature = "bits")]
                     ReaderRet::Bits(Some(bits)) => {
                         let a = <$typ>::read(&bits, (endian, size))?;
                         a.1
                     }
+                    #[cfg(feature = "bits")]
                     ReaderRet::Bits(None) => {
                         return Err(DekuError::Parse(Cow::from("no bits read from reader")));
                     }
@@ -229,6 +240,7 @@ macro_rules! ImplDekuReadBytes {
 
 macro_rules! ImplDekuReadSignExtend {
     ($typ:ty, $inner:ty) => {
+        #[cfg(feature = "bits")]
         impl DekuRead<'_, (Endian, ByteSize)> for $typ {
             #[inline(never)]
             fn read(
@@ -262,6 +274,7 @@ macro_rules! ImplDekuReadSignExtend {
                             <$typ>::from_be_bytes(buf.try_into()?)
                         }
                     }
+                    #[cfg(feature = "bits")]
                     ReaderRet::Bits(bits) => {
                         let Some(bits) = bits else {
                             return Err(DekuError::Parse(Cow::from("no bits read from reader")));
@@ -279,6 +292,7 @@ macro_rules! ImplDekuReadSignExtend {
             }
         }
 
+        #[cfg(feature = "bits")]
         impl DekuRead<'_, (Endian, BitSize)> for $typ {
             #[inline(never)]
             fn read(
@@ -296,6 +310,7 @@ macro_rules! ImplDekuReadSignExtend {
             }
         }
 
+        #[cfg(feature = "bits")]
         impl DekuReader<'_, (Endian, BitSize)> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
@@ -340,10 +355,12 @@ macro_rules! ForwardDekuRead {
                             <$typ>::from_be_bytes(buf)
                         }
                     }
+                    #[cfg(feature = "bits")]
                     ReaderRet::Bits(Some(bits)) => {
                         let a = <$typ>::read(&bits, (endian, ByteSize(MAX_TYPE_BYTES)))?;
                         a.1
                     }
+                    #[cfg(feature = "bits")]
                     ReaderRet::Bits(None) => {
                         return Err(DekuError::Parse(Cow::from("no bits read from reader")));
                     }
@@ -367,6 +384,7 @@ macro_rules! ForwardDekuRead {
         }
 
         //// Only have `bit_size`, set `endian` to `Endian::default`.
+        #[cfg(feature = "bits")]
         impl DekuReader<'_, BitSize> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read>(
@@ -397,6 +415,7 @@ macro_rules! ForwardDekuRead {
 
 macro_rules! ImplDekuWrite {
     ($typ:ty) => {
+        #[cfg(feature = "bits")]
         impl DekuWriter<(Endian, BitSize)> for $typ {
             #[inline(always)]
             fn to_writer<W: Write>(
@@ -494,6 +513,7 @@ macro_rules! ImplDekuWrite {
 
 macro_rules! ForwardDekuWrite {
     ($typ:ty) => {
+        #[cfg(feature = "bits")]
         impl DekuWriter<BitSize> for $typ {
             #[inline(always)]
             fn to_writer<W: Write>(

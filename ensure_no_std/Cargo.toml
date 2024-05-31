@@ -20,6 +20,6 @@ alloc = []
 
 [dependencies]
 cortex-m-rt = "0.7.3"
-deku = { path = "../", default-features = false, features = ["alloc"] }
+deku = { path = "../", default-features = false, features = ["alloc", "bits"] }
 embedded-alloc = "0.5.1"
 

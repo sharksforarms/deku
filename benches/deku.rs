@@ -3,6 +3,7 @@ use std::io::{Cursor, Read, Seek};
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use deku::prelude::*;
 
+#[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuBits {
     #[deku(bits = 1)]
@@ -61,6 +62,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             }))
         })
     });
+    #[cfg(feature = "bits")]
     c.bench_function("deku_read_bits", |b| {
         let reader = Cursor::new(&[0x01; 1]);
         b.iter_batched(
@@ -69,6 +71,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             BatchSize::SmallInput,
         )
     });
+    #[cfg(feature = "bits")]
     c.bench_function("deku_write_bits", |b| {
         b.iter(|| {
             deku_write(black_box(&DekuBits {

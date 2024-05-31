@@ -360,6 +360,7 @@ pub mod no_std_io {
 }
 
 /// re-export of bitvec
+#[cfg(feature = "bits")]
 pub mod bitvec {
     pub use bitvec::prelude::*;
     pub use bitvec::view::BitView;
@@ -568,6 +569,7 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     /// assert_eq!(deku::bitvec::bitvec![1, 1, 1, 1, 0, 0, 0, 1, 1], bits);
     /// ```
     #[inline(always)]
+    #[cfg(feature = "bits")]
     fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError> {
         let mut out_buf = Vec::new();
         let mut cursor = no_std_io::Cursor::new(&mut out_buf);

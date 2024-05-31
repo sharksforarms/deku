@@ -178,7 +178,11 @@ fn test_id_pat_with_id() {
         }
     );
     assert_eq!(input, &*v.to_bytes().unwrap());
+}
 
+#[test]
+#[cfg(feature = "bits")]
+fn id_pat_with_id_bits() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(id_type = "u8", bits = "2")]
     pub enum IdPatBits {

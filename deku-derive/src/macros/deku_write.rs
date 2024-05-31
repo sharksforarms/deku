@@ -91,6 +91,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
+        #[cfg(feature = "bits")]
         tokens.extend(quote! {
              impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
@@ -100,7 +101,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     input.to_bits()
                 }
             }
+        });
 
+        tokens.extend(quote! {
             impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
                 type Error = ::#crate_::DekuError;
 
@@ -288,6 +291,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
+        #[cfg(feature = "bits")]
         tokens.extend(quote! {
              impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
@@ -297,7 +301,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     input.to_bits()
                 }
             }
+        });
 
+        tokens.extend(quote! {
             impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
                 type Error = ::#crate_::DekuError;
 
@@ -308,7 +314,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
 
             impl #imp DekuContainerWrite for #ident #wher {}
-        })
+        });
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;

@@ -20,6 +20,7 @@ fn test_to_slice_bytes() {
     assert_eq!(amt_written, 3);
 }
 
+#[cfg(feature = "bits")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 pub struct B {
     #[deku(bits = "3", endian = "little")]
@@ -27,6 +28,7 @@ pub struct B {
 }
 
 #[test]
+#[cfg(feature = "bits")]
 fn test_to_slice_bits() {
     let b = B { inner: 0b111 };
 

@@ -2,6 +2,7 @@
 
 use core::cmp::Ordering;
 
+#[cfg(feature = "bits")]
 use bitvec::prelude::*;
 use no_std_io::io::{ErrorKind, Read};
 
@@ -16,6 +17,7 @@ pub enum ReaderRet {
     /// Successfully read bytes
     Bytes,
     /// Successfully read bits
+    #[cfg(feature = "bits")]
     Bits(Option<BitVec<u8, Msb0>>),
 }
 
@@ -24,6 +26,7 @@ pub const MAX_BITS_AMT: usize = 128;
 
 enum Leftover {
     Byte(u8),
+    #[cfg(feature = "bits")]
     Bits(BitVec<u8, Msb0>),
 }
 
@@ -86,6 +89,7 @@ impl<'a, R: Read> Reader<'a, R> {
     /// ```
     #[inline]
     pub fn rest(&mut self) -> Vec<bool> {
+        #[cfg(feature = "bits")]
         match &self.leftover {
             Some(Leftover::Bits(bits)) => bits.iter().by_vals().collect(),
             Some(Leftover::Byte(byte)) => {
@@ -95,6 +99,8 @@ impl<'a, R: Read> Reader<'a, R> {
             }
             None => alloc::vec![],
         }
+        #[cfg(not(feature = "bits"))]
+        alloc::vec![]
     }
 
     /// Return true if we are at the end of a reader and there are no cached bits in the reader.
@@ -130,10 +136,20 @@ impl<'a, R: Read> Reader<'a, R> {
     // TODO: maybe send into read_bytes() if amt >= 8
     #[inline]
     pub fn skip_bits(&mut self, amt: usize) -> Result<(), DekuError> {
-        #[cfg(feature = "logging")]
-        log::trace!("skip_bits: {amt}");
-        // Save, and keep the leftover bits since the read will most likely be less than a byte
-        self.read_bits(amt)?;
+        #[cfg(feature = "bits")]
+        {
+            #[cfg(feature = "logging")]
+            log::trace!("skip_bits: {amt}");
+            // Save, and keep the leftover bits since the read will most likely be less than a byte
+            self.read_bits(amt)?;
+        }
+
+        #[cfg(not(feature = "bits"))]
+        {
+            if amt > 0 {
+                panic!("deku features no-bits was used");
+            }
+        }
 
         Ok(())
     }
@@ -149,6 +165,7 @@ impl<'a, R: Read> Reader<'a, R> {
     /// # Params
     /// `amt`    - Amount of bits that will be read. Must be <= [`MAX_BITS_AMT`].
     #[inline(never)]
+    #[cfg(feature = "bits")]
     pub fn read_bits(&mut self, amt: usize) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("read_bits: requesting {amt} bits");
@@ -278,6 +295,7 @@ impl<'a, R: Read> Reader<'a, R> {
     fn read_bytes_other(&mut self, amt: usize, buf: &mut [u8]) -> Result<ReaderRet, DekuError> {
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_leftover(buf, byte, amt),
+            #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => Ok(ReaderRet::Bits(self.read_bits(amt * 8)?)),
             _ => unreachable!(),
         }
@@ -363,6 +381,7 @@ impl<'a, R: Read> Reader<'a, R> {
     ) -> Result<ReaderRet, DekuError> {
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_const_leftover(buf, byte),
+            #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => Ok(ReaderRet::Bits(self.read_bits(N * 8)?)),
             _ => unreachable!(),
         }

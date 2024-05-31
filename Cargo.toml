@@ -20,15 +20,16 @@ members = [
 ]
 
 [features]
-default = ["std"]
-std = ["deku_derive/std", "bitvec/std", "alloc", "no_std_io/std"]
-alloc = ["bitvec/alloc"]
+default = ["std", "bits"]
+std = ["deku_derive/std", "bitvec?/std", "alloc", "no_std_io/std"]
+alloc = ["bitvec?/alloc"]
 logging = ["deku_derive/logging", "log"]
 no-assert-string = ["deku_derive/no-assert-string"]
+bits = ["dep:bitvec", "deku_derive/bits"]
 
 [dependencies]
 deku_derive = { version = "^0.17.0", path = "deku-derive", default-features = false}
-bitvec = { version = "1.0.1", default-features = false }
+bitvec = { version = "1.0.1", default-features = false, optional = true }
 log = { version = "0.4.21", optional = true }
 no_std_io = { version = "0.6.0", default-features = false, features = ["alloc"] }
 rustversion = "1.0.16"

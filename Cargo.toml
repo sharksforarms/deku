@@ -46,3 +46,11 @@ assert_hex = "0.4.1"
 [[bench]]
 name = "deku"
 harness = false
+
+[lints]
+workspace = true
+
+[workspace.lints.clippy]
+# Triggers in macro generated code of darling
+# https://github.com/rust-lang/rust-clippy/issues/12643
+manual-unwrap-or-default = "allow"

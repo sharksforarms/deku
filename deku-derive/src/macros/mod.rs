@@ -95,10 +95,15 @@ fn gen_struct_init<I: ToTokens>(
 /// - Unnamed: `#ident ( ref fields )`
 fn gen_struct_destruction<I: ToTokens, F: ToTokens>(
     named: bool,
+    unit: bool,
     ident: I,
     field_idents: impl Iterator<Item = F>,
 ) -> TokenStream {
-    if named {
+    if unit {
+        quote! {
+            #ident
+        }
+    } else if named {
         quote! {
             #ident {
                 #(ref #field_idents),*

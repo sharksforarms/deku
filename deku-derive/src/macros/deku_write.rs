@@ -34,6 +34,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }));
 
     let named = fields.style.is_struct();
+    let unit = fields.style.is_unit();
 
     let field_idents = fields.iter().enumerate().filter_map(|(i, f)| {
         if !f.temp {
@@ -43,7 +44,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
     });
 
-    let destructured = gen_struct_destruction(named, &input.ident, field_idents);
+    let destructured = gen_struct_destruction(named, unit, &input.ident, field_idents);
 
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {

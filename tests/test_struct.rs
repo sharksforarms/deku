@@ -204,3 +204,19 @@ fn test_big_endian() {
     let new_bytes = a.to_bytes().unwrap();
     assert_eq!(&bytes[..2], &*new_bytes);
 }
+
+#[test]
+fn test_units() {
+    #[derive(DekuRead, DekuWrite)]
+    #[deku(magic = b"\xf0")]
+    struct Unit;
+
+    let bytes = [0xf0];
+    let a = Unit::from_bytes((&bytes, 0)).unwrap().1;
+    let new_bytes = a.to_bytes().unwrap();
+    assert_eq!(bytes, &*new_bytes);
+
+    let a = Unit;
+    let new_bytes = a.to_bytes().unwrap();
+    assert_eq!(bytes, &*new_bytes);
+}

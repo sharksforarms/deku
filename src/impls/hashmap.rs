@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
 
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 use crate::ctx::*;
 use crate::writer::Writer;
@@ -15,7 +15,7 @@ use crate::{DekuError, DekuReader, DekuWriter};
 /// and a borrow of the latest value to have been read. It should return `true` if reading
 /// should now stop, and `false` otherwise
 #[allow(clippy::type_complexity)]
-fn from_reader_with_ctx_hashmap_with_predicate<'a, K, V, S, Ctx, Predicate, R: Read>(
+fn from_reader_with_ctx_hashmap_with_predicate<'a, K, V, S, Ctx, Predicate, R: Read + Seek>(
     reader: &mut crate::reader::Reader<R>,
     capacity: Option<usize>,
     ctx: Ctx,
@@ -42,7 +42,7 @@ where
     Ok(res)
 }
 
-fn from_reader_with_ctx_hashmap_to_end<'a, K, V, S, Ctx, R: Read>(
+fn from_reader_with_ctx_hashmap_to_end<'a, K, V, S, Ctx, R: Read + Seek>(
     reader: &mut crate::reader::Reader<R>,
     capacity: Option<usize>,
     ctx: Ctx,
@@ -92,7 +92,7 @@ where
     /// expected.insert(100, 0x04030201);
     /// assert_eq!(expected, map)
     /// ```
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
         (limit, inner_ctx): (Limit<(K, V), Predicate>, Ctx),
     ) -> Result<Self, DekuError>
@@ -175,7 +175,7 @@ where
     Predicate: FnMut(&(K, V)) -> bool,
 {
     /// Read `K, V`s until the given limit from input for types which don't require context.
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
         limit: Limit<(K, V), Predicate>,
     ) -> Result<Self, DekuError>
@@ -198,15 +198,21 @@ impl<K: DekuWriter<Ctx>, V: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for H
     /// # use deku::writer::Writer;
     /// # use deku::bitvec::{Msb0, bitvec};
     /// # use std::collections::HashMap;
+    /// # use std::io::Cursor;
     /// let mut out_buf = vec![];
-    /// let mut writer = Writer::new(&mut out_buf);
+    /// let mut cursor = Cursor::new(&mut out_buf);
+    /// let mut writer = Writer::new(&mut cursor);
     /// let mut map = HashMap::<u8, u32>::default();
     /// map.insert(100, 0x04030201);
     /// map.to_writer(&mut writer, Endian::Big).unwrap();
     /// let expected: Vec<u8> = vec![100, 4, 3, 2, 1];
     /// assert_eq!(expected, out_buf);
     /// ```
-    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write + Seek>(
+        &self,
+        writer: &mut Writer<W>,
+        inner_ctx: Ctx,
+    ) -> Result<(), DekuError> {
         for kv in self {
             kv.to_writer(writer, inner_ctx)?;
         }
@@ -302,8 +308,8 @@ mod tests {
         case::normal(fxhashmap!{0x11u8 => 0xAABBu16, 0x23u8 => 0xCCDDu16}, Endian::Little, vec![0x11, 0xBB, 0xAA, 0x23, 0xDD, 0xCC]),
     )]
     fn test_hashmap_write(input: FxHashMap<u8, u16>, endian: Endian, expected: Vec<u8>) {
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         input.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(expected, writer.inner);
+        assert_eq!(expected, writer.inner.into_inner());
     }
 }

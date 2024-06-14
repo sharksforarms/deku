@@ -1,9 +1,9 @@
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 use crate::{writer::Writer, DekuError, DekuReader, DekuWriter};
 
 impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
@@ -13,7 +13,11 @@ impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
 }
 
 impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Option<T> {
-    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write + Seek>(
+        &self,
+        writer: &mut Writer<W>,
+        inner_ctx: Ctx,
+    ) -> Result<(), DekuError> {
         self.as_ref()
             .map_or(Ok(()), |v| v.to_writer(writer, inner_ctx))
     }
@@ -38,8 +42,8 @@ mod tests {
 
     #[test]
     fn test_option_write() {
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         Some(true).to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![1], writer.inner);
+        assert_eq!(vec![1], writer.inner.into_inner());
     }
 }

@@ -1,4 +1,4 @@
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 #[cfg(feature = "alloc")]
 use alloc::borrow::Cow;
@@ -14,7 +14,7 @@ where
     Ctx: Copy,
     u8: DekuReader<'a, Ctx>,
 {
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<bool, DekuError> {
@@ -37,7 +37,11 @@ where
     u8: DekuWriter<Ctx>,
 {
     /// wrapper around u8::write with consideration to context, such as bit size
-    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, inner_ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write + Seek>(
+        &self,
+        writer: &mut Writer<W>,
+        inner_ctx: Ctx,
+    ) -> Result<(), DekuError> {
         match self {
             true => (0x01u8).to_writer(writer, inner_ctx),
             false => (0x00u8).to_writer(writer, inner_ctx),
@@ -62,8 +66,9 @@ mod tests {
         #[should_panic(expected = "Parse(\"cannot parse bool value: 2\")")]
         case(&hex!("02"), false),
     )]
-    fn test_bool(mut input: &[u8], expected: bool) {
-        let mut reader = Reader::new(&mut input);
+    fn test_bool(input: &[u8], expected: bool) {
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
         let res_read = bool::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
     }
@@ -80,16 +85,16 @@ mod tests {
 
     #[test]
     fn test_writer() {
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         true.to_writer(&mut writer, BitSize(1)).unwrap();
         assert_eq!(vec![true], writer.rest());
 
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         true.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![1], writer.inner);
+        assert_eq!(vec![1], writer.inner.into_inner());
 
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         false.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![0], writer.inner);
+        assert_eq!(vec![0], writer.inner.into_inner());
     }
 }

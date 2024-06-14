@@ -1,9 +1,9 @@
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 use crate::{reader::Reader, writer::Writer, DekuError, DekuReader, DekuWriter};
 
 impl<Ctx: Copy> DekuReader<'_, Ctx> for () {
-    fn from_reader_with_ctx<R: Read>(
+    fn from_reader_with_ctx<R: Read + Seek>(
         _reader: &mut Reader<R>,
         _inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
@@ -13,7 +13,7 @@ impl<Ctx: Copy> DekuReader<'_, Ctx> for () {
 
 impl<Ctx: Copy> DekuWriter<Ctx> for () {
     /// NOP on write
-    fn to_writer<W: Write>(
+    fn to_writer<W: Write + Seek>(
         &self,
         _writer: &mut Writer<W>,
         _inner_ctx: Ctx,
@@ -40,8 +40,8 @@ mod tests {
         let res_read = <()>::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!((), res_read);
 
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         res_read.to_writer(&mut writer, ()).unwrap();
-        assert!(writer.inner.is_empty());
+        assert!(writer.inner.into_inner().is_empty());
     }
 }

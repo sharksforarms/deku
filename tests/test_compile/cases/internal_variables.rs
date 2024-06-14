@@ -49,7 +49,7 @@ struct TestMap {
     field_b: usize,
 }
 
-fn dummy_reader<R: std::io::Read>(
+fn dummy_reader<R: std::io::Read + std::io::Seek>(
     offset: usize,
     _reader: &mut Reader<R>,
 ) -> Result<usize, DekuError> {

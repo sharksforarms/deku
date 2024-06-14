@@ -70,7 +70,8 @@ fn test_top_level_ctx_enum() {
     assert_eq!(ret_read, TopLevelCtxEnum::VariantA(0x06));
 
     let mut out_buf = vec![];
-    let mut writer = Writer::new(&mut out_buf);
+    let mut cursor = Cursor::new(&mut out_buf);
+    let mut writer = Writer::new(&mut cursor);
     ret_read.to_writer(&mut writer, (1, 2)).unwrap();
     assert_eq!(out_buf.to_vec(), &test_data[..]);
 }
@@ -107,7 +108,8 @@ fn test_top_level_ctx_enum_default() {
     .unwrap();
     assert_eq!(ret_read, TopLevelCtxEnumDefault::VariantA(0x06));
     let mut out_buf = vec![];
-    let mut writer = Writer::new(&mut out_buf);
+    let mut cursor = Cursor::new(&mut out_buf);
+    let mut writer = Writer::new(&mut cursor);
     ret_read.to_writer(&mut writer, (1, 2)).unwrap();
     assert_eq!(test_data.to_vec(), out_buf.to_vec());
 }
@@ -181,7 +183,8 @@ fn test_struct_enum_ctx_id() {
 
     // VarC
     let test_data = [0x02_u8, 0x03, 0xcc];
-    let (_, ret_read) = StructEnumId::from_reader((&mut test_data.as_slice(), 0)).unwrap();
+    let mut cursor = Cursor::new(test_data);
+    let (_, ret_read) = StructEnumId::from_reader((&mut cursor, 0)).unwrap();
 
     assert_eq!(
         StructEnumId {
@@ -229,7 +232,8 @@ fn test_ctx_default_struct() {
     .unwrap();
     assert_eq!(expected, ret_read);
     let mut out_buf = vec![];
-    let mut writer = Writer::new(&mut out_buf);
+    let mut cursor = Cursor::new(&mut out_buf);
+    let mut writer = Writer::new(&mut cursor);
     ret_read.to_writer(&mut writer, (1, 2)).unwrap();
     assert_eq!(test_data.to_vec(), out_buf.to_vec());
 }

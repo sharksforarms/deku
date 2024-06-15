@@ -1,0 +1,5 @@
+error: DekuRead: `id` cannot be used with arbitrary_enum_discriminant
+ --> tests/test_compile/cases/id_arbitrary_enum_discriminant.rs:8:5
+  |
+8 |     A(u8) = 0,
+  |     ^

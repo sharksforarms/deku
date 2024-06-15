@@ -181,8 +181,15 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .first()
             .and_then(|v| v.ident.as_ref())
             .is_some();
+        let disc = &variant.discriminant;
 
         let (use_id, variant_id) = if let Some(variant_id) = &variant.id {
+            if disc.is_some() {
+                return Err(syn::Error::new(
+                    variant.ident.span(),
+                    "DekuRead: `id` cannot be used with arbitrary_enum_discriminant",
+                ));
+            }
             match variant_id {
                 Id::TokenStream(v) => (false, quote! {&#v}.into_token_stream()),
                 Id::LitByteStr(v) => (false, v.into_token_stream()),
@@ -199,12 +206,51 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 (false, variant_id_pat.clone())
             }
         } else if has_discriminant {
-            let ident = &variant.ident;
-            let internal_ident = gen_internal_field_ident(&quote!(#ident));
-            pre_match_tokens.push(quote! {
-                let #internal_ident = <#id_type>::try_from(Self::#ident as isize)?;
-            });
-            (true, quote! { _ if __deku_variant_id == #internal_ident })
+            // Regular enum
+            if variant.fields.fields.is_empty() {
+                let ident = &variant.ident;
+                let internal_ident = gen_internal_field_ident(&quote!(#ident));
+
+                // If we have the discriminant, we can use that directly into the id_type
+                if let Some(disc) = disc {
+                    // the discriminant is just an ident, we use the ident here
+                    pre_match_tokens.push(quote! {
+                        #[allow(non_upper_case_globals)]
+                        const #internal_ident: #id_type = #disc;
+                    });
+                } else {
+                    // if not, we need to convert this into the type expressed by a cast
+                    // enum Discriminant {
+                    //     Cats = 0x01,
+                    //     Dogs,
+                    // }
+                    pre_match_tokens.push(quote! {
+                        let #internal_ident = <#id_type>::try_from(Self::#ident as isize)?;
+                    });
+                }
+                (true, quote! { _ if __deku_variant_id == #internal_ident })
+            } else {
+                // arbitrary_enum_discriminant, such as:
+                //
+                // #[repr(u8)]
+                // #[derive(DekuRead, Debug)]
+                // #[deku(id_type = "u8")]
+                // enum Foo {
+                //     A(u8) = 0,
+                //     B(i8) = 1,
+                //     C(bool) = 42,
+                // }
+                let ident = &variant.ident;
+                let disc = &variant.discriminant;
+                let internal_ident = gen_internal_field_ident(&quote!(#ident));
+                pre_match_tokens.push(quote! {
+                    #[allow(non_upper_case_globals)]
+                    const #internal_ident: #id_type = #disc;
+                });
+
+                // In this case, we send back false for use_id as we still need to read fields
+                (false, quote! { _ if __deku_variant_id == #internal_ident })
+            }
         } else {
             return Err(syn::Error::new(
                 variant.ident.span(),

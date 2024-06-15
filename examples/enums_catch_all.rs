@@ -10,13 +10,13 @@ use hexlit::hex;
 pub enum DekuTest {
     /// A
     #[deku(id = "1")]
-    A = 0,
+    A,
     /// B
     #[deku(id = "2")]
-    B = 1,
+    B,
     /// C
     #[deku(id = "3", default)]
-    C = 2,
+    C,
 }
 
 fn main() {

@@ -108,5 +108,40 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, criterion_benchmark);
+pub fn read_all_vs_count(c: &mut Criterion) {
+    #[derive(DekuRead, DekuWrite)]
+    pub struct AllWrapper {
+        #[deku(read_all)]
+        pub data: Vec<u8>,
+    }
+
+    #[derive(DekuRead, DekuWrite)]
+    #[deku(ctx = "len: usize")]
+    pub struct CountWrapper {
+        #[deku(count = "len")]
+        pub data: Vec<u8>,
+    }
+
+    c.bench_function("read_all_bytes", |b| {
+        b.iter(|| AllWrapper::from_bytes(black_box((&[1; 1500], 0))))
+    });
+
+    c.bench_function("read_all", |b| {
+        b.iter(|| {
+            let mut cursor = [1u8; 1500].as_ref();
+            let mut reader = Reader::new(&mut cursor);
+            AllWrapper::from_reader_with_ctx(black_box(&mut reader), ())
+        })
+    });
+
+    c.bench_function("count", |b| {
+        b.iter(|| {
+            let mut cursor = [1u8; 1500].as_ref();
+            let mut reader = Reader::new(&mut cursor);
+            CountWrapper::from_reader_with_ctx(black_box(&mut reader), 1500)
+        })
+    });
+}
+
+criterion_group!(benches, criterion_benchmark, read_all_vs_count);
 criterion_main!(benches);

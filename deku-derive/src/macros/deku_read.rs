@@ -37,6 +37,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         fields,
     } = DekuDataStruct::try_from(input)?;
 
+    let wher = wher.as_deref();
+
     let magic_read = emit_magic_read(input);
 
     // check if the first field has an ident, if not, it's a unnamed struct

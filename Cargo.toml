@@ -39,7 +39,7 @@ hexlit = "0.5.5"
 criterion = "0.5.1"
 alloc_counter = "0.0.4"
 trybuild = "1.0.95"
-rustc-hash = "1.1.0"
+rustc-hash = "2.0.0"
 env_logger = "0.11.3"
 assert_hex = "0.4.1"
 

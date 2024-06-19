@@ -27,14 +27,18 @@ pub struct Reader<'a, R: Read + Seek> {
     inner: &'a mut R,
     /// bits stored from previous reads that didn't read to the end of a byte size
     leftover: BitVec<u8, Msb0>,
-    /// Amount of bits read during the use of [read_bits](Reader::read_bits) and [read_bytes](Reader::read_bytes).
+    /// Amount of bits read during the last call to [read_bits](Reader::read_bits) and [read_bytes](Reader::read_bytes)
+    pub last_bits_read_amt: usize,
+    /// Amount of bits read during the use of [read_bits](Reader::read_bits) and [read_bytes](Reader::read_bytes)
     pub bits_read: usize,
 }
 
 impl<R: Read + Seek> Seek for Reader<'_, R> {
+    #[inline]
     fn seek(&mut self, pos: SeekFrom) -> no_std_io::io::Result<u64> {
         #[cfg(feature = "logging")]
         log::trace!("seek: {pos:?}");
+
         // clear leftover
         self.leftover = BitVec::new();
         self.inner.seek(pos)
@@ -42,6 +46,7 @@ impl<R: Read + Seek> Seek for Reader<'_, R> {
 }
 
 impl<R: Read + Seek> AsMut<R> for Reader<'_, R> {
+    #[inline]
     fn as_mut(&mut self) -> &mut R {
         self.inner
     }
@@ -54,8 +59,21 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
         Self {
             inner,
             leftover: BitVec::new(), // with_capacity 8?
+            last_bits_read_amt: 0,
             bits_read: 0,
         }
+    }
+
+    /// Seek to previous previous before the last read, used for `id_pat`
+    #[inline]
+    pub fn seek_last_read(&mut self) -> no_std_io::io::Result<()> {
+        let number = self.last_bits_read_amt as i64;
+        let seek_amt = (number / 8).saturating_add((number % 8).signum());
+        self.seek(SeekFrom::Current(seek_amt.saturating_neg()))?;
+        self.bits_read -= self.last_bits_read_amt;
+        self.leftover = BitVec::new();
+
+        Ok(())
     }
 
     /// Consume self, returning inner Reader
@@ -209,9 +227,13 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
             }
         }
 
-        self.bits_read += ret.len();
+        let bits_read = ret.len();
+        self.last_bits_read_amt = bits_read;
+        self.bits_read += bits_read;
+
         #[cfg(feature = "logging")]
         log::trace!("read_bits: returning {ret}");
+
         Ok(Some(ret))
     }
 
@@ -237,7 +259,9 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
                 return Err(DekuError::Io(e.kind()));
             }
 
-            self.bits_read += amt * 8;
+            let bits_read = amt * 8;
+            self.last_bits_read_amt += bits_read;
+            self.bits_read += bits_read;
 
             #[cfg(feature = "logging")]
             log::trace!("read_bytes: returning {:02x?}", &buf[..amt]);
@@ -269,6 +293,7 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
                 return Err(DekuError::Io(e.kind()));
             }
 
+            self.last_bits_read_amt += N * 8;
             self.bits_read += N * 8;
 
             #[cfg(feature = "logging")]

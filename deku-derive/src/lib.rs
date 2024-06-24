@@ -135,6 +135,9 @@ struct DekuData {
     /// enum only: type of the enum `id`
     id_type: Option<TokenStream>,
 
+    /// enum only: endianness of the enum `id`
+    id_endian: Option<syn::LitStr>,
+
     /// enum only: bit size of the enum `id`
     bits: Option<Num>,
 
@@ -186,6 +189,7 @@ impl DekuData {
             magic: receiver.magic,
             id: receiver.id,
             id_type: receiver.id_type?,
+            id_endian: receiver.id_endian,
             bits: receiver.bits,
             bytes: receiver.bytes,
         };
@@ -215,6 +219,8 @@ impl DekuData {
                     ))
                 } else if data.id.is_some() {
                     Err(cerror(data.id.span(), "`id` only supported on enum"))
+                } else if data.id_endian.is_some() {
+                    Err(cerror(data.id.span(), "`id_endian` only supported on enum"))
                 } else if data.bytes.is_some() {
                     Err(cerror(data.bytes.span(), "`bytes` only supported on enum"))
                 } else if data.bits.is_some() {
@@ -320,6 +326,7 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataEnum<'a> {
 
         let id_args = crate::macros::gen_id_args(
             deku_data.endian.as_ref(),
+            deku_data.id_endian.as_ref(),
             deku_data.bits.as_ref(),
             deku_data.bytes.as_ref(),
         )?;
@@ -660,6 +667,10 @@ struct DekuReceiver {
     /// enum only: type of the enum `id`
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     id_type: Result<Option<TokenStream>, ReplacementError>,
+
+    /// enum only: endianness of the enum `id`
+    #[darling(default)]
+    id_endian: Option<syn::LitStr>,
 
     /// enum only: bit size of the enum `id`
     #[darling(default)]

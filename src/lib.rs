@@ -515,6 +515,33 @@ pub trait DekuContainerWrite: DekuWriter<()> {
         Ok(out_buf)
     }
 
+    /// Write struct/enum to a given slice
+    ///
+    /// ```rust
+    /// # use deku::prelude::*;
+    /// #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    /// #[deku(endian = "little")]
+    /// struct S {
+    ///    data_00: u8,
+    ///    data_01: u16,
+    ///    data_02: u32,
+    /// }
+    ///
+    /// let mut buf = [0; 7];
+    /// let s = S { data_00: 0x01, data_01: 0x02, data_02: 0x03 };
+    /// let amt_written = s.to_slice(&mut buf).unwrap();
+    /// assert_eq!(buf, [0x01, 0x02, 0x00, 0x03, 0x00, 0x00, 0x00]);
+    /// assert_eq!(amt_written, 7)
+    /// ````
+    #[inline(always)]
+    fn to_slice(&self, buf: &mut [u8]) -> Result<usize, DekuError> {
+        let mut __deku_writer = Writer::new(buf);
+        DekuWriter::to_writer(self, &mut __deku_writer, ())?;
+        __deku_writer.finalize()?;
+
+        Ok(__deku_writer.bits_written / 8)
+    }
+
     /// Write struct/enum to BitVec
     ///
     /// ```rust

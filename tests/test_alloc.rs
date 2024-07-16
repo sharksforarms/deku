@@ -78,4 +78,21 @@ mod tests {
             (2, 1, 2)
         );
     }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_to_slice() {
+        let input = hex!("aa_bbbb_cc_0102_dd_ffffff_aa_0100ff");
+        let t = TestDeku::from_reader((&mut input.as_slice(), 0)).unwrap().1;
+
+        let mut out = [0x00; 100];
+
+        assert_eq!(
+            count_alloc(|| {
+                t.to_slice(&mut out).unwrap();
+            })
+            .0,
+            (1, 0, 1)
+        );
+    }
 }

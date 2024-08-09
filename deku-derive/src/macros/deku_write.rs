@@ -154,6 +154,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .first()
             .and_then(|v| v.ident.as_ref())
             .is_some();
+        let disc = &variant.discriminant;
 
         let variant_ident = &variant.ident;
         let variant_writer = &variant.writer;
@@ -174,6 +175,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         } else if id_type.is_some() {
             if let Some(variant_id) = &variant.id {
+                if disc.is_some() {
+                    return Err(syn::Error::new(
+                        variant.ident.span(),
+                        "DekuWrite: `id` cannot be used with arbitrary_enum_discriminant",
+                    ));
+                }
                 match variant_id {
                     Id::TokenStream(v) => {
                         quote! {
@@ -197,9 +204,19 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             } else if variant.id_pat.is_some() {
                 quote! {}
             } else if has_discriminant {
-                quote! {
-                    let mut __deku_variant_id: #id_type = Self::#variant_ident as #id_type;
-                    __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
+                // Discriminant is provided, use it
+                if let Some(disc) = disc {
+                    quote! {
+                        #[allow(non_upper_case_globals)]
+                        const __deku_variant_id: #id_type = #disc;
+                        __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
+                    }
+                // Regular enum
+                } else {
+                    quote! {
+                        let mut __deku_variant_id: #id_type = Self::#variant_ident as #id_type;
+                        __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
+                    }
                 }
             } else {
                 return Err(syn::Error::new(

@@ -152,3 +152,43 @@ fn test_id_pat_with_id() {
     );
     assert_eq!(input, &*v.to_bytes().unwrap());
 }
+
+#[test]
+fn test_arbitrary() {
+    #[repr(u8)]
+    #[derive(DekuRead, DekuWrite, Debug, PartialEq)]
+    #[deku(id_type = "u8")]
+    enum Foo {
+        A(u8) = 0,
+        B(bool) = 42,
+        I(Inner) = 12,
+        N = 10,
+    }
+
+    #[repr(u8)]
+    #[derive(DekuRead, DekuWrite, Debug, PartialEq)]
+    #[deku(id_type = "u8")]
+    enum Inner {
+        One(u8) = 0,
+    }
+
+    let bytes = [0, 1];
+    let (_, foo) = Foo::from_bytes((&bytes, 0)).unwrap();
+    assert_eq!(foo, Foo::A(1));
+    assert_eq!(bytes, &*foo.to_bytes().unwrap());
+
+    let bytes = [42, 1];
+    let (_, foo) = Foo::from_bytes((&bytes, 0)).unwrap();
+    assert_eq!(foo, Foo::B(true));
+    assert_eq!(bytes, &*foo.to_bytes().unwrap());
+
+    let bytes = [12, 0, 1];
+    let (_, foo) = Foo::from_bytes((&bytes, 0)).unwrap();
+    assert_eq!(foo, Foo::I(Inner::One(1)));
+    assert_eq!(bytes, &*foo.to_bytes().unwrap());
+
+    let bytes = [10];
+    let (_, foo) = Foo::from_bytes((&bytes, 0)).unwrap();
+    assert_eq!(foo, Foo::N);
+    assert_eq!(bytes, &*foo.to_bytes().unwrap());
+}

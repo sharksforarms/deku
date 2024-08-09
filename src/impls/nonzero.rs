@@ -3,7 +3,7 @@ use alloc::borrow::Cow;
 #[cfg(feature = "alloc")]
 use alloc::format;
 use core::num::*;
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 use crate::ctx::*;
 use crate::reader::Reader;
@@ -13,7 +13,7 @@ use crate::{DekuError, DekuReader, DekuWriter};
 macro_rules! ImplDekuTraitsCtx {
     ($typ:ty, $readtype:ty, $ctx_arg:tt, $ctx_type:tt) => {
         impl DekuReader<'_, $ctx_type> for $typ {
-            fn from_reader_with_ctx<R: Read>(
+            fn from_reader_with_ctx<R: Read + Seek>(
                 reader: &mut Reader<R>,
                 $ctx_arg: $ctx_type,
             ) -> Result<Self, DekuError> {
@@ -28,7 +28,7 @@ macro_rules! ImplDekuTraitsCtx {
         }
 
         impl DekuWriter<$ctx_type> for $typ {
-            fn to_writer<W: Write>(
+            fn to_writer<W: Write + Seek>(
                 &self,
                 writer: &mut Writer<W>,
                 $ctx_arg: $ctx_type,
@@ -66,6 +66,7 @@ ImplDekuTraits!(NonZeroIsize, isize);
 mod tests {
     use hexlit::hex;
     use rstest::rstest;
+    use std::io::Cursor;
 
     use crate::reader::Reader;
 
@@ -79,14 +80,13 @@ mod tests {
         case(&hex!("00"), NonZeroU8::new(0xFF).unwrap()),
     )]
     fn test_non_zero(input: &[u8], expected: NonZeroU8) {
-        let mut bit_slice = input.view_bits::<Msb0>();
-
-        let mut reader = Reader::new(&mut bit_slice);
+        let mut cursor = std::io::Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
         let res_read = NonZeroU8::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);
 
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         res_read.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(input.to_vec(), writer.inner);
+        assert_eq!(input.to_vec(), writer.inner.into_inner());
     }
 }

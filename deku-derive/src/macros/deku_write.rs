@@ -28,6 +28,49 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         fields,
     } = DekuDataStruct::try_from(input)?;
 
+    let seek = if let Some(num) = &input.seek_from_current {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_writer.seek(SeekFrom::Current(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &input.seek_from_end {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_writer.seek(SeekFrom::End(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &input.seek_from_start {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_writer.seek(SeekFrom::Start(u64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if input.seek_rewind {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                if let Err(e) = __deku_writer.rewind() {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let magic_write = emit_magic_write(input);
 
     let field_writes = emit_field_writes(input, &fields, None, &ident)?;
@@ -76,6 +119,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let write_body = quote! {
         match *self {
             #destructured => {
+                #seek
                 #magic_write
                 #(#field_writes)*
 
@@ -101,7 +145,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         impl #imp ::#crate_::DekuWriter<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
             #[inline]
-            fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
+            fn to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
                 #write_body
             }
         }
@@ -114,7 +158,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             impl #imp ::#crate_::DekuWriter for #ident #wher {
                 #[allow(unused_variables)]
                 #[inline]
-                fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
+                fn to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
                     #write_body
                 }
             }
@@ -299,7 +343,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         impl #imp ::#crate_::DekuWriter<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
             #[inline]
-            fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
+            fn to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, #ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
                 #write_body
             }
         }
@@ -312,7 +356,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             impl #imp ::#crate_::DekuWriter for #ident #wher {
                 #[allow(unused_variables)]
                 #[inline]
-                fn to_writer<W: ::#crate_::no_std_io::Write>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
+                fn to_writer<W: ::#crate_::no_std_io::Write + ::#crate_::no_std_io::Seek>(&self, __deku_writer: &mut ::#crate_::writer::Writer<W>, _: ()) -> core::result::Result<(), ::#crate_::DekuError> {
                     #write_body
                 }
             }
@@ -438,6 +482,49 @@ fn emit_field_write(
     let crate_ = super::get_crate_name();
     let field_endian = f.endian.as_ref().or(input.endian.as_ref());
 
+    let seek = if let Some(num) = &f.seek_from_current {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_writer.seek(SeekFrom::Current(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &f.seek_from_end {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_writer.seek(SeekFrom::End(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &f.seek_from_start {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_writer.seek(SeekFrom::Start(u64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if f.seek_rewind {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                if let Err(e) = __deku_writer.rewind() {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     // fields to check usage of bit/byte offset
     let field_check_vars = [
         &f.writer,
@@ -559,6 +646,7 @@ fn emit_field_write(
     };
 
     let field_write = quote! {
+        #seek
         #pad_bits_before
 
         #bit_offset

@@ -231,6 +231,7 @@ mod tests {
     use crate::reader::Reader;
 
     use super::*;
+    #[cfg(feature = "bits")]
     use bitvec::prelude::*;
 
     // Macro to create a deterministic HashMap for tests
@@ -250,6 +251,7 @@ mod tests {
          };
     );
 
+    #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
         case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), FxHashMap::default(), bits![u8, Msb0;], &[0xaa]),
         case::count_1([0x01, 0xAA, 0x02, 0xBB].as_ref(), Endian::Little, Some(8), 1.into(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0x02, 0xbb]),

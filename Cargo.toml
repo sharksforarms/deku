@@ -56,3 +56,31 @@ workspace = true
 # Triggers in macro generated code of darling
 # https://github.com/rust-lang/rust-clippy/issues/12643
 manual-unwrap-or-default = "allow"
+
+[[example]]
+name = "custom_reader_and_writer"
+required-features = ["bits"]
+
+[[example]]
+name = "deku_input"
+
+[[example]]
+name = "enums_catch_all"
+required-features = ["bits"]
+
+[[example]]
+name = "enums"
+
+[[example]]
+name = "example"
+required-features = ["bits"]
+
+[[example]]
+name = "ipv4"
+required-features = ["bits"]
+
+[[example]]
+name = "many"
+
+[[example]]
+name = "read_all"

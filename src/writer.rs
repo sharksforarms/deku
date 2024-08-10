@@ -206,7 +206,8 @@ mod tests {
     use hexlit::hex;
 
     #[test]
-    fn test_writer() {
+    #[cfg(feature = "bits")]
+    fn test_writer_bits() {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
 
@@ -242,5 +243,17 @@ mod tests {
             &mut out_buf.into_inner(),
             &mut vec![0xaa, 0xbb, 0xf1, 0xaa, 0x1f, 0x1a, 0xaf]
         );
+    }
+
+    #[test]
+    #[cfg(feature = "bits")]
+    fn test_writer_bytes() {
+        let mut out_buf = Cursor::new(vec![]);
+        let mut writer = Writer::new(&mut out_buf);
+
+        let mut input = hex!("aa");
+        writer.write_bytes(&mut input).unwrap();
+
+        assert_eq!(&mut out_buf.into_inner(), &mut vec![0xaa]);
     }
 }

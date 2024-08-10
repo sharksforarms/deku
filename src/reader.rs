@@ -478,6 +478,7 @@ mod tests {
     use no_std_io::io::Cursor;
 
     #[test]
+    #[cfg(feature = "bits")]
     fn test_end() {
         let input = hex!("aabb");
         let mut cursor = Cursor::new(input);
@@ -498,6 +499,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bits")]
     fn test_bits_less() {
         let input = hex!("aa");
         let mut cursor = Cursor::new(input);

@@ -1,5 +1,6 @@
 use deku::prelude::*;
 
+#[cfg(feature = "bits")]
 #[test]
 fn test_from_bytes_struct() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -28,6 +29,7 @@ fn test_from_bytes_struct() {
     assert_eq!(0, i);
 }
 
+#[cfg(feature = "bits")]
 #[test]
 fn test_from_bytes_enum() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]

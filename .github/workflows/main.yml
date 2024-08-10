@@ -22,6 +22,8 @@ jobs:
       - run: cargo test --all
       # run examples
       - run: cargo run --example 2>&1 | grep -P '   ' | awk '{print $1}' | xargs -i cargo run --example {}
+      # test with no bits feature (don't test docs)
+      - run: cargo test --lib --examples --tests --features std --no-default-features
 
   # Only build on MSRV, since trybuild will fail on older version
   build-msrv:

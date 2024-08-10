@@ -1,6 +1,7 @@
 use deku::prelude::*;
 use no_std_io::io::Seek;
 
+#[cfg(feature = "bits")]
 #[test]
 fn test_from_reader_struct() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -21,7 +22,6 @@ fn test_from_reader_struct() {
     total_read = amt_read;
     assert_eq!(TestDeku(0b0110), ret_read);
 
-    env_logger::init();
     c.rewind().unwrap();
     let (amt_read, ret_read) = TestDeku::from_reader((&mut c, total_read)).unwrap();
     assert_eq!(amt_read, 12);
@@ -34,6 +34,7 @@ fn test_from_reader_struct() {
     assert_eq!(TestDeku(0b1010), ret_read);
 }
 
+#[cfg(feature = "bits")]
 #[test]
 fn test_from_reader_enum() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]

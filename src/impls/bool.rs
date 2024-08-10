@@ -73,6 +73,7 @@ mod tests {
         assert_eq!(expected, res_read);
     }
 
+    #[cfg(feature = "bits")]
     #[test]
     fn test_bool_with_context() {
         let input = &[0b01_000000];
@@ -83,12 +84,16 @@ mod tests {
         assert!(res_read);
     }
 
+    #[cfg(feature = "bits")]
     #[test]
-    fn test_writer() {
+    fn test_writer_bits() {
         let mut writer = Writer::new(Cursor::new(vec![]));
         true.to_writer(&mut writer, BitSize(1)).unwrap();
         assert_eq!(vec![true], writer.rest());
+    }
 
+    #[test]
+    fn test_writer() {
         let mut writer = Writer::new(Cursor::new(vec![]));
         true.to_writer(&mut writer, ()).unwrap();
         assert_eq!(vec![1], writer.inner.into_inner());

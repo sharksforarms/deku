@@ -5,6 +5,7 @@ use std::io::Cursor;
 // BitSlice to type
 //
 // https://github.com/sharksforarms/deku/issues/224
+#[cfg(feature = "bits")]
 #[test]
 fn issue_224() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -66,6 +67,7 @@ fn issue_224() {
     let _packet = Packet::from_reader((&mut c, 0)).unwrap();
 }
 
+#[cfg(feature = "bits")]
 // Extra zeroes added when reading fewer bytes than needed to fill a number
 //
 // https://github.com/sharksforarms/deku/issues/282
@@ -128,6 +130,7 @@ mod issue_282 {
 // Invalid alignment assumptions when converting doing Bits and Bytes optimizations
 //
 // https://github.com/sharksforarms/deku/issues/292
+#[cfg(feature = "bits")]
 #[test]
 fn test_regression_292() {
     let test_data = [0x0f, 0xf0];

@@ -2,11 +2,14 @@ use std::convert::{TryFrom, TryInto};
 
 use deku::prelude::*;
 
+#[cfg(feature = "bits")]
 mod test_pad_bits_after;
+#[cfg(feature = "bits")]
 mod test_pad_bits_before;
 mod test_pad_bytes_after;
 mod test_pad_bytes_before;
 
+#[cfg(feature = "bits")]
 #[test]
 #[allow(clippy::identity_op)]
 fn test_pad_bits_before_and_pad_bytes_before() {
@@ -34,6 +37,7 @@ fn test_pad_bits_before_and_pad_bytes_before() {
     assert_eq!(vec![0b10_000000, 0x00, 0xbb], ret_write);
 }
 
+#[cfg(feature = "bits")]
 #[test]
 fn test_pad_bits_after_and_pad_bytes_after() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]

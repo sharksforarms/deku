@@ -803,6 +803,7 @@ mod tests {
         native_endian!(-0.006_f64)
     );
 
+    #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, expected, expected_rest_bits, expected_rest_bytes,
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, bits![u8, Msb0;], &[]),
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(32), 0xDDCC_BBAA, bits![u8, Msb0;], &[]),
@@ -880,6 +881,7 @@ mod tests {
         assert_eq!(expected_rest_bytes, buf);
     }
 
+    #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, expected, expected_leftover,
         case::normal_le(0xDDCC_BBAA, Endian::Little, None, vec![0xAA, 0xBB, 0xCC, 0xDD], vec![]),
         case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA], vec![]),
@@ -925,6 +927,7 @@ mod tests {
         assert_hex::assert_eq_hex!(expected, writer.inner.into_inner());
     }
 
+    #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, expected, expected_write,
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
@@ -970,11 +973,17 @@ mod tests {
         };
     }
 
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_i8, i8);
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_i16, i16);
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_i32, i32);
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_i64, i64);
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_i128, i128);
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_isize, isize);
 
     macro_rules! TestSignExtendingPanic {
@@ -998,9 +1007,14 @@ mod tests {
         };
     }
 
+    #[cfg(feature = "bits")]
     TestSignExtendingPanic!(test_sign_extend_i8_panic, i8, 8);
+    #[cfg(feature = "bits")]
     TestSignExtendingPanic!(test_sign_extend_i16_panic, i16, 16);
+    #[cfg(feature = "bits")]
     TestSignExtendingPanic!(test_sign_extend_i32_panic, i32, 32);
+    #[cfg(feature = "bits")]
     TestSignExtendingPanic!(test_sign_extend_i64_panic, i64, 64);
+    #[cfg(feature = "bits")]
     TestSignExtendingPanic!(test_sign_extend_i128_panic, i128, 128);
 }

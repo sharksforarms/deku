@@ -72,9 +72,9 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("deku_write_bits", |b| {
         b.iter(|| {
             deku_write(black_box(&DekuBits {
-                data_01: 0x0f,
-                data_02: 0x00,
-                data_03: 0x01,
+                data_01: 0x01,
+                data_02: 0x03,
+                data_03: 0x06,
             }))
         })
     });

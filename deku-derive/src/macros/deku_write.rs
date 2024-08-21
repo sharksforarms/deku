@@ -3,10 +3,11 @@ use std::convert::TryFrom;
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::LitStr;
 
 use crate::macros::{
-    assertion_failed, gen_ctx_types_and_arg, gen_field_args, gen_struct_destruction, pad_bits,
-    token_contains_string, wrap_default_ctx,
+    assertion_failed, gen_bit_order_from_str, gen_ctx_types_and_arg, gen_field_args,
+    gen_struct_destruction, pad_bits, token_contains_string, wrap_default_ctx,
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
@@ -410,20 +411,38 @@ fn emit_bit_byte_offsets(
     (bit_offset, byte_offset)
 }
 
-fn emit_padding(bit_size: &TokenStream) -> TokenStream {
+fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStream {
     let crate_ = super::get_crate_name();
-    quote! {
-        {
-            use core::convert::TryFrom;
-            extern crate alloc;
-            use alloc::borrow::Cow;
-            let __deku_pad = usize::try_from(#bit_size).map_err(|e|
-                ::#crate_::DekuError::InvalidParam(Cow::from(format!(
-                    "Invalid padding param \"({})\": cannot convert to usize",
-                    stringify!(#bit_size)
-                )))
-            )?;
-            __deku_writer.write_bits(::#crate_::bitvec::bitvec![u8, ::#crate_::bitvec::Msb0; 0; __deku_pad].as_bitslice())?;
+    if let Some(bit_order) = bit_order {
+        let order = gen_bit_order_from_str(bit_order).unwrap();
+        quote! {
+            {
+                use core::convert::TryFrom;
+                extern crate alloc;
+                use alloc::borrow::Cow;
+                let __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                    ::#crate_::DekuError::InvalidParam(Cow::from(format!(
+                        "Invalid padding param \"({})\": cannot convert to usize",
+                        stringify!(#bit_size)
+                    )))
+                )?;
+                __deku_writer.write_bits_order(::#crate_::bitvec::bitvec![u8, ::#crate_::bitvec::Msb0; 0; __deku_pad].as_bitslice(), #order)?;
+            }
+        }
+    } else {
+        quote! {
+            {
+                use core::convert::TryFrom;
+                extern crate alloc;
+                use alloc::borrow::Cow;
+                let __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                    ::#crate_::DekuError::InvalidParam(Cow::from(format!(
+                        "Invalid padding param \"({})\": cannot convert to usize",
+                        stringify!(#bit_size)
+                    )))
+                )?;
+                __deku_writer.write_bits(::#crate_::bitvec::bitvec![u8, ::#crate_::bitvec::Msb0; 0; __deku_pad].as_bitslice())?;
+            }
         }
     }
 }
@@ -437,6 +456,7 @@ fn emit_field_write(
 ) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
     let field_endian = f.endian.as_ref().or(input.endian.as_ref());
+    let field_bit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());
 
     // fields to check usage of bit/byte offset
     let field_check_vars = [
@@ -492,6 +512,7 @@ fn emit_field_write(
             f.bits.as_ref(),
             f.bytes.as_ref(),
             f.ctx.as_ref(),
+            field_bit_order,
         )?;
 
         if f.temp {
@@ -512,11 +533,13 @@ fn emit_field_write(
     let pad_bits_before = pad_bits(
         f.pad_bits_before.as_ref(),
         f.pad_bytes_before.as_ref(),
+        field_bit_order,
         emit_padding,
     );
     let pad_bits_after = pad_bits(
         f.pad_bits_after.as_ref(),
         f.pad_bytes_after.as_ref(),
+        field_bit_order,
         emit_padding,
     );
 

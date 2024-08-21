@@ -140,6 +140,9 @@ struct DekuData {
 
     /// enum only: byte size of the enum `id`
     bytes: Option<Num>,
+
+    /// Bit Order for all fields
+    bit_order: Option<syn::LitStr>,
 }
 
 impl DekuData {
@@ -188,6 +191,7 @@ impl DekuData {
             id_type: receiver.id_type?,
             bits: receiver.bits,
             bytes: receiver.bytes,
+            bit_order: receiver.bit_order,
         };
 
         DekuData::validate(&data)?;
@@ -322,6 +326,7 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataEnum<'a> {
             deku_data.endian.as_ref(),
             deku_data.bits.as_ref(),
             deku_data.bytes.as_ref(),
+            deku_data.bit_order.as_ref(),
         )?;
 
         Ok(Self {
@@ -439,11 +444,14 @@ struct FieldData {
     /// condition to parse field
     cond: Option<TokenStream>,
 
-    // assertion on field
+    /// assertion on field
     assert: Option<TokenStream>,
 
-    // assert value of field
+    /// assert value of field
     assert_eq: Option<TokenStream>,
+
+    /// Bit Order of field
+    bit_order: Option<syn::LitStr>,
 }
 
 impl FieldData {
@@ -481,6 +489,7 @@ impl FieldData {
             cond: receiver.cond?,
             assert: receiver.assert?,
             assert_eq: receiver.assert_eq?,
+            bit_order: receiver.bit_order,
         };
 
         FieldData::validate(&data)?;
@@ -668,6 +677,10 @@ struct DekuReceiver {
     /// enum only: byte size of the enum `id`
     #[darling(default)]
     bytes: Option<Num>,
+
+    /// Bit Order of field
+    #[darling(default)]
+    bit_order: Option<syn::LitStr>,
 }
 
 type ReplacementError = TokenStream;
@@ -848,6 +861,10 @@ struct DekuFieldReceiver {
     // assert value of field
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     assert_eq: Result<Option<TokenStream>, ReplacementError>,
+
+    /// Bit Order of field
+    #[darling(default)]
+    bit_order: Option<syn::LitStr>,
 }
 
 /// Receiver for the variant-level attributes inside a enum

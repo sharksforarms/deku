@@ -10,6 +10,25 @@ use crate::reader::Reader;
 use crate::writer::Writer;
 use crate::{DekuError, DekuReader, DekuWriter};
 
+macro_rules! ImplDekuTraitsCtxOrder {
+    ($typ:ty, $readtype:ty, $ctx_arg:tt, $ctx_type:tt) => {
+        impl DekuReader<'_, $ctx_type> for $typ {
+            fn from_reader_with_ctx<R: Read + Seek>(
+                reader: &mut crate::reader::Reader<R>,
+                $ctx_arg: $ctx_type,
+            ) -> Result<Self, DekuError> {
+                let value = <$readtype>::from_reader_with_ctx(reader, $ctx_arg)?;
+                let value = <$typ>::new(value);
+
+                match value {
+                    None => Err(DekuError::Parse(Cow::from(format!("NonZero assertion")))),
+                    Some(v) => Ok(v),
+                }
+            }
+        }
+    };
+}
+
 macro_rules! ImplDekuTraitsCtx {
     ($typ:ty, $readtype:ty, $ctx_arg:tt, $ctx_type:tt) => {
         impl DekuReader<'_, $ctx_type> for $typ {
@@ -46,6 +65,18 @@ macro_rules! ImplDekuTraits {
         #[cfg(feature = "bits")]
         ImplDekuTraitsCtx!($typ, $readtype, (endian, bitsize), (Endian, BitSize));
         ImplDekuTraitsCtx!($typ, $readtype, (endian, bytesize), (Endian, ByteSize));
+        ImplDekuTraitsCtxOrder!(
+            $typ,
+            $readtype,
+            (endian, bitsize, order),
+            (Endian, BitSize, Order)
+        );
+        ImplDekuTraitsCtxOrder!(
+            $typ,
+            $readtype,
+            (endian, bytesize, order),
+            (Endian, ByteSize, Order)
+        );
         ImplDekuTraitsCtx!($typ, $readtype, endian, Endian);
     };
 }

@@ -25,6 +25,7 @@ enum Id {
     TokenStream(TokenStream),
     LitByteStr(syn::LitByteStr),
     Int(syn::LitInt),
+    Bool(syn::LitBool),
 }
 
 impl Display for Id {
@@ -39,6 +40,7 @@ impl ToTokens for Id {
             Id::TokenStream(v) => v.to_tokens(tokens),
             Id::LitByteStr(v) => v.to_tokens(tokens),
             Id::Int(v) => v.to_tokens(tokens),
+            Id::Bool(v) => v.to_tokens(tokens),
         }
     }
 }
@@ -53,6 +55,7 @@ impl FromMeta for Id {
                     .expect("could not parse token stream"),
             )),
             syn::Lit::Int(ref s) => Ok(Id::Int(s.clone())),
+            syn::Lit::Bool(ref s) => Ok(Id::Bool(s.clone())),
             syn::Lit::ByteStr(ref s) => Ok(Id::LitByteStr(s.clone())),
             _ => Err(darling::Error::unexpected_lit_type(value)),
         })

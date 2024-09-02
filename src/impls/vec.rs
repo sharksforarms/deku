@@ -178,6 +178,7 @@ impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Vec<T> {
 mod tests {
     use crate::bitvec::{bits, BitSlice, Msb0};
     use rstest::rstest;
+    use std::io::Cursor;
 
     use crate::reader::Reader;
 

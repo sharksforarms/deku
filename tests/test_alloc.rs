@@ -85,7 +85,8 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn test_to_slice() {
         let input = hex!("aa_bbbb_cc_0102_dd_ffffff_aa_0100ff");
-        let t = TestDeku::from_reader((&mut input.as_slice(), 0)).unwrap().1;
+        let mut cursor = std::io::Cursor::new(input);
+        let t = TestDeku::from_reader((&mut cursor, 0)).unwrap().1;
 
         let mut out = [0x00; 100];
 

@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- Add attributes `seek_from_start`, `seek_from_current`, `seek_from_end`, and `seek_rewind` to control the position of the reader before reading a field ([#360](https://github.com/sharksforarms/deku/pull/360))
 
 ## [0.17.0] - 2024-04-23
 
@@ -21,7 +22,6 @@
      VariantC((u8, u8)),
  }
 ```
-- Add attributes `seek_from_start`, `seek_from_current`, `seek_from_end`, and `seek_rewind` to control the position of the reader before reading a field ([#360](https://github.com/sharksforarms/deku/pull/360))
 
 ### Updated Reader API
 - Changed API of reading to use `io::Read`, bringing massive performance and usability improvements ([#352](https://github.com/sharksforarms/deku/pull/352))

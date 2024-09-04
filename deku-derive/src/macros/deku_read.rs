@@ -43,7 +43,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_reader.seek(SeekFrom::Current(i64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -53,7 +53,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_reader.seek(SeekFrom::End(i64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -63,7 +63,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_reader.seek(SeekFrom::Start(u64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -72,7 +72,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             {
                 use ::#crate_::no_std_io::Seek;
                 if let Err(e) = __deku_reader.rewind() {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -105,6 +105,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
         let from_reader_body = quote! {
             use core::convert::TryFrom;
+            use ::#crate_::DekuReader as _;
             let __deku_reader = &mut deku::reader::Reader::new(__deku_input.0);
             if __deku_input.1 != 0 {
                 __deku_reader.skip_bits(__deku_input.1)?;
@@ -117,6 +118,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         let from_bytes_body = quote! {
             use core::convert::TryFrom;
+            use ::#crate_::DekuReader as _;
             let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
             let mut __deku_reader = &mut deku::reader::Reader::new(&mut __deku_cursor);
             if __deku_input.1 != 0 {
@@ -374,6 +376,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
         let from_reader_body = quote! {
             use core::convert::TryFrom;
+            use ::#crate_::DekuReader as _;
             let __deku_reader = &mut deku::reader::Reader::new(__deku_input.0);
             if __deku_input.1 != 0 {
                 __deku_reader.skip_bits(__deku_input.1)?;
@@ -386,6 +389,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         let from_bytes_body = quote! {
             use core::convert::TryFrom;
+            use ::#crate_::DekuReader as _;
             let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
             let mut __deku_reader = &mut deku::reader::Reader::new(&mut __deku_cursor);
             if __deku_input.1 != 0 {
@@ -417,6 +421,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let read_body = quote! {
         use core::convert::TryFrom;
+        use ::#crate_::DekuReader as _;
 
         #magic_read
 
@@ -466,10 +471,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             tokens.extend(quote! {
             impl<'__deku> #imp ::#crate_::DekuEnumExt<#lifetime, (#deku_id_type)> for #ident #wher {
                 #[inline]
-                fn deku_id(&self) -> core::result::Result<(#deku_id_type), DekuError> {
+                fn deku_id(&self) -> core::result::Result<(#deku_id_type), ::#crate_::DekuError> {
                     match self {
                         #(#deku_ids ,)*
-                        _ => Err(DekuError::IdVariantNotFound),
+                        _ => Err(::#crate_::DekuError::IdVariantNotFound),
                     }
                 }
             }
@@ -647,7 +652,7 @@ fn emit_field_read(
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_reader.seek(SeekFrom::Current(i64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -657,7 +662,7 @@ fn emit_field_read(
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_reader.seek(SeekFrom::End(i64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -667,7 +672,7 @@ fn emit_field_read(
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_reader.seek(SeekFrom::Start(u64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -676,7 +681,7 @@ fn emit_field_read(
             {
                 use ::#crate_::no_std_io::Seek;
                 if let Err(e) = __deku_reader.rewind() {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -761,7 +766,7 @@ fn emit_field_read(
             quote! {
                 {
                     if let Err(e) = __deku_reader.seek_last_read() {
-                        return Err(DekuError::Io(e.kind()));
+                        return Err(::#crate_::DekuError::Io(e.kind()));
                     }
                     #type_as_deku_read::from_reader_with_ctx
                     (

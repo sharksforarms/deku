@@ -40,8 +40,9 @@ impl<R: Read + Seek> Seek for Reader<'_, R> {
     fn seek(&mut self, pos: SeekFrom) -> no_std_io::io::Result<u64> {
         #[cfg(feature = "logging")]
         log::trace!("seek: {pos:?}");
+
         // clear leftover
-        self.leftover = BitVec::new();
+        self.leftover = None;
         self.inner.seek(pos)
     }
 }
@@ -160,7 +161,7 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
     ///
     /// # Guarantees
     /// - if Some(bits), the returned `BitVec` will have the size of `amt` and
-    /// `self.bits_read` will increase by `amt`
+    ///   `self.bits_read` will increase by `amt`
     ///
     /// # Params
     /// `amt`    - Amount of bits that will be read. Must be <= [`MAX_BITS_AMT`].

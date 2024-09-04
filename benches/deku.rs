@@ -128,7 +128,7 @@ pub fn read_all_vs_count(c: &mut Criterion) {
 
     c.bench_function("read_all", |b| {
         b.iter(|| {
-            let mut cursor = [1u8; 1500].as_ref();
+            let mut cursor = Cursor::new([1u8; 1500].as_ref());
             let mut reader = Reader::new(&mut cursor);
             AllWrapper::from_reader_with_ctx(black_box(&mut reader), ())
         })
@@ -136,7 +136,7 @@ pub fn read_all_vs_count(c: &mut Criterion) {
 
     c.bench_function("count", |b| {
         b.iter(|| {
-            let mut cursor = [1u8; 1500].as_ref();
+            let mut cursor = Cursor::new([1u8; 1500].as_ref());
             let mut reader = Reader::new(&mut cursor);
             CountWrapper::from_reader_with_ctx(black_box(&mut reader), 1500)
         })

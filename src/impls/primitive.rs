@@ -16,7 +16,7 @@ trait DekuRead<'a, Ctx = ()> {
     /// Read bits and construct type
     /// * **input** - Input as bits
     /// * **ctx** - A context required by context-sensitive reading. A unit type `()` means no context
-    /// needed.
+    ///   needed.
     ///
     /// Returns the amount of bits read after parsing in addition to Self.
     ///

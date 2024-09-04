@@ -11,9 +11,9 @@ use crate::{DekuError, DekuReader, DekuWriter};
 /// * `capacity` - an optional capacity to pre-allocate the hashmap with
 /// * `ctx` - The context required by `K, V`. It will be passed to every `K, V` when constructing.
 /// * `predicate` - the predicate that decides when to stop reading `K, V`s
-/// The predicate takes two parameters: the number of bits that have been read so far,
-/// and a borrow of the latest value to have been read. It should return `true` if reading
-/// should now stop, and `false` otherwise
+///   The predicate takes two parameters: the number of bits that have been read so far,
+///   and a borrow of the latest value to have been read. It should return `true` if reading
+///   should now stop, and `false` otherwise
 #[allow(clippy::type_complexity)]
 fn from_reader_with_ctx_hashmap_with_predicate<'a, K, V, S, Ctx, Predicate, R: Read + Seek>(
     reader: &mut crate::reader::Reader<R>,
@@ -189,9 +189,11 @@ where
 impl<K: DekuWriter<Ctx>, V: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for HashMap<K, V, S> {
     /// Write all `K, V`s in a `HashMap` to bits.
     /// * **inner_ctx** - The context required by `K, V`.
+    ///
     /// Note: depending on the Hasher `S`, the order in which the `K, V` pairs are
     /// written may change between executions. Use a deterministic Hasher for your HashMap
     /// instead of the default RandomState hasher if you don't want the order written to change.
+    ///
     /// # Examples
     /// ```rust
     /// # use deku::{ctx::Endian, DekuWriter};

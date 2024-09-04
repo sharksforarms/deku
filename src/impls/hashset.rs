@@ -11,9 +11,9 @@ use crate::{DekuError, DekuReader, DekuWriter};
 /// * `capacity` - an optional capacity to pre-allocate the hashset with
 /// * `ctx` - The context required by `T`. It will be passed to every `T` when constructing.
 /// * `predicate` - the predicate that decides when to stop reading `T`s
-/// The predicate takes two parameters: the number of bits that have been read so far,
-/// and a borrow of the latest value to have been read. It should return `true` if reading
-/// should now stop, and `false` otherwise
+///    The predicate takes two parameters: the number of bits that have been read so far,
+///    and a borrow of the latest value to have been read. It should return `true` if reading
+///    should now stop, and `false` otherwise
 #[allow(clippy::type_complexity)]
 fn from_reader_with_ctx_hashset_with_predicate<'a, T, S, Ctx, Predicate, R: Read + Seek>(
     reader: &mut crate::reader::Reader<R>,
@@ -179,9 +179,11 @@ impl<'a, T: DekuReader<'a> + Eq + Hash, S: BuildHasher + Default, Predicate: FnM
 impl<T: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for HashSet<T, S> {
     /// Write all `T`s in a `HashSet` to bits.
     /// * **inner_ctx** - The context required by `T`.
+    ///
     /// Note: depending on the Hasher `S`, the order in which the `T`'s are
     /// written may change between executions. Use a deterministic Hasher for your HashSet
     /// instead of the default RandomState hasher if you don't want the order written to change.
+    ///
     /// # Examples
     /// ```rust
     /// # use deku::{ctx::Endian, DekuWriter};

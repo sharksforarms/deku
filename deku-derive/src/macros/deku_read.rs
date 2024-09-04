@@ -227,21 +227,22 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .and_then(|v| v.ident.as_ref())
             .is_some();
 
-        let (use_id, variant_id) = if let Some(variant_id) = &variant.id {
+        let mut restore = false;
+        let variant_id = if let Some(variant_id) = &variant.id {
             match variant_id {
-                Id::TokenStream(v) => (false, quote! {&#v}.into_token_stream()),
-                Id::LitByteStr(v) => (false, v.into_token_stream()),
-                Id::Int(v) => (false, v.into_token_stream()),
+                Id::TokenStream(v) => quote! {&#v}.into_token_stream(),
+                Id::LitByteStr(v) => v.into_token_stream(),
+                Id::Int(v) => v.into_token_stream(),
             }
         } else if let Some(variant_id_pat) = &variant.id_pat {
             // If user has supplied an id, then we have an id_pat that and the id variant doesn't
             // need read into an id value
             if id.is_none() {
-                // if set, the first field read will not read from reader and instead
-                // be __deku_variant_id
-                (true, variant_id_pat.clone())
+                // if id_pat and !id, we need to restore after reading
+                restore = true;
+                variant_id_pat.clone()
             } else {
-                (false, variant_id_pat.clone())
+                variant_id_pat.clone()
             }
         } else if has_discriminant {
             let ident = &variant.ident;
@@ -249,7 +250,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             pre_match_tokens.push(quote! {
                 let #internal_ident = <#id_type>::try_from(Self::#ident as isize)?;
             });
-            (true, quote! { _ if __deku_variant_id == #internal_ident })
+            quote! { _ if __deku_variant_id == #internal_ident }
         } else {
             return Err(syn::Error::new(
                 variant.ident.span(),
@@ -269,7 +270,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             quote! { #variant_reader; }
         } else {
             let (field_idents, field_reads) =
-                emit_field_reads(input, &variant.fields.as_ref(), &ident, use_id)?;
+                emit_field_reads(input, &variant.fields.as_ref(), &ident, restore)?;
 
             // filter out temporary fields
             let field_idents = field_idents
@@ -589,7 +590,7 @@ fn emit_field_read(
     i: usize,
     f: &FieldData,
     ident: &TokenStream,
-    use_id: bool,
+    restore_pad_id: bool,
 ) -> Result<(TokenStream, TokenStream), syn::Error> {
     let crate_ = super::get_crate_name();
     let field_type = &f.ty;
@@ -726,9 +727,18 @@ fn emit_field_read(
             quote!(<#field_type as ::#crate_::DekuReader<'_, _>>)
         };
 
-        if use_id {
+        if restore_pad_id {
             quote! {
-                __deku_variant_id
+                {
+                    if let Err(e) = __deku_reader.seek_last_read() {
+                        return Err(DekuError::Io(e.kind()));
+                    }
+                    #type_as_deku_read::from_reader_with_ctx
+                    (
+                        __deku_reader,
+                        (#read_args)
+                    )?
+                }
             }
         } else if let Some(field_count) = &f.count {
             quote! {

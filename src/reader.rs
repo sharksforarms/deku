@@ -161,7 +161,7 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
     ///
     /// # Guarantees
     /// - if Some(bits), the returned `BitVec` will have the size of `amt` and
-    /// `self.bits_read` will increase by `amt`
+    ///   `self.bits_read` will increase by `amt`
     ///
     /// # Params
     /// `amt`    - Amount of bits that will be read. Must be <= [`MAX_BITS_AMT`].

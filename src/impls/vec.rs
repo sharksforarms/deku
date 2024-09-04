@@ -12,9 +12,9 @@ use crate::{DekuError, DekuWriter};
 /// * `capacity` - an optional capacity to pre-allocate the vector with
 /// * `ctx` - The context required by `T`. It will be passed to every `T` when constructing.
 /// * `predicate` - the predicate that decides when to stop reading `T`s
-/// The predicate takes two parameters: the number of bits that have been read so far,
-/// and a borrow of the latest value to have been read. It should return `true` if reading
-/// should now stop, and `false` otherwise
+///   The predicate takes two parameters: the number of bits that have been read so far,
+///   and a borrow of the latest value to have been read. It should return `true` if reading
+///   should now stop, and `false` otherwise
 fn reader_vec_with_predicate<'a, T, Ctx, Predicate, R: Read + Seek>(
     reader: &mut Reader<R>,
     capacity: Option<usize>,

@@ -571,8 +571,8 @@ impl FieldData {
                 || (data.bits_read.is_some() || data.bytes_read.is_some()))
         {
             return Err(cerror(
-                data.bits.span(),
-                "conflicting: `read_all` cannot be used with `until`, count`, `bits_read`, or `bytes_read`",
+                data.read_all.span(),
+                "conflicting: `read_all` cannot be used with `until`, `count`, `bits_read`, or `bytes_read`",
             ));
         }
 
@@ -584,7 +584,7 @@ impl FieldData {
             > 1
         {
             return Err(cerror(
-                data.bits.span(),
+                data.ty.span(),
                 "conflicting: only one `seek` attribute can be used at one time",
             ));
         }

@@ -37,6 +37,49 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         fields,
     } = DekuDataStruct::try_from(input)?;
 
+    let seek = if let Some(num) = &input.seek_from_current {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::Current(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &input.seek_from_end {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::End(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &input.seek_from_start {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::Start(u64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if input.seek_rewind {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                if let Err(e) = __deku_reader.rewind() {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let magic_read = emit_magic_read(input);
 
     // check if the first field has an ident, if not, it's a unnamed struct
@@ -107,6 +150,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let read_body = quote! {
         use core::convert::TryFrom;
 
+        #seek
+
         #magic_read
 
         #(#field_reads)*
@@ -118,7 +163,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     tokens.extend(quote! {
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
             #[inline]
-            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -130,7 +175,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         tokens.extend(quote! {
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
                 #[inline]
-                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -381,7 +426,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         #[allow(non_snake_case)]
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
             #[inline]
-            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -394,7 +439,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             #[allow(non_snake_case)]
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
                 #[inline]
-                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -567,6 +612,49 @@ fn emit_field_read(
         &f.assert,
         &f.assert_eq,
     ];
+
+    let seek = if let Some(num) = &f.seek_from_current {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::Current(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &f.seek_from_end {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::End(i64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if let Some(num) = &f.seek_from_start {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                use ::#crate_::no_std_io::SeekFrom;
+                if let Err(e) = __deku_reader.seek(SeekFrom::Start(u64::try_from(#num).unwrap())) {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else if f.seek_rewind {
+        quote! {
+            {
+                use ::#crate_::no_std_io::Seek;
+                if let Err(e) = __deku_reader.rewind() {
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
 
     let (bit_offset, byte_offset) = emit_bit_byte_offsets(&field_check_vars);
 
@@ -761,6 +849,7 @@ fn emit_field_read(
     };
 
     let field_read = quote! {
+        #seek
         #pad_bits_before
 
         #bit_offset
@@ -795,7 +884,7 @@ pub fn emit_container_read(
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
             #[inline]
-            fn from_reader<'a, R: ::#crate_::no_std_io::Read>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
+            fn from_reader<'a, R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #from_reader_body
             }
 

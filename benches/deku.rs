@@ -1,4 +1,4 @@
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek};
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use deku::prelude::*;
@@ -38,7 +38,7 @@ fn deku_write<T: DekuContainerWrite>(input: &T) {
     let _v = input.to_bytes().unwrap();
 }
 
-fn deku_read<T: for<'a> DekuContainerRead<'a>>(mut reader: impl Read) {
+fn deku_read<T: for<'a> DekuContainerRead<'a>>(mut reader: impl Read + Seek) {
     let mut reader = Reader::new(&mut reader);
     let _v = T::from_reader_with_ctx(&mut reader, ()).unwrap();
 }

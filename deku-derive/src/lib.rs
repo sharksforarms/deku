@@ -140,6 +140,18 @@ struct DekuData {
 
     /// enum only: byte size of the enum `id`
     bytes: Option<Num>,
+
+    /// struct only: seek from current position
+    seek_rewind: bool,
+
+    /// struct only: seek from current position
+    seek_from_current: Option<TokenStream>,
+
+    /// struct only: seek from end position
+    seek_from_end: Option<TokenStream>,
+
+    /// struct only: seek from start position
+    seek_from_start: Option<TokenStream>,
 }
 
 impl DekuData {
@@ -188,6 +200,10 @@ impl DekuData {
             id_type: receiver.id_type?,
             bits: receiver.bits,
             bytes: receiver.bytes,
+            seek_rewind: receiver.seek_rewind,
+            seek_from_current: receiver.seek_from_current?,
+            seek_from_end: receiver.seek_from_end?,
+            seek_from_start: receiver.seek_from_start?,
         };
 
         DekuData::validate(&data)?;
@@ -444,6 +460,18 @@ struct FieldData {
 
     // assert value of field
     assert_eq: Option<TokenStream>,
+
+    /// seek from current position
+    seek_rewind: bool,
+
+    /// seek from current position
+    seek_from_current: Option<TokenStream>,
+
+    /// seek from end position
+    seek_from_end: Option<TokenStream>,
+
+    /// seek from start position
+    seek_from_start: Option<TokenStream>,
 }
 
 impl FieldData {
@@ -481,6 +509,10 @@ impl FieldData {
             cond: receiver.cond?,
             assert: receiver.assert?,
             assert_eq: receiver.assert_eq?,
+            seek_rewind: receiver.seek_rewind,
+            seek_from_current: receiver.seek_from_current?,
+            seek_from_end: receiver.seek_from_end?,
+            seek_from_start: receiver.seek_from_start?,
         };
 
         FieldData::validate(&data)?;
@@ -541,6 +573,19 @@ impl FieldData {
             return Err(cerror(
                 data.bits.span(),
                 "conflicting: `read_all` cannot be used with `until`, count`, `bits_read`, or `bytes_read`",
+            ));
+        }
+
+        // Validate usage of seek_*
+        if (data.seek_from_current.is_some() as u8
+            + data.seek_from_end.is_some() as u8
+            + data.seek_from_start.is_some() as u8
+            + data.seek_rewind as u8)
+            > 1
+        {
+            return Err(cerror(
+                data.bits.span(),
+                "conflicting: only one `seek` attribute can be used at one time",
             ));
         }
 
@@ -668,6 +713,22 @@ struct DekuReceiver {
     /// enum only: byte size of the enum `id`
     #[darling(default)]
     bytes: Option<Num>,
+
+    /// struct only: seek from current position
+    #[darling(default)]
+    seek_rewind: bool,
+
+    /// struct only: seek from current position
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    seek_from_current: Result<Option<TokenStream>, ReplacementError>,
+
+    /// struct only: seek from end position
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    seek_from_end: Result<Option<TokenStream>, ReplacementError>,
+
+    /// struct only: seek from start position
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    seek_from_start: Result<Option<TokenStream>, ReplacementError>,
 }
 
 type ReplacementError = TokenStream;
@@ -848,6 +909,22 @@ struct DekuFieldReceiver {
     // assert value of field
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     assert_eq: Result<Option<TokenStream>, ReplacementError>,
+
+    /// seek from current position
+    #[darling(default)]
+    seek_rewind: bool,
+
+    /// seek from current position
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    seek_from_current: Result<Option<TokenStream>, ReplacementError>,
+
+    /// seek from end position
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    seek_from_end: Result<Option<TokenStream>, ReplacementError>,
+
+    /// seek from start position
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    seek_from_start: Result<Option<TokenStream>, ReplacementError>,
 }
 
 /// Receiver for the variant-level attributes inside a enum

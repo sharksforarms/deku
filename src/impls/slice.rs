@@ -4,13 +4,16 @@ use crate::reader::Reader;
 use crate::writer::Writer;
 use crate::{DekuError, DekuReader, DekuWriter};
 use core::mem::MaybeUninit;
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 impl<'a, Ctx: Copy, T, const N: usize> DekuReader<'a, Ctx> for [T; N]
 where
     T: DekuReader<'a, Ctx>,
 {
-    fn from_reader_with_ctx<R: Read>(reader: &mut Reader<R>, ctx: Ctx) -> Result<Self, DekuError>
+    fn from_reader_with_ctx<R: Read + Seek>(
+        reader: &mut Reader<R>,
+        ctx: Ctx,
+    ) -> Result<Self, DekuError>
     where
         Self: Sized,
     {
@@ -46,7 +49,11 @@ impl<Ctx: Copy, T, const N: usize> DekuWriter<Ctx> for [T; N]
 where
     T: DekuWriter<Ctx>,
 {
-    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write + Seek>(
+        &self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
         for v in self {
             v.to_writer(writer, ctx)?;
         }
@@ -58,7 +65,11 @@ impl<Ctx: Copy, T> DekuWriter<Ctx> for &[T]
 where
     T: DekuWriter<Ctx>,
 {
-    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write + Seek>(
+        &self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
         for v in *self {
             v.to_writer(writer, ctx)?;
         }
@@ -70,7 +81,11 @@ impl<Ctx: Copy, T> DekuWriter<Ctx> for [T]
 where
     T: DekuWriter<Ctx>,
 {
-    fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
+    fn to_writer<W: Write + Seek>(
+        &self,
+        writer: &mut Writer<W>,
+        ctx: Ctx,
+    ) -> Result<(), DekuError> {
         for v in self {
             v.to_writer(writer, ctx)?;
         }
@@ -83,6 +98,7 @@ mod tests {
     use super::*;
     use bitvec::prelude::*;
     use rstest::rstest;
+    use std::io::Cursor;
 
     use crate::{ctx::Endian, reader::Reader, writer::Writer, DekuReader};
 
@@ -93,9 +109,8 @@ mod tests {
         case::normal_be([0xDD, 0xCC].as_ref(), Endian::Big, [0xDDCC, 0xBBAA]),
     )]
     fn test_bit_read(input: &[u8], endian: Endian, expected: [u16; 2]) {
-        let mut bit_slice = input.view_bits::<Msb0>();
-
-        let mut reader = Reader::new(&mut bit_slice);
+        let mut cursor = std::io::Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
         let res_read = <[u16; 2]>::from_reader_with_ctx(&mut reader, endian).unwrap();
         assert_eq!(expected, res_read);
     }
@@ -106,9 +121,11 @@ mod tests {
     )]
     fn test_bit_write(input: [u16; 2], endian: Endian, expected: Vec<u8>) {
         // test writer
-        let mut writer = Writer::new(vec![]);
+
+        use std::io::Cursor;
+        let mut writer = Writer::new(Cursor::new(vec![]));
         input.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(expected, writer.inner);
+        assert_eq!(expected, writer.inner.into_inner());
     }
 
     #[rstest(input,endian,expected,
@@ -125,14 +142,15 @@ mod tests {
     )]
     fn test_nested_array_bit_write(input: [[u16; 2]; 2], endian: Endian, expected: Vec<u8>) {
         // test writer
-        let mut writer = Writer::new(vec![]);
+
+        let mut writer = Writer::new(Cursor::new(vec![]));
         input.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(expected, writer.inner);
+        assert_eq!(expected, writer.inner.into_inner());
 
         // test &slice
         let input = input.as_ref();
-        let mut writer = Writer::new(vec![]);
+        let mut writer = Writer::new(Cursor::new(vec![]));
         input.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(expected, writer.inner);
+        assert_eq!(expected, writer.inner.into_inner());
     }
 }

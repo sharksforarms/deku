@@ -2,7 +2,7 @@
 
 use crate::writer::Writer;
 
-use no_std_io::io::{Read, Write};
+use no_std_io::io::{Read, Seek, Write};
 
 use crate::{DekuError, DekuReader, DekuWriter};
 
@@ -39,7 +39,7 @@ macro_rules! ImplDekuTupleTraits {
 
         impl<'a, Ctx: Copy, $($T:DekuReader<'a, Ctx>+Sized),+> DekuReader<'a, Ctx> for ($($T,)+)
         {
-            fn from_reader_with_ctx<R: Read>(
+            fn from_reader_with_ctx<R: Read + Seek>(
                 reader: &mut crate::reader::Reader<R>,
                 ctx: Ctx,
             ) -> Result<Self, DekuError>
@@ -58,7 +58,7 @@ macro_rules! ImplDekuTupleTraits {
         impl<Ctx: Copy, $($T:DekuWriter<Ctx>),+> DekuWriter<Ctx> for ($($T,)+)
         {
             #[allow(non_snake_case)]
-            fn to_writer<W: Write>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
+            fn to_writer<W: Write + Seek>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
                 let ($(ref $T,)+) = *self;
                 $(
                     $T.to_writer(writer, ctx)?;
@@ -97,8 +97,10 @@ mod tests {
     where
         T: DekuWriter,
     {
-        let mut writer = Writer::new(vec![]);
+        use std::io::Cursor;
+
+        let mut writer = Writer::new(Cursor::new(vec![]));
         input.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(expected, writer.inner);
+        assert_eq!(expected, writer.inner.into_inner());
     }
 }

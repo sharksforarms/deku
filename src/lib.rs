@@ -354,6 +354,8 @@ pub mod no_std_io {
     pub use no_std_io::io::Cursor;
     pub use no_std_io::io::Read;
     pub use no_std_io::io::Result;
+    pub use no_std_io::io::Seek;
+    pub use no_std_io::io::SeekFrom;
     pub use no_std_io::io::Write;
 }
 
@@ -406,7 +408,7 @@ pub trait DekuReader<'a, Ctx = ()> {
     /// let mut reader = Reader::new(&mut file);
     /// let ec = EcHdr::from_reader_with_ctx(&mut reader, Endian::Big).unwrap();
     /// ```
-    fn from_reader_with_ctx<R: no_std_io::Read>(
+    fn from_reader_with_ctx<R: no_std_io::Read + no_std_io::Seek>(
         reader: &mut Reader<R>,
         ctx: Ctx,
     ) -> Result<Self, DekuError>
@@ -443,12 +445,12 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     ///     magic: [u8; 4],
     ///     version: u8,
     /// }
-    ///
+    /// ```
     /// let mut file = File::options().read(true).open("file").unwrap();
     /// file.seek(SeekFrom::Start(0)).unwrap();
     /// let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
     /// ```
-    fn from_reader<R: no_std_io::Read>(
+    fn from_reader<R: no_std_io::Read + no_std_io::Seek>(
         input: (&'a mut R, usize),
     ) -> Result<(usize, Self), DekuError>
     where
@@ -473,7 +475,7 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
 )]
 pub trait DekuWriter<Ctx = ()> {
     /// Write type to bytes
-    fn to_writer<W: no_std_io::Write>(
+    fn to_writer<W: no_std_io::Write + no_std_io::Seek>(
         &self,
         writer: &mut Writer<W>,
         ctx: Ctx,
@@ -509,7 +511,8 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     #[inline(always)]
     fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
         let mut out_buf = Vec::new();
-        let mut __deku_writer = Writer::new(&mut out_buf);
+        let mut cursor = no_std_io::Cursor::new(&mut out_buf);
+        let mut __deku_writer = Writer::new(&mut cursor);
         DekuWriter::to_writer(self, &mut __deku_writer, ())?;
         __deku_writer.finalize()?;
         Ok(out_buf)
@@ -535,11 +538,12 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     /// ````
     #[inline(always)]
     fn to_slice(&self, buf: &mut [u8]) -> Result<usize, DekuError> {
-        let mut __deku_writer = Writer::new(buf);
-        DekuWriter::to_writer(self, &mut __deku_writer, ())?;
-        __deku_writer.finalize()?;
+        let mut cursor = no_std_io::Cursor::new(buf);
+        let mut writer = Writer::new(&mut cursor);
+        DekuWriter::to_writer(self, &mut writer, ())?;
+        writer.finalize()?;
 
-        Ok(__deku_writer.bits_written / 8)
+        Ok(writer.bits_written / 8)
     }
 
     /// Write struct/enum to BitVec
@@ -566,7 +570,8 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     #[inline(always)]
     fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError> {
         let mut out_buf = Vec::new();
-        let mut __deku_writer = Writer::new(&mut out_buf);
+        let mut cursor = no_std_io::Cursor::new(&mut out_buf);
+        let mut __deku_writer = Writer::new(&mut cursor);
         DekuWriter::to_writer(self, &mut __deku_writer, ())?;
         let mut leftover = __deku_writer.leftover;
         let mut bv = bitvec::BitVec::from_slice(&out_buf);
@@ -593,7 +598,7 @@ where
     Ctx: Copy,
 {
     #[inline(always)]
-    fn to_writer<W: no_std_io::Write>(
+    fn to_writer<W: no_std_io::Write + no_std_io::Seek>(
         &self,
         writer: &mut Writer<W>,
         ctx: Ctx,

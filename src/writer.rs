@@ -2,7 +2,7 @@
 
 use bitvec::bitvec;
 use bitvec::{field::BitField, prelude::*};
-use no_std_io::io::Write;
+use no_std_io::io::{Seek, SeekFrom, Write};
 
 #[cfg(feature = "logging")]
 use log;
@@ -17,7 +17,7 @@ const fn bits_of<T>() -> usize {
 pub const MAX_BITS_AMT: usize = 128;
 
 /// Container to use with `to_writer`
-pub struct Writer<W: Write> {
+pub struct Writer<W: Write + Seek> {
     pub(crate) inner: W,
     /// Leftover bits
     pub leftover: BitVec<u8, Msb0>,
@@ -25,7 +25,17 @@ pub struct Writer<W: Write> {
     pub bits_written: usize,
 }
 
-impl<W: Write> Writer<W> {
+impl<W: Write + Seek> Seek for Writer<W> {
+    fn seek(&mut self, pos: SeekFrom) -> no_std_io::io::Result<u64> {
+        #[cfg(feature = "logging")]
+        log::trace!("seek: {pos:?}");
+        // clear leftover
+        self.leftover = BitVec::new();
+        self.inner.seek(pos)
+    }
+}
+
+impl<W: Write + Seek> Writer<W> {
     /// Create a new `Writer`
     #[inline]
     pub fn new(inner: W) -> Self {
@@ -162,12 +172,14 @@ impl<W: Write> Writer<W> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use super::*;
     use hexlit::hex;
 
     #[test]
     fn test_writer() {
-        let mut out_buf = vec![];
+        let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
 
         let mut input = hex!("aa");
@@ -199,7 +211,7 @@ mod tests {
         writer.write_bits(&mut bv).unwrap();
 
         assert_eq!(
-            &mut out_buf,
+            &mut out_buf.into_inner(),
             &mut vec![0xaa, 0xbb, 0xf1, 0xaa, 0x1f, 0x1a, 0xaf]
         );
     }

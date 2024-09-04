@@ -3,9 +3,9 @@ use std::convert::TryInto;
 use deku::ctx::BitSize;
 use deku::writer::Writer;
 use deku::{prelude::*, DekuWriter};
-use no_std_io::io::Write;
+use no_std_io::io::{Seek, Write};
 
-fn bit_flipper_read<R: std::io::Read>(
+fn bit_flipper_read<R: std::io::Read + std::io::Seek>(
     field_a: u8,
     reader: &mut Reader<R>,
     bit_size: BitSize,
@@ -25,7 +25,7 @@ fn bit_flipper_read<R: std::io::Read>(
     Ok(value)
 }
 
-fn bit_flipper_write<W: Write>(
+fn bit_flipper_write<W: Write + Seek>(
     field_a: u8,
     field_b: u8,
     writer: &mut Writer<W>,
@@ -59,8 +59,9 @@ struct DekuTest {
 
 fn main() {
     let test_data = [0x01, 0b1001_0110];
+    let mut cursor = std::io::Cursor::new(test_data);
 
-    let (_read_amt, ret_read) = DekuTest::from_reader((&mut test_data.as_slice(), 0)).unwrap();
+    let (_read_amt, ret_read) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 
     assert_eq!(
         ret_read,

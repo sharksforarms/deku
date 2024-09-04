@@ -234,20 +234,9 @@ macro_rules! ImplDekuReadBytes {
                 input: &BitSlice<u8, Msb0>,
                 (endian, size): (Endian, ByteSize),
             ) -> Result<(usize, Self), DekuError> {
-                let bit_size: usize = size.0 * 8;
+                let bit_size = BitSize(size.0 * 8);
 
-                let input_is_le = endian.is_le();
-
-                let bit_slice = &input[..bit_size];
-
-                let bytes = bit_slice.domain().region().unwrap().1;
-                let value = if input_is_le {
-                    <$typ>::from_le_bytes(bytes.try_into()?)
-                } else {
-                    <$typ>::from_be_bytes(bytes.try_into()?)
-                };
-
-                Ok((bit_size, value))
+                <$typ>::read(input, (endian, bit_size))
             }
         }
 

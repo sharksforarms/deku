@@ -40,8 +40,9 @@ impl<R: Read + Seek> Seek for Reader<'_, R> {
     fn seek(&mut self, pos: SeekFrom) -> no_std_io::io::Result<u64> {
         #[cfg(feature = "logging")]
         log::trace!("seek: {pos:?}");
+
         // clear leftover
-        self.leftover = BitVec::new();
+        self.leftover = None;
         self.inner.seek(pos)
     }
 }

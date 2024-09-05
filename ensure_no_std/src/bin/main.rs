@@ -7,7 +7,7 @@ extern crate alloc;
 use core::panic::PanicInfo;
 
 use cortex_m_rt::entry;
-use embedded_alloc::Heap;
+use embedded_alloc::LlffHeap as Heap;
 
 #[global_allocator]
 static HEAP: Heap = Heap::empty();

@@ -235,6 +235,7 @@ fn id_pat_with_id_bits() {
 }
 
 #[test]
+#[cfg(feature = "bits")]
 fn test_litbool_as_id() {
     use deku::prelude::*;
 

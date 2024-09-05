@@ -34,7 +34,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_writer.seek(SeekFrom::Current(i64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -44,7 +44,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_writer.seek(SeekFrom::End(i64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -54,7 +54,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_writer.seek(SeekFrom::Start(u64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -63,7 +63,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             {
                 use ::#crate_::no_std_io::Seek;
                 if let Err(e) = __deku_writer.rewind() {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -98,6 +98,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
                 #[inline]
                 fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
+                    use ::#crate_::DekuContainerWrite as _;
                     input.to_bits()
                 }
             }
@@ -113,7 +114,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 }
             }
 
-            impl #imp DekuContainerWrite for #ident #wher {}
+            impl #imp ::#crate_::DekuContainerWrite for #ident #wher {}
         });
     }
 
@@ -135,7 +136,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let update_use = check_update_use(&field_updates);
 
     tokens.extend(quote! {
-        impl #imp DekuUpdate for #ident #wher {
+        impl #imp ::#crate_::DekuUpdate for #ident #wher {
             #[inline]
             fn update(&mut self) -> core::result::Result<(), ::#crate_::DekuError> {
                 #update_use
@@ -304,6 +305,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
                 #[inline]
                 fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
+                    use ::#crate_::DekuContainerWrite as _;
                     input.to_bits()
                 }
             }
@@ -319,7 +321,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 }
             }
 
-            impl #imp DekuContainerWrite for #ident #wher {}
+            impl #imp ::#crate_::DekuContainerWrite for #ident #wher {}
         });
     }
 
@@ -339,7 +341,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let update_use = check_update_use(&variant_updates);
 
     tokens.extend(quote! {
-        impl #imp DekuUpdate for #ident #wher {
+        impl #imp ::#crate_::DekuUpdate for #ident #wher {
             #[inline]
             fn update(&mut self) -> core::result::Result<(), ::#crate_::DekuError> {
                 #update_use
@@ -521,7 +523,7 @@ fn emit_field_write(
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_writer.seek(SeekFrom::Current(i64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -531,7 +533,7 @@ fn emit_field_write(
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_writer.seek(SeekFrom::End(i64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -541,7 +543,7 @@ fn emit_field_write(
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
                 if let Err(e) = __deku_writer.seek(SeekFrom::Start(u64::try_from(#num).unwrap())) {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }
@@ -550,7 +552,7 @@ fn emit_field_write(
             {
                 use ::#crate_::no_std_io::Seek;
                 if let Err(e) = __deku_writer.rewind() {
-                    return Err(DekuError::Io(e.kind()));
+                    return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
         }

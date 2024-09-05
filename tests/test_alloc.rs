@@ -7,12 +7,14 @@ use deku::prelude::*;
 #[global_allocator]
 static A: AllocCounterSystem = AllocCounterSystem;
 
+#[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(ctx = "_endian: Endian")]
 struct NestedStruct {
     field_a: u8,
 }
 
+#[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(id_type = "u8", ctx = "_endian: Endian")]
 enum NestedEnum {
@@ -20,6 +22,7 @@ enum NestedEnum {
     VarA(u8),
 }
 
+#[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(id_type = "u32", bytes = 2, ctx = "_endian: Endian")]
 enum NestedEnum2 {
@@ -27,6 +30,7 @@ enum NestedEnum2 {
     VarA(u8),
 }
 
+#[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
 struct TestDeku {
@@ -44,6 +48,7 @@ struct TestDeku {
                  //field_i: NestedEnum2,
 }
 
+#[cfg(feature = "bits")]
 mod tests {
     use alloc_counter::count_alloc;
     use hexlit::hex;

@@ -1,6 +1,8 @@
 //! Writer for writer functions
 
+#[cfg(feature = "bits")]
 use bitvec::bitvec;
+#[cfg(feature = "bits")]
 use bitvec::{field::BitField, prelude::*};
 use no_std_io::io::{Seek, SeekFrom, Write};
 
@@ -20,6 +22,7 @@ pub const MAX_BITS_AMT: usize = 128;
 pub struct Writer<W: Write + Seek> {
     pub(crate) inner: W,
     /// Leftover bits
+    #[cfg(feature = "bits")]
     pub leftover: BitVec<u8, Msb0>,
     /// Total bits written
     pub bits_written: usize,
@@ -29,8 +32,13 @@ impl<W: Write + Seek> Seek for Writer<W> {
     fn seek(&mut self, pos: SeekFrom) -> no_std_io::io::Result<u64> {
         #[cfg(feature = "logging")]
         log::trace!("seek: {pos:?}");
+
         // clear leftover
-        self.leftover = BitVec::new();
+        #[cfg(feature = "bits")]
+        {
+            self.leftover = BitVec::new();
+        }
+
         self.inner.seek(pos)
     }
 }
@@ -41,6 +49,7 @@ impl<W: Write + Seek> Writer<W> {
     pub fn new(inner: W) -> Self {
         Self {
             inner,
+            #[cfg(feature = "bits")]
             leftover: BitVec::new(),
             bits_written: 0,
         }
@@ -49,7 +58,15 @@ impl<W: Write + Seek> Writer<W> {
     /// Return the unused bits
     #[inline]
     pub fn rest(&mut self) -> alloc::vec::Vec<bool> {
-        self.leftover.iter().by_vals().collect()
+        #[cfg(feature = "bits")]
+        {
+            self.leftover.iter().by_vals().collect()
+        }
+
+        #[cfg(not(feature = "bits"))]
+        {
+            alloc::vec![]
+        }
     }
 
     /// Write all `bits` to `Writer` buffer if bits can fit into a byte buffer.
@@ -60,6 +77,7 @@ impl<W: Write + Seek> Writer<W> {
     /// # Params
     /// `bits`    - Amount of bits that will be written. length must be <= [`MAX_BITS_AMT`].
     #[inline(never)]
+    #[cfg(feature = "bits")]
     pub fn write_bits(&mut self, bits: &BitSlice<u8, Msb0>) -> Result<(), DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("attempting {} bits", bits.len());
@@ -119,6 +137,7 @@ impl<W: Write + Seek> Writer<W> {
         #[cfg(feature = "logging")]
         log::trace!("writing {} bytes: {buf:02x?}", buf.len());
 
+        #[cfg(feature = "bits")]
         if !self.leftover.is_empty() {
             #[cfg(feature = "logging")]
             log::trace!("leftover exists");
@@ -133,6 +152,14 @@ impl<W: Write + Seek> Writer<W> {
             self.bits_written += buf.len() * 8;
         }
 
+        #[cfg(not(feature = "bits"))]
+        {
+            if let Err(e) = self.inner.write_all(buf) {
+                return Err(DekuError::Io(e.kind()));
+            }
+            self.bits_written += buf.len() * 8;
+        }
+
         Ok(())
     }
 
@@ -140,6 +167,7 @@ impl<W: Write + Seek> Writer<W> {
     /// into a byte buffer
     #[inline]
     pub fn finalize(&mut self) -> Result<(), DekuError> {
+        #[cfg(feature = "bits")]
         if !self.leftover.is_empty() {
             #[cfg(feature = "logging")]
             log::trace!("finalized: {} bits leftover", self.leftover.len());
@@ -178,7 +206,8 @@ mod tests {
     use hexlit::hex;
 
     #[test]
-    fn test_writer() {
+    #[cfg(feature = "bits")]
+    fn test_writer_bits() {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
 
@@ -214,5 +243,17 @@ mod tests {
             &mut out_buf.into_inner(),
             &mut vec![0xaa, 0xbb, 0xf1, 0xaa, 0x1f, 0x1a, 0xaf]
         );
+    }
+
+    #[test]
+    #[cfg(feature = "bits")]
+    fn test_writer_bytes() {
+        let mut out_buf = Cursor::new(vec![]);
+        let mut writer = Writer::new(&mut out_buf);
+
+        let mut input = hex!("aa");
+        writer.write_bytes(&mut input).unwrap();
+
+        assert_eq!(&mut out_buf.into_inner(), &mut vec![0xaa]);
     }
 }

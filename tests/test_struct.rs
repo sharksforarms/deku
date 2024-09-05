@@ -10,11 +10,13 @@ mod test_common;
 /// TODO: These should be divided into smaller tests
 
 // Common struct to test nesting
+#[cfg(feature = "bits")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 pub struct DoubleNestedDeku {
     pub data: u16,
 }
 
+#[cfg(feature = "bits")]
 // Common struct to test nesting
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 pub struct NestedDeku {
@@ -26,6 +28,7 @@ pub struct NestedDeku {
     pub inner: DoubleNestedDeku,
 }
 
+#[cfg(feature = "bits")]
 #[test]
 #[should_panic(expected = r#"Parse("Too much data")"#)]
 fn test_read_too_much_data() {
@@ -39,6 +42,7 @@ fn test_read_too_much_data() {
     TestStruct::try_from(test_data).unwrap();
 }
 
+#[cfg(feature = "bits")]
 #[test]
 fn test_unnamed_struct() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -96,6 +100,7 @@ fn test_unnamed_struct() {
     assert_eq!(test_data, ret_write);
 }
 
+#[cfg(feature = "bits")]
 #[test]
 fn test_named_struct() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]

@@ -136,6 +136,7 @@ struct DekuData {
     id_type: Option<TokenStream>,
 
     /// enum only: bit size of the enum `id`
+    #[cfg(feature = "bits")]
     bits: Option<Num>,
 
     /// enum only: byte size of the enum `id`
@@ -198,6 +199,7 @@ impl DekuData {
             magic: receiver.magic,
             id: receiver.id,
             id_type: receiver.id_type?,
+            #[cfg(feature = "bits")]
             bits: receiver.bits,
             bytes: receiver.bytes,
             seek_rewind: receiver.seek_rewind,
@@ -224,7 +226,7 @@ impl DekuData {
         match data.data {
             ast::Data::Struct(_) => {
                 // Validate id_* attributes are being used on an enum
-                if data.id_type.is_some() {
+                let ret = if data.id_type.is_some() {
                     Err(cerror(
                         data.id_type.span(),
                         "`id_type` only supported on enum",
@@ -233,11 +235,16 @@ impl DekuData {
                     Err(cerror(data.id.span(), "`id` only supported on enum"))
                 } else if data.bytes.is_some() {
                     Err(cerror(data.bytes.span(), "`bytes` only supported on enum"))
-                } else if data.bits.is_some() {
-                    Err(cerror(data.bits.span(), "`bits` only supported on enum"))
                 } else {
                     Ok(())
+                };
+
+                #[cfg(feature = "bits")]
+                if ret.is_ok() && data.bits.is_some() {
+                    return Err(cerror(data.bits.span(), "`bits` only supported on enum"));
                 }
+
+                ret
             }
             ast::Data::Enum(_) => {
                 // Validate `id_type` or `id` is specified
@@ -257,6 +264,7 @@ impl DekuData {
                 }
 
                 // Validate `id_*` used correctly
+                #[cfg(feature = "bits")]
                 if data.id.is_some() && data.bits.is_some() {
                     return Err(cerror(
                         data.ident.span(),
@@ -271,6 +279,7 @@ impl DekuData {
                 }
 
                 // Validate either `bits` or `bytes` is specified
+                #[cfg(feature = "bits")]
                 if data.bits.is_some() && data.bytes.is_some() {
                     return Err(cerror(
                         data.bits.span(),
@@ -336,7 +345,10 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataEnum<'a> {
 
         let id_args = crate::macros::gen_id_args(
             deku_data.endian.as_ref(),
+            #[cfg(feature = "bits")]
             deku_data.bits.as_ref(),
+            #[cfg(not(feature = "bits"))]
+            None,
             deku_data.bytes.as_ref(),
         )?;
 
@@ -393,6 +405,7 @@ struct FieldData {
     endian: Option<syn::LitStr>,
 
     /// field bit size
+    #[cfg(feature = "bits")]
     bits: Option<Num>,
 
     /// field byte size
@@ -402,6 +415,7 @@ struct FieldData {
     count: Option<TokenStream>,
 
     /// tokens providing the number of bits for the length of the container
+    #[cfg(feature = "bits")]
     bits_read: Option<TokenStream>,
 
     /// tokens providing the number of bytes for the length of the container
@@ -432,12 +446,14 @@ struct FieldData {
     skip: bool,
 
     /// pad a number of bits before
+    #[cfg(feature = "bits")]
     pad_bits_before: Option<TokenStream>,
 
     /// pad a number of bytes before
     pad_bytes_before: Option<TokenStream>,
 
     /// pad a number of bits after
+    #[cfg(feature = "bits")]
     pad_bits_after: Option<TokenStream>,
 
     /// pad a number of bytes after
@@ -486,9 +502,11 @@ impl FieldData {
             ident: receiver.ident,
             ty: receiver.ty,
             endian: receiver.endian,
+            #[cfg(feature = "bits")]
             bits: receiver.bits,
             bytes: receiver.bytes,
             count: receiver.count?,
+            #[cfg(feature = "bits")]
             bits_read: receiver.bits_read?,
             bytes_read: receiver.bytes_read?,
             until: receiver.until?,
@@ -499,8 +517,10 @@ impl FieldData {
             reader: receiver.reader?,
             writer: receiver.writer?,
             skip: receiver.skip,
+            #[cfg(feature = "bits")]
             pad_bits_before: receiver.pad_bits_before?,
             pad_bytes_before: receiver.pad_bytes_before?,
+            #[cfg(feature = "bits")]
             pad_bits_after: receiver.pad_bits_after?,
             pad_bytes_after: receiver.pad_bytes_after?,
             temp: receiver.temp,
@@ -524,6 +544,7 @@ impl FieldData {
 
     fn validate(data: &FieldData) -> Result<(), TokenStream> {
         // Validate either `read_bytes` or `read_bits` is specified
+        #[cfg(feature = "bits")]
         if data.bits_read.is_some() && data.bytes_read.is_some() {
             return Err(cerror(
                 data.bits_read.span(),
@@ -532,6 +553,7 @@ impl FieldData {
         }
 
         // Validate either `count` or `bits_read`/`bytes_read` is specified
+        #[cfg(feature = "bits")]
         if data.count.is_some() && (data.bits_read.is_some() || data.bytes_read.is_some()) {
             if data.bits_read.is_some() {
                 return Err(cerror(
@@ -546,7 +568,16 @@ impl FieldData {
             }
         }
 
+        #[cfg(not(feature = "bits"))]
+        if data.count.is_some() && data.bytes_read.is_some() {
+            return Err(cerror(
+                data.count.span(),
+                "conflicting: both `count` and `bytes_read` specified on field",
+            ));
+        }
+
         // Validate either `bits` or `bytes` is specified
+        #[cfg(feature = "bits")]
         if data.bits.is_some() && data.bytes.is_some() {
             // FIXME: Use `Span::join` once out of nightly
             return Err(cerror(
@@ -565,6 +596,7 @@ impl FieldData {
         }
 
         // Validate usage of read_all
+        #[cfg(feature = "bits")]
         if data.read_all
             && (data.until.is_some()
                 || data.count.is_some()
@@ -707,6 +739,7 @@ struct DekuReceiver {
     id_type: Result<Option<TokenStream>, ReplacementError>,
 
     /// enum only: bit size of the enum `id`
+    #[cfg(feature = "bits")]
     #[darling(default)]
     bits: Option<Num>,
 
@@ -816,6 +849,7 @@ struct DekuFieldReceiver {
     endian: Option<syn::LitStr>,
 
     /// field bit size
+    #[cfg(feature = "bits")]
     #[darling(default)]
     bits: Option<Num>,
 
@@ -828,6 +862,7 @@ struct DekuFieldReceiver {
     count: Result<Option<TokenStream>, ReplacementError>,
 
     /// tokens providing the number of bits for the length of the container
+    #[cfg(feature = "bits")]
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     bits_read: Result<Option<TokenStream>, ReplacementError>,
 
@@ -871,6 +906,7 @@ struct DekuFieldReceiver {
     skip: bool,
 
     /// pad a number of bits before
+    #[cfg(feature = "bits")]
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     pad_bits_before: Result<Option<TokenStream>, ReplacementError>,
 
@@ -879,6 +915,7 @@ struct DekuFieldReceiver {
     pad_bytes_before: Result<Option<TokenStream>, ReplacementError>,
 
     /// pad a number of bits after
+    #[cfg(feature = "bits")]
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     pad_bits_after: Result<Option<TokenStream>, ReplacementError>,
 

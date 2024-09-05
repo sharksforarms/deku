@@ -1,8 +1,10 @@
 use std::convert::TryFrom;
 
+#[cfg(feature = "bits")]
 use deku::bitvec::Lsb0;
 use deku::prelude::*;
 
+#[cfg(feature = "bits")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 pub struct Test {
     #[deku(bits = "4")]
@@ -11,6 +13,7 @@ pub struct Test {
     pub b: u8,
 }
 
+#[cfg(feature = "bits")]
 #[test]
 fn test_to_bits_correct() {
     let test_data: &[u8] = &[0xf1];
@@ -19,6 +22,7 @@ fn test_to_bits_correct() {
     assert_eq!(deku::bitvec::bitvec![1, 1, 1, 1, 0, 0, 0, 1], bits);
 }
 
+#[cfg(feature = "bits")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 pub struct TestOver {
     #[deku(bits = "4")]
@@ -29,6 +33,7 @@ pub struct TestOver {
     pub c: u8,
 }
 
+#[cfg(feature = "bits")]
 #[test]
 fn test_to_bits_correct_over() {
     let test_data: &[u8] = &[0xf1, 0x80];
@@ -37,6 +42,7 @@ fn test_to_bits_correct_over() {
     assert_eq!(deku::bitvec::bitvec![1, 1, 1, 1, 0, 0, 0, 1, 1], bits);
 }
 
+#[cfg(feature = "bits")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u8", bits = "4")]
 enum TestEnum {
@@ -44,6 +50,7 @@ enum TestEnum {
     VarA,
 }
 
+#[cfg(feature = "bits")]
 #[test]
 fn test_to_bits_enum() {
     let test_data: &[u8] = &[0b1010_0000];

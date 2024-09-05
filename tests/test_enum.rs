@@ -8,6 +8,7 @@ use rstest::*;
 /// General smoke tests for enums
 /// TODO: These should be divided into smaller tests
 
+#[cfg(feature = "bits")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u8")]
 enum TestEnum {
@@ -32,6 +33,7 @@ enum TestEnum {
     VarDefault { id: u8, value: u8 },
 }
 
+#[cfg(feature = "bits")]
 #[rstest(input,expected,
     case(&hex!("01AB"), TestEnum::VarA(0xAB)),
     case(&hex!("0269"), TestEnum::VarB(0b0110, 0b1001)),
@@ -178,7 +180,11 @@ fn test_id_pat_with_id() {
         }
     );
     assert_eq!(input, &*v.to_bytes().unwrap());
+}
 
+#[test]
+#[cfg(feature = "bits")]
+fn id_pat_with_id_bits() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(id_type = "u8", bits = "2")]
     pub enum IdPatBits {

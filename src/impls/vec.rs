@@ -176,6 +176,7 @@ impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Vec<T> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "bits")]
     use crate::bitvec::{bits, BitSlice, Msb0};
     use rstest::rstest;
     use std::io::Cursor;
@@ -184,6 +185,7 @@ mod tests {
 
     use super::*;
 
+    #[cfg(feature = "bits")]
     #[rstest(input, limit, expected, expected_rest_bits, expected_rest_bytes,
         case::count_0([0xAA].as_ref(), 0.into(), vec![], bits![u8, Msb0;], &[0xaa]),
         case::count_1([0xAA, 0xBB].as_ref(), 1.into(), vec![0xAA], bits![u8, Msb0;], &[0xbb]),
@@ -211,6 +213,7 @@ mod tests {
         assert_eq!(expected_rest_bytes, buf);
     }
 
+    #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
         case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), vec![], bits![u8, Msb0;], &[0xaa]),
         case::count_1([0xAA, 0xBB].as_ref(), Endian::Little, Some(8), 1.into(), vec![0xAA], bits![u8, Msb0;], &[0xbb]),
@@ -271,6 +274,7 @@ mod tests {
     }
 
     // Note: These tests also exist in boxed.rs
+    #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes, expected_write,
         case::normal_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), 2.into(), vec![0xBBAA, 0xDDCC], bits![u8, Msb0;], &[], vec![0xAA, 0xBB, 0xCC, 0xDD]),
         case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), 2.into(), vec![0xAABB, 0xCCDD], bits![u8, Msb0;], &[], vec![0xAA, 0xBB, 0xCC, 0xDD]),

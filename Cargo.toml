@@ -20,16 +20,17 @@ members = [
 ]
 
 [features]
-default = ["std"]
-std = ["deku_derive/std", "bitvec/std", "alloc", "no_std_io/std"]
-alloc = ["bitvec/alloc"]
+default = ["std", "bits"]
+std = ["deku_derive/std", "bitvec?/std", "alloc", "no_std_io/std"]
+alloc = ["bitvec?/alloc"]
 logging = ["deku_derive/logging", "log"]
 no-assert-string = ["deku_derive/no-assert-string"]
 error_in_core = []
+bits = ["dep:bitvec", "deku_derive/bits"]
 
 [dependencies]
 deku_derive = { version = "^0.17.0", path = "deku-derive", default-features = false}
-bitvec = { version = "1.0.1", default-features = false }
+bitvec = { version = "1.0.1", default-features = false, optional = true }
 log = { version = "0.4.21", optional = true }
 no_std_io = { version = "0.8.0", default-features = false, features = ["alloc"], package = "no_std_io2" }
 rustversion = "1.0.16"
@@ -55,3 +56,31 @@ workspace = true
 # Triggers in macro generated code of darling
 # https://github.com/rust-lang/rust-clippy/issues/12643
 manual-unwrap-or-default = "allow"
+
+[[example]]
+name = "custom_reader_and_writer"
+required-features = ["bits"]
+
+[[example]]
+name = "deku_input"
+
+[[example]]
+name = "enums_catch_all"
+required-features = ["bits"]
+
+[[example]]
+name = "enums"
+
+[[example]]
+name = "example"
+required-features = ["bits"]
+
+[[example]]
+name = "ipv4"
+required-features = ["bits"]
+
+[[example]]
+name = "many"
+
+[[example]]
+name = "read_all"

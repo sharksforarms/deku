@@ -7,7 +7,7 @@ use quote::quote;
 
 use crate::macros::{
     gen_ctx_types_and_arg, gen_field_args, gen_internal_field_ident, gen_internal_field_idents,
-    gen_type_from_ctx_id, pad_bits, token_contains_string, wrap_default_ctx,
+    gen_type_from_ctx_id, token_contains_string, wrap_default_ctx,
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
@@ -558,6 +558,7 @@ fn emit_bit_byte_offsets(
     (bit_offset, byte_offset)
 }
 
+#[cfg(feature = "bits")]
 fn emit_padding(bit_size: &TokenStream) -> TokenStream {
     let crate_ = super::get_crate_name();
     quote! {
@@ -585,6 +586,29 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
     }
 }
 
+// TODO: if this is a simple calculation such as "8 + 2", this could be const
+#[cfg(not(feature = "bits"))]
+fn emit_padding_bytes(bit_size: &TokenStream) -> TokenStream {
+    let crate_ = super::get_crate_name();
+    quote! {
+        {
+            use core::convert::TryFrom;
+            extern crate alloc;
+            use alloc::borrow::Cow;
+            let __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                ::#crate_::DekuError::InvalidParam(Cow::from(format!(
+                    "Invalid padding param \"({})\": cannot convert to usize",
+                    stringify!(#bit_size)
+                )))
+            )?;
+
+
+            let mut buf = vec![0; __deku_pad];
+            let _ = __deku_reader.read_bytes(__deku_pad, &mut buf)?;
+        }
+    }
+}
+
 fn emit_field_read(
     input: &DekuData,
     i: usize,
@@ -602,6 +626,7 @@ fn emit_field_read(
     // fields to check usage of bit/byte offset
     let field_check_vars = [
         &f.count,
+        #[cfg(feature = "bits")]
         &f.bits_read,
         &f.bytes_read,
         &f.until,
@@ -705,7 +730,10 @@ fn emit_field_read(
     } else {
         let read_args = gen_field_args(
             field_endian,
+            #[cfg(feature = "bits")]
             f.bits.as_ref(),
+            #[cfg(not(feature = "bits"))]
+            None,
             f.bytes.as_ref(),
             f.ctx.as_ref(),
         )?;
@@ -751,17 +779,6 @@ fn emit_field_read(
                     )?
                 }
             }
-        } else if let Some(field_bits) = &f.bits_read {
-            quote! {
-                {
-                    use core::borrow::Borrow;
-                    #type_as_deku_read::from_reader_with_ctx
-                    (
-                        __deku_reader,
-                        (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args))
-                    )?
-                }
-            }
         } else if let Some(field_bytes) = &f.bytes_read {
             quote! {
                 {
@@ -795,26 +812,53 @@ fn emit_field_read(
                 }
             }
         } else {
-            quote! {
-                #type_as_deku_read::from_reader_with_ctx
-                (
-                    __deku_reader,
-                    (#read_args)
-                )?
+            let mut ret = quote! {};
+
+            #[cfg(feature = "bits")]
+            if let Some(field_bits) = &f.bits_read {
+                ret.extend(quote! {
+                    {
+                        use core::borrow::Borrow;
+                        #type_as_deku_read::from_reader_with_ctx
+                        (
+                            __deku_reader,
+                            (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args))
+                        )?
+                    }
+                })
             }
+            if ret.is_empty() {
+                ret.extend(quote! {
+                    #type_as_deku_read::from_reader_with_ctx
+                    (
+                        __deku_reader,
+                        (#read_args)
+                    )?
+                })
+            }
+
+            ret
         }
     };
 
-    let pad_bits_before = pad_bits(
+    #[cfg(feature = "bits")]
+    let pad_bits_before = crate::macros::pad_bits(
         f.pad_bits_before.as_ref(),
         f.pad_bytes_before.as_ref(),
         emit_padding,
     );
-    let pad_bits_after = pad_bits(
+    #[cfg(feature = "bits")]
+    let pad_bits_after = crate::macros::pad_bits(
         f.pad_bits_after.as_ref(),
         f.pad_bytes_after.as_ref(),
         emit_padding,
     );
+
+    #[cfg(not(feature = "bits"))]
+    let pad_bits_before = crate::macros::pad_bytes(f.pad_bytes_before.as_ref(), emit_padding_bytes);
+
+    #[cfg(not(feature = "bits"))]
+    let pad_bits_after = crate::macros::pad_bytes(f.pad_bytes_after.as_ref(), emit_padding_bytes);
 
     let field_read_normal = quote! {
         let __deku_value = #field_read_func;

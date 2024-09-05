@@ -3,6 +3,7 @@ use alloc::borrow::Cow;
 use alloc::format;
 use core::convert::TryInto;
 
+#[cfg(feature = "bits")]
 use bitvec::prelude::*;
 use no_std_io::io::{Read, Seek, Write};
 
@@ -12,6 +13,7 @@ use crate::writer::Writer;
 use crate::{DekuError, DekuReader, DekuWriter};
 
 /// "Read" trait: read bits and construct type
+#[cfg(feature = "bits")]
 trait DekuRead<'a, Ctx = ()> {
     /// Read bits and construct type
     /// * **input** - Input as bits
@@ -32,8 +34,8 @@ trait DekuRead<'a, Ctx = ()> {
 }
 
 // specialize u8 for ByteSize
+#[cfg(feature = "bits")]
 impl DekuRead<'_, (Endian, ByteSize)> for u8 {
-    /// Ignore endian and byte_size, as this is a `u8`
     #[inline]
     fn read(
         input: &BitSlice<u8, Msb0>,
@@ -59,6 +61,7 @@ impl DekuReader<'_, (Endian, ByteSize)> for u8 {
         let ret = reader.read_bytes_const::<MAX_TYPE_BYTES>(&mut buf)?;
         let a = match ret {
             ReaderRet::Bytes => <u8>::from_be_bytes(buf),
+            #[cfg(feature = "bits")]
             ReaderRet::Bits(bits) => {
                 let Some(bits) = bits else {
                     return Err(DekuError::Parse(Cow::from("no bits read from reader")));
@@ -71,6 +74,7 @@ impl DekuReader<'_, (Endian, ByteSize)> for u8 {
     }
 }
 
+#[cfg(feature = "bits")]
 impl DekuWriter<(Endian, BitSize)> for u8 {
     /// Ignore endian, as this is a `u8`
     #[inline(always)]
@@ -126,6 +130,7 @@ impl DekuWriter<(Endian, ByteSize)> for u8 {
 
 macro_rules! ImplDekuReadBits {
     ($typ:ty, $inner:ty) => {
+        #[cfg(feature = "bits")]
         impl DekuRead<'_, (Endian, BitSize)> for $typ {
             #[inline(never)]
             fn read(
@@ -202,6 +207,7 @@ macro_rules! ImplDekuReadBits {
             }
         }
 
+        #[cfg(feature = "bits")]
         impl DekuReader<'_, (Endian, BitSize)> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
@@ -228,6 +234,7 @@ macro_rules! ImplDekuReadBits {
 
 macro_rules! ImplDekuReadBytes {
     ($typ:ty, $inner:ty) => {
+        #[cfg(feature = "bits")]
         impl DekuRead<'_, (Endian, ByteSize)> for $typ {
             #[inline(never)]
             fn read(
@@ -268,10 +275,12 @@ macro_rules! ImplDekuReadBytes {
                             <$typ>::from_be_bytes(buf.try_into().unwrap())
                         }
                     }
+                    #[cfg(feature = "bits")]
                     ReaderRet::Bits(Some(bits)) => {
                         let a = <$typ>::read(&bits, (endian, size))?;
                         a.1
                     }
+                    #[cfg(feature = "bits")]
                     ReaderRet::Bits(None) => {
                         return Err(DekuError::Parse(Cow::from("no bits read from reader")));
                     }
@@ -284,6 +293,7 @@ macro_rules! ImplDekuReadBytes {
 
 macro_rules! ImplDekuReadSignExtend {
     ($typ:ty, $inner:ty) => {
+        #[cfg(feature = "bits")]
         impl DekuRead<'_, (Endian, ByteSize)> for $typ {
             #[inline(never)]
             fn read(
@@ -317,6 +327,7 @@ macro_rules! ImplDekuReadSignExtend {
                             <$typ>::from_be_bytes(buf.try_into()?)
                         }
                     }
+                    #[cfg(feature = "bits")]
                     ReaderRet::Bits(bits) => {
                         let Some(bits) = bits else {
                             return Err(DekuError::Parse(Cow::from("no bits read from reader")));
@@ -334,6 +345,7 @@ macro_rules! ImplDekuReadSignExtend {
             }
         }
 
+        #[cfg(feature = "bits")]
         impl DekuRead<'_, (Endian, BitSize)> for $typ {
             #[inline(never)]
             fn read(
@@ -351,6 +363,7 @@ macro_rules! ImplDekuReadSignExtend {
             }
         }
 
+        #[cfg(feature = "bits")]
         impl DekuReader<'_, (Endian, BitSize)> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
@@ -395,10 +408,12 @@ macro_rules! ForwardDekuRead {
                             <$typ>::from_be_bytes(buf)
                         }
                     }
+                    #[cfg(feature = "bits")]
                     ReaderRet::Bits(Some(bits)) => {
                         let a = <$typ>::read(&bits, (endian, ByteSize(MAX_TYPE_BYTES)))?;
                         a.1
                     }
+                    #[cfg(feature = "bits")]
                     ReaderRet::Bits(None) => {
                         return Err(DekuError::Parse(Cow::from("no bits read from reader")));
                     }
@@ -422,6 +437,7 @@ macro_rules! ForwardDekuRead {
         }
 
         //// Only have `bit_size`, set `endian` to `Endian::default`.
+        #[cfg(feature = "bits")]
         impl DekuReader<'_, BitSize> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
@@ -452,6 +468,7 @@ macro_rules! ForwardDekuRead {
 
 macro_rules! ImplDekuWrite {
     ($typ:ty) => {
+        #[cfg(feature = "bits")]
         impl DekuWriter<(Endian, BitSize)> for $typ {
             #[inline(always)]
             fn to_writer<W: Write + Seek>(
@@ -578,6 +595,7 @@ macro_rules! ImplDekuWriteOnlyEndian {
 
 macro_rules! ForwardDekuWrite {
     ($typ:ty) => {
+        #[cfg(feature = "bits")]
         impl DekuWriter<BitSize> for $typ {
             #[inline(always)]
             fn to_writer<W: Write + Seek>(
@@ -785,6 +803,7 @@ mod tests {
         native_endian!(-0.006_f64)
     );
 
+    #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, expected, expected_rest_bits, expected_rest_bytes,
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, bits![u8, Msb0;], &[]),
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(32), 0xDDCC_BBAA, bits![u8, Msb0;], &[]),
@@ -862,6 +881,7 @@ mod tests {
         assert_eq!(expected_rest_bytes, buf);
     }
 
+    #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, expected, expected_leftover,
         case::normal_le(0xDDCC_BBAA, Endian::Little, None, vec![0xAA, 0xBB, 0xCC, 0xDD], vec![]),
         case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA], vec![]),
@@ -907,6 +927,7 @@ mod tests {
         assert_hex::assert_eq_hex!(expected, writer.inner.into_inner());
     }
 
+    #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, expected, expected_write,
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, vec![0xDD, 0xCC, 0xBB, 0xAA]),
     )]
@@ -952,11 +973,17 @@ mod tests {
         };
     }
 
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_i8, i8);
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_i16, i16);
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_i32, i32);
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_i64, i64);
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_i128, i128);
+    #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_isize, isize);
 
     macro_rules! TestSignExtendingPanic {
@@ -980,9 +1007,14 @@ mod tests {
         };
     }
 
+    #[cfg(feature = "bits")]
     TestSignExtendingPanic!(test_sign_extend_i8_panic, i8, 8);
+    #[cfg(feature = "bits")]
     TestSignExtendingPanic!(test_sign_extend_i16_panic, i16, 16);
+    #[cfg(feature = "bits")]
     TestSignExtendingPanic!(test_sign_extend_i32_panic, i32, 32);
+    #[cfg(feature = "bits")]
     TestSignExtendingPanic!(test_sign_extend_i64_panic, i64, 64);
+    #[cfg(feature = "bits")]
     TestSignExtendingPanic!(test_sign_extend_i128_panic, i128, 128);
 }

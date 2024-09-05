@@ -43,6 +43,7 @@ macro_rules! ImplDekuTraitsCtx {
 macro_rules! ImplDekuTraits {
     ($typ:ty, $readtype:ty) => {
         ImplDekuTraitsCtx!($typ, $readtype, (), ());
+        #[cfg(feature = "bits")]
         ImplDekuTraitsCtx!($typ, $readtype, (endian, bitsize), (Endian, BitSize));
         ImplDekuTraitsCtx!($typ, $readtype, (endian, bytesize), (Endian, ByteSize));
         ImplDekuTraitsCtx!($typ, $readtype, endian, Endian);
@@ -64,14 +65,14 @@ ImplDekuTraits!(NonZeroIsize, isize);
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use hexlit::hex;
     use rstest::rstest;
-    use std::io::Cursor;
 
     use crate::reader::Reader;
 
     use super::*;
-    use bitvec::prelude::*;
 
     #[rstest(input, expected,
         case(&hex!("FF"), NonZeroU8::new(0xFF).unwrap()),
@@ -80,7 +81,7 @@ mod tests {
         case(&hex!("00"), NonZeroU8::new(0xFF).unwrap()),
     )]
     fn test_non_zero(input: &[u8], expected: NonZeroU8) {
-        let mut cursor = std::io::Cursor::new(input);
+        let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let res_read = NonZeroU8::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!(expected, res_read);

@@ -1,6 +1,7 @@
 use deku::prelude::*;
 use rstest::*;
 
+#[cfg(feature = "bits")]
 #[derive(Debug, Default, PartialEq, DekuWrite, DekuRead)]
 #[deku(endian = "big")]
 struct Test {
@@ -14,6 +15,7 @@ struct Test {
     field_u32_be: u32,
 }
 
+#[cfg(feature = "bits")]
 #[rstest(input,
     #[should_panic(
         expected = "InvalidParam(\"bit size 5 of input is larger than bit requested size 4\")"

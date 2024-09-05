@@ -96,12 +96,14 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "bits")]
     use bitvec::prelude::*;
     use rstest::rstest;
     use std::io::Cursor;
 
     use crate::{ctx::Endian, reader::Reader, writer::Writer, DekuReader};
 
+    #[cfg(feature = "bits")]
     #[rstest(input,endian,expected,
         case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, [0xCCDD, 0xAABB]),
         case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, [0xDDCC, 0xBBAA]),

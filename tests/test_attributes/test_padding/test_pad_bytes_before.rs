@@ -42,6 +42,8 @@ fn test_pad_bytes_before_not_enough() {
     let _ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 }
 
+// TODO: add cfg test with updated msg for not(bits)
+#[cfg(feature = "bits")]
 #[test]
 #[should_panic(
     expected = r#"InvalidParam("Invalid padding param \"(((- 2) * 8))\": cannot convert to usize")"#
@@ -59,6 +61,8 @@ fn test_pad_bytes_before_read_err() {
     let _ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 }
 
+// TODO: add cfg test with updated msg for not(bits)
+#[cfg(feature = "bits")]
 #[test]
 #[should_panic(
     expected = r#"InvalidParam("Invalid padding param \"(((- 2) * 8))\": cannot convert to usize")"#

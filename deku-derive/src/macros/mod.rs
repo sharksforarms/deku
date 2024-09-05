@@ -340,6 +340,7 @@ fn token_contains_string(tok: &Option<TokenStream>, s: &str) -> bool {
         .unwrap_or(false)
 }
 
+#[cfg(feature = "bits")]
 fn pad_bits(
     bits: Option<&TokenStream>,
     bytes: Option<&TokenStream>,
@@ -352,6 +353,17 @@ fn pad_bits(
         (Some(pad_bits), None) => emit_padding(pad_bits),
         (None, Some(pad_bytes)) => emit_padding(&quote! {((#pad_bytes) * 8)}),
         (None, None) => quote!(),
+    }
+}
+
+#[cfg(not(feature = "bits"))]
+fn pad_bytes(
+    bytes: Option<&TokenStream>,
+    emit_padding: fn(&TokenStream) -> TokenStream,
+) -> TokenStream {
+    match bytes {
+        Some(pad_bytes) => emit_padding(&quote! {((#pad_bytes))}),
+        None => quote!(),
     }
 }
 

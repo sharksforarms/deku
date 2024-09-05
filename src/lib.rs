@@ -338,6 +338,11 @@ environment, you will see logging messages as Deku does its deserialising.
 - `DekuError` whenever possible will use a `'static str`, to make the errors compile away when following a
    guide such as [min-sized-rust](https://github.com/johnthagen/min-sized-rust).
 
+# Performance: Compile without `bitvec`
+The feature `bits` enables the `bitvec` crate to use when reading and writing, which is enabled by default.
+This however slows down the reading and writing process if your code doesn't use `bits` and the `bit_offset`
+in `from_bytes`.
+
 */
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -360,6 +365,7 @@ pub mod no_std_io {
 }
 
 /// re-export of bitvec
+#[cfg(feature = "bits")]
 pub mod bitvec {
     pub use bitvec::prelude::*;
     pub use bitvec::view::BitView;
@@ -568,6 +574,7 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     /// assert_eq!(deku::bitvec::bitvec![1, 1, 1, 1, 0, 0, 0, 1, 1], bits);
     /// ```
     #[inline(always)]
+    #[cfg(feature = "bits")]
     fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError> {
         let mut out_buf = Vec::new();
         let mut cursor = no_std_io::Cursor::new(&mut out_buf);

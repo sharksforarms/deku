@@ -5,7 +5,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::macros::{
-    assertion_failed, gen_ctx_types_and_arg, gen_field_args, gen_struct_destruction, pad_bits,
+    assertion_failed, gen_ctx_types_and_arg, gen_field_args, gen_struct_destruction,
     token_contains_string, wrap_default_ctx,
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
@@ -91,6 +91,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
+        #[cfg(feature = "bits")]
         tokens.extend(quote! {
              impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
@@ -100,7 +101,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     input.to_bits()
                 }
             }
+        });
 
+        tokens.extend(quote! {
             impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
                 type Error = ::#crate_::DekuError;
 
@@ -288,6 +291,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
+        #[cfg(feature = "bits")]
         tokens.extend(quote! {
              impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
@@ -297,7 +301,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     input.to_bits()
                 }
             }
+        });
 
+        tokens.extend(quote! {
             impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
                 type Error = ::#crate_::DekuError;
 
@@ -308,7 +314,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
 
             impl #imp DekuContainerWrite for #ident #wher {}
-        })
+        });
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
@@ -454,6 +460,7 @@ fn emit_bit_byte_offsets(
     (bit_offset, byte_offset)
 }
 
+#[cfg(feature = "bits")]
 fn emit_padding(bit_size: &TokenStream) -> TokenStream {
     let crate_ = super::get_crate_name();
     quote! {
@@ -468,6 +475,26 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
                 )))
             )?;
             __deku_writer.write_bits(::#crate_::bitvec::bitvec![u8, ::#crate_::bitvec::Msb0; 0; __deku_pad].as_bitslice())?;
+        }
+    }
+}
+
+// TODO: if this is a simple calculation such as "8 + 2", this could be const
+#[cfg(not(feature = "bits"))]
+fn emit_padding_bytes(bit_size: &TokenStream) -> TokenStream {
+    let crate_ = super::get_crate_name();
+    quote! {
+        {
+            use core::convert::TryFrom;
+            extern crate alloc;
+            use alloc::borrow::Cow;
+            let __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                ::#crate_::DekuError::InvalidParam(Cow::from(format!(
+                    "Invalid padding param \"({})\": cannot convert to usize",
+                    stringify!(#bit_size)
+                )))
+            )?;
+            __deku_writer.write_bytes(&vec![0; __deku_pad])?;
         }
     }
 }
@@ -576,7 +603,10 @@ fn emit_field_write(
     } else {
         let write_args = gen_field_args(
             field_endian,
+            #[cfg(feature = "bits")]
             f.bits.as_ref(),
+            #[cfg(not(feature = "bits"))]
+            None,
             f.bytes.as_ref(),
             f.ctx.as_ref(),
         )?;
@@ -596,16 +626,24 @@ fn emit_field_write(
         }
     };
 
-    let pad_bits_before = pad_bits(
+    #[cfg(feature = "bits")]
+    let pad_bits_before = crate::macros::pad_bits(
         f.pad_bits_before.as_ref(),
         f.pad_bytes_before.as_ref(),
         emit_padding,
     );
-    let pad_bits_after = pad_bits(
+    #[cfg(feature = "bits")]
+    let pad_bits_after = crate::macros::pad_bits(
         f.pad_bits_after.as_ref(),
         f.pad_bytes_after.as_ref(),
         emit_padding,
     );
+
+    #[cfg(not(feature = "bits"))]
+    let pad_bits_before = crate::macros::pad_bytes(f.pad_bytes_before.as_ref(), emit_padding_bytes);
+
+    #[cfg(not(feature = "bits"))]
+    let pad_bits_after = crate::macros::pad_bytes(f.pad_bytes_after.as_ref(), emit_padding_bytes);
 
     let field_write_normal = quote! {
         #field_write_func ?;

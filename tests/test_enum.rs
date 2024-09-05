@@ -233,3 +233,47 @@ fn id_pat_with_id_bits() {
     assert_eq!(v, IdPatBitsTuple::B((0, 1)));
     assert_eq!(input, &*v.to_bytes().unwrap());
 }
+
+#[test]
+fn test_litbool_as_id() {
+    use deku::prelude::*;
+
+    #[derive(DekuRead, DekuWrite, Debug, PartialEq, Eq)]
+    pub struct A {
+        #[deku(bits = 1)]
+        bit: bool,
+        #[deku(ctx = "*bit")]
+        var: Var,
+    }
+
+    #[derive(DekuRead, DekuWrite, Debug, PartialEq, Eq)]
+    #[deku(id = "bit", ctx = "bit: bool")]
+    pub enum Var {
+        #[deku(id = false)]
+        False(#[deku(bits = 15)] u16),
+        #[deku(id = true)]
+        True(#[deku(bits = 15)] u16),
+    }
+    let input = [0b1000_0000, 0xff];
+    let mut cursor = Cursor::new(input);
+    let (_, v) = A::from_reader((&mut cursor, 0)).unwrap();
+    assert_eq!(
+        v,
+        A {
+            bit: true,
+            var: Var::True(0x7f01),
+        }
+    );
+    assert_eq!(input, &*v.to_bytes().unwrap());
+    let input = [0b0000_0000, 0xff];
+    let mut cursor = Cursor::new(input);
+    let (_, v) = A::from_reader((&mut cursor, 0)).unwrap();
+    assert_eq!(
+        v,
+        A {
+            bit: false,
+            var: Var::False(0x7f01),
+        }
+    );
+    assert_eq!(input, &*v.to_bytes().unwrap());
+}

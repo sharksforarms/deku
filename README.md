@@ -21,7 +21,7 @@ for binary structs or network headers
 
 ```toml
 [dependencies]
-deku = "0.17"
+deku = "0.18"
 ```
 
 no_std:

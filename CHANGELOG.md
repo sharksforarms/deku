@@ -5,11 +5,11 @@
 ## [0.18.0] - 2024-08-05
 
 Usability
-- Add attributes `seek_from_start`, `seek_from_current`, `seek_from_end`, and `seek_rewind` to control the position of the reader before reading a field ([#360](https://github.com/sharksforarms/deku/pull/360))
+- Reading now requires `Seek`. Attributes such as `seek_from_start`, `seek_from_current`, `seek_from_end`, and `seek_rewind` were added to be able to control the position of the reader before reading a field ([#360](https://github.com/sharksforarms/deku/pull/360))
 - Support added for unit structs ([#450](https://github.com/sharksforarms/deku/pull/450))
 
 Performance
-- The use of bits parsing is now an optional feature. If bit-level parsing is not usefull for your application, you can disable it to get some performance benefits. ([#446](https://github.com/sharksforarms/deku/pull/446))
+- The use of bits parsing is now an optional feature. If bit-level parsing is not useful for your application, you can disable it to get some performance benefits. ([#446](https://github.com/sharksforarms/deku/pull/446))
 - Performance of `read_all` was improved ([#441](https://github.com/sharksforarms/deku/pull/441))
 
 Enum improvements

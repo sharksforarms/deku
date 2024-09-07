@@ -35,7 +35,7 @@ pub struct Reader<'a, R: Read + Seek> {
     inner: &'a mut R,
     /// bits stored from previous reads that didn't read to the end of a byte size
     leftover: Option<Leftover>,
-    /// Amount of bits read during the last call to [read_bits](Reader::read_bits) and [read_bytes](Reader::read_bytes)
+    /// Amount of bits read after last read, reseted before reading enum ids
     pub last_bits_read_amt: usize,
     /// Amount of bits read during the use of [read_bits](Reader::read_bits) and [read_bytes](Reader::read_bytes)
     pub bits_read: usize,
@@ -289,7 +289,7 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
         }
 
         let bits_read = ret.len();
-        self.last_bits_read_amt = bits_read;
+        self.last_bits_read_amt += bits_read;
         self.bits_read += bits_read;
 
         #[cfg(feature = "logging")]
@@ -517,5 +517,53 @@ mod tests {
         let mut buf = [0; 1];
         let _ = reader.read_bytes(1, &mut buf);
         assert_eq!([0xaa], buf);
+    }
+
+    #[test]
+    fn test_seek_last_read_bytes() {
+        // bytes
+        let input = hex!("aa");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let mut buf = [0; 1];
+        let _ = reader.read_bytes(1, &mut buf);
+        assert_eq!([0xaa], buf);
+        reader.seek_last_read().unwrap();
+        let _ = reader.read_bytes(1, &mut buf);
+        assert_eq!([0xaa], buf);
+
+        // 2 bytes (and const)
+        let input = hex!("aabb");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let mut buf = [0; 2];
+        let _ = reader.read_bytes_const::<2>(&mut buf);
+        assert_eq!([0xaa, 0xbb], buf);
+        reader.seek_last_read().unwrap();
+        let _ = reader.read_bytes_const::<2>(&mut buf);
+        assert_eq!([0xaa, 0xbb], buf);
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_seek_last_read_bits() {
+        let input = hex!("ab");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let bits = reader.read_bits(4).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0]));
+        reader.seek_last_read().unwrap();
+        let bits = reader.read_bits(4).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0]));
+
+        // more than byte
+        let input = hex!("abd0");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let bits = reader.read_bits(9).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 1, 1]));
+        reader.seek_last_read().unwrap();
+        let bits = reader.read_bits(9).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 1, 1]));
     }
 }

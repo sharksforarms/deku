@@ -2,11 +2,12 @@
 
 ## [Unreleased]
 
-## [0.18.0] - 2024-08-05
+## [0.18.0] - 2024-08-07
 
 Usability
 - Reading now requires `Seek`. Attributes such as `seek_from_start`, `seek_from_current`, `seek_from_end`, and `seek_rewind` were added to be able to control the position of the reader before reading a field ([#360](https://github.com/sharksforarms/deku/pull/360))
 - Support added for unit structs ([#450](https://github.com/sharksforarms/deku/pull/450))
+- `to_slice` was added to write an to a slice ([#461](https://github.com/sharksforarms/deku/pull/461))
 
 Performance
 - The use of bits parsing is now an optional feature. If bit-level parsing is not useful for your application, you can disable it to get some performance benefits. ([#446](https://github.com/sharksforarms/deku/pull/446))

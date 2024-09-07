@@ -22,7 +22,7 @@ struct DekuTest {
     #[deku(bits = 3)]
     field_b: u8,
     count: u8,
-    #[deku(count = "count")]
+    #[deku(count = "count", pad_bytes_after = "8")]
     data: Vec<u8>,
 }
 
@@ -39,7 +39,7 @@ fn main() -> ! {
     // now the allocator is ready types like Box, Vec can be used.
 
     #[allow(clippy::unusual_byte_groupings)]
-    let test_data: &[u8] = &[0b10101_101, 0x02, 0xBE, 0xEF];
+    let test_data: &[u8] = &[0b10101_101, 0x02, 0xBE, 0xEF, 0xff];
     let mut cursor = deku::no_std_io::Cursor::new(test_data);
 
     // Test reading

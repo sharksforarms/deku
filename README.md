@@ -27,7 +27,7 @@ deku = "0.18"
 no_std:
 ```toml
 [dependencies]
-deku = { version = "0.17", default-features = false, features = ["alloc"] }
+deku = { version = "0.18", default-features = false, features = ["alloc"] }
 ```
 
 ## Example

@@ -278,7 +278,7 @@ mod tests {
     }
 
     #[rstest(input, endian, expected,
-        case::normal(vec![0xAABB, 0xCCDD].into_iter().collect(), Endian::Little, vec![0xDD, 0xCC, 0xBB, 0xAA]),
+        case::normal(vec![0xAABB, 0xCCDD].into_iter().collect(), Endian::Little, vec![0xBB, 0xAA, 0xDD, 0xCC]),
     )]
     fn test_hashset_write(input: FxHashSet<u16>, endian: Endian, expected: Vec<u8>) {
         let mut writer = Writer::new(Cursor::new(vec![]));
@@ -290,7 +290,7 @@ mod tests {
     #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes, expected_write,
         case::normal_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), 2.into(), vec![0xBBAA, 0xDDCC].into_iter().collect(), bits![u8, Msb0;], &[], vec![0xCC, 0xDD, 0xAA, 0xBB]),
-        case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), 2.into(), vec![0xAABB, 0xCCDD].into_iter().collect(), bits![u8, Msb0;], &[], vec![0xCC, 0xDD, 0xAA, 0xBB]),
+        case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), 2.into(), vec![0xAABB, 0xCCDD].into_iter().collect(), bits![u8, Msb0;], &[], vec![0xAA, 0xBB, 0xCC, 0xDD]),
         case::predicate_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), (|v: &u16| *v == 0xBBAA).into(), vec![0xBBAA].into_iter().collect(), bits![u8, Msb0;], &[0xcc, 0xdd], vec![0xAA, 0xBB]),
         case::predicate_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), (|v: &u16| *v == 0xAABB).into(), vec![0xAABB].into_iter().collect(), bits![u8, Msb0;], &[0xcc, 0xdd], vec![0xAA, 0xBB]),
         case::bytes_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), BitSize(16).into(), vec![0xBBAA].into_iter().collect(), bits![u8, Msb0;], &[0xcc, 0xdd], vec![0xAA, 0xBB]),

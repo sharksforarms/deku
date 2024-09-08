@@ -363,6 +363,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     };
 
     let variant_read = quote! {
+        __deku_reader.last_bits_read_amt = 0;
         #variant_id_read
 
         #(#pre_match_tokens)*

@@ -584,7 +584,7 @@ fn emit_padding(bit_size: &TokenStream) -> TokenStream {
 
             if (__deku_pad % 8) == 0 {
                 let bytes_read = __deku_pad / 8;
-                let mut buf = vec![0; bytes_read];
+                let mut buf = alloc::vec![0; bytes_read];
                 let _ = __deku_reader.read_bytes(bytes_read, &mut buf)?;
             } else {
                 let _ = __deku_reader.read_bits(__deku_pad)?;
@@ -610,7 +610,7 @@ fn emit_padding_bytes(bit_size: &TokenStream) -> TokenStream {
             )?;
 
 
-            let mut buf = vec![0; __deku_pad];
+            let mut buf = alloc::vec![0; __deku_pad];
             let _ = __deku_reader.read_bytes(__deku_pad, &mut buf)?;
         }
     }

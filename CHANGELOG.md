@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.18.1] - 2024-08-09
+
+- Fix pad_* attributes in no_std ([#478](https://github.com/sharksforarms/deku/pull/478))
+- Fix bug with id_pat and read_bytes_const ([#479](https://github.com/sharksforarms/deku/pull/479))
+
 ## [0.18.0] - 2024-08-07
 
 Usability
@@ -485,7 +490,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.18.0...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.18.1...HEAD
+
+[0.18.1]: https://github.com/sharksforarms/deku/compare/deku-v0.18.0...deku-v0.18.1
 
 [0.18.0]: https://github.com/sharksforarms/deku/compare/deku-v0.17.0...deku-v0.18.0
 

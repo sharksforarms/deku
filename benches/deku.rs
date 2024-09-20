@@ -111,7 +111,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
 }
 
-pub fn read_all_vs_count(c: &mut Criterion) {
+pub fn read_all_vs_count_vs_read_exact(c: &mut Criterion) {
     #[derive(DekuRead, DekuWrite)]
     pub struct AllWrapper {
         #[deku(read_all)]
@@ -119,8 +119,20 @@ pub fn read_all_vs_count(c: &mut Criterion) {
     }
 
     #[derive(DekuRead, DekuWrite)]
-    #[deku(ctx = "len: usize")]
     pub struct CountWrapper {
+        #[deku(count = "1500")]
+        pub data: Vec<u8>,
+    }
+
+    #[derive(DekuRead, DekuWrite)]
+    pub struct CountNonSpecialize {
+        #[deku(count = "(1500/2)")]
+        pub data: Vec<u16>,
+    }
+
+    #[derive(DekuRead, DekuWrite)]
+    #[deku(ctx = "len: usize")]
+    pub struct CountFromCtxWrapper {
         #[deku(count = "len")]
         pub data: Vec<u8>,
     }
@@ -137,14 +149,34 @@ pub fn read_all_vs_count(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("count", |b| {
+    c.bench_function("count_specialize", |b| {
         b.iter(|| {
             let mut cursor = Cursor::new([1u8; 1500].as_ref());
             let mut reader = Reader::new(&mut cursor);
-            CountWrapper::from_reader_with_ctx(black_box(&mut reader), 1500)
+            CountWrapper::from_reader_with_ctx(black_box(&mut reader), ())
+        })
+    });
+
+    c.bench_function("count_from_u8_specialize", |b| {
+        b.iter(|| {
+            let mut cursor = Cursor::new([1u8; 1500].as_ref());
+            let mut reader = Reader::new(&mut cursor);
+            CountWrapper::from_reader_with_ctx(black_box(&mut reader), ())
+        })
+    });
+
+    c.bench_function("count_no_specialize", |b| {
+        b.iter(|| {
+            let mut cursor = Cursor::new([1u8; 1500].as_ref());
+            let mut reader = Reader::new(&mut cursor);
+            CountNonSpecialize::from_reader_with_ctx(black_box(&mut reader), ())
         })
     });
 }
 
-criterion_group!(benches, criterion_benchmark, read_all_vs_count);
+criterion_group!(
+    benches,
+    criterion_benchmark,
+    read_all_vs_count_vs_read_exact
+);
 criterion_main!(benches);

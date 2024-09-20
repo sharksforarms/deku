@@ -8,6 +8,20 @@ use crate::writer::Writer;
 use crate::{ctx::*, DekuReader};
 use crate::{DekuError, DekuWriter};
 
+impl<'a> DekuReader<'a, ReadExact> for Vec<u8> {
+    fn from_reader_with_ctx<R: Read + Seek>(
+        reader: &mut Reader<R>,
+        exact: ReadExact,
+    ) -> Result<Self, DekuError>
+    where
+        Self: Sized,
+    {
+        let mut bytes = alloc::vec![0x00; exact.0];
+        let _ = reader.read_bytes(exact.0, &mut bytes)?;
+        Ok(bytes)
+    }
+}
+
 /// Read `T`s into a vec until a given predicate returns true
 /// * `capacity` - an optional capacity to pre-allocate the vector with
 /// * `ctx` - The context required by `T`. It will be passed to every `T` when constructing.

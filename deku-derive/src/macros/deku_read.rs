@@ -777,14 +777,44 @@ fn emit_field_read(
                 }
             }
         } else if let Some(field_count) = &f.count {
-            quote! {
-                {
-                    use core::borrow::Borrow;
-                    #type_as_deku_read::from_reader_with_ctx
-                    (
-                        __deku_reader,
-                        (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args))
-                    )?
+            use syn::{GenericArgument, PathArguments, Type};
+            let mut is_vec_u8 = false;
+            if let Type::Path(type_path) = &f.ty {
+                if type_path.path.segments.len() == 1 && type_path.path.segments[0].ident == "Vec" {
+                    if let PathArguments::AngleBracketed(ref generic_args) =
+                        type_path.path.segments[0].arguments
+                    {
+                        if generic_args.args.len() == 1 {
+                            if let GenericArgument::Type(Type::Path(ref arg_path)) =
+                                generic_args.args[0]
+                            {
+                                is_vec_u8 = arg_path.path.is_ident("u8");
+                            }
+                        }
+                    }
+                }
+            }
+            if is_vec_u8 {
+                quote! {
+                    {
+                        use core::borrow::Borrow;
+                        #type_as_deku_read::from_reader_with_ctx
+                        (
+                            __deku_reader,
+                            ::#crate_::ctx::ReadExact(usize::try_from(*((#field_count).borrow()))?)
+                        )?
+                    }
+                }
+            } else {
+                quote! {
+                    {
+                        use core::borrow::Borrow;
+                        #type_as_deku_read::from_reader_with_ctx
+                        (
+                            __deku_reader,
+                            (::#crate_::ctx::Limit::new_count(usize::try_from(*((#field_count).borrow()))?), (#read_args))
+                        )?
+                    }
                 }
             }
         } else if let Some(field_bytes) = &f.bytes_read {

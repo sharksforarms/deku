@@ -159,6 +159,9 @@ struct DekuData {
 
     /// struct only: seek from start position
     seek_from_start: Option<TokenStream>,
+
+    /// Bit Order for all fields
+    bit_order: Option<syn::LitStr>,
 }
 
 impl DekuData {
@@ -213,6 +216,7 @@ impl DekuData {
             seek_from_current: receiver.seek_from_current?,
             seek_from_end: receiver.seek_from_end?,
             seek_from_start: receiver.seek_from_start?,
+            bit_order: receiver.bit_order,
         };
 
         DekuData::validate(&data)?;
@@ -360,6 +364,7 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataEnum<'a> {
             #[cfg(not(feature = "bits"))]
             None,
             deku_data.bytes.as_ref(),
+            deku_data.bit_order.as_ref(),
         )?;
 
         Ok(Self {
@@ -481,10 +486,10 @@ struct FieldData {
     /// condition to parse field
     cond: Option<TokenStream>,
 
-    // assertion on field
+    /// assertion on field
     assert: Option<TokenStream>,
 
-    // assert value of field
+    /// assert value of field
     assert_eq: Option<TokenStream>,
 
     /// seek from current position
@@ -498,6 +503,9 @@ struct FieldData {
 
     /// seek from start position
     seek_from_start: Option<TokenStream>,
+
+    /// Bit Order of field
+    bit_order: Option<syn::LitStr>,
 }
 
 impl FieldData {
@@ -543,6 +551,7 @@ impl FieldData {
             seek_from_current: receiver.seek_from_current?,
             seek_from_end: receiver.seek_from_end?,
             seek_from_start: receiver.seek_from_start?,
+            bit_order: receiver.bit_order,
         };
 
         FieldData::validate(&data)?;
@@ -776,6 +785,10 @@ struct DekuReceiver {
     /// struct only: seek from start position
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     seek_from_start: Result<Option<TokenStream>, ReplacementError>,
+
+    /// Bit Order of field
+    #[darling(default)]
+    bit_order: Option<syn::LitStr>,
 }
 
 type ReplacementError = TokenStream;
@@ -976,6 +989,10 @@ struct DekuFieldReceiver {
     /// seek from start position
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     seek_from_start: Result<Option<TokenStream>, ReplacementError>,
+
+    /// Bit Order of field
+    #[darling(default)]
+    bit_order: Option<syn::LitStr>,
 }
 
 /// Receiver for the variant-level attributes inside a enum

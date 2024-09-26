@@ -6,7 +6,7 @@ use core::cmp::Ordering;
 use bitvec::prelude::*;
 use no_std_io::io::{ErrorKind, Read, Seek, SeekFrom};
 
-use crate::{prelude::NeedSize, DekuError};
+use crate::{ctx::Order, prelude::NeedSize, DekuError};
 use alloc::vec::Vec;
 
 #[cfg(feature = "logging")]
@@ -24,6 +24,7 @@ pub enum ReaderRet {
 /// Max bits requested from [`Reader::read_bits`] during one call
 pub const MAX_BITS_AMT: usize = 128;
 
+#[derive(Debug)]
 enum Leftover {
     Byte(u8),
     #[cfg(feature = "bits")]
@@ -187,12 +188,12 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
                 .map_err(|e| DekuError::Io(e.kind()))?;
             }
 
-            // Unlike normal seek not counting as bits_read, this one does
+            // Unlike normal seek not couting as bits_read, this one does
             // to keep from_bytes returns
             self.bits_read += bytes_amt * 8;
 
             // Save, and keep the leftover bits since the read will most likely be less than a byte
-            self.read_bits(bits_amt)?;
+            self.read_bits(bits_amt, Order::Msb0)?;
         }
 
         #[cfg(not(feature = "bits"))]
@@ -201,7 +202,6 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
                 panic!("requires deku feature: bits");
             }
         }
-
         Ok(())
     }
 
@@ -217,12 +217,18 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
     /// `amt`    - Amount of bits that will be read. Must be <= [`MAX_BITS_AMT`].
     #[inline(never)]
     #[cfg(feature = "bits")]
-    pub fn read_bits(&mut self, amt: usize) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
+    pub fn read_bits(
+        &mut self,
+        amt: usize,
+        order: Order,
+    ) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
         #[cfg(feature = "logging")]
-        log::trace!("read_bits: requesting {amt} bits");
+        log::trace!("read_bits: requesting {amt} bits in {order:?} order");
+
         if amt == 0 {
             #[cfg(feature = "logging")]
             log::trace!("read_bits: returned None");
+
             return Ok(None);
         }
         let mut ret = BitVec::new();
@@ -235,7 +241,12 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
         }
 
         let previous_len = match &self.leftover {
-            Some(Leftover::Bits(bits)) => bits.len(),
+            Some(Leftover::Bits(bits)) => {
+                #[cfg(feature = "logging")]
+                log::trace!("read_bits: using stored {} bits", bits.len());
+
+                bits.len()
+            }
             None => 0,
             Some(Leftover::Byte(_)) => unreachable!(),
         };
@@ -243,6 +254,9 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
         match amt.cmp(&previous_len) {
             // exact match, just use leftover
             Ordering::Equal => {
+                #[cfg(feature = "logging")]
+                log::trace!("read_bits: exact bits already read");
+
                 if let Some(Leftover::Bits(bits)) = &mut self.leftover {
                     core::mem::swap(&mut ret, bits);
                     self.leftover = None;
@@ -252,19 +266,16 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
             }
             // previous read was not enough to satisfy the amt requirement, return all previously
             Ordering::Greater => {
-                // read bits
-                match self.leftover {
-                    Some(Leftover::Bits(ref bits)) => {
-                        ret.extend_from_bitslice(bits);
-                    }
-                    Some(Leftover::Byte(_)) => {
-                        unreachable!();
-                    }
-                    None => {}
-                }
+                #[cfg(feature = "logging")]
+                log::trace!("read_bits: reading more bits");
 
                 // calculate the amount of bytes we need to read to read enough bits
-                let bits_left = amt - ret.len();
+                let bits_len = if let Some(Leftover::Bits(ref bits)) = self.leftover {
+                    bits.len()
+                } else {
+                    0
+                };
+                let mut bits_left = amt - bits_len;
                 let mut bytes_len = bits_left / 8;
                 if (bits_left % 8) != 0 {
                     bytes_len += 1;
@@ -284,21 +295,73 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
                 log::trace!("read_bits: read() {:02x?}", read_buf);
 
                 // create bitslice and remove unused bits
-                let rest = BitSlice::try_from_slice(read_buf).unwrap();
-                let (rest, not_needed) = rest.split_at(bits_left);
-                self.leftover = Some(Leftover::Bits(not_needed.to_bitvec()));
+                let mut new_bits = BitSlice::try_from_slice(read_buf).unwrap();
+                // remove bytes until we get to the last byte, of which
+                // we need to care abount bit-order
+                let mut front_bits = None;
+                // Allow bits_left -= bits_left - (bits_left % 8), as this is correct
+                #[allow(clippy::misrefactored_assign_op)]
+                if bits_left > 8 {
+                    let (used, more) = new_bits.split_at(bits_left - (bits_left % 8));
+                    bits_left -= bits_left - (bits_left % 8);
+                    front_bits = Some(used);
+                    new_bits = more;
+                }
 
-                // create return
-                ret.extend_from_bitslice(rest);
+                match order {
+                    Order::Lsb0 => {
+                        let (rest, used) = new_bits.split_at(new_bits.len() - bits_left);
+                        ret.extend_from_bitslice(used);
+                        if let Some(front_bits) = front_bits {
+                            ret.extend_from_bitslice(front_bits);
+                        }
+                        if let Some(Leftover::Bits(bits)) = &self.leftover {
+                            ret.extend_from_bitslice(bits);
+                        }
+
+                        if !rest.is_empty() {
+                            self.leftover = Some(Leftover::Bits(rest.to_bitvec()));
+                        } else {
+                            self.leftover = None;
+                        }
+                    }
+                    Order::Msb0 => {
+                        let (rest, not_needed) = new_bits.split_at(bits_left);
+                        if let Some(front_bits) = front_bits {
+                            ret.extend_from_bitslice(front_bits);
+                        }
+                        if let Some(Leftover::Bits(bits)) = &self.leftover {
+                            ret.extend_from_bitslice(bits);
+                        }
+                        ret.extend_from_bitslice(rest);
+
+                        if !not_needed.is_empty() {
+                            self.leftover = Some(Leftover::Bits(not_needed.to_bitvec()));
+                        } else {
+                            self.leftover = None;
+                        }
+                    }
+                }
             }
             // The entire bits we need to return have been already read previously from bytes but
             // not all were read, return required leftover bits
             Ordering::Less => {
+                #[cfg(feature = "logging")]
+                log::trace!("read_bits: bits already read");
+
                 // read bits
                 if let Some(Leftover::Bits(bits)) = &mut self.leftover {
-                    let used = bits.split_off(amt);
-                    ret.extend_from_bitslice(bits);
-                    self.leftover = Some(Leftover::Bits(used));
+                    match order {
+                        Order::Lsb0 => {
+                            let used = bits.split_off(bits.len() - amt);
+                            ret.extend_from_bitslice(&used);
+                        }
+                        Order::Msb0 => {
+                            let used = bits.split_off(amt);
+                            ret.extend_from_bitslice(bits);
+                            *bits = used;
+                        }
+                    }
                 } else {
                     unreachable!();
                 }
@@ -312,6 +375,8 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
         #[cfg(feature = "logging")]
         log::trace!("read_bits: returning {ret}");
 
+        debug_assert!(ret.len() == amt);
+
         Ok(Some(ret))
     }
 
@@ -323,7 +388,12 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
     /// `amt`    - Amount of bytes that will be read
     /// `buf`    - result bytes
     #[inline(always)]
-    pub fn read_bytes(&mut self, amt: usize, buf: &mut [u8]) -> Result<ReaderRet, DekuError> {
+    pub fn read_bytes(
+        &mut self,
+        amt: usize,
+        buf: &mut [u8],
+        order: Order,
+    ) -> Result<ReaderRet, DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("read_bytes: requesting {amt} bytes");
 
@@ -346,14 +416,19 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
         }
 
         // Trying to keep this not in the hot path
-        self.read_bytes_other(amt, buf)
+        self.read_bytes_other(amt, buf, order)
     }
 
-    fn read_bytes_other(&mut self, amt: usize, buf: &mut [u8]) -> Result<ReaderRet, DekuError> {
+    fn read_bytes_other(
+        &mut self,
+        amt: usize,
+        buf: &mut [u8],
+        order: Order,
+    ) -> Result<ReaderRet, DekuError> {
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_leftover(buf, byte, amt),
             #[cfg(feature = "bits")]
-            Some(Leftover::Bits(_)) => Ok(ReaderRet::Bits(self.read_bits(amt * 8)?)),
+            Some(Leftover::Bits(_)) => Ok(ReaderRet::Bits(self.read_bits(amt * 8, order)?)),
             _ => unreachable!(),
         }
     }
@@ -409,6 +484,7 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
     pub fn read_bytes_const<const N: usize>(
         &mut self,
         buf: &mut [u8; N],
+        order: Order,
     ) -> Result<ReaderRet, DekuError> {
         #[cfg(feature = "logging")]
         log::trace!("read_bytes_const: requesting {N} bytes");
@@ -431,17 +507,18 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
         }
 
         // Trying to keep this not in the hot path
-        self.read_bytes_const_other::<N>(buf)
+        self.read_bytes_const_other::<N>(buf, order)
     }
 
     fn read_bytes_const_other<const N: usize>(
         &mut self,
         buf: &mut [u8; N],
+        order: Order,
     ) -> Result<ReaderRet, DekuError> {
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_const_leftover(buf, byte),
             #[cfg(feature = "bits")]
-            Some(Leftover::Bits(_)) => Ok(ReaderRet::Bits(self.read_bits(N * 8)?)),
+            Some(Leftover::Bits(_)) => Ok(ReaderRet::Bits(self.read_bits(N * 8, order)?)),
             _ => unreachable!(),
         }
     }
@@ -504,7 +581,7 @@ mod tests {
         let mut reader = Reader::new(&mut cursor);
         assert!(!reader.end());
         let mut buf = [0; 2];
-        let _ = reader.read_bytes_const::<2>(&mut buf).unwrap();
+        let _ = reader.read_bytes_const::<2>(&mut buf, Order::Lsb0).unwrap();
         assert!(reader.end());
         assert_eq!(reader.bits_read, 8 * 2);
 
@@ -512,9 +589,9 @@ mod tests {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         assert!(!reader.end());
-        let _ = reader.read_bits(4).unwrap();
+        let _ = reader.read_bits(4, Order::Lsb0).unwrap();
         assert!(!reader.end());
-        let _ = reader.read_bits(4).unwrap();
+        let _ = reader.read_bits(4, Order::Lsb0).unwrap();
         assert!(reader.end());
         assert_eq!(reader.bits_read, 8);
 
@@ -523,7 +600,7 @@ mod tests {
         let mut reader = Reader::new(&mut cursor);
         assert!(!reader.end());
         let mut buf = [0; 1];
-        let _ = reader.read_bytes(1, &mut buf).unwrap();
+        let _ = reader.read_bytes(1, &mut buf, Order::Lsb0).unwrap();
         assert!(reader.end());
         assert_eq!(reader.bits_read, 8);
     }
@@ -534,22 +611,9 @@ mod tests {
         let input = hex!("aa");
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        let _ = reader.read_bits(1).unwrap();
-        let _ = reader.read_bits(4).unwrap();
-        let _ = reader.read_bits(3).unwrap();
-        assert_eq!(reader.bits_read, 8);
-    }
-
-    #[test]
-    #[cfg(feature = "bits")]
-    fn test_bits_skip() {
-        let input = hex!("aa");
-        let mut cursor = Cursor::new(input);
-        let mut reader = Reader::new(&mut cursor);
-        let _ = reader.skip_bits(1).unwrap();
-        let _ = reader.skip_bits(4).unwrap();
-        let _ = reader.skip_bits(3).unwrap();
-        assert_eq!(reader.bits_read, 8);
+        let _ = reader.read_bits(1, Order::Lsb0);
+        let _ = reader.read_bits(4, Order::Lsb0);
+        let _ = reader.read_bits(3, Order::Lsb0);
     }
 
     #[test]
@@ -558,7 +622,7 @@ mod tests {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let mut buf = [0; 1];
-        let _ = reader.read_bytes(1, &mut buf).unwrap();
+        let _ = reader.read_bytes(1, &mut buf, Order::Lsb0).unwrap();
         assert_eq!([0xaa], buf);
         assert_eq!(reader.bits_read, 8);
     }
@@ -570,12 +634,12 @@ mod tests {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let mut buf = [0; 1];
-        let _ = reader.read_bytes(1, &mut buf).unwrap();
+        let _ = reader.read_bytes(1, &mut buf, Order::Msb0).unwrap();
         assert_eq!([0xaa], buf);
         assert_eq!(reader.bits_read, 8);
 
         reader.seek_last_read().unwrap();
-        let _ = reader.read_bytes(1, &mut buf).unwrap();
+        let _ = reader.read_bytes(1, &mut buf, Order::Msb0).unwrap();
         assert_eq!([0xaa], buf);
         assert_eq!(reader.bits_read, 8);
 
@@ -584,12 +648,12 @@ mod tests {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let mut buf = [0; 2];
-        let _ = reader.read_bytes_const::<2>(&mut buf).unwrap();
+        let _ = reader.read_bytes_const::<2>(&mut buf, Order::Msb0).unwrap();
         assert_eq!([0xaa, 0xbb], buf);
         assert_eq!(reader.bits_read, 16);
 
         reader.seek_last_read().unwrap();
-        let _ = reader.read_bytes_const::<2>(&mut buf).unwrap();
+        let _ = reader.read_bytes_const::<2>(&mut buf, Order::Msb0).unwrap();
         assert_eq!([0xaa, 0xbb], buf);
         assert_eq!(reader.bits_read, 16);
     }
@@ -600,11 +664,11 @@ mod tests {
         let input = hex!("ab");
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        let bits = reader.read_bits(4).unwrap();
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
         assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0]));
         assert_eq!(reader.bits_read, 4);
         reader.seek_last_read().unwrap();
-        let bits = reader.read_bits(4).unwrap();
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
         assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0]));
         assert_eq!(reader.bits_read, 4);
 
@@ -612,12 +676,131 @@ mod tests {
         let input = hex!("abd0");
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        let bits = reader.read_bits(9).unwrap();
+        let bits = reader.read_bits(9, Order::Msb0).unwrap();
         assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 1, 1]));
         assert_eq!(reader.bits_read, 9);
         reader.seek_last_read().unwrap();
-        let bits = reader.read_bits(9).unwrap();
+        let bits = reader.read_bits(9, Order::Msb0).unwrap();
         assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 1, 1]));
         assert_eq!(reader.bits_read, 9);
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_bit_order() {
+        // Lsb0 one byte
+        let input = hex!("ab");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        // b
+        let bits = reader.read_bits(4, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 1]));
+        // a
+        let bits = reader.read_bits(4, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0]));
+
+        // Msb0 one byte
+        let input = hex!("ab");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        // a
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0]));
+        // b
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 1]));
+
+        // Lsb0 two bytes
+        let input = hex!("abcd");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        // b
+        let bits = reader.read_bits(4, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 1]));
+        // a
+        let bits = reader.read_bits(4, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0]));
+        // d
+        let bits = reader.read_bits(4, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 1, 0, 1]));
+        // c
+        let bits = reader.read_bits(4, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 1, 0, 0]));
+
+        // Msb0 two byte
+        let input = hex!("abcd");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        // a
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0]));
+        // b
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 1]));
+        // c
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 1, 0, 0]));
+        // d
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 1, 0, 1]));
+
+        // split order two bytes, lsb first
+        let input = hex!("abcd");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        // b
+        let bits = reader.read_bits(4, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 1]));
+        // a
+        let bits = reader.read_bits(4, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0]));
+        // c
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 1, 0, 0]));
+        // d
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 1, 0, 1]));
+
+        // split order two bytes, msb first
+        let input = hex!("abcd");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        // a
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0]));
+        // b
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 1]));
+        // d
+        let bits = reader.read_bits(4, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 1, 0, 1]));
+        // c
+        let bits = reader.read_bits(4, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 1, 0, 0]));
+
+        let input = hex!("ab");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let bits = reader.read_bits(1, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1]));
+        let bits = reader.read_bits(3, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 0, 1, 0]));
+        // b
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 1]));
+
+        // 10101011
+        //        |
+        // |||
+        //    ||||
+        let input = hex!("ab");
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let bits = reader.read_bits(1, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1]));
+        let bits = reader.read_bits(3, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1]));
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 0, 1, 0, 1]));
     }
 }

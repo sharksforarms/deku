@@ -4,7 +4,7 @@ use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::Lifetime;
+use syn::{Lifetime, LitStr};
 
 use crate::Num;
 
@@ -251,6 +251,7 @@ pub(crate) fn gen_id_args(
     id_endian: Option<&syn::LitStr>,
     bits: Option<&Num>,
     bytes: Option<&Num>,
+    bit_order: Option<&syn::LitStr>,
 ) -> syn::Result<TokenStream> {
     let crate_ = get_crate_name();
     let endian = id_endian
@@ -259,12 +260,18 @@ pub(crate) fn gen_id_args(
         .transpose()?;
     let bits = bits.map(|n| quote! {::#crate_::ctx::BitSize(#n)});
     let bytes = bytes.map(|n| quote! {::#crate_::ctx::ByteSize(#n)});
+    let bit_order = bit_order.map(gen_bit_order_from_str).transpose()?;
 
     // FIXME: Should be `into_iter` here, see https://github.com/rust-lang/rust/issues/66145.
-    let id_args = [endian.as_ref(), bits.as_ref(), bytes.as_ref()]
-        .iter()
-        .filter_map(|i| *i)
-        .collect::<Vec<_>>();
+    let id_args = [
+        endian.as_ref(),
+        bits.as_ref(),
+        bytes.as_ref(),
+        bit_order.as_ref(),
+    ]
+    .iter()
+    .filter_map(|i| *i)
+    .collect::<Vec<_>>();
 
     match &id_args[..] {
         [arg] => Ok(quote! {#arg}),
@@ -281,23 +288,46 @@ fn gen_field_args(
     bits: Option<&Num>,
     bytes: Option<&Num>,
     ctx: Option<&Punctuated<syn::Expr, syn::token::Comma>>,
+    bit_order: Option<&syn::LitStr>,
 ) -> syn::Result<TokenStream> {
     let crate_ = get_crate_name();
     let endian = endian.map(gen_endian_from_str).transpose()?;
     let bits = bits.map(|n| quote! {::#crate_::ctx::BitSize(#n)});
     let bytes = bytes.map(|n| quote! {::#crate_::ctx::ByteSize(#n)});
+    let bit_order = bit_order.map(gen_bit_order_from_str).transpose()?;
     let ctx = ctx.map(|c| quote! {#c});
 
     // FIXME: Should be `into_iter` here, see https://github.com/rust-lang/rust/issues/66145.
-    let field_args = [endian.as_ref(), bits.as_ref(), bytes.as_ref(), ctx.as_ref()]
-        .iter()
-        .filter_map(|i| *i)
-        .collect::<Vec<_>>();
+    // TODO: the order here should be documented
+    let field_args = [
+        endian.as_ref(),
+        bits.as_ref(),
+        bytes.as_ref(),
+        bit_order.as_ref(),
+        ctx.as_ref(),
+    ]
+    .iter()
+    .filter_map(|i| *i)
+    .collect::<Vec<_>>();
 
     // Because `impl DekuRead<'_, (T1, T2)>` but `impl DekuRead<'_, T1>`(not tuple)
     match &field_args[..] {
         [arg] => Ok(quote! {#arg}),
         args => Ok(quote! {#(#args),*}),
+    }
+}
+
+/// Generate bit_order tokens from string: `lsb` -> `Order::Lsb0`.
+fn gen_bit_order_from_str(s: &syn::LitStr) -> syn::Result<TokenStream> {
+    let crate_ = get_crate_name();
+    match s.value().as_str() {
+        "lsb" => Ok(quote! {::#crate_::ctx::Order::Lsb0}),
+        "msb" => Ok(quote! {::#crate_::ctx::Order::Msb0}),
+        _ => {
+            // treat as variable, possibly from `ctx`
+            let v: TokenStream = s.value().parse()?;
+            Ok(quote! {#v})
+        }
     }
 }
 
@@ -348,14 +378,15 @@ fn token_contains_string(tok: &Option<TokenStream>, s: &str) -> bool {
 fn pad_bits(
     bits: Option<&TokenStream>,
     bytes: Option<&TokenStream>,
-    emit_padding: fn(&TokenStream) -> TokenStream,
+    bit_order: Option<&LitStr>,
+    emit_padding: fn(&TokenStream, bit_order: Option<&LitStr>) -> TokenStream,
 ) -> TokenStream {
     match (bits, bytes) {
         (Some(pad_bits), Some(pad_bytes)) => {
-            emit_padding(&quote! { (#pad_bits) + ((#pad_bytes) * 8) })
+            emit_padding(&quote! { (#pad_bits) + ((#pad_bytes) * 8) }, bit_order)
         }
-        (Some(pad_bits), None) => emit_padding(pad_bits),
-        (None, Some(pad_bytes)) => emit_padding(&quote! {((#pad_bytes) * 8)}),
+        (Some(pad_bits), None) => emit_padding(pad_bits, bit_order),
+        (None, Some(pad_bytes)) => emit_padding(&quote! {((#pad_bytes) * 8)}, bit_order),
         (None, None) => quote!(),
     }
 }

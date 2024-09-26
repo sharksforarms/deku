@@ -17,7 +17,7 @@ impl DekuReader<'_, ReadExact> for Vec<u8> {
         Self: Sized,
     {
         let mut bytes = alloc::vec![0x00; exact.0];
-        let _ = reader.read_bytes(exact.0, &mut bytes)?;
+        let _ = reader.read_bytes(exact.0, &mut bytes, Order::Lsb0)?;
         Ok(bytes)
     }
 }

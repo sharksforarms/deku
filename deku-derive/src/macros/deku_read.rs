@@ -4,14 +4,15 @@ use darling::ast::{Data, Fields};
 use darling::ToTokens;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::LitStr;
 
 use crate::macros::{
-    gen_ctx_types_and_arg, gen_field_args, gen_internal_field_ident, gen_internal_field_idents,
-    gen_type_from_ctx_id, token_contains_string, wrap_default_ctx,
+    assertion_failed, gen_bit_order_from_str, gen_ctx_types_and_arg, gen_field_args,
+    gen_internal_field_idents, token_contains_string, wrap_default_ctx,
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
-use super::assertion_failed;
+use super::{gen_internal_field_ident, gen_type_from_ctx_id};
 
 pub(crate) fn emit_deku_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
     match &input.data {
@@ -575,28 +576,59 @@ fn emit_bit_byte_offsets(
 }
 
 #[cfg(feature = "bits")]
-fn emit_padding(bit_size: &TokenStream) -> TokenStream {
+fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStream {
     let crate_ = super::get_crate_name();
-    quote! {
-        {
-            use core::convert::TryFrom;
-            // TODO: I hope this consts in most cases?
-            extern crate alloc;
-            use alloc::borrow::Cow;
-            let __deku_pad = usize::try_from(#bit_size).map_err(|e|
-                ::#crate_::DekuError::InvalidParam(Cow::from(format!(
-                    "Invalid padding param \"({})\": cannot convert to usize",
-                    stringify!(#bit_size)
-                )))
-            )?;
+    if let Some(bit_order) = bit_order {
+        let order = gen_bit_order_from_str(bit_order).unwrap();
+        quote! {
+            {
+                use core::convert::TryFrom;
+                // TODO: I hope this consts in most cases?
+                extern crate alloc;
+                use alloc::borrow::Cow;
+                let __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                    ::#crate_::DekuError::InvalidParam(Cow::from(format!(
+                        "Invalid padding param \"({})\": cannot convert to usize",
+                        stringify!(#bit_size)
+                    )))
+                )?;
 
 
-            if (__deku_pad % 8) == 0 {
-                let bytes_read = __deku_pad / 8;
-                let mut buf = alloc::vec![0; bytes_read];
-                let _ = __deku_reader.read_bytes(bytes_read, &mut buf)?;
-            } else {
-                let _ = __deku_reader.read_bits(__deku_pad)?;
+                if (__deku_pad % 8) == 0 {
+                    let bytes_read = __deku_pad / 8;
+                    let mut buf = vec![0; bytes_read];
+                    // TODO: use skip_bytes, or Seek in the future?
+                    let _ = __deku_reader.read_bytes(bytes_read, &mut buf, #order)?;
+                } else {
+                    // TODO: use skip_bits, or Seek in the future?
+                    let _ = __deku_reader.read_bits(__deku_pad, #order)?;
+                }
+            }
+        }
+    } else {
+        quote! {
+            {
+                use core::convert::TryFrom;
+                // TODO: I hope this consts in most cases?
+                extern crate alloc;
+                use alloc::borrow::Cow;
+                let __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                    ::#crate_::DekuError::InvalidParam(Cow::from(format!(
+                        "Invalid padding param \"({})\": cannot convert to usize",
+                        stringify!(#bit_size)
+                    )))
+                )?;
+
+
+                if (__deku_pad % 8) == 0 {
+                    let bytes_read = __deku_pad / 8;
+                    let mut buf = vec![0; bytes_read];
+                    // TODO: use skip_bytes, or Seek in the future?
+                    let _ = __deku_reader.read_bytes(bytes_read, &mut buf, ::#crate_::ctx::Order::default())?;
+                } else {
+                    // TODO: use skip_bits, or Seek in the future?
+                    let _ = __deku_reader.read_bits(__deku_pad, ::#crate_::ctx::Order::default())?;
+                }
             }
         }
     }
@@ -620,7 +652,7 @@ fn emit_padding_bytes(bit_size: &TokenStream) -> TokenStream {
 
 
             let mut buf = alloc::vec![0; __deku_pad];
-            let _ = __deku_reader.read_bytes(__deku_pad, &mut buf)?;
+            let _ = __deku_reader.read_bytes(__deku_pad, &mut buf, ::#crate_::ctx::Order::default())?;
         }
     }
 }
@@ -636,6 +668,7 @@ fn emit_field_read(
     let field_type = &f.ty;
 
     let field_endian = f.endian.as_ref().or(input.endian.as_ref());
+    let field_bit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());
 
     let field_reader = &f.reader;
 
@@ -752,6 +785,7 @@ fn emit_field_read(
             None,
             f.bytes.as_ref(),
             f.ctx.as_ref(),
+            field_bit_order,
         )?;
 
         // The __deku_reader limiting options are special, we need to generate `(limit, (other, ..))` for them.
@@ -891,12 +925,14 @@ fn emit_field_read(
     let pad_bits_before = crate::macros::pad_bits(
         f.pad_bits_before.as_ref(),
         f.pad_bytes_before.as_ref(),
+        field_bit_order,
         emit_padding,
     );
     #[cfg(feature = "bits")]
     let pad_bits_after = crate::macros::pad_bits(
         f.pad_bits_after.as_ref(),
         f.pad_bytes_after.as_ref(),
+        field_bit_order,
         emit_padding,
     );
 

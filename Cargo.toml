@@ -80,6 +80,10 @@ name = "ipv4"
 required-features = ["bits"]
 
 [[example]]
+name = "80211"
+required-features = ["bits"]
+
+[[example]]
 name = "many"
 
 [[example]]

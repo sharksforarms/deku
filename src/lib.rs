@@ -377,6 +377,7 @@ pub mod attributes;
 pub mod ctx;
 pub mod error;
 mod impls;
+pub mod noseek;
 pub mod prelude;
 pub mod reader;
 pub mod writer;

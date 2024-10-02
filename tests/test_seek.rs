@@ -1,4 +1,4 @@
-use deku::prelude::*;
+use deku::{noseek::NoSeek, prelude::*};
 use hexlit::hex;
 use rstest::*;
 
@@ -25,7 +25,6 @@ pub struct Test {
 )]
 fn test_seek(input: &[u8], expected: Test) {
     let input = input.to_vec();
-
     let mut cursor = std::io::Cursor::new(input.clone());
     let (_, ret_read) = Test::from_reader((&mut cursor, 0)).unwrap();
 
@@ -111,6 +110,39 @@ fn test_seek_ctx_end(input: &[u8], expected: SeekCtxBeforeEnd) {
 
     let mut buf = vec![0, 0, 0];
     let mut cursor = Cursor::new(&mut buf);
+    let mut writer = Writer::new(&mut cursor);
+    let _ = ret_read.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buf, input);
+}
+
+#[derive(DekuRead, DekuWrite, Debug, PartialEq, Eq)]
+#[deku(seek_from_start = "0")]
+pub struct SeekCtxNoSeek {
+    byte: u8,
+}
+
+#[rstest(input, expected,
+    case(&hex!("03"), SeekCtxNoSeek { byte: 0x03 }),
+    case(&hex!("ff"), SeekCtxNoSeek { byte: 0xff }),
+)]
+fn test_seek_ctx_no_seek(input: &[u8], expected: SeekCtxNoSeek) {
+    use std::io::Cursor;
+    let input = input.to_vec();
+
+    let mut cursor = std::io::Cursor::new(input.clone());
+    let mut reader = Reader::new(&mut cursor);
+    let ret_read = SeekCtxNoSeek::from_reader_with_ctx(&mut reader, ()).unwrap();
+
+    assert_eq!(ret_read, expected);
+
+    let mut buf = vec![];
+    let mut cursor = Cursor::new(&mut buf);
+    let mut writer = Writer::new(&mut cursor);
+    let _ = ret_read.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buf, input);
+
+    let mut buf = vec![];
+    let mut cursor = NoSeek::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
     let _ = ret_read.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buf, input);

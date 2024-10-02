@@ -1,3 +1,4 @@
+use deku::noseek::NoSeek;
 use deku::prelude::*;
 use no_std_io::io::Seek;
 
@@ -32,6 +33,12 @@ fn test_from_reader_struct() {
     let (amt_read, ret_read) = TestDeku::from_reader((&mut c, total_read)).unwrap();
     assert_eq!(amt_read, 16);
     assert_eq!(TestDeku(0b1010), ret_read);
+
+    let inner = &c.into_inner();
+    let mut s = NoSeek::new(inner.as_slice());
+    let (amt_read, ret_read) = TestDeku::from_reader((&mut s, 0)).unwrap();
+    assert_eq!(amt_read, 4);
+    assert_eq!(TestDeku(0b0110), ret_read);
 }
 
 #[cfg(feature = "bits")]
@@ -57,4 +64,11 @@ fn test_from_reader_enum() {
     let (amt_read, ret_read) = TestDeku::from_reader((&mut c, first_amt_read)).unwrap();
     assert_eq!(amt_read, 6 + first_amt_read);
     assert_eq!(TestDeku::VariantB(0b10), ret_read);
+
+    c.rewind();
+    let inner = &c.into_inner();
+    let mut s = NoSeek::new(inner.as_slice());
+    let (amt_read, ret_read) = TestDeku::from_reader((&mut s, 0)).unwrap();
+    assert_eq!(first_amt_read, 8);
+    assert_eq!(TestDeku::VariantA(0b0110), ret_read);
 }

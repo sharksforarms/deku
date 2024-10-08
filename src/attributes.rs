@@ -520,6 +520,39 @@ let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(&*data, value);
 ```
 
+This attribute can also be set from a previous read:
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    field_a_len: u8,
+    #[deku(bits = "*field_a_len as usize")]
+    field_a: u8,
+    #[deku(bits = 6)]
+    field_b: u8,
+}
+
+let data: &[u8] = &[0x02, 0b11_101010];
+
+let value = DekuTest::try_from(data).unwrap();
+
+assert_eq!(
+    DekuTest {
+       field_a_len: 2,
+       field_a: 0b11,
+       field_b: 0b101010,
+    },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(&*data, value);
+```
+
+
 # bytes
 
 Set the byte-size of the field
@@ -545,6 +578,35 @@ assert_eq!(
     DekuTest {
        field_a: 0xCDAB,
        field_b: 0xFF,
+    },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(data, value);
+```
+
+This attribute can also be set from a previous read:
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    field_a_size: u8,
+    #[deku(bytes = "*field_a_size as usize")]
+    field_a: u32,
+}
+
+let data: &[u8] = &[0x03, 0x01, 0x02, 0x03];
+
+let value = DekuTest::try_from(data).unwrap();
+
+assert_eq!(
+    DekuTest {
+       field_a_size: 0x03,
+       field_a: 0x030201,
     },
     value
 );

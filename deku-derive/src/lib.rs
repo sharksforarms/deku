@@ -8,6 +8,7 @@ extern crate alloc;
 use alloc::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt::Display;
+use syn::Type;
 
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};
 use proc_macro2::TokenStream;
@@ -412,7 +413,7 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataStruct<'a> {
 #[derive(Debug)]
 struct FieldData {
     ident: Option<syn::Ident>,
-    ty: syn::Type,
+    ty: Type,
 
     /// endianness for the field
     endian: Option<syn::LitStr>,
@@ -859,7 +860,7 @@ fn default_res_opt<T, E>() -> Result<Option<T>, E> {
 #[darling(attributes(deku))]
 struct DekuFieldReceiver {
     ident: Option<syn::Ident>,
-    ty: syn::Type,
+    ty: Type,
 
     /// Endianness for the field
     #[darling(default)]

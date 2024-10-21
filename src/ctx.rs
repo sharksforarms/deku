@@ -201,3 +201,6 @@ impl BitSize {
         Self::bits_from_reader(core::mem::size_of_val(val))
     }
 }
+
+/// Amount of bytes to read_exact
+pub struct ReadExact(pub usize);

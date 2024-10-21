@@ -649,6 +649,8 @@ assert_eq!(data, value);
 
 **Note**: See [update](#update) for more information on the attribute!
 
+## Specializations
+- `Vec<u8>`: `count` used with a byte vector will result in one invocation to `read_bytes`, thus improving performance.
 
 # bytes_read
 
@@ -768,7 +770,6 @@ assert_eq!(
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(&*data, value);
 ```
-
 
 # update
 

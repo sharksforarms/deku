@@ -70,38 +70,41 @@ impl FromMeta for Id {
 }
 
 #[derive(Debug)]
-struct Num(syn::LitInt);
+enum Num {
+    LitInt(syn::LitInt),
+    TokenStream(TokenStream),
+}
 
 impl Num {
     fn new(n: syn::LitInt) -> Self {
-        Self(n)
+        Self::LitInt(n)
     }
 }
 
 impl Display for Num {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0.to_token_stream().to_string())
+        f.write_str(&self.to_token_stream().to_string())
     }
 }
 
 impl ToTokens for Num {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.0.to_tokens(tokens)
+        match self {
+            Num::LitInt(v) => v.to_tokens(tokens),
+            Num::TokenStream(v) => v.to_tokens(tokens),
+        }
     }
 }
 
 impl FromMeta for Num {
     fn from_value(value: &syn::Lit) -> darling::Result<Self> {
         (match *value {
-            syn::Lit::Str(ref s) => Ok(Num::new(syn::LitInt::new(
-                s.value()
-                    .as_str()
-                    .parse::<usize>()
-                    .map_err(|_| darling::Error::unknown_value(&s.value()))?
-                    .to_string()
-                    .as_str(),
-                s.span(),
-            ))),
+            syn::Lit::Str(ref s) => Ok(Num::TokenStream(
+                apply_replacements(s)
+                    .map_err(darling::Error::custom)?
+                    .parse::<TokenStream>()
+                    .expect("could not parse token stream"),
+            )),
             syn::Lit::Int(ref s) => Ok(Num::new(s.clone())),
             _ => Err(darling::Error::unexpected_lit_type(value)),
         })

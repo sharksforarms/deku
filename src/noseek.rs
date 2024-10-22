@@ -1,4 +1,4 @@
-//! Wrapper type that provides a fake [`Seek`](std::io::Seek) implementation.
+//! Wrapper type that provides a fake [`Seek`] implementation.
 
 #[cfg(not(feature = "std"))]
 use alloc::{string::String, vec::Vec};

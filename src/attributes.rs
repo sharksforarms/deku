@@ -65,7 +65,7 @@ enum DekuEnum {
 | enum: [id](#id) | top-level, variant | enum or variant id value
 | enum: [id_endian](#id_endian) | top-level | Endianness of *just* the enum `id`
 | enum: [id_pat](#id_pat) | variant | variant id match pattern
-| enum: [type](#type) | top-level | Set the type of the variant `id`
+| enum: [id_type](#id_type) | top-level | Set the type of the variant `id`
 | enum: [bits](#bits-1) | top-level | Set the bit-size of the variant `id`
 | enum: [bytes](#bytes-1) | top-level | Set the byte-size of the variant `id`
 
@@ -1362,7 +1362,7 @@ assert_eq!(&*ret_write, data)
 
 ## id (variant)
 
-Specify the identifier of the enum variant, must be paired with [type](#type)
+Specify the identifier of the enum variant, must be paired with [id_type](#id_type)
 or [id (top-level)](#id-top-level)
 
 **Note**:
@@ -1533,7 +1533,7 @@ let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0xFF], variant_bytes);
 ```
 
-# type
+# id_type
 
 Specify the type of the enum variant id to consume, see [example](#id-variant)
 

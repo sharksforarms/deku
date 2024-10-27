@@ -358,7 +358,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             let __deku_variant_id = <#id_type>::from_reader_with_ctx(__deku_reader,  (#id_args))?;
         }
     } else {
-        // either `id` or `type` needs to be specified
+        // either `id` or `id_type` needs to be specified
         unreachable!();
     };
 

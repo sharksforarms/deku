@@ -152,12 +152,12 @@ assert_eq!(DekuTest {
 As enums can have multiple variants, each variant must have a way to match on
 the incoming data.
 
-First the "type" is read using the `type`, then is matched against the
+First the "type" is read using `id_type`, then is matched against the
 variants given `id`. What happens after is the same as structs!
 
 This is implemented with the [id](attributes#id),
 [id_pat](attributes#id_pat), [default](attributes#default) and
-[type](attributes#type) attributes. See these for more examples.
+[id_type](attributes#id_type) attributes. See these for more examples.
 
 If no `id` is specified, the variant will default to it's discriminant value.
 

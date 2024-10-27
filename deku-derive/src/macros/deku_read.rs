@@ -163,6 +163,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     };
 
     tokens.extend(quote! {
+        #[automatically_derived]
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
             #[inline]
             fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
@@ -175,6 +176,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let read_body = wrap_default_ctx(read_body, &input.ctx, &input.ctx_default);
 
         tokens.extend(quote! {
+            #[automatically_derived]
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
                 #[inline]
                 fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
@@ -433,6 +435,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         #[allow(non_snake_case)]
+        #[automatically_derived]
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
             #[inline]
             fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
@@ -446,6 +449,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
         tokens.extend(quote! {
             #[allow(non_snake_case)]
+            #[automatically_derived]
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
                 #[inline]
                 fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
@@ -470,6 +474,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             // would need to be appended to #imp
         } else {
             tokens.extend(quote! {
+            #[automatically_derived]
             impl<'__deku> #imp ::#crate_::DekuEnumExt<#lifetime, (#deku_id_type)> for #ident #wher {
                 #[inline]
                 fn deku_id(&self) -> core::result::Result<(#deku_id_type), ::#crate_::DekuError> {
@@ -973,6 +978,7 @@ pub fn emit_container_read(
 ) -> TokenStream {
     let crate_ = super::get_crate_name();
     quote! {
+        #[automatically_derived]
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
             #[inline]
@@ -998,6 +1004,7 @@ pub fn emit_try_from(
 ) -> TokenStream {
     let crate_ = super::get_crate_name();
     quote! {
+        #[automatically_derived]
         impl #imp core::convert::TryFrom<&#lifetime [u8]> for #ident #wher {
             type Error = ::#crate_::DekuError;
 

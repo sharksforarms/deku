@@ -93,6 +93,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
         #[cfg(feature = "bits")]
         tokens.extend(quote! {
+            #[automatically_derived]
              impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
 
@@ -105,6 +106,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
 
         tokens.extend(quote! {
+            #[automatically_derived]
             impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
                 type Error = ::#crate_::DekuError;
 
@@ -114,6 +116,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 }
             }
 
+            #[automatically_derived]
             impl #imp ::#crate_::DekuContainerWrite for #ident #wher {}
         });
     }
@@ -136,6 +139,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let update_use = check_update_use(&field_updates);
 
     tokens.extend(quote! {
+        #[automatically_derived]
         impl #imp ::#crate_::DekuUpdate for #ident #wher {
             #[inline]
             fn update(&mut self) -> core::result::Result<(), ::#crate_::DekuError> {
@@ -146,6 +150,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         }
 
+        #[automatically_derived]
         impl #imp ::#crate_::DekuWriter<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
             #[inline]
@@ -159,6 +164,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let write_body = wrap_default_ctx(write_body, &input.ctx, &input.ctx_default);
 
         tokens.extend(quote! {
+            #[automatically_derived]
             impl #imp ::#crate_::DekuWriter for #ident #wher {
                 #[allow(unused_variables)]
                 #[inline]
@@ -300,6 +306,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
         #[cfg(feature = "bits")]
         tokens.extend(quote! {
+            #[automatically_derived]
              impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
                 type Error = ::#crate_::DekuError;
 
@@ -312,6 +319,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
 
         tokens.extend(quote! {
+            #[automatically_derived]
             impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
                 type Error = ::#crate_::DekuError;
 
@@ -321,6 +329,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 }
             }
 
+            #[automatically_derived]
             impl #imp ::#crate_::DekuContainerWrite for #ident #wher {}
         });
     }
@@ -341,6 +350,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let update_use = check_update_use(&variant_updates);
 
     tokens.extend(quote! {
+        #[automatically_derived]
         impl #imp ::#crate_::DekuUpdate for #ident #wher {
             #[inline]
             fn update(&mut self) -> core::result::Result<(), ::#crate_::DekuError> {
@@ -354,6 +364,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         }
 
+        #[automatically_derived]
         impl #imp ::#crate_::DekuWriter<#ctx_types> for #ident #wher {
             #[allow(unused_variables)]
             #[inline]
@@ -367,6 +378,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let write_body = wrap_default_ctx(write_body, &input.ctx, &input.ctx_default);
 
         tokens.extend(quote! {
+            #[automatically_derived]
             impl #imp ::#crate_::DekuWriter for #ident #wher {
                 #[allow(unused_variables)]
                 #[inline]

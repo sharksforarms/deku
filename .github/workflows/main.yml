@@ -73,7 +73,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
-      - uses: jetli/wasm-pack-action@v0.3.0
+      - uses: jetli/wasm-pack-action@v0.4.0
         with:
           version: 'latest'
       - run: cd ensure_wasm && wasm-pack build --target web && wasm-pack test --node

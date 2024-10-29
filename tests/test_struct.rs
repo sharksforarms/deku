@@ -198,6 +198,11 @@ fn test_big_endian() {
     let new_bytes = a.to_bytes().unwrap();
     assert_eq!(bytes, &*new_bytes);
 
+    let bytes = &[0x11, 0x22, 0x33];
+    let a = A::from_bytes((bytes, 0)).unwrap().1;
+    let new_bytes = a.to_bytes().unwrap();
+    assert_eq!(bytes, &*new_bytes);
+
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     pub struct B {
         #[deku(bytes = "2", endian = "big")]

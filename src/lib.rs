@@ -343,6 +343,9 @@ The feature `bits` enables the `bitvec` crate to use when reading and writing, w
 This however slows down the reading and writing process if your code doesn't use `bits` and the `bit_offset`
 in `from_bytes`.
 
+# NoSeek
+Unseekable streams such as [TcpStream](https://doc.rust-lang.org/std/net/struct.TcpStream.html) are supported through the [NoSeek](noseek::NoSeek) wrapper.
+
 */
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -377,6 +380,7 @@ pub mod attributes;
 pub mod ctx;
 pub mod error;
 mod impls;
+pub mod noseek;
 pub mod prelude;
 pub mod reader;
 pub mod writer;

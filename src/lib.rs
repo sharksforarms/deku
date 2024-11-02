@@ -586,7 +586,7 @@ pub trait DekuContainerWrite: DekuWriter<()> {
         DekuWriter::to_writer(self, &mut __deku_writer, ())?;
         let mut leftover = __deku_writer.leftover;
         let mut bv = bitvec::BitVec::from_slice(&out_buf);
-        bv.append(&mut leftover);
+        bv.append(&mut leftover.0);
         Ok(bv)
     }
 }

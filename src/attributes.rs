@@ -33,6 +33,7 @@ enum DekuEnum {
 | Attribute | Scope | Description
 |-----------|------------------|------------
 | [endian](#endian) | top-level, field | Set the endianness
+| [bit_order](#bit_order) | top-level, field | Set the bit-order when reading bits
 | [magic](#magic) | top-level | A magic value that must be present at the start of this struct/enum
 | [seek_from_current](#seek_from_current) | top-level, field | Sets the offset of reader and writer to the current position plus the specified number of bytes
 | [seek_from_end](#seek_from_end) | top-level, field | Sets the offset to the size of reader and writer plus the specified number of bytes
@@ -146,6 +147,89 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(&*data, value);
+```
+
+# bit_order
+Specify the field or containers bit order. By default all bits are read in `Msb0` (Most significant bit) order.
+### Top-Level Example
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+#[deku(bit_order = "lsb")]
+pub struct SquashfsV3 {
+    #[deku(bits = "4")]
+    inode_type: u8,
+    #[deku(bits = "12")]
+    mode: u16,
+    uid: u8,
+    guid: u8,
+    mtime: u32,
+    inode_number: u32,
+}
+let data: &[u8] = &[
+//       inode_type
+//     ╭-----------
+//     |
+//     |    mode
+//    ╭+--------   ...and so on
+//    ||    ||
+//    vv    vv
+    0x31, 0x12, 0x04, 0x05, 0x06, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,
+];
+let header = SquashfsV3::try_from(data).unwrap();
+assert_eq!(
+    SquashfsV3 {
+        inode_type: 0x01,
+        mode: 0x123,
+        uid: 0x4,
+        guid: 0x5,
+        mtime: 0x6,
+        inode_number: 0x7
+    },
+    header,
+);
+```
+With endian-ness:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+#[deku(endian = "big", bit_order = "lsb")]
+pub struct BigEndian {
+    #[deku(bits = "13")]
+    offset: u16,
+    #[deku(bits = "3")]
+    t: u8,
+}
+let data = vec![0x40, 0x40];
+let big_endian = BigEndian::try_from(data.as_ref()).unwrap();
+assert_eq!(
+    big_endian,
+    BigEndian {
+        offset: 0x4000,
+        t: 2
+    }
+);
+let bytes = big_endian.to_bytes().unwrap();
+assert_eq!(bytes, data);
+````
+### Field Example
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+pub struct LsbField {
+    #[deku(bit_order = "lsb", bits = "13")]
+    offset: u16,
+    #[deku(bit_order = "lsb", bits = "3")]
+    t: u8,
+}
+let data = vec![0x40, 0x40];
+let more_first = LsbField::try_from(data.as_ref()).unwrap();
+assert_eq!(more_first, LsbField { offset: 0x40, t: 2 });
+let bytes = more_first.to_bytes().unwrap();
+assert_eq!(bytes, data);
 ```
 
 # magic

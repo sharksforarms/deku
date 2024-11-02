@@ -82,7 +82,7 @@ mod tests {
                 t.to_bytes().unwrap();
             })
             .0,
-            (2, 1, 2)
+            (3, 1, 3)
         );
     }
 
@@ -100,7 +100,7 @@ mod tests {
                 t.to_slice(&mut out).unwrap();
             })
             .0,
-            (1, 0, 1)
+            (2, 0, 2)
         );
     }
 }

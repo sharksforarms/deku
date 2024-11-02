@@ -31,6 +31,23 @@ where
     ) -> Result<Self, DekuError> {
         let bytes =
             Vec::from_reader_with_ctx(reader, (Limit::from(|b: &u8| *b == 0x00), inner_ctx))?;
+        let value = CString::from_vec_with_nul(bytes).map_err(|e| {
+            DekuError::Parse(Cow::from(format!("Failed to convert Vec to CString: {e}")))
+        })?;
+
+        Ok(value)
+    }
+}
+
+impl<'a, Ctx: Copy> DekuReader<'a, (ByteSize, Ctx)> for CString
+where
+    u8: DekuReader<'a, Ctx>,
+{
+    fn from_reader_with_ctx<R: Read + Seek>(
+        reader: &mut Reader<R>,
+        (byte_size, inner_ctx): (ByteSize, Ctx),
+    ) -> Result<Self, DekuError> {
+        let bytes = Vec::from_reader_with_ctx(reader, (Limit::from(byte_size.0), inner_ctx))?;
 
         let value = CString::from_vec_with_nul(bytes).map_err(|e| {
             DekuError::Parse(Cow::from(format!("Failed to convert Vec to CString: {e}")))
@@ -49,25 +66,59 @@ mod tests {
 
     use super::*;
 
-    #[rstest(input, expected, expected_rest,
+    #[rstest(input, len, expected, expected_rest,
         case(
             &[b't', b'e', b's', b't', b'\0'],
+            Some(5),
+            CString::new("test").unwrap(),
+            &[],
+        ),
+        case(
+            &[b't', b'e', b's', b't', b'\0'],
+            None,
             CString::new("test").unwrap(),
             &[],
         ),
         case(
             &[b't', b'e', b's', b't', b'\0', b'a'],
+            Some(5),
+            CString::new("test").unwrap(),
+            &[b'a'],
+        ),
+        case(
+            &[b't', b'e', b's', b't', b'\0', b'a'],
+            None,
+            CString::new("test").unwrap(),
+            &[b'a'],
+        ),
+
+        #[should_panic(expected = "Parse(\"Failed to convert Vec to CString: data provided is not nul terminated\")")]
+        case(
+            &[b't', b'e', b's', b't'],
+            Some(4),
             CString::new("test").unwrap(),
             &[b'a'],
         ),
 
         #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case(&[b't', b'e', b's', b't'], CString::new("test").unwrap(), &[]),
+        case(&[b't', b'e', b's', b't'], Some(5), CString::new("test").unwrap(), &[]),
+
+        #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
+        case(&[b't', b'e', b's', b't'], None, CString::new("test").unwrap(), &[]),
     )]
-    fn test_cstring(input: &[u8], expected: CString, expected_rest: &[u8]) {
+    fn test_cstring_count(
+        input: &[u8],
+        len: Option<usize>,
+        expected: CString,
+        expected_rest: &[u8],
+    ) {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        let res_read = CString::from_reader_with_ctx(&mut reader, ()).unwrap();
+        let res_read = if let Some(len) = len {
+            CString::from_reader_with_ctx(&mut reader, (ByteSize(len), ())).unwrap()
+        } else {
+            CString::from_reader_with_ctx(&mut reader, ()).unwrap()
+        };
         assert_eq!(expected, res_read);
         let mut buf = vec![];
         cursor.read_to_end(&mut buf).unwrap();

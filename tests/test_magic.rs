@@ -72,3 +72,22 @@ fn test_magic_enum(input: &[u8]) {
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(ret_write, input)
 }
+
+#[rstest(input,
+    case(&hex!("64656b7500")),
+)]
+fn test_struct_magic_field(input: &[u8]) {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct TestStruct {
+        #[deku(magic = b"deku")]
+        magic: u8,
+    }
+    let input = input.to_vec();
+
+    let ret_read = TestStruct::try_from(input.as_slice()).unwrap();
+
+    assert_eq!(TestStruct { magic: 0 }, ret_read);
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(ret_write, input)
+}

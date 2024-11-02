@@ -5,6 +5,7 @@ use darling::ToTokens;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::LitStr;
+use syn::{Ident, LitByteStr};
 
 use crate::macros::{
     assertion_failed, gen_bit_order_from_str, gen_ctx_types_and_arg, gen_field_args,
@@ -499,20 +500,24 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 fn emit_magic_read(input: &DekuData) -> TokenStream {
     let crate_ = super::get_crate_name();
     if let Some(magic) = &input.magic {
-        quote! {
-            let __deku_magic = #magic;
-
-            for __deku_byte in __deku_magic {
-                let __deku_read_byte = u8::from_reader_with_ctx(__deku_reader, ())?;
-                if *__deku_byte != __deku_read_byte {
-                    extern crate alloc;
-                    use alloc::borrow::Cow;
-                    return Err(::#crate_::DekuError::Parse(Cow::from(format!("Missing magic value {:?}", #magic))));
-                }
-            }
-        }
+        emit_magic_read_lit(&crate_, magic)
     } else {
         quote! {}
+    }
+}
+
+fn emit_magic_read_lit(crate_: &Ident, magic: &LitByteStr) -> TokenStream {
+    quote! {
+        let __deku_magic = #magic;
+
+        for __deku_byte in __deku_magic {
+            let __deku_read_byte = u8::from_reader_with_ctx(__deku_reader, ())?;
+            if *__deku_byte != __deku_read_byte {
+                extern crate alloc;
+                use alloc::borrow::Cow;
+                return Err(::#crate_::DekuError::Parse(Cow::from(format!("Missing magic value {:?}", #magic))));
+            }
+        }
     }
 }
 
@@ -774,6 +779,12 @@ fn emit_field_read(
         quote! {}
     };
 
+    let magic_read = if let Some(magic) = &f.magic {
+        emit_magic_read_lit(&crate_, magic)
+    } else {
+        quote! {}
+    };
+
     let field_read_func = if field_reader.is_some() {
         quote! { #field_reader? }
     } else {
@@ -986,6 +997,7 @@ fn emit_field_read(
 
     let field_read = quote! {
         #seek
+        #magic_read
         #pad_bits_before
 
         #bit_offset

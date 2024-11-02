@@ -510,6 +510,9 @@ struct FieldData {
 
     /// Bit Order of field
     bit_order: Option<syn::LitStr>,
+
+    /// magic value that needs to appear before field
+    magic: Option<syn::LitByteStr>,
 }
 
 impl FieldData {
@@ -556,6 +559,7 @@ impl FieldData {
             seek_from_end: receiver.seek_from_end?,
             seek_from_start: receiver.seek_from_start?,
             bit_order: receiver.bit_order,
+            magic: receiver.magic,
         };
 
         FieldData::validate(&data)?;
@@ -997,6 +1001,10 @@ struct DekuFieldReceiver {
     /// Bit Order of field
     #[darling(default)]
     bit_order: Option<syn::LitStr>,
+
+    /// magic value that needs to appear before field
+    #[darling(default)]
+    magic: Option<syn::LitByteStr>,
 }
 
 /// Receiver for the variant-level attributes inside a enum

@@ -92,6 +92,14 @@ mod tests {
             &[b'a'],
         ),
 
+        #[should_panic(expected = "Parse(\"Failed to convert Vec to CString: data provided is not nul terminated\")")]
+        case(
+            &[b't', b'e', b's', b't'],
+            Some(4),
+            CString::new("test").unwrap(),
+            &[b'a'],
+        ),
+
         #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
         case(&[b't', b'e', b's', b't'], Some(5), CString::new("test").unwrap(), &[]),
 

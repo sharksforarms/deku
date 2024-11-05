@@ -174,8 +174,24 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
         {
             #[cfg(feature = "logging")]
             log::trace!("skip_bits: {amt}");
+
+            let bytes_amt = amt / 8;
+            let bits_amt = amt % 8;
+
+            // first, seek with bytes
+            if bytes_amt != 0 {
+                self.seek(SeekFrom::Current(
+                    i64::try_from(bytes_amt).expect("could not convert seek usize into i64"),
+                ))
+                .map_err(|e| DekuError::Io(e.kind()))?;
+            }
+
+            // Unlike normal seek not couting as bits_read, this one does
+            // to keep from_bytes returns
+            self.bits_read += bytes_amt * 8;
+
             // Save, and keep the leftover bits since the read will most likely be less than a byte
-            self.read_bits(amt)?;
+            self.read_bits(bits_amt)?;
         }
 
         #[cfg(not(feature = "bits"))]

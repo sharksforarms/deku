@@ -42,7 +42,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             {
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
-                if let Err(e) = __deku_reader.seek(SeekFrom::Current(i64::try_from(#num).unwrap())) {
+                let seek_amt = i64::try_from(#num).expect("could not convert into i64");
+                if let Err(e) = __deku_reader.seek(SeekFrom::Current(seek_amt)) {
                     return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
@@ -52,7 +53,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             {
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
-                if let Err(e) = __deku_reader.seek(SeekFrom::End(i64::try_from(#num).unwrap())) {
+                let seek_amt = i64::try_from(#num).expect("could not convert into i64");
+                if let Err(e) = __deku_reader.seek(SeekFrom::End(seek_amt)) {
                     return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }
@@ -62,7 +64,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             {
                 use ::#crate_::no_std_io::Seek;
                 use ::#crate_::no_std_io::SeekFrom;
-                if let Err(e) = __deku_reader.seek(SeekFrom::Start(u64::try_from(#num).unwrap())) {
+                let seek_amt = u64::try_from(#num).expect("could not convert into u64");
+                if let Err(e) = __deku_reader.seek(SeekFrom::Start(seek_amt)) {
                     return Err(::#crate_::DekuError::Io(e.kind()));
                 }
             }

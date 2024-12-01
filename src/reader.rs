@@ -197,7 +197,7 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
         #[cfg(not(feature = "bits"))]
         {
             if amt > 0 {
-                panic!("deku features no-bits was used");
+                panic!("requires deku feature: bits");
             }
         }
 

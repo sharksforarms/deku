@@ -8,7 +8,7 @@ use crate::writer::Writer;
 use crate::{ctx::*, DekuReader};
 use crate::{DekuError, DekuWriter};
 
-impl<'a> DekuReader<'a, ReadExact> for Vec<u8> {
+impl DekuReader<'_, ReadExact> for Vec<u8> {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
         exact: ReadExact,

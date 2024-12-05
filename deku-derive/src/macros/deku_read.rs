@@ -507,7 +507,7 @@ fn emit_magic_read(input: &DekuData) -> TokenStream {
                 if *__deku_byte != __deku_read_byte {
                     extern crate alloc;
                     use alloc::borrow::Cow;
-                    return Err(::#crate_::DekuError::Parse(Cow::from(format!("Missing magic value {:?}", #magic))));
+                    return Err(::#crate_::DekuError::Framing(::#crate_::error::NeedMagic::new(&__deku_magic[0..])));
                 }
             }
         }

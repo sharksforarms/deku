@@ -34,7 +34,7 @@ enum DekuEnum {
 |-----------|------------------|------------
 | [endian](#endian) | top-level, field | Set the endianness
 | [bit_order](#bit_order) | top-level, field | Set the bit-order when reading bits
-| [magic](#magic) | top-level | A magic value that must be present at the start of this struct/enum
+| [magic](#magic) | top-level, field | A magic value that must be present at the start of this struct/enum/field
 | [seek_from_current](#seek_from_current) | top-level, field | Sets the offset of reader and writer to the current position plus the specified number of bytes
 | [seek_from_end](#seek_from_end) | top-level, field | Sets the offset to the size of reader and writer plus the specified number of bytes
 | [seek_from_start](#seek_from_start) | top-level, field | Sets the offset of reader and writer to provided number of bytes
@@ -235,16 +235,39 @@ assert_eq!(bytes, data);
 # magic
 
 Sets a "magic" value that must be present in the data at the start of
-a struct/enum when reading, and that is written out of the start of
+a struct/enum or field when reading, and that is written out of the start of
 that type's data when writing.
 
-Example:
+Example (top-level):
 ```rust
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(magic = b"deku")]
 struct DekuTest {
+    data: u8
+}
+
+let data: &[u8] = &[b'd', b'e', b'k', b'u', 50];
+
+let value = DekuTest::try_from(data).unwrap();
+
+assert_eq!(
+    DekuTest { data: 50 },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(data, value);
+```
+
+Example (field):
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(magic = b"deku")]
     data: u8
 }
 

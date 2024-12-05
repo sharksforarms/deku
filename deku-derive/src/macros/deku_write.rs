@@ -551,6 +551,13 @@ fn emit_field_write(
     let crate_ = super::get_crate_name();
     let field_endian = f.endian.as_ref().or(input.endian.as_ref());
     let field_bit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());
+    let magic_write = if let Some(magic) = &f.magic {
+        quote! {
+            ::#crate_::DekuWriter::to_writer(#magic, __deku_writer, ())?;
+        }
+    } else {
+        quote! {}
+    };
 
     let seek = if let Some(num) = &f.seek_from_current {
         quote! {
@@ -731,6 +738,7 @@ fn emit_field_write(
 
     let field_write = quote! {
         #seek
+        #magic_write
         #pad_bits_before
 
         #bit_offset

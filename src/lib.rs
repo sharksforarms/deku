@@ -455,7 +455,6 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     ///     magic: [u8; 4],
     ///     version: u8,
     /// }
-    /// ```
     /// let mut file = File::options().read(true).open("file").unwrap();
     /// file.seek(SeekFrom::Start(0)).unwrap();
     /// let ec = EcHdr::from_reader((&mut file, 0)).unwrap();

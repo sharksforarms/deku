@@ -230,7 +230,7 @@ assert_eq!(value.sub.b, 0x01 + 0x02)
 # `Read` supported
 Parsers can be created that directly read from a source implementing [Read](crate::no_std_io::Read).
 
-The crate [no_std_io] is re-exported for use in `no_std` environments.
+The crate [no_std_io2](https://crates.io/crates/no-std-io2) is re-exported as [no_std_io] for use in `no_std` environments.
 This functions as an alias for [std::io](https://doc.rust-lang.org/stable/std/io/) when not
 using `no_std`.
 
@@ -357,7 +357,7 @@ extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-/// re-export of no_std_io
+/// re-export of [no_std_io2](https://crates.io/crates/no-std-io2)
 pub mod no_std_io {
     pub use no_std_io::io::Cursor;
     pub use no_std_io::io::Read;

@@ -61,7 +61,7 @@ impl<R: Read + Seek> AsMut<R> for Reader<R> {
     }
 }
 
-impl<'a, R: Read + Seek> Reader<R> {
+impl<R: Read + Seek> Reader<R> {
     /// Create a new `Reader`
     #[inline]
     pub fn new(inner: R) -> Self {

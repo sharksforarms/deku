@@ -8,6 +8,9 @@ mod unit;
 mod vec;
 
 #[cfg(feature = "std")]
+mod arc;
+
+#[cfg(feature = "std")]
 mod cow;
 
 #[cfg(feature = "std")]

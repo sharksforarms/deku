@@ -406,3 +406,24 @@ fn issue_533() {
     let v = BitsAndValue::from_reader_with_ctx(&mut reader, ()).unwrap();
     assert_eq!(v, BitsAndValue::Other(1));
 }
+
+#[test]
+fn issue_525() {
+    env_logger::init();
+    use deku::{DekuContainerRead, DekuRead, DekuWrite};
+
+    #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+    #[deku(endian = "big")]
+    pub struct TestSeek {
+        pub a: u8,
+        #[deku(seek_from_start = "2")]
+        pub b: u8,
+        pub c: u8,
+    }
+
+    let data: &[u8] = &[0, 1, 2, 3, 4, 5];
+    let test = TestSeek::from_bytes((data, 0)).unwrap();
+    let ret: &[u8] = &[4, 5];
+    assert_eq!(test.0, (ret, 0));
+    assert_eq!(test.1, TestSeek { a: 0, b: 2, c: 3 });
+}

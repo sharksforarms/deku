@@ -21,9 +21,6 @@ pub enum ReaderRet {
     Bits(Option<BitVec<u8, Msb0>>),
 }
 
-/// Max bits requested from [`Reader::read_bits`] during one call
-pub const MAX_BITS_AMT: usize = 128;
-
 #[derive(Debug)]
 enum Leftover {
     Byte(u8),
@@ -214,7 +211,7 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
     ///   `self.bits_read` will increase by `amt`
     ///
     /// # Params
-    /// `amt`    - Amount of bits that will be read. Must be <= [`MAX_BITS_AMT`].
+    /// `amt`    - Amount of bits that will be read
     #[inline(never)]
     #[cfg(feature = "bits")]
     pub fn read_bits(
@@ -282,8 +279,8 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
                 }
 
                 // read in new bytes
-                let mut buf = [0; MAX_BITS_AMT];
-                if let Err(e) = self.inner.read_exact(&mut buf[..bytes_len]) {
+                let mut buf = vec![0; bytes_len];
+                if let Err(e) = self.inner.read_exact(&mut buf) {
                     if e.kind() == ErrorKind::UnexpectedEof {
                         return Err(DekuError::Incomplete(NeedSize::new(amt)));
                     }
@@ -802,5 +799,21 @@ mod tests {
         assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1]));
         let bits = reader.read_bits(4, Order::Msb0).unwrap();
         assert_eq!(bits, Some(bitvec![u8, Msb0; 0, 1, 0, 1]));
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_long_unaligned_bytes_read() {
+        let input = vec![0xff; 0xff * 2];
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+
+        // read 1 bits to make this unaligned
+        let bits = reader.read_bits(1, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1]));
+        // Now, read the bytes
+        let mut out = vec![0x00; 0xff * 2];
+        // doesn't crash
+        let _ = reader.read_bytes(0xfe * 2, &mut out, Order::Lsb0).unwrap();
     }
 }

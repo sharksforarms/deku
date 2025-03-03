@@ -66,7 +66,7 @@ mod tests {
                 let _ = TestDeku::from_reader((&mut cursor, 0)).unwrap();
             })
             .0,
-            (5, 0, 5)
+            (6, 0, 6)
         );
     }
 

@@ -21,8 +21,9 @@ pub enum ReaderRet {
     Bits(Option<BitVec<u8, Msb0>>),
 }
 
-#[derive(Debug)]
-enum Leftover {
+/// Bits or Byte stored from previous read, such as the case of id_pat
+#[derive(Debug, Clone)]
+pub enum Leftover {
     Byte(u8),
     #[cfg(feature = "bits")]
     Bits(BitVec<u8, Msb0>),
@@ -32,7 +33,7 @@ enum Leftover {
 pub struct Reader<'a, R: Read + Seek> {
     inner: &'a mut R,
     /// bits stored from previous reads that didn't read to the end of a byte size
-    leftover: Option<Leftover>,
+    pub leftover: Option<Leftover>,
     /// Amount of bits read after last read, reseted before reading enum ids
     pub last_bits_read_amt: usize,
     /// Amount of bits read during the use of [read_bits](Reader::read_bits) and [read_bytes](Reader::read_bytes)
@@ -75,6 +76,8 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
     pub fn seek_last_read(&mut self) -> no_std_io::io::Result<()> {
         let number = self.last_bits_read_amt as i64;
         let seek_amt = (number / 8).saturating_add((number % 8).signum());
+        #[cfg(feature = "logging")]
+        log::trace!("seek_last_read: {seek_amt:?}");
         self.seek(SeekFrom::Current(seek_amt.saturating_neg()))?;
         self.bits_read -= self.last_bits_read_amt;
         self.leftover = None;

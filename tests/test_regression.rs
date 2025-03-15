@@ -385,3 +385,23 @@ fn issue_397() {
     }
     let _ = Packet::from_bytes((&[0x00, 0x01], 0));
 }
+
+#[test]
+fn issue_533() {
+    #[derive(PartialEq, Debug, DekuRead)]
+    #[deku(id_type = "u8", bits = "1")]
+    pub enum BitsAndValue {
+        #[deku(id = 0)]
+        Zero,
+        #[deku(id_pat = "_")]
+        Other(#[deku(bits = 1)] u8),
+    }
+    let input = [0b0100_0000];
+    let mut cursor = Cursor::new(input);
+    let mut reader = Reader::new(&mut cursor);
+    let v = BitsAndValue::from_reader_with_ctx(&mut reader, ()).unwrap();
+    assert_eq!(v, BitsAndValue::Zero);
+
+    let v = BitsAndValue::from_reader_with_ctx(&mut reader, ()).unwrap();
+    assert_eq!(v, BitsAndValue::Other(1));
+}

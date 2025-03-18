@@ -24,7 +24,9 @@ pub enum ReaderRet {
 /// Bits or Byte stored from previous read, such as the case of id_pat
 #[derive(Debug, Clone)]
 pub enum Leftover {
+    /// byte value
     Byte(u8),
+    /// bit values
     #[cfg(feature = "bits")]
     Bits(BitVec<u8, Msb0>),
 }

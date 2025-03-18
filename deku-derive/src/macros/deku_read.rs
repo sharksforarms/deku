@@ -371,6 +371,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let variant_read = quote! {
         __deku_reader.last_bits_read_amt = 0;
+        let __deku_last_leftover = __deku_reader.leftover.clone();
         #variant_id_read
 
         #(#pre_match_tokens)*
@@ -822,6 +823,7 @@ fn emit_field_read(
                     if let Err(e) = __deku_reader.seek_last_read() {
                         return Err(::#crate_::DekuError::Io(e.kind()));
                     }
+                    __deku_reader.leftover = __deku_last_leftover;
                     #type_as_deku_read::from_reader_with_ctx
                     (
                         __deku_reader,

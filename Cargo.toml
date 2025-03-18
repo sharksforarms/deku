@@ -9,7 +9,7 @@ keywords = ["deku", "bits", "serialization", "deserialization", "struct"]
 categories = ["encoding", "parsing", "no-std"]
 description = "bit level serialization/deserialization proc-macro for structs"
 readme = "README.md"
-rust-version = "1.71"
+rust-version = "1.81"
 
 [lib]
 bench = false
@@ -32,7 +32,7 @@ bits = ["dep:bitvec", "deku_derive/bits"]
 deku_derive = { version = "^0.18.1", path = "deku-derive", default-features = false}
 bitvec = { version = "1.0.1", default-features = false, optional = true }
 log = { version = "0.4.22", optional = true }
-no_std_io = { version = "0.8.0", default-features = false, features = ["alloc"], package = "no_std_io2" }
+no_std_io = { version = "0.9.0", default-features = false, features = ["alloc"], package = "no_std_io2" }
 rustversion = "1.0.17"
 
 [dev-dependencies]

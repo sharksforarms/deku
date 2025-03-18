@@ -1,9 +1,10 @@
 //! Wrapper type that provides a fake [`Seek`] implementation.
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 
 use crate::no_std_io::{Read, Result, Seek, SeekFrom, Write};
+#[cfg(feature = "std")]
 use no_std_io::io::ErrorKind;
 
 /// A wrapper that provides a limited implementation of

@@ -7,7 +7,7 @@ use bitvec::prelude::*;
 use no_std_io::io::{ErrorKind, Read, Seek, SeekFrom};
 
 use crate::{ctx::Order, prelude::NeedSize, DekuError};
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 
 #[cfg(feature = "logging")]
 use log;

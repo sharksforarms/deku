@@ -386,6 +386,7 @@ fn issue_397() {
     let _ = Packet::from_bytes((&[0x00, 0x01], 0));
 }
 
+#[cfg(feature = "bits")]
 #[test]
 fn issue_533() {
     #[derive(PartialEq, Debug, DekuRead)]

@@ -32,8 +32,8 @@ pub enum Leftover {
 }
 
 /// Reader to use with `from_reader_with_ctx`
-pub struct Reader<'a, R: Read + Seek> {
-    inner: &'a mut R,
+pub struct Reader<R: Read + Seek> {
+    inner: R,
     /// bits stored from previous reads that didn't read to the end of a byte size
     pub leftover: Option<Leftover>,
     /// Amount of bits read after last read, reseted before reading enum ids
@@ -42,7 +42,7 @@ pub struct Reader<'a, R: Read + Seek> {
     pub bits_read: usize,
 }
 
-impl<R: Read + Seek> Seek for Reader<'_, R> {
+impl<R: Read + Seek> Seek for Reader<R> {
     #[inline]
     fn seek(&mut self, pos: SeekFrom) -> no_std_io::io::Result<u64> {
         #[cfg(feature = "logging")]
@@ -71,17 +71,17 @@ impl<R: Read + Seek> Seek for Reader<'_, R> {
     }
 }
 
-impl<R: Read + Seek> AsMut<R> for Reader<'_, R> {
+impl<R: Read + Seek> AsMut<R> for Reader<R> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
-        self.inner
+        &mut self.inner
     }
 }
 
-impl<'a, R: Read + Seek> Reader<'a, R> {
+impl<R: Read + Seek> Reader<R> {
     /// Create a new `Reader`
     #[inline]
-    pub fn new(inner: &'a mut R) -> Self {
+    pub fn new(inner: R) -> Self {
         Self {
             inner,
             leftover: None,
@@ -111,7 +111,7 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
 
     /// Consume self, returning inner Reader
     #[inline]
-    pub fn into_inner(self) -> &'a mut R {
+    pub fn into_inner(self) -> R {
         self.inner
     }
 

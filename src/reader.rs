@@ -50,6 +50,23 @@ impl<R: Read + Seek> Seek for Reader<'_, R> {
 
         // clear leftover
         self.leftover = None;
+        // set bits read
+        match pos {
+            // When reading from the start, reset the bits_read so from_bytes
+            // return can still be reasonable
+            SeekFrom::Start(n) => {
+                if n > 0 {
+                    self.bits_read = (n * 8) as usize;
+                }
+            }
+            SeekFrom::End(_) => (),
+            // If seeking from current, act as if we just read those bytes
+            SeekFrom::Current(n) => {
+                if n > 0 {
+                    self.bits_read += (n * 8) as usize;
+                }
+            }
+        }
         self.inner.seek(pos)
     }
 }
@@ -76,12 +93,17 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
     /// Seek to previous previous before the last read, used for `id_pat`
     #[inline]
     pub fn seek_last_read(&mut self) -> no_std_io::io::Result<()> {
+        // save the previous bits read
+        let bits_read = self.bits_read;
+
         let number = self.last_bits_read_amt as i64;
         let seek_amt = (number / 8).saturating_add((number % 8).signum());
         #[cfg(feature = "logging")]
         log::trace!("seek_last_read: {seek_amt:?}");
         self.seek(SeekFrom::Current(seek_amt.saturating_neg()))?;
-        self.bits_read -= self.last_bits_read_amt;
+
+        // restore bits read, minus bits we read last time
+        self.bits_read = bits_read - self.last_bits_read_amt;
         self.leftover = None;
 
         Ok(())
@@ -188,9 +210,10 @@ impl<'a, R: Read + Seek> Reader<'a, R> {
                     i64::try_from(bytes_amt).expect("could not convert seek usize into i64"),
                 ))
                 .map_err(|e| DekuError::Io(e.kind()))?;
+                self.bits_read = 0;
             }
 
-            // Unlike normal seek not couting as bits_read, this one does
+            // Unlike normal seek not counting as bits_read, this one does
             // to keep from_bytes returns
             self.bits_read += bytes_amt * 8;
 

@@ -334,6 +334,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             _ => {
                 extern crate alloc;
                 use alloc::borrow::Cow;
+                use alloc::format;
                 return Err(::#crate_::DekuError::Parse(
                             Cow::from(format!(
                                 "Could not match enum variant id = {:?} on enum `{}`",
@@ -516,6 +517,7 @@ fn emit_magic_read_lit(crate_: &Ident, magic: &LitByteStr) -> TokenStream {
             if *__deku_byte != __deku_read_byte {
                 extern crate alloc;
                 use alloc::borrow::Cow;
+                use alloc::format;
                 return Err(::#crate_::DekuError::Parse(Cow::from(format!("Missing magic value {:?}", #magic))));
             }
         }
@@ -592,6 +594,7 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
                 // TODO: I hope this consts in most cases?
                 extern crate alloc;
                 use alloc::borrow::Cow;
+                use alloc::format;
                 let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                     ::#crate_::DekuError::InvalidParam(Cow::from(format!(
                         "Invalid padding param \"({})\": cannot convert to usize",
@@ -618,6 +621,7 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
                 // TODO: I hope this consts in most cases?
                 extern crate alloc;
                 use alloc::borrow::Cow;
+                use alloc::format;
                 let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                     ::#crate_::DekuError::InvalidParam(Cow::from(format!(
                         "Invalid padding param \"({})\": cannot convert to usize",
@@ -649,6 +653,7 @@ fn emit_padding_bytes(bit_size: &TokenStream) -> TokenStream {
             use core::convert::TryFrom;
             extern crate alloc;
             use alloc::borrow::Cow;
+            use alloc::format;
             let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                 ::#crate_::DekuError::InvalidParam(Cow::from(format!(
                     "Invalid padding param \"({})\": cannot convert to usize",

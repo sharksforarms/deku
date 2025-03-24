@@ -426,6 +426,7 @@ fn assertion_failed(
         quote! {
             extern crate alloc;
             use alloc::borrow::Cow;
+            use alloc::format;
             return Err(::#crate_::DekuError::Assertion(Cow::from(format!(
                 "{}.{} field failed assertion: {}",
                 #ident,

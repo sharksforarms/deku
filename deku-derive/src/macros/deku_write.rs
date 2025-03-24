@@ -494,6 +494,7 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
                 use core::convert::TryFrom;
                 extern crate alloc;
                 use alloc::borrow::Cow;
+                use alloc::format;
                 let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                     ::#crate_::DekuError::InvalidParam(Cow::from(format!(
                         "Invalid padding param \"({})\": cannot convert to usize",
@@ -509,6 +510,7 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
                 use core::convert::TryFrom;
                 extern crate alloc;
                 use alloc::borrow::Cow;
+                use alloc::format;
                 let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                     ::#crate_::DekuError::InvalidParam(Cow::from(format!(
                         "Invalid padding param \"({})\": cannot convert to usize",
@@ -530,6 +532,7 @@ fn emit_padding_bytes(bit_size: &TokenStream) -> TokenStream {
             use core::convert::TryFrom;
             extern crate alloc;
             use alloc::borrow::Cow;
+            use alloc::format;
             let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                 ::#crate_::DekuError::InvalidParam(Cow::from(format!(
                     "Invalid padding param \"({})\": cannot convert to usize",

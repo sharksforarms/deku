@@ -13,6 +13,13 @@ lto = true
 
 [workspace]
 
+[lib]
+name = "no_std_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ensure_no_std"
+path = "src/main.rs"
 
 [features]
 default = ["alloc"]

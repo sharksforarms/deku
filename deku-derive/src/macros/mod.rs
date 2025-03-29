@@ -355,7 +355,7 @@ fn wrap_default_ctx(
     if let (Some(ctx), Some(ctx_default)) = (ctx, ctx_default) {
         // wrap in a function to make `ctx` variables in scope
         quote! {
-            |#ctx| -> Result<_, _> {
+            |#ctx| -> ::core::result::Result<_, _> {
                 #body
             }(#ctx_default)
         }

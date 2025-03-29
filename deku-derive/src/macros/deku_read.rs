@@ -11,7 +11,7 @@ use crate::macros::{
     assertion_failed, gen_bit_order_from_str, gen_ctx_types_and_arg, gen_field_args,
     gen_internal_field_idents, token_contains_string, wrap_default_ctx,
 };
-use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
+use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id, Num};
 
 use super::{gen_internal_field_ident, gen_type_from_ctx_id};
 
@@ -236,7 +236,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .and_then(|v| v.ident.as_ref())
             .is_some();
 
-        let mut restore = false;
+        let mut pad_id = false;
         let variant_id = if let Some(variant_id) = &variant.id {
             match variant_id {
                 Id::TokenStream(v) => quote! {&#v}.into_token_stream(),
@@ -248,8 +248,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             // If user has supplied an id, then we have an id_pat that and the id variant doesn't
             // need read into an id value
             if id.is_none() {
-                // if id_pat and !id, we need to restore after reading
-                restore = true;
+                pad_id = true;
                 variant_id_pat.clone()
             } else {
                 variant_id_pat.clone()
@@ -280,7 +279,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             quote! { #variant_reader; }
         } else {
             let (field_idents, field_reads) =
-                emit_field_reads(input, &variant.fields.as_ref(), &ident, restore)?;
+                emit_field_reads(input, &variant.fields.as_ref(), &ident, pad_id)?;
 
             // filter out temporary fields
             let field_idents = field_idents
@@ -371,8 +370,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     };
 
     let variant_read = quote! {
-        __deku_reader.last_bits_read_amt = 0;
-        let __deku_last_leftover = __deku_reader.leftover.clone();
         #variant_id_read
 
         #(#pre_match_tokens)*
@@ -673,7 +670,7 @@ fn emit_field_read(
     i: usize,
     f: &FieldData,
     ident: &TokenStream,
-    restore_pad_id: bool,
+    pad_id: bool,
 ) -> Result<(TokenStream, TokenStream), syn::Error> {
     let crate_ = super::get_crate_name();
     let field_type = &f.ty;
@@ -822,19 +819,41 @@ fn emit_field_read(
             quote!(<#field_type as ::#crate_::DekuReader<'_, _>>)
         };
 
-        if restore_pad_id {
-            quote! {
-                {
-                    if let Err(e) = __deku_reader.seek_last_read() {
-                        return Err(::#crate_::DekuError::Io(e.kind()));
-                    }
-                    __deku_reader.leftover = __deku_last_leftover;
-                    #type_as_deku_read::from_reader_with_ctx
-                    (
-                        __deku_reader,
-                        (#read_args)
-                    )?
+        if pad_id {
+            #[cfg(not(feature = "bits"))]
+            if let (Some(Num::LitInt(a)), Some(Num::LitInt(b))) = (&f.bits, &input.bits) {
+                if a != b {
+                    // TODO: This would be nice to point to the field
+                    return Err(syn::Error::new(
+                        input.ident.span(),
+                        format!("DekuRead: id_pat bits `{}` must match bits `{}`", a, b),
+                    ));
                 }
+            }
+            if let (Some(Num::LitInt(a)), Some(Num::LitInt(b))) = (&f.bytes, &input.bytes) {
+                if a != b {
+                    // TODO: This would be nice to point to the field
+                    return Err(syn::Error::new(
+                        input.ident.span(),
+                        format!("DekuRead: id_pat bytes `{}` must match bytes `{}`", a, b),
+                    ));
+                }
+            }
+            if let (Some(a), Some(b)) = (&f.endian, &input.id_endian) {
+                if a != b {
+                    // TODO: This would be nice to point to the field
+                    return Err(syn::Error::new(
+                        input.ident.span(),
+                        format!(
+                            "DekuRead: id_pat endian `{}` must match id_endian `{}`",
+                            a.value(),
+                            b.value(),
+                        ),
+                    ));
+                }
+            }
+            quote! {
+                __deku_variant_id;
             }
         } else if let Some(field_count) = &f.count {
             use syn::{GenericArgument, PathArguments, Type};

@@ -100,12 +100,26 @@ impl ToTokens for Num {
 impl FromMeta for Num {
     fn from_value(value: &syn::Lit) -> darling::Result<Self> {
         (match *value {
-            syn::Lit::Str(ref s) => Ok(Num::TokenStream(
-                apply_replacements(s)
-                    .map_err(darling::Error::custom)?
-                    .parse::<TokenStream>()
-                    .expect("could not parse token stream"),
-            )),
+            syn::Lit::Str(ref s) => {
+                let str_value = s.value();
+
+                // Attempt to read ("2") as a Num LitInt (2)
+                match str_value.parse::<u64>() {
+                    Ok(int_value) => {
+                        let int_string = int_value.to_string();
+                        let span = s.span();
+                        let lit_int = syn::LitInt::new(&int_string, span);
+                        Ok(Num::new(lit_int))
+                    }
+                    // else, just a tokenstream
+                    Err(_) => Ok(Num::TokenStream(
+                        apply_replacements(s)
+                            .map_err(darling::Error::custom)?
+                            .parse::<TokenStream>()
+                            .expect("could not parse token stream"),
+                    )),
+                }
+            }
             syn::Lit::Int(ref s) => Ok(Num::new(s.clone())),
             _ => Err(darling::Error::unexpected_lit_type(value)),
         })

@@ -76,4 +76,36 @@ enum Test11 {
     B(u8),
 }
 
+// test non matching bits (2) == bits (7)
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(id_type = "u8", bits = "2")]
+pub enum Test12 {
+    #[deku(id_pat = "_")]
+    B(#[deku(bits = 7)] u8, #[deku(bits = 6)] u8),
+}
+
+// test non matching bytes(2) == bytes (3)
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(id_type = "u32", bytes = "2")]
+pub enum Test13 {
+    #[deku(id_pat = "_")]
+    B(#[deku(bytes = 3)] u32, #[deku(bits = 6)] u8),
+}
+
+// test non matching bytes(2) == bytes (3)
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(id_type = "u32", bytes = "2", id_endian = "little")]
+pub enum Test14 {
+    #[deku(id_pat = "_")]
+    B(#[deku(bytes = 2, endian = "big")] u32, #[deku(bits = 6)] u8),
+}
+
+// test non matching type
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(id_type = "u32", bytes = "2")]
+pub enum Test15 {
+    #[deku(id_pat = "_")]
+    B(#[deku(bits = 2)] u8, #[deku(bits = 6)] u8),
+}
+
 fn main() {}

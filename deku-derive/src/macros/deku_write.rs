@@ -110,15 +110,20 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
 
         tokens.extend(quote! {
-            #[automatically_derived]
-            impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
-                type Error = ::#crate_::DekuError;
+            const _: () = {
+                extern crate alloc;
+                use alloc::vec::Vec;
 
-                #[inline]
-                fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
-                    ::#crate_::DekuContainerWrite::to_bytes(&input)
+                #[automatically_derived]
+                impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
+                    type Error = ::#crate_::DekuError;
+
+                    #[inline]
+                    fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
+                        ::#crate_::DekuContainerWrite::to_bytes(&input)
+                    }
                 }
-            }
+            };
 
             #[automatically_derived]
             impl #imp ::#crate_::DekuContainerWrite for #ident #wher {}
@@ -323,15 +328,20 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         });
 
         tokens.extend(quote! {
-            #[automatically_derived]
-            impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
-                type Error = ::#crate_::DekuError;
+            const _: () = {
+                extern crate alloc;
+                use alloc::vec::Vec;
 
-                #[inline]
-                fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
-                    ::#crate_::DekuContainerWrite::to_bytes(&input)
+                #[automatically_derived]
+                impl #imp core::convert::TryFrom<#ident> for Vec<u8> #wher {
+                    type Error = ::#crate_::DekuError;
+
+                    #[inline]
+                    fn try_from(input: #ident) -> core::result::Result<Self, Self::Error> {
+                        ::#crate_::DekuContainerWrite::to_bytes(&input)
+                    }
                 }
-            }
+            };
 
             #[automatically_derived]
             impl #imp ::#crate_::DekuContainerWrite for #ident #wher {}

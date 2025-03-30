@@ -278,6 +278,15 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let variant_read_func = if variant_reader.is_some() {
             quote! { #variant_reader; }
         } else {
+            // VarDefault { id: u8, value: u8 }, is allowed
+            // VarDefault, is not, if we need to store the id
+            if pad_id && variant.id.is_none() && variant.fields.is_empty() {
+                // TODO: This would be nice to point to the field
+                return Err(syn::Error::new(
+                    input.ident.span(),
+                    "DekuRead: id_pat requires storage field",
+                ));
+            }
             let (field_idents, field_reads) =
                 emit_field_reads(input, &variant.fields.as_ref(), &ident, pad_id)?;
 

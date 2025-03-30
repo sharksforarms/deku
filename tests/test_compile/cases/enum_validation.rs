@@ -116,4 +116,20 @@ pub enum Test16 {
     B(u16, #[deku(bits = 6)] u8),
 }
 
+// Test id_pat id storage must exist (read)
+#[derive(PartialEq, Debug, DekuRead)]
+#[deku(id_type = "u8")]
+pub enum Test17 {
+    #[deku(id_pat = "_")]
+    B,
+}
+
+// Test id_pat id storage must exist (write)
+#[derive(PartialEq, Debug, DekuWrite)]
+#[deku(id_type = "u8")]
+pub enum Test18 {
+    #[deku(id_pat = "_")]
+    B,
+}
+
 fn main() {}

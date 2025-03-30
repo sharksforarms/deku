@@ -421,6 +421,15 @@ fn emit_field_writes(
     object_prefix: Option<TokenStream>,
     ident: &TokenStream,
 ) -> Result<Vec<TokenStream>, syn::Error> {
+    // VarDefault { id: u8, value: u8 }, is allowed
+    // VarDefault, is not, if we need to store the id
+    if is_id_pat && input.id.is_none() && fields.is_empty() {
+        // TODO: This would be nice to point to the field
+        return Err(syn::Error::new(
+            input.ident.span(),
+            "DekuRead: id_pat requires storage field",
+        ));
+    }
     let mut is_id_pat = is_id_pat;
     fields
         .iter()
@@ -568,21 +577,16 @@ fn emit_field_write(
         // Such as magic, seek*
         let crate_ = super::get_crate_name();
         let field_endian = input.id_endian.as_ref();
+        #[cfg(feature = "bits")]
         let field_bits = input.bits.as_ref();
+        #[cfg(not(feature = "bits"))]
+        let field_bits = None;
         let field_bytes = input.bytes.as_ref();
         let field_bit_order = input.bit_order.as_ref();
         let field_ident = f.get_ident(i, object_prefix.is_none());
 
-        let write_args = gen_field_args(
-            field_endian,
-            #[cfg(feature = "bits")]
-            field_bits,
-            #[cfg(not(feature = "bits"))]
-            None,
-            field_bytes,
-            None,
-            field_bit_order,
-        )?;
+        let write_args =
+            gen_field_args(field_endian, field_bits, field_bytes, None, field_bit_order)?;
 
         let ret = quote! {
             ::#crate_::DekuWriter::to_writer(#object_prefix #field_ident, __deku_writer, (#write_args))?;

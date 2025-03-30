@@ -77,7 +77,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let magic_write = emit_magic_write(input);
 
-    let field_writes = emit_field_writes(input, &fields, None, &ident)?;
+    let field_writes = emit_field_writes(input, &fields, false, None, &ident)?;
     let field_updates = emit_field_updates(&fields, Some(quote! { self. }));
 
     let named = fields.style.is_struct();
@@ -281,7 +281,13 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let variant_write = if variant_writer.is_some() {
             quote! { #variant_writer ?; }
         } else {
-            let field_writes = emit_field_writes(input, &variant.fields.as_ref(), None, &ident)?;
+            let field_writes = emit_field_writes(
+                input,
+                &variant.fields.as_ref(),
+                variant.id_pat.is_some(),
+                None,
+                &ident,
+            )?;
 
             quote! {
                 {
@@ -411,13 +417,15 @@ fn emit_magic_write(input: &DekuData) -> TokenStream {
 fn emit_field_writes(
     input: &DekuData,
     fields: &Fields<&FieldData>,
+    is_id_pat: bool,
     object_prefix: Option<TokenStream>,
     ident: &TokenStream,
 ) -> Result<Vec<TokenStream>, syn::Error> {
+    let mut is_id_pat = is_id_pat;
     fields
         .iter()
         .enumerate()
-        .map(|(i, f)| emit_field_write(input, i, f, &object_prefix, ident))
+        .map(|(i, f)| emit_field_write(input, i, f, &object_prefix, ident, &mut is_id_pat))
         .collect()
 }
 
@@ -550,7 +558,41 @@ fn emit_field_write(
     f: &FieldData,
     object_prefix: &Option<TokenStream>,
     ident: &TokenStream,
+    is_id_pat: &mut bool,
 ) -> Result<TokenStream, syn::Error> {
+    // If this is the storage field of the Enum id_pat, we use
+    // the field args that were used for reading, to ensure that
+    // the writing will be the same
+    if *is_id_pat {
+        // TODO: This should error on some attributes that don't make sense aren't used?
+        // Such as magic, seek*
+        let crate_ = super::get_crate_name();
+        let field_endian = input.id_endian.as_ref();
+        let field_bits = input.bits.as_ref();
+        let field_bytes = input.bytes.as_ref();
+        let field_bit_order = input.bit_order.as_ref();
+        let field_ident = f.get_ident(i, object_prefix.is_none());
+
+        let write_args = gen_field_args(
+            field_endian,
+            #[cfg(feature = "bits")]
+            field_bits,
+            #[cfg(not(feature = "bits"))]
+            None,
+            field_bytes,
+            None,
+            field_bit_order,
+        )?;
+
+        let ret = quote! {
+            ::#crate_::DekuWriter::to_writer(#object_prefix #field_ident, __deku_writer, (#write_args))?;
+        };
+
+        // only the first field
+        *is_id_pat = false;
+        return Ok(ret);
+    }
+
     let crate_ = super::get_crate_name();
     let field_endian = f.endian.as_ref().or(input.endian.as_ref());
     let field_bit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());

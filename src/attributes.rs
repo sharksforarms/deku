@@ -1596,7 +1596,8 @@ assert_eq!(
 
 Specify the identifier in the form of a match pattern for the enum variant.
 
-The enum variant must have space to store the identifier for proper writing.
+The first field of the variant is used for storage, and must be the same type as `id_type` and no attributes.
+The writing of the field will use the same options as the reading.
 
 Example:
 ```rust

@@ -530,6 +530,61 @@ struct FieldData {
 }
 
 impl FieldData {
+    pub fn any_field_set(&self) -> bool {
+        // NOTE: Ignore ident
+        let mut any_option_set = self.endian.is_some();
+
+        #[cfg(feature = "bits")]
+        {
+            any_option_set = any_option_set || self.bits.is_some();
+        }
+
+        any_option_set = any_option_set || self.bytes.is_some() || self.count.is_some();
+
+        #[cfg(feature = "bits")]
+        {
+            any_option_set = any_option_set || self.bits_read.is_some();
+        }
+
+        any_option_set = any_option_set
+            || self.bytes_read.is_some()
+            || self.until.is_some()
+            || self.map.is_some()
+            || self.ctx.is_some()
+            || self.update.is_some()
+            || self.reader.is_some()
+            || self.writer.is_some();
+
+        #[cfg(feature = "bits")]
+        {
+            any_option_set = any_option_set || self.pad_bits_before.is_some();
+        }
+
+        any_option_set = any_option_set || self.pad_bytes_before.is_some();
+
+        #[cfg(feature = "bits")]
+        {
+            any_option_set = any_option_set || self.pad_bits_after.is_some();
+        }
+
+        // NOTE: Ignore default
+        any_option_set = any_option_set
+            || self.pad_bytes_after.is_some()
+            || self.temp_value.is_some()
+            || self.cond.is_some()
+            || self.assert.is_some()
+            || self.assert_eq.is_some()
+            || self.seek_from_current.is_some()
+            || self.seek_from_end.is_some()
+            || self.seek_from_start.is_some()
+            || self.bit_order.is_some()
+            || self.magic.is_some();
+
+        let any_bool_set = self.read_all || self.skip || self.temp || self.seek_rewind;
+
+        any_option_set || any_bool_set
+    }
+
     fn from_receiver(receiver: DekuFieldReceiver) -> Result<Self, TokenStream> {
         let ctx = receiver
             .ctx?

@@ -192,7 +192,7 @@ fn id_pat_with_id_bits() {
         A(#[deku(bits = 6)] u8),
 
         #[deku(id_pat = "_")]
-        B(#[deku(bits = 2)] u8, #[deku(bits = 6)] u8),
+        B(u8, #[deku(bits = 6)] u8),
     }
 
     let input = [0b1100_1111];

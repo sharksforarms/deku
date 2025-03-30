@@ -395,7 +395,7 @@ fn issue_533() {
         #[deku(id = 0)]
         Zero,
         #[deku(id_pat = "_")]
-        Other(#[deku(bits = 1)] u8),
+        Other(u8),
     }
     let input = [0b0100_0000];
     let mut cursor = Cursor::new(input);

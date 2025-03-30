@@ -11,7 +11,7 @@ use crate::macros::{
     assertion_failed, gen_bit_order_from_str, gen_ctx_types_and_arg, gen_field_args,
     gen_internal_field_idents, token_contains_string, wrap_default_ctx,
 };
-use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id, Num};
+use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
 use super::{gen_internal_field_ident, gen_type_from_ctx_id};
 
@@ -820,37 +820,12 @@ fn emit_field_read(
         };
 
         if pad_id {
-            #[cfg(not(feature = "bits"))]
-            if let (Some(Num::LitInt(a)), Some(Num::LitInt(b))) = (&f.bits, &input.bits) {
-                if a != b {
-                    // TODO: This would be nice to point to the field
-                    return Err(syn::Error::new(
-                        input.ident.span(),
-                        format!("DekuRead: id_pat bits `{}` must match bits `{}`", a, b),
-                    ));
-                }
-            }
-            if let (Some(Num::LitInt(a)), Some(Num::LitInt(b))) = (&f.bytes, &input.bytes) {
-                if a != b {
-                    // TODO: This would be nice to point to the field
-                    return Err(syn::Error::new(
-                        input.ident.span(),
-                        format!("DekuRead: id_pat bytes `{}` must match bytes `{}`", a, b),
-                    ));
-                }
-            }
-            if let (Some(a), Some(b)) = (&f.endian, &input.id_endian) {
-                if a != b {
-                    // TODO: This would be nice to point to the field
-                    return Err(syn::Error::new(
-                        input.ident.span(),
-                        format!(
-                            "DekuRead: id_pat endian `{}` must match id_endian `{}`",
-                            a.value(),
-                            b.value(),
-                        ),
-                    ));
-                }
+            if f.any_field_set() {
+                // TODO: This would be nice to point to the field
+                return Err(syn::Error::new(
+                    input.ident.span(),
+                    "DekuRead: id_pat id storage cannot have attributes",
+                ));
             }
             quote! {
                 __deku_variant_id;

@@ -2,10 +2,78 @@
 
 ## [Unreleased]
 
-## [0.18.1] - 2024-08-09
+## Features
+### Added `bit_order` ([#483](https://github.com/sharksforarms/deku/pull/483/files))
+After much development, `bit_order` is now a supported attribute! `Msb0` is still the default bit-order for all operations,
+but if you need something special with bit ordering, deku now has you covered.
 
+For example, the following is now possible:
+```rs
+# #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+#[deku(bit_order = "lsb")]
+pub struct SquashfsV3 {
+    #[deku(bits = "4")]
+    inode_type: u8,
+    #[deku(bits = "12")]
+    mode: u16,
+    uid: u8,
+    guid: u8,
+    mtime: u32,
+    inode_number: u32,
+}
+let data: &[u8] = &[
+//       inode_type
+//     ╭-----------
+//     |
+//     |    mode
+//    ╭+--------   ...and so on
+//    ||    ||
+//    vv    vv
+    0x31, 0x12, 0x04, 0x05, 0x06, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,
+];
+```
+
+If you were using our internal `reader` the following changed. As well as the `leftover` field now containing ordering.
+```diff
+- reader.read_bytes(exact.0, &mut bytes)?;
++ reader.read_bytes(exact.0, &mut bytes, Order::Lsb0)?;
+```
+
+### Added bytes ctx for `CString` ([#497](https://github.com/sharksforarms/deku/pull/497))
+```rs
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+pub struct Data {
+    len: u8,
+    #[deku(bytes = "*len as usize")]
+    s: CString,
+}
+```
+
+### Changed `id_pat` ([#540](https://github.com/sharksforarms/deku/pull/540))
+The `id_pat` attribute has been restored to the behavior of `0.16.0`, removing the seek and re-read.
+Added the requirement of the type used to read the id needs to be the same as the storage unit and force no attributes.
+
+* `Arc` support by [@vhdirk](https://github.com/vhdirk) ([#522](https://github.com/sharksforarms/deku/pull/522))
+* Update `no-std-io2` to 0.9.0 and Updated `MSRV` to `1.81` ([#529](https://github.com/sharksforarms/deku/pull/529))
+* Add field support for `magic` attribute ([#503](https://github.com/sharksforarms/deku/pull/503))
+* Add `NoSeek` for unseekable `Read` + `Write` impls ([#487](https://github.com/sharksforarms/deku/pull/487))
+* Add performance specializations for `count` attribute + `Vec<u8>`([#481](https://github.com/sharksforarms/deku/pull/481))
+* `Reader` may now take ownership of `Read + Seek` type. Thanks [@wgreenburg](https://github.com/wgreenburg) ([#521](https://github.com/sharksforarms/deku/pull/521)).
+
+### Allow token streams for `bytes` attribute ([#489](https://github.com/sharksforarms/deku/pull/489))
+```rs
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    field_a_size: u8,
+    #[deku(bytes = "*field_a_size as usize")]
+    field_a: u32,
+}
+```
+
+## Fixes
 - Fix pad_* attributes in no_std ([#478](https://github.com/sharksforarms/deku/pull/478))
 - Fix bug with id_pat and read_bytes_const ([#479](https://github.com/sharksforarms/deku/pull/479))
+- Several fixes for scope and imports in proc-macros, thanks [@Serial-ATA](https://github.com/Serial-ATA) ([#541](https://github.com/sharksforarms/deku/pull/541), [#538](https://github.com/sharksforarms/deku/pull/538), [#539](https://github.com/sharksforarms/deku/pull/539))
 
 ## [0.18.0] - 2024-08-07
 

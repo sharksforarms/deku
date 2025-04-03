@@ -334,13 +334,20 @@ impl<R: Read + Seek> Reader<R> {
                 }
 
                 match order {
+                    // | used | front_bits | leftover |
                     Order::Lsb0 => {
                         let (rest, used) = new_bits.split_at(new_bits.len() - bits_left);
+                        #[cfg(feature = "logging")]
+                        log::trace!("extend(used): {}", used);
                         ret.extend_from_bitslice(used);
                         if let Some(front_bits) = front_bits {
+                            #[cfg(feature = "logging")]
+                            log::trace!("extend(front_bits): {}", front_bits);
                             ret.extend_from_bitslice(front_bits);
                         }
                         if let Some(Leftover::Bits(bits)) = &self.leftover {
+                            #[cfg(feature = "logging")]
+                            log::trace!("extend(leftover): {}", bits);
                             ret.extend_from_bitslice(bits);
                         }
 
@@ -350,14 +357,21 @@ impl<R: Read + Seek> Reader<R> {
                             self.leftover = None;
                         }
                     }
+                    // | leftover | front_bits | rest |
                     Order::Msb0 => {
                         let (rest, not_needed) = new_bits.split_at(bits_left);
-                        if let Some(front_bits) = front_bits {
-                            ret.extend_from_bitslice(front_bits);
-                        }
                         if let Some(Leftover::Bits(bits)) = &self.leftover {
+                            #[cfg(feature = "logging")]
+                            log::trace!("extend(leftover): {}", bits);
                             ret.extend_from_bitslice(bits);
                         }
+                        if let Some(front_bits) = front_bits {
+                            #[cfg(feature = "logging")]
+                            log::trace!("extend(front_bits): {}", front_bits);
+                            ret.extend_from_bitslice(front_bits);
+                        }
+                        #[cfg(feature = "logging")]
+                        log::trace!("extend(rest): {}", rest);
                         ret.extend_from_bitslice(rest);
 
                         if !not_needed.is_empty() {
@@ -843,5 +857,37 @@ mod tests {
         let mut out = vec![0x00; 0xff * 2];
         // doesn't crash
         let _ = reader.read_bytes(0xfe * 2, &mut out, Order::Lsb0).unwrap();
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_regression_msb0() {
+        // 0110_0100b, 0010_0000b
+        let input = [0x64, 0x20];
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        reader.leftover = Some(Leftover::Bits(bitvec![u8, Msb0; 1, 0]));
+        let bits = reader.read_bits(17, Order::Msb0).unwrap();
+        assert_eq!(
+            bits,
+            //                     |left|first                |last                |
+            Some(bitvec![u8, Msb0; 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0])
+        );
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_regression_lsb0() {
+        // 0110_0100b, 0010_0000b
+        let input = [0x64, 0x20];
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        reader.leftover = Some(Leftover::Bits(bitvec![u8, Msb0; 1, 0]));
+        let bits = reader.read_bits(17, Order::Lsb0).unwrap();
+        assert_eq!(
+            bits,
+            //                     |first               |last                   |left|
+            Some(bitvec![u8, Msb0; 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0])
+        );
     }
 }

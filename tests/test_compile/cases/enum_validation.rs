@@ -76,4 +76,60 @@ enum Test11 {
     B(u8),
 }
 
+// Test id_pat id storage must not have attributes
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(id_type = "u8", bits = "2")]
+pub enum Test12 {
+    #[deku(id_pat = "_")]
+    B(#[deku(bits = 7)] u8, #[deku(bits = 6)] u8),
+}
+
+// Test id_pat id storage must not have attributes
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(id_type = "u32", bytes = "2")]
+pub enum Test13 {
+    #[deku(id_pat = "_")]
+    B(#[deku(bytes = 3)] u32, #[deku(bits = 6)] u8),
+}
+
+// Test id_pat id storage must not have attributes
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(id_type = "u32", bytes = "2", id_endian = "little")]
+pub enum Test14 {
+    #[deku(id_pat = "_")]
+    B(#[deku(bytes = 2, endian = "big")] u32, #[deku(bits = 6)] u8),
+}
+
+// Test id_pat id storage must have matching types
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(id_type = "u32", bytes = "2")]
+pub enum Test15 {
+    #[deku(id_pat = "_")]
+    B(u8, #[deku(bits = 6)] u8),
+}
+
+// Test id_pat id storage must have matching types
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[deku(id_type = "[u8; 32]")]
+pub enum Test16 {
+    #[deku(id_pat = "_")]
+    B(u16, #[deku(bits = 6)] u8),
+}
+
+// Test id_pat id storage must exist (read)
+#[derive(PartialEq, Debug, DekuRead)]
+#[deku(id_type = "u8")]
+pub enum Test17 {
+    #[deku(id_pat = "_")]
+    B,
+}
+
+// Test id_pat id storage must exist (write)
+#[derive(PartialEq, Debug, DekuWrite)]
+#[deku(id_type = "u8")]
+pub enum Test18 {
+    #[deku(id_pat = "_")]
+    B,
+}
+
 fn main() {}

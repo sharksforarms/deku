@@ -100,12 +100,26 @@ impl ToTokens for Num {
 impl FromMeta for Num {
     fn from_value(value: &syn::Lit) -> darling::Result<Self> {
         (match *value {
-            syn::Lit::Str(ref s) => Ok(Num::TokenStream(
-                apply_replacements(s)
-                    .map_err(darling::Error::custom)?
-                    .parse::<TokenStream>()
-                    .expect("could not parse token stream"),
-            )),
+            syn::Lit::Str(ref s) => {
+                let str_value = s.value();
+
+                // Attempt to read ("2") as a Num LitInt (2)
+                match str_value.parse::<u64>() {
+                    Ok(int_value) => {
+                        let int_string = int_value.to_string();
+                        let span = s.span();
+                        let lit_int = syn::LitInt::new(&int_string, span);
+                        Ok(Num::new(lit_int))
+                    }
+                    // else, just a tokenstream
+                    Err(_) => Ok(Num::TokenStream(
+                        apply_replacements(s)
+                            .map_err(darling::Error::custom)?
+                            .parse::<TokenStream>()
+                            .expect("could not parse token stream"),
+                    )),
+                }
+            }
             syn::Lit::Int(ref s) => Ok(Num::new(s.clone())),
             _ => Err(darling::Error::unexpected_lit_type(value)),
         })
@@ -516,6 +530,61 @@ struct FieldData {
 }
 
 impl FieldData {
+    pub fn any_field_set(&self) -> bool {
+        // NOTE: Ignore ident
+        let mut any_option_set = self.endian.is_some();
+
+        #[cfg(feature = "bits")]
+        {
+            any_option_set = any_option_set || self.bits.is_some();
+        }
+
+        any_option_set = any_option_set || self.bytes.is_some() || self.count.is_some();
+
+        #[cfg(feature = "bits")]
+        {
+            any_option_set = any_option_set || self.bits_read.is_some();
+        }
+
+        any_option_set = any_option_set
+            || self.bytes_read.is_some()
+            || self.until.is_some()
+            || self.map.is_some()
+            || self.ctx.is_some()
+            || self.update.is_some()
+            || self.reader.is_some()
+            || self.writer.is_some();
+
+        #[cfg(feature = "bits")]
+        {
+            any_option_set = any_option_set || self.pad_bits_before.is_some();
+        }
+
+        any_option_set = any_option_set || self.pad_bytes_before.is_some();
+
+        #[cfg(feature = "bits")]
+        {
+            any_option_set = any_option_set || self.pad_bits_after.is_some();
+        }
+
+        // NOTE: Ignore default
+        any_option_set = any_option_set
+            || self.pad_bytes_after.is_some()
+            || self.temp_value.is_some()
+            || self.cond.is_some()
+            || self.assert.is_some()
+            || self.assert_eq.is_some()
+            || self.seek_from_current.is_some()
+            || self.seek_from_end.is_some()
+            || self.seek_from_start.is_some()
+            || self.bit_order.is_some()
+            || self.magic.is_some();
+
+        let any_bool_set = self.read_all || self.skip || self.temp || self.seek_rewind;
+
+        any_option_set || any_bool_set
+    }
+
     fn from_receiver(receiver: DekuFieldReceiver) -> Result<Self, TokenStream> {
         let ctx = receiver
             .ctx?

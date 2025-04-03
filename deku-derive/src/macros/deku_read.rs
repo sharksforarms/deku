@@ -236,7 +236,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             .and_then(|v| v.ident.as_ref())
             .is_some();
 
-        let mut restore = false;
+        let mut pad_id = false;
         let variant_id = if let Some(variant_id) = &variant.id {
             match variant_id {
                 Id::TokenStream(v) => quote! {&#v}.into_token_stream(),
@@ -248,8 +248,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             // If user has supplied an id, then we have an id_pat that and the id variant doesn't
             // need read into an id value
             if id.is_none() {
-                // if id_pat and !id, we need to restore after reading
-                restore = true;
+                pad_id = true;
                 variant_id_pat.clone()
             } else {
                 variant_id_pat.clone()
@@ -279,8 +278,17 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let variant_read_func = if variant_reader.is_some() {
             quote! { #variant_reader; }
         } else {
+            // VarDefault { id: u8, value: u8 }, is allowed
+            // VarDefault, is not, if we need to store the id
+            if pad_id && variant.id.is_none() && variant.fields.is_empty() {
+                // TODO: This would be nice to point to the field
+                return Err(syn::Error::new(
+                    input.ident.span(),
+                    "DekuRead: id_pat requires storage field",
+                ));
+            }
             let (field_idents, field_reads) =
-                emit_field_reads(input, &variant.fields.as_ref(), &ident, restore)?;
+                emit_field_reads(input, &variant.fields.as_ref(), &ident, pad_id)?;
 
             // filter out temporary fields
             let field_idents = field_idents
@@ -371,8 +379,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     };
 
     let variant_read = quote! {
-        __deku_reader.last_bits_read_amt = 0;
-        let __deku_last_leftover = __deku_reader.leftover.clone();
         #variant_id_read
 
         #(#pre_match_tokens)*
@@ -673,7 +679,7 @@ fn emit_field_read(
     i: usize,
     f: &FieldData,
     ident: &TokenStream,
-    restore_pad_id: bool,
+    pad_id: bool,
 ) -> Result<(TokenStream, TokenStream), syn::Error> {
     let crate_ = super::get_crate_name();
     let field_type = &f.ty;
@@ -822,19 +828,16 @@ fn emit_field_read(
             quote!(<#field_type as ::#crate_::DekuReader<'_, _>>)
         };
 
-        if restore_pad_id {
+        if pad_id {
+            if f.any_field_set() {
+                // TODO: This would be nice to point to the field
+                return Err(syn::Error::new(
+                    input.ident.span(),
+                    "DekuRead: id_pat id storage cannot have attributes",
+                ));
+            }
             quote! {
-                {
-                    if let Err(e) = __deku_reader.seek_last_read() {
-                        return Err(::#crate_::DekuError::Io(e.kind()));
-                    }
-                    __deku_reader.leftover = __deku_last_leftover;
-                    #type_as_deku_read::from_reader_with_ctx
-                    (
-                        __deku_reader,
-                        (#read_args)
-                    )?
-                }
+                __deku_variant_id;
             }
         } else if let Some(field_count) = &f.count {
             use syn::{GenericArgument, PathArguments, Type};

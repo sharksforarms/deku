@@ -63,3 +63,51 @@ error: DekuRead: `id` must be specified on non-unit variants
    |
 76 |     B(u8),
    |     ^
+
+error: DekuRead: id_pat id storage cannot have attributes
+  --> tests/test_compile/cases/enum_validation.rs:82:10
+   |
+82 | pub enum Test12 {
+   |          ^^^^^^
+
+error: DekuRead: id_pat id storage cannot have attributes
+  --> tests/test_compile/cases/enum_validation.rs:90:10
+   |
+90 | pub enum Test13 {
+   |          ^^^^^^
+
+error: DekuRead: id_pat id storage cannot have attributes
+  --> tests/test_compile/cases/enum_validation.rs:98:10
+   |
+98 | pub enum Test14 {
+   |          ^^^^^^
+
+error: DekuRead: id_pat requires storage field
+   --> tests/test_compile/cases/enum_validation.rs:122:10
+    |
+122 | pub enum Test17 {
+    |          ^^^^^^
+
+error: DekuRead: id_pat requires storage field
+   --> tests/test_compile/cases/enum_validation.rs:130:10
+    |
+130 | pub enum Test18 {
+    |          ^^^^^^
+
+error[E0308]: `?` operator has incompatible types
+   --> tests/test_compile/cases/enum_validation.rs:104:28
+    |
+104 | #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    |                            ^^^^^^^^ expected `u8`, found `u32`
+    |
+    = note: `?` operator cannot convert from `u32` to `u8`
+    = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: `?` operator has incompatible types
+   --> tests/test_compile/cases/enum_validation.rs:112:28
+    |
+112 | #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    |                            ^^^^^^^^ expected `u16`, found `[u8; 32]`
+    |
+    = note: `?` operator cannot convert from `[u8; 32]` to `u16`
+    = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)

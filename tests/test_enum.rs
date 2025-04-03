@@ -102,7 +102,7 @@ fn test_enum_array_type() {
         #[deku(id = "[1,1,1]")]
         VarB,
         #[deku(id_pat = "_")]
-        VarC((u8, u8, u8)),
+        VarC([u8; 3]),
     }
 
     let input = b"123".to_vec();
@@ -116,7 +116,7 @@ fn test_enum_array_type() {
     let input = b"321".to_vec();
 
     let ret_read = TestEnumArray::try_from(input.as_slice()).unwrap();
-    assert_eq!(TestEnumArray::VarC((b"3"[0], b"2"[0], b"1"[0])), ret_read);
+    assert_eq!(TestEnumArray::VarC([b"3"[0], b"2"[0], b"1"[0]]), ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(input.to_vec(), ret_write);
@@ -176,7 +176,7 @@ fn test_id_pat_with_id() {
         v,
         DekuTest {
             my_id: 0x06,
-            enum_from_id: MyEnum::VariantB
+            enum_from_id: MyEnum::VariantB,
         }
     );
     assert_eq!(input, &*v.to_bytes().unwrap());
@@ -192,45 +192,13 @@ fn id_pat_with_id_bits() {
         A(#[deku(bits = 6)] u8),
 
         #[deku(id_pat = "_")]
-        B(#[deku(bits = 8)] u8),
+        B(u8, #[deku(bits = 6)] u8),
     }
 
     let input = [0b1100_1111];
     let mut cursor = Cursor::new(input);
     let (_, v) = IdPatBits::from_reader((&mut cursor, 0)).unwrap();
-    assert_eq!(v, IdPatBits::B(0b1100_1111));
-    assert_eq!(input, &*v.to_bytes().unwrap());
-
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(id_type = "u8", bits = "7")]
-    pub enum IdPatBitsBigger {
-        #[deku(id = 1)]
-        A(#[deku(bits = 9)] u16),
-
-        #[deku(id_pat = "_")]
-        B(u16),
-    }
-
-    let input = [0b0000_0000, 0b0000_0001];
-    let mut cursor = Cursor::new(input);
-    let (_, v) = IdPatBitsBigger::from_reader((&mut cursor, 0)).unwrap();
-    assert_eq!(v, IdPatBitsBigger::B(0b1_0000_0000));
-    assert_eq!(input, &*v.to_bytes().unwrap());
-
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    #[deku(id_type = "u8", bits = "7")]
-    pub enum IdPatBitsTuple {
-        #[deku(id = 1)]
-        A(#[deku(bits = 9)] u16),
-
-        #[deku(id_pat = "_")]
-        B((u8, u8)),
-    }
-
-    let input = [0b0000_0000, 0b0000_0001];
-    let mut cursor = Cursor::new(input);
-    let (_, v) = IdPatBitsTuple::from_reader((&mut cursor, 0)).unwrap();
-    assert_eq!(v, IdPatBitsTuple::B((0, 1)));
+    assert_eq!(v, IdPatBits::B(0b11, 0b00_1111));
     assert_eq!(input, &*v.to_bytes().unwrap());
 }
 

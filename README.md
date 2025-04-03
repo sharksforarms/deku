@@ -21,13 +21,13 @@ for binary structs or network headers
 
 ```toml
 [dependencies]
-deku = "0.18"
+deku = "0.19"
 ```
 
 no_std:
 ```toml
 [dependencies]
-deku = { version = "0.18", default-features = false, features = ["alloc"] }
+deku = { version = "0.19", default-features = false, features = ["alloc"] }
 ```
 
 ## Example

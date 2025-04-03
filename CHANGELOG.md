@@ -55,13 +55,6 @@ pub struct Data {
 The `id_pat` attribute has been restored to the behavior of `0.16.0`, removing the seek and re-read.
 Added the requirement of the type used to read the id needs to be the same as the storage unit and force no attributes.
 
-* `Arc` support by [@vhdirk](https://github.com/vhdirk) ([#522](https://github.com/sharksforarms/deku/pull/522))
-* Update `no-std-io2` to 0.9.0 and Updated `MSRV` to `1.81` ([#529](https://github.com/sharksforarms/deku/pull/529))
-* Add field support for `magic` attribute ([#503](https://github.com/sharksforarms/deku/pull/503))
-* Add `NoSeek` type for unseekable `Read` + `Write` impls ([#487](https://github.com/sharksforarms/deku/pull/487))
-* Add performance specializations for `count` attribute + `Vec<u8>`([#481](https://github.com/sharksforarms/deku/pull/481))
-* `Reader` may now take ownership of `Read + Seek` type. Thanks [@wgreenburg](https://github.com/wgreenburg) ([#521](https://github.com/sharksforarms/deku/pull/521)).
-
 ### Allow token streams for `bytes` attribute ([#489](https://github.com/sharksforarms/deku/pull/489))
 ```rs
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -71,6 +64,15 @@ struct DekuTest {
     field_a: u32,
 }
 ```
+
+### Updates
+* `Arc` support by [@vhdirk](https://github.com/vhdirk) ([#522](https://github.com/sharksforarms/deku/pull/522))
+* Update `no-std-io2` to 0.9.0 and Updated `MSRV` to `1.81` ([#529](https://github.com/sharksforarms/deku/pull/529))
+* Add field support for `magic` attribute ([#503](https://github.com/sharksforarms/deku/pull/503))
+* Add `NoSeek` type for unseekable `Read` + `Write` impls ([#487](https://github.com/sharksforarms/deku/pull/487))
+* Add performance specializations for `count` attribute + `Vec<u8>`([#481](https://github.com/sharksforarms/deku/pull/481))
+* `Reader` may now take ownership of `Read + Seek` type. Thanks [@wgreenburg](https://github.com/wgreenburg) ([#521](https://github.com/sharksforarms/deku/pull/521)).
+
 
 ## Fixes
 - Fix pad_* attributes in no_std ([#478](https://github.com/sharksforarms/deku/pull/478))

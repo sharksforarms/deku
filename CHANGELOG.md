@@ -2,15 +2,17 @@
 
 ## [Unreleased]
 
+## [0.19.0] - 2025-02-07
+
 ## Features
 ### Added `bit_order` ([#483](https://github.com/sharksforarms/deku/pull/483/files))
-After much development, `bit_order` is now a supported attribute! `Msb0` is still the default bit-order for all operations,
-but if you need something special with bit ordering, deku now has you covered.
+After much development, `bit_order` is now a supported attribute! `Msb` is still the default bit-order for all operations,
+but if you need `Lsb` ordering, deku now has you covered.
 
 For example, the following is now possible:
 ```rs
 # #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
-#[deku(bit_order = "lsb")]
+#[deku(bit_order = "lsb")] // <--
 pub struct SquashfsV3 {
     #[deku(bits = "4")]
     inode_type: u8,
@@ -56,7 +58,7 @@ Added the requirement of the type used to read the id needs to be the same as th
 * `Arc` support by [@vhdirk](https://github.com/vhdirk) ([#522](https://github.com/sharksforarms/deku/pull/522))
 * Update `no-std-io2` to 0.9.0 and Updated `MSRV` to `1.81` ([#529](https://github.com/sharksforarms/deku/pull/529))
 * Add field support for `magic` attribute ([#503](https://github.com/sharksforarms/deku/pull/503))
-* Add `NoSeek` for unseekable `Read` + `Write` impls ([#487](https://github.com/sharksforarms/deku/pull/487))
+* Add `NoSeek` type for unseekable `Read` + `Write` impls ([#487](https://github.com/sharksforarms/deku/pull/487))
 * Add performance specializations for `count` attribute + `Vec<u8>`([#481](https://github.com/sharksforarms/deku/pull/481))
 * `Reader` may now take ownership of `Read + Seek` type. Thanks [@wgreenburg](https://github.com/wgreenburg) ([#521](https://github.com/sharksforarms/deku/pull/521)).
 
@@ -558,7 +560,9 @@ Community:
 - Added `release.toml`
 - Added `CHANGELOG.md` to track changes
 
-[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.18.1...HEAD
+[Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.19.0...HEAD
+
+[0.19.0]: https://github.com/sharksforarms/deku/compare/deku-v0.18.1...deku-v0.19.0
 
 [0.18.1]: https://github.com/sharksforarms/deku/compare/deku-v0.18.0...deku-v0.18.1
 

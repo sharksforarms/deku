@@ -336,7 +336,7 @@ environment, you will see logging messages as Deku does its deserialising.
 
 - With the use of the `no-assert-string` feature, you can remove the strings Deku adds to assertion errors.
 - `DekuError` whenever possible will use a `'static str`, to make the errors compile away when following a
-   guide such as [min-sized-rust](https://github.com/johnthagen/min-sized-rust).
+  guide such as [min-sized-rust](https://github.com/johnthagen/min-sized-rust).
 
 # Performance: Compile without `bitvec`
 The feature `bits` enables the `bitvec` crate to use when reading and writing, which is enabled by default.

@@ -279,7 +279,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                         "DekuWrite: cannot determine write `id`. must provide storage for the id or discriminant"
                     } else {
                         "DekuWrite: `id` must be specified on non-unit variants"
-                    }
+                    },
                 ));
             }
         } else {

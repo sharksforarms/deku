@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 pub trait FromBeBytes: Sized {
     type Bytes;
     fn from_be_bytes(_: Self::Bytes) -> Self;

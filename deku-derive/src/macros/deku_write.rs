@@ -7,8 +7,7 @@ use syn::LitStr;
 
 use crate::macros::{
     assertion_failed, gen_bit_order_from_str, gen_ctx_types_and_arg, gen_field_args,
-    gen_internal_field_ident, gen_internal_field_idents, gen_struct_destruction,
-    token_contains_string, wrap_default_ctx,
+    gen_internal_field_ident, gen_struct_destruction, token_contains_string, wrap_default_ctx,
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 

@@ -360,6 +360,8 @@ use alloc::vec::Vec;
 /// re-export of [no_std_io2](https://crates.io/crates/no-std-io2)
 pub mod no_std_io {
     pub use no_std_io::io::Cursor;
+    pub use no_std_io::io::Error;
+    pub use no_std_io::io::ErrorKind;
     pub use no_std_io::io::Read;
     pub use no_std_io::io::Result;
     pub use no_std_io::io::Seek;

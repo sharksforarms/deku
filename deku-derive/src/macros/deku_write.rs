@@ -7,7 +7,7 @@ use syn::LitStr;
 
 use crate::macros::{
     assertion_failed, gen_bit_order_from_str, gen_ctx_types_and_arg, gen_field_args,
-    gen_struct_destruction, token_contains_string, wrap_default_ctx,
+    gen_internal_field_ident, gen_struct_destruction, token_contains_string, wrap_default_ctx,
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
@@ -721,8 +721,10 @@ fn emit_field_write(
         if f.temp {
             if let Some(temp_value) = &f.temp_value {
                 let field_type = &f.ty;
+                let internal_field_ident = gen_internal_field_ident(&field_ident);
                 quote! {
-                    let #field_ident: #field_type = #temp_value;
+                    let #internal_field_ident: #field_type = #temp_value;
+                    let #field_ident: &#field_type = &#internal_field_ident;
                     ::#crate_::DekuWriter::to_writer(#object_prefix &#field_ident, __deku_writer, (#write_args))
                 }
             } else {

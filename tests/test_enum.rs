@@ -122,6 +122,96 @@ fn test_enum_array_type() {
     assert_eq!(input.to_vec(), ret_write);
 }
 
+#[cfg(feature = "bits")]
+#[test]
+fn test_enum_id_pat_with_discriminant() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct DekuTest {
+        inner: TestEnum,
+        #[deku(bits = 5)]
+        rest: u8,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(id_type = "u8", bits = "3")]
+    #[repr(u8)]
+    enum TestEnum {
+        VarA = 0,
+        VarB,
+        #[deku(id_pat = "_")]
+        VarC,
+    }
+
+    let input = &[0b001_00101];
+    let ret_read = DekuTest::try_from(input.as_slice()).unwrap();
+    assert_eq!(
+        DekuTest {
+            inner: TestEnum::VarB,
+            rest: 0b00101
+        },
+        ret_read
+    );
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(input.to_vec(), ret_write);
+
+    let input = &[0b101_00101];
+    let ret_read = DekuTest::try_from(input.as_slice()).unwrap();
+    assert_eq!(
+        DekuTest {
+            inner: TestEnum::VarC,
+            rest: 0b00101
+        },
+        ret_read
+    );
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(vec![0b010_00101], ret_write);
+}
+
+#[cfg(feature = "bits")]
+#[test]
+fn test_enum_id_pat_with_discriminant_and_storage() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct DekuTest {
+        inner: TestEnumStorage,
+        #[deku(bits = 5)]
+        rest: u8,
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(id_type = "u8", bits = "3")]
+    #[repr(u8)]
+    enum TestEnumStorage {
+        VarA = 0,
+        VarB,
+        #[deku(id_pat = "_")]
+        VarC(u8),
+    }
+
+    let input = &[0b001_00101];
+    let ret_read = DekuTest::try_from(input.as_slice()).unwrap();
+    assert_eq!(
+        DekuTest {
+            inner: TestEnumStorage::VarB,
+            rest: 0b00101
+        },
+        ret_read
+    );
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(input.to_vec(), ret_write);
+
+    let input = &[0b101_00101];
+    let ret_read = DekuTest::try_from(input.as_slice()).unwrap();
+    assert_eq!(
+        DekuTest {
+            inner: TestEnumStorage::VarC(0b101),
+            rest: 0b00101
+        },
+        ret_read
+    );
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(input.to_vec(), ret_write);
+}
+
 #[test]
 fn test_id_pat_with_id() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]

@@ -29,7 +29,7 @@ impl NeedSize {
     /// Number of bytes needed
     #[inline]
     pub fn byte_size(&self) -> usize {
-        (self.bits + 7) / 8
+        self.bits.div_ceil(8)
     }
 }
 

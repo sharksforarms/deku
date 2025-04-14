@@ -173,7 +173,7 @@ macro_rules! ImplDekuReadBits {
                 // PANIC: We already check that input.len() < bit_size above, so no panic will happen
                 let bit_slice = &input;
 
-                let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
+                let pad = 8 * bit_slice.len().div_ceil(8) - bit_slice.len();
 
                 // if everything is aligned, just read the value
                 if pad == 0 && bit_slice.len() == MAX_TYPE_BITS {
@@ -291,7 +291,7 @@ macro_rules! ImplDekuReadBits {
 
                 let bit_slice = &input[..bit_size];
 
-                let pad = 8 * ((bit_slice.len() + 7) / 8) - bit_slice.len();
+                let pad = 8 * bit_slice.len().div_ceil(8) - bit_slice.len();
 
                 // if everything is aligned, just read the value
                 if pad == 0 && bit_slice.len() == MAX_TYPE_BITS {
@@ -1308,7 +1308,7 @@ mod tests {
     #[rstest(input, endian, byte_size, expected,
         case::normal_le(0xDDCC_BBAA, Endian::Little, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
         case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
-        case::byte_size_be_smaller(0x00ffABAA, Endian::Big, Some(2), vec![0xab, 0xaa]),
+        case::byte_size_be_smaller(0x00FFABAA, Endian::Big, Some(2), vec![0xab, 0xaa]),
         #[should_panic(expected = "InvalidParam(\"byte size 10 is larger then input 4\")")]
         case::byte_size_le_bigger(0x03AB, Endian::Little, Some(10), vec![0xAB, 0b11_000000]),
     )]

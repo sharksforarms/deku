@@ -53,7 +53,6 @@ pub struct Data {
 
 ### Changed `id_pat` ([#540](https://github.com/sharksforarms/deku/pull/540))
 The `id_pat` attribute has been restored to the behavior of `0.16.0`, removing the seek and re-read.
-Added the requirement of the type used to read the id needs to be the same as the storage unit and force no attributes.
 
 ### Allow token streams for `bytes` attribute ([#489](https://github.com/sharksforarms/deku/pull/489))
 ```rs

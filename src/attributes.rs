@@ -1596,7 +1596,10 @@ assert_eq!(
 
 Specify the identifier in the form of a match pattern for the enum variant.
 
-The first field of the variant is used for storage, and must be the same type as `id_type` and no attributes.
+The first field of the variant may be used for storage, and must be the same type as `id_type` and no attributes.
+
+If no storage for the id is provided, the enum discriminent (if provided) will be used to write as the id for that variant
+
 The writing of the field will use the same options as the reading.
 
 Example:

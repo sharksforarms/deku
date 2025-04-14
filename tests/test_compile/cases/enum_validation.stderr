@@ -82,17 +82,17 @@ error: DekuRead: id_pat id storage cannot have attributes
 98 | pub enum Test14 {
    |          ^^^^^^
 
-error: DekuRead: id_pat requires storage field
-   --> tests/test_compile/cases/enum_validation.rs:122:10
+error: DekuWrite: cannot determine write `id`. must provide storage for the id or discriminant
+   --> tests/test_compile/cases/enum_validation.rs:132:5
     |
-122 | pub enum Test17 {
-    |          ^^^^^^
+132 |     B,
+    |     ^
 
-error: DekuRead: id_pat requires storage field
-   --> tests/test_compile/cases/enum_validation.rs:130:10
+error[E0732]: `#[repr(inttype)]` must be specified
+   --> tests/test_compile/cases/enum_validation.rs:138:1
     |
-130 | pub enum Test18 {
-    |          ^^^^^^
+138 | pub enum Test19 {
+    | ^^^^^^^^^^^^^^^
 
 error[E0308]: `?` operator has incompatible types
    --> tests/test_compile/cases/enum_validation.rs:104:28

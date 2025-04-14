@@ -124,12 +124,21 @@ pub enum Test17 {
     B,
 }
 
-// Test id_pat id storage must exist (write)
+// Test cannot determine id write
 #[derive(PartialEq, Debug, DekuWrite)]
 #[deku(id_type = "u8")]
 pub enum Test18 {
     #[deku(id_pat = "_")]
     B,
+}
+
+// Test #[repr(inttype)]
+#[derive(PartialEq, Debug, DekuWrite)]
+#[deku(id_type = "u8")]
+pub enum Test19 {
+    A = 0,
+    #[deku(id_pat = "_")]
+    B(u8),
 }
 
 fn main() {}

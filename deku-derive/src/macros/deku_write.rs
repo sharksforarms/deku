@@ -263,17 +263,23 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                         }
                     }
                 }
-            } else if variant.id_pat.is_some() {
+            } else if variant.id_pat.is_some() && !variant.fields.is_empty() {
+                // if the variant has fields, the first must be storing the id
                 quote! {}
             } else if has_discriminant {
                 quote! {
-                    let mut __deku_variant_id: #id_type = Self::#variant_ident as #id_type;
+                    // https://doc.rust-lang.org/reference/items/enumerations.html#r-items.enum.discriminant.access-memory
+                    let mut __deku_variant_id: #id_type = unsafe { *(&Self::#variant_ident as *const Self as *const #id_type) };
                     __deku_variant_id.to_writer(__deku_writer, (#id_args))?;
                 }
             } else {
                 return Err(syn::Error::new(
                     variant.ident.span(),
-                    "DekuWrite: `id` must be specified on non-unit variants",
+                    if variant.id_pat.is_some() && !has_discriminant {
+                        "DekuWrite: cannot determine write `id`. must provide storage for the id or discriminant"
+                    } else {
+                        "DekuWrite: `id` must be specified on non-unit variants"
+                    },
                 ));
             }
         } else {
@@ -431,15 +437,6 @@ fn emit_field_writes(
     object_prefix: Option<TokenStream>,
     ident: &TokenStream,
 ) -> Result<Vec<TokenStream>, syn::Error> {
-    // VarDefault { id: u8, value: u8 }, is allowed
-    // VarDefault, is not, if we need to store the id
-    if is_id_pat && input.id.is_none() && fields.is_empty() {
-        // TODO: This would be nice to point to the field
-        return Err(syn::Error::new(
-            input.ident.span(),
-            "DekuRead: id_pat requires storage field",
-        ));
-    }
     let mut is_id_pat = is_id_pat;
     fields
         .iter()

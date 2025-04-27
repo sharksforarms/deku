@@ -603,7 +603,7 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
 
                 if (__deku_pad % 8) == 0 {
                     let bytes_read = __deku_pad / 8;
-                    let mut buf = vec![0; bytes_read];
+                    let mut buf = alloc::vec![0; bytes_read];
                     // TODO: use skip_bytes, or Seek in the future?
                     let _ = __deku_reader.read_bytes(bytes_read, &mut buf, #order)?;
                 } else {
@@ -630,7 +630,7 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
 
                 if (__deku_pad % 8) == 0 {
                     let bytes_read = __deku_pad / 8;
-                    let mut buf = vec![0; bytes_read];
+                    let mut buf = alloc::vec![0; bytes_read];
                     // TODO: use skip_bytes, or Seek in the future?
                     let _ = __deku_reader.read_bytes(bytes_read, &mut buf, ::#crate_::ctx::Order::default())?;
                 } else {

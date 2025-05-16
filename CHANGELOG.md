@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## Fixes
+- fix and test of conditional temporary fields depending on conditional temporary fields (did not compile before). See [unittest](./tests/test_attributes/test_temp_value_with_cond.rs).
+
 ## [0.19.0] - 2025-02-07
 
 ## Features

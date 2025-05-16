@@ -719,12 +719,8 @@ fn emit_field_write(
         )?;
 
         if f.temp {
-            if let Some(temp_value) = &f.temp_value {
-                let field_type = &f.ty;
-                let internal_field_ident = gen_internal_field_ident(&field_ident);
+            if f.temp_value.is_some() {
                 quote! {
-                    let #internal_field_ident: #field_type = #temp_value;
-                    let #field_ident: &#field_type = &#internal_field_ident;
                     ::#crate_::DekuWriter::to_writer(#object_prefix &#field_ident, __deku_writer, (#write_args))
                 }
             } else {
@@ -768,10 +764,25 @@ fn emit_field_write(
         quote! {}
     };
 
+    let temp_decl = if f.temp {
+        if let Some(temp_value) = &f.temp_value {
+            let field_type = &f.ty;
+            let internal_field_ident = gen_internal_field_ident(&field_ident);
+            Some(quote! {
+                let #internal_field_ident: #field_type = #temp_value;
+                let #field_ident: &#field_type = &#internal_field_ident;
+            })
+        } else {
+            None // Note: temp w/o temp_value with not work
+        }
+    } else {
+        None
+    };
     let field_write_tokens = match (f.skip, &f.cond) {
         (true, Some(field_cond)) => {
             // #[deku(skip, cond = "...")] ==> `skip` if `cond`
             quote! {
+                #temp_decl
                 if (#field_cond) {
                     #skipping_log
                    // skipping, no write
@@ -789,6 +800,7 @@ fn emit_field_write(
         }
         (false, _) => {
             quote! {
+                #temp_decl
                 #field_write_normal
             }
         }

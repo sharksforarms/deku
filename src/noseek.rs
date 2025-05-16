@@ -4,8 +4,6 @@
 use alloc::vec::Vec;
 
 use crate::no_std_io::{Read, Result, Seek, SeekFrom, Write};
-#[cfg(feature = "std")]
-use no_std_io::io::ErrorKind;
 
 /// A wrapper that provides a limited implementation of
 /// [`Seek`] for unseekable [`Read`] and [`Write`] streams.
@@ -50,10 +48,7 @@ impl<T> Seek for NoSeek<T> {
             SeekFrom::Current(0) => Ok(self.pos),
             // https://github.com/rust-lang/rust/issues/86442
             #[cfg(feature = "std")]
-            _ => Err(std::io::Error::new(
-                ErrorKind::Other,
-                "seek on unseekable file",
-            )),
+            _ => Err(std::io::Error::other("seek on unseekable file")),
             #[cfg(not(feature = "std"))]
             _ => panic!("seek on unseekable file"),
         }

@@ -8,10 +8,10 @@ extern crate alloc;
 use alloc::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt::Display;
-use syn::Type;
+use syn::{Attribute, Meta, Type};
 
 use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};
-use proc_macro2::TokenStream;
+use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -138,6 +138,8 @@ struct DekuData {
     generics: syn::Generics,
     data: ast::Data<VariantData, FieldData>,
 
+    repr: Option<ReprType>,
+
     /// Endianness for all fields
     endian: Option<syn::LitStr>,
 
@@ -182,6 +184,71 @@ struct DekuData {
     bit_order: Option<syn::LitStr>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum ReprType {
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+}
+
+fn from_token(ts: TokenStream) -> Option<ReprType> {
+    let mut repr_value = None;
+
+    for token in ts.into_iter() {
+        if let TokenTree::Ident(ident) = token {
+            match ident.to_string().as_str() {
+                "u8" => repr_value = Some(ReprType::U8),
+                "u16" => repr_value = Some(ReprType::U16),
+                "u32" => repr_value = Some(ReprType::U32),
+                "u64" => repr_value = Some(ReprType::U64),
+                "u128" => repr_value = Some(ReprType::U128),
+                "i8" => repr_value = Some(ReprType::I8),
+                "i16" => repr_value = Some(ReprType::I16),
+                "i32" => repr_value = Some(ReprType::I32),
+                "i64" => repr_value = Some(ReprType::I64),
+                "i128" => repr_value = Some(ReprType::I128),
+                _ => {}
+            }
+        }
+    }
+
+    repr_value
+}
+
+fn repr(attrs: &[Attribute]) -> Option<ReprType> {
+    for attr in attrs {
+        if attr.path().is_ident("repr") {
+            let meta = &attr.meta;
+            if let Meta::List(meta_list) = meta {
+                let tokens = &meta_list.tokens;
+                let token_str = tokens.to_string();
+                match token_str.trim() {
+                    "u8" => return Some(ReprType::U8),
+                    "u16" => return Some(ReprType::U16),
+                    "u32" => return Some(ReprType::U32),
+                    "u64" => return Some(ReprType::U64),
+                    "u128" => return Some(ReprType::U128),
+                    "i8" => return Some(ReprType::I8),
+                    "i16" => return Some(ReprType::I16),
+                    "i32" => return Some(ReprType::I32),
+                    "i64" => return Some(ReprType::I64),
+                    "i128" => return Some(ReprType::I128),
+                    _ => (),
+                }
+            }
+        }
+    }
+
+    None
+}
+
 impl DekuData {
     fn from_input(input: TokenStream) -> Result<Self, TokenStream> {
         let input = match syn::parse2(input) {
@@ -194,11 +261,13 @@ impl DekuData {
             Err(err) => return Err(err.write_errors()),
         };
 
-        DekuData::from_receiver(receiver)
+        let attrs = input.attrs;
+
+        DekuData::from_receiver(receiver, attrs)
     }
 
     /// Map a `DekuReceiver` to `DekuData`
-    fn from_receiver(receiver: DekuReceiver) -> Result<Self, TokenStream> {
+    fn from_receiver(receiver: DekuReceiver, attrs: Vec<Attribute>) -> Result<Self, TokenStream> {
         let data = match receiver.data {
             ast::Data::Struct(fields) => ast::Data::Struct(ast::Fields::new(
                 fields.style,
@@ -216,10 +285,13 @@ impl DekuData {
             ),
         };
 
+        let repr = repr(&attrs);
+
         let data = Self {
             ident: receiver.ident,
             generics: receiver.generics,
             data,
+            repr,
             endian: receiver.endian,
             ctx: receiver.ctx,
             ctx_default: receiver.ctx_default,

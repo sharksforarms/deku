@@ -9,7 +9,7 @@ use crate::macros::{
     assertion_failed, gen_bit_order_from_str, gen_ctx_types_and_arg, gen_field_args,
     gen_internal_field_ident, gen_struct_destruction, token_contains_string, wrap_default_ctx,
 };
-use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
+use crate::{from_token, DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
 pub(crate) fn emit_deku_write(input: &DekuData) -> Result<TokenStream, syn::Error> {
     match &input.data {
@@ -267,6 +267,31 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 // if the variant has fields, the first must be storing the id
                 quote! {}
             } else if has_discriminant {
+                match &input.repr {
+                    None => {
+                        return Err(syn::Error::new(
+                            variant.ident.span(),
+                            "DekuWrite: `id_type` must be specified on non-unit variants",
+                        ));
+                    }
+                    Some(repr) => {
+                        if let Some(id_type) = id_type {
+                            if let Some(id_type_repr) = from_token(id_type.clone()) {
+                                if id_type_repr != *repr {
+                                    return Err(syn::Error::new(
+                                        variant.ident.span(),
+                                        "DekuWrite: `repr` must match `id_type`",
+                                    ));
+                                }
+                            } else {
+                                return Err(syn::Error::new(
+                                    variant.ident.span(),
+                                    "DekuWrite: `repr` must be specified on non-unit variants",
+                                ));
+                            }
+                        }
+                    }
+                }
                 quote! {
                     // https://doc.rust-lang.org/reference/items/enumerations.html#r-items.enum.discriminant.access-memory
                     let mut __deku_variant_id: #id_type = unsafe { *(&Self::#variant_ident as *const Self as *const #id_type) };

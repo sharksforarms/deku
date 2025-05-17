@@ -88,6 +88,72 @@ error: DekuWrite: cannot determine write `id`. must provide storage for the id o
 132 |     B,
     |     ^
 
+error: DekuWrite: `id_type` must be specified on non-unit variants
+   --> tests/test_compile/cases/enum_validation.rs:139:5
+    |
+139 |     A = 0,
+    |     ^
+
+error: DekuRead: `id_type` must be specified on non-unit variants
+   --> tests/test_compile/cases/enum_validation.rs:148:5
+    |
+148 |     Base = 0x00,
+    |     ^^^^
+
+error: DekuRead: `repr` must match `id_type`
+   --> tests/test_compile/cases/enum_validation.rs:156:5
+    |
+156 |     Base = 0x00,
+    |     ^^^^
+
+error: DekuRead: `id_type` must be specified on non-unit variants
+   --> tests/test_compile/cases/enum_validation.rs:163:5
+    |
+163 |     Base = 0x00,
+    |     ^^^^
+
+error: DekuRead: `id_type` must be specified on non-unit variants
+   --> tests/test_compile/cases/enum_validation.rs:170:5
+    |
+170 |     Base = 0x00,
+    |     ^^^^
+
+error: DekuRead: `id_type` must be specified on non-unit variants
+   --> tests/test_compile/cases/enum_validation.rs:177:5
+    |
+177 |     Base = 0x00,
+    |     ^^^^
+
+error: DekuWrite: `id_type` must be specified on non-unit variants
+   --> tests/test_compile/cases/enum_validation.rs:184:5
+    |
+184 |     Base = 0x00,
+    |     ^^^^
+
+error: DekuWrite: `repr` must match `id_type`
+   --> tests/test_compile/cases/enum_validation.rs:192:5
+    |
+192 |     Base = 0x00,
+    |     ^^^^
+
+error: DekuWrite: `id_type` must be specified on non-unit variants
+   --> tests/test_compile/cases/enum_validation.rs:199:5
+    |
+199 |     Base = 0x00,
+    |     ^^^^
+
+error: DekuWrite: `id_type` must be specified on non-unit variants
+   --> tests/test_compile/cases/enum_validation.rs:206:5
+    |
+206 |     Base = 0x00,
+    |     ^^^^
+
+error: DekuWrite: `id_type` must be specified on non-unit variants
+   --> tests/test_compile/cases/enum_validation.rs:213:5
+    |
+213 |     Base = 0x00,
+    |     ^^^^
+
 error[E0732]: `#[repr(inttype)]` must be specified
    --> tests/test_compile/cases/enum_validation.rs:138:1
     |

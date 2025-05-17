@@ -190,6 +190,7 @@ mod tests {
     }
 
     #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+    #[repr(u8)]
     #[deku(
         bits = "4",
         id_type = "u8",

@@ -1520,6 +1520,7 @@ Example discriminant
 # use std::io::Cursor;
 # use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[repr(u8)]
 #[deku(id_type = "u8")]
 enum DekuTest {
     VariantA = 0x01,

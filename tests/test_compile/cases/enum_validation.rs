@@ -141,4 +141,76 @@ pub enum Test19 {
     B(u8),
 }
 
+// Require #[repr(u8)]
+#[derive(Debug, Clone, DekuRead)]
+#[deku(id_type = "u8")]
+pub enum CommandU8 {
+    Base = 0x00,
+}
+
+// id_type must match repr
+#[derive(Debug, Clone, DekuRead)]
+#[repr(u16)]
+#[deku(id_type = "u8")]
+pub enum CommandU8NonMatchingRead {
+    Base = 0x00,
+}
+
+// Require #[repr(u16)]
+#[derive(Debug, Clone, DekuRead)]
+#[deku(id_type = "u16")]
+pub enum CommandU16 {
+    Base = 0x00,
+}
+
+// Require #[repr(u32)]
+#[derive(Debug, Clone, DekuRead)]
+#[deku(id_type = "u32")]
+pub enum CommandU32 {
+    Base = 0x00,
+}
+
+// Require #[repr(i32)]
+#[derive(Debug, Clone, DekuRead)]
+#[deku(id_type = "i32")]
+pub enum CommandI32 {
+    Base = 0x00,
+}
+
+// Require #[repr(u8)]
+#[derive(Debug, Clone, DekuWrite)]
+#[deku(id_type = "u8")]
+pub enum CommandWU8 {
+    Base = 0x00,
+}
+
+// id_type must match repr
+#[derive(Debug, Clone, DekuWrite)]
+#[repr(u16)]
+#[deku(id_type = "u8")]
+pub enum CommandU8NonMatchingWrite {
+    Base = 0x00,
+}
+
+// Require #[repr(u16)]
+#[derive(Debug, Clone, DekuWrite)]
+#[deku(id_type = "u16")]
+pub enum CommandWU16 {
+    Base = 0x00,
+}
+
+// Require #[repr(u32)]
+#[derive(Debug, Clone, DekuWrite)]
+#[deku(id_type = "u32")]
+pub enum CommandWU32 {
+    Base = 0x00,
+}
+
+// Require #[repr(i32)]
+#[derive(Debug, Clone, DekuWrite)]
+#[deku(id_type = "i32")]
+pub enum CommandWI32 {
+    Base = 0x00,
+}
+
 fn main() {}

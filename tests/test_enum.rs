@@ -68,6 +68,7 @@ fn test_enum_error() {
 }
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[repr(u8)]
 #[deku(id_type = "u8")]
 enum TestEnumDiscriminant {
     VarA = 0x00,

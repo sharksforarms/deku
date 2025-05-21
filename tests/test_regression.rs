@@ -20,6 +20,7 @@ fn issue_224() {
     }
 
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[repr(u8)]
     #[deku(id_type = "u8", bits = 2)]
     pub enum One {
         Start = 0,

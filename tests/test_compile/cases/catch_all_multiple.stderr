@@ -1,5 +1,5 @@
 error: DekuRead: `default` must be specified only once
- --> tests/test_compile/cases/catch_all_multiple.rs:9:5
-  |
-9 |     B = 2,
-  |     ^
+  --> tests/test_compile/cases/catch_all_multiple.rs:10:5
+   |
+10 |     B = 2,
+   |     ^

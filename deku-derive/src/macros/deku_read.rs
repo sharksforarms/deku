@@ -11,7 +11,7 @@ use crate::macros::{
     assertion_failed, gen_bit_order_from_str, gen_ctx_types_and_arg, gen_field_args,
     gen_internal_field_idents, token_contains_string, wrap_default_ctx,
 };
-use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
+use crate::{from_token, DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
 use super::{gen_internal_field_ident, gen_type_from_ctx_id};
 
@@ -254,6 +254,31 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 variant_id_pat.clone()
             }
         } else if has_discriminant {
+            match &input.repr {
+                None => {
+                    return Err(syn::Error::new(
+                        variant.ident.span(),
+                        "DekuRead: `id_type` must be specified on non-unit variants",
+                    ));
+                }
+                Some(repr) => {
+                    if let Some(id_type) = id_type {
+                        if let Some(id_type_repr) = from_token(id_type.clone()) {
+                            if id_type_repr != *repr {
+                                return Err(syn::Error::new(
+                                    variant.ident.span(),
+                                    "DekuRead: `repr` must match `id_type`",
+                                ));
+                            }
+                        } else {
+                            return Err(syn::Error::new(
+                                variant.ident.span(),
+                                "DekuRead: `repr` must be specified on non-unit variants",
+                            ));
+                        }
+                    }
+                }
+            }
             let ident = &variant.ident;
             let internal_ident = gen_internal_field_ident(&quote!(#ident));
             pre_match_tokens.push(quote! {

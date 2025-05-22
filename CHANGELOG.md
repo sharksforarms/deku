@@ -2,8 +2,14 @@
 
 ## [Unreleased]
 
+## [0.19.1] - 2025-05-22
+
+## Added
+- Support IpAddr in nostd [#557](https://github.com/sharksforarms/deku/pull/557)
+
 ## Fixes
-- fix and test of conditional temporary fields depending on conditional temporary fields (did not compile before). See [unittest](./tests/test_attributes/test_temp_value_with_cond.rs).
+- Require repr when using enum discriminant to avoid panic [#554](https://github.com/sharksforarms/deku/pull/554)
+- Fix and test of conditional temporary fields depending on conditional temporary fields (did not compile before). See [unittest](./tests/test_attributes/test_temp_value_with_cond.rs).
 
 ## [0.19.0] - 2025-02-07
 
@@ -565,6 +571,8 @@ Community:
 - Added `CHANGELOG.md` to track changes
 
 [Unreleased]: https://github.com/sharksforarms/deku/compare/deku-v0.19.0...HEAD
+
+[0.19.1]: https://github.com/sharksforarms/deku/compare/deku-v0.19.0...deku-v0.19.1
 
 [0.19.0]: https://github.com/sharksforarms/deku/compare/deku-v0.18.1...deku-v0.19.0
 

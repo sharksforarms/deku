@@ -47,3 +47,53 @@ fn test_to_slice_panic_writer_failure() {
     let mut out = [0x00; 2];
     a.to_slice(&mut out).unwrap();
 }
+
+#[cfg(feature = "bits")]
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+pub struct C {
+    a: u8,
+    #[deku(bits = "3", endian = "little")]
+    b: u8,
+    c: u8,
+    #[deku(bits = "13", endian = "little")]
+    d: u16,
+    e: u8,
+}
+
+#[test]
+#[cfg(feature = "bits")]
+fn test_to_slice_counts_unaligned_writes_with_aligned_end() {
+    let bytes = [0x11, 0x22, 0x33, 0x44, 0x55];
+    let (leftover, c) = C::from_bytes((&bytes, 0)).unwrap();
+    assert_eq!(leftover, (&[][..], 0));
+
+    let mut out = [0x00; 5];
+    let amt_written = c.to_slice(&mut out).unwrap();
+    assert_eq!(bytes, out);
+    assert_eq!(bytes.len(), amt_written);
+}
+
+#[cfg(feature = "bits")]
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+pub struct D {
+    a: u8,
+    #[deku(bits = "3", endian = "little")]
+    b: u8,
+    c: u8,
+    #[deku(bits = "12", endian = "little")]
+    d: u16,
+    e: u8,
+}
+
+#[test]
+#[cfg(feature = "bits")]
+fn test_to_slice_counts_unaligned_writes_with_unaligned_end() {
+    let bytes = [0x11, 0x22, 0x33, 0x44, 0x54];
+    let (leftover, d) = D::from_bytes((&bytes, 0)).unwrap();
+    assert_eq!(leftover, (&[0x54][..], 7));
+
+    let mut out = [0x00; 5];
+    let amt_written = d.to_slice(&mut out).unwrap();
+    assert_eq!(bytes, out);
+    assert_eq!(bytes.len(), amt_written);
+}

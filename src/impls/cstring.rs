@@ -21,16 +21,14 @@ where
     }
 }
 
-impl<'a, Ctx: Copy> DekuReader<'a, Ctx> for CString
-where
-    u8: DekuReader<'a, Ctx>,
-{
+impl DekuReader<'_> for CString {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
-        inner_ctx: Ctx,
+        _: (),
     ) -> Result<Self, DekuError> {
         let bytes =
-            Vec::from_reader_with_ctx(reader, (Limit::from(|b: &u8| *b == 0x00), inner_ctx))?;
+            Vec::<u8>::from_reader_with_ctx(reader, (Limit::from(|b: &u8| *b == 0x00), ()))?;
+
         let value = CString::from_vec_with_nul(bytes).map_err(|e| {
             DekuError::Parse(Cow::from(format!("Failed to convert Vec to CString: {e}")))
         })?;
@@ -39,15 +37,15 @@ where
     }
 }
 
-impl<'a, Ctx: Copy> DekuReader<'a, (ByteSize, Ctx)> for CString
+impl<'a> DekuReader<'a, ByteSize> for CString
 where
-    u8: DekuReader<'a, Ctx>,
+    u8: DekuReader<'a>,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
-        (byte_size, inner_ctx): (ByteSize, Ctx),
+        byte_size: ByteSize,
     ) -> Result<Self, DekuError> {
-        let bytes = Vec::from_reader_with_ctx(reader, (Limit::from(byte_size.0), inner_ctx))?;
+        let bytes = Vec::from_reader_with_ctx(reader, (Limit::from(byte_size.0), ()))?;
 
         let value = CString::from_vec_with_nul(bytes).map_err(|e| {
             DekuError::Parse(Cow::from(format!("Failed to convert Vec to CString: {e}")))
@@ -115,7 +113,7 @@ mod tests {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
         let res_read = if let Some(len) = len {
-            CString::from_reader_with_ctx(&mut reader, (ByteSize(len), ())).unwrap()
+            CString::from_reader_with_ctx(&mut reader, ByteSize(len)).unwrap()
         } else {
             CString::from_reader_with_ctx(&mut reader, ()).unwrap()
         };

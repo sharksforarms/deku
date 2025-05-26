@@ -154,7 +154,7 @@ impl<W: Write + Seek> Writer<W> {
             bits = unsafe { bits.get_unchecked(count * bits_of::<u8>()..) };
 
             // TODO: with_capacity?
-            self.bits_written = buf.len() * 8;
+            self.bits_written += buf.len() * 8;
             self.leftover = (bits.to_bitvec(), order);
             if let Err(e) = self.inner.write_all(&buf) {
                 return Err(DekuError::Io(e.kind()));
@@ -193,7 +193,7 @@ impl<W: Write + Seek> Writer<W> {
                 return Err(DekuError::Io(e.kind()));
             }
 
-            self.bits_written = buf.len() * 8;
+            self.bits_written += buf.len() * 8;
             self.leftover = (bits.to_bitvec(), order);
 
             #[cfg(feature = "logging")]
@@ -281,7 +281,7 @@ impl<W: Write + Seek> Writer<W> {
             #[cfg(feature = "logging")]
             log::trace!("finalized: wrote {} bits", buf.len() * 8);
 
-            self.bits_written = buf.len() * 8;
+            self.bits_written += buf.len() * 8;
         }
         Ok(())
     }

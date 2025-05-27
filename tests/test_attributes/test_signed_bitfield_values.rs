@@ -11,11 +11,10 @@ fn check_signed_i10_decode_encode() {
     }
 
     let buffer = vec![0b10000011, 0b11111110];
-    //                        ^^   ^^^^^^^^10 bits
+    //                                 ^^   ^^^^^^^^10 bits
 
     let ((remaining_bytes, offset), test_struct) =
         TestStruct::from_bytes((&buffer, 0)).expect("decoder error");
-    // println!("{decoded_asterix:#?}");
 
     // everything consumed?
     assert_eq!(offset, 0);

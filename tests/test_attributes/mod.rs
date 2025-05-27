@@ -9,4 +9,6 @@ mod test_skip;
 mod test_temp;
 #[cfg(feature = "bits")]
 mod test_temp_value_with_cond;
+#[cfg(feature = "bits")]
+mod test_signed_bitfield_values;
 mod test_update;

@@ -440,7 +440,7 @@ fn check_little_signed_i16_decode_encode_positive_negative_value() {
 fn check_non_bitfield_big_signed_i16_decode_encode_positive_negative_value() {
     #[derive(Debug, PartialEq, Default, Clone, DekuRead, DekuWrite)]
     pub struct TestStruct {
-        #[deku(endian = "big")]
+        #[deku(endian = "big", bit_order = "msb")]
         pub b: i16,
     }
 
@@ -480,7 +480,7 @@ fn check_non_bitfield_big_signed_i16_decode_encode_positive_negative_value() {
 fn check_non_bitfield_little_signed_i16_decode_encode_positive_negative_value() {
     #[derive(Debug, PartialEq, Default, Clone, DekuRead, DekuWrite)]
     pub struct TestStruct {
-        #[deku(endian = "little")]
+        #[deku(endian = "little", bit_order = "msb")]
         pub b: i16,
     }
 

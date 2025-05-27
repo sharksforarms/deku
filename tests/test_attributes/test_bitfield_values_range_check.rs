@@ -180,7 +180,7 @@ fn check_little_signed_i10_decode_encode_negative_value() {
         pub b: i16,
     }
 
-    let buffer = vec![0b10000011, 0b11111110];
+    let buffer = vec![0b10000011, 0b11111011];
     //                                 ^^    ^^^^^^^^10 bits
 
     let ((remaining_bytes, offset), mut test_struct) =

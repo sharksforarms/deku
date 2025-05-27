@@ -1022,14 +1022,28 @@ macro_rules! ImplDekuWriteSigned {
                 if matches!(endian, Endian::Little) {
                     // Check if this is a value that will fit inside the required bits, if
                     // not, throw an error
-                    let input_bits_lsb = input.view_bits::<Lsb0>();
-                    if let Some(last) = input_bits_lsb.last_one() {
-                        let last = last + 2;
-                        let max = bit_size;
-                        if last > max {
-                            return Err(DekuError::InvalidParam(Cow::from(format!(
-                                "bit size {last} of input is larger than bit requested size {bit_size}",
-                            ))));
+                    if *self>0 {
+                        let input_bits_lsb = input.view_bits::<Lsb0>();
+                        if let Some(last) = input_bits_lsb.last_one() {
+                            let last = last + 2;
+                            let max = bit_size;
+                            if last > max {
+                                return Err(DekuError::InvalidParam(Cow::from(format!(
+                                    "bit size {last} of input is larger than bit requested size {bit_size}",
+                                ))));
+                            }
+                        }
+                    }
+                    else {
+                        let input_bits_lsb = input.view_bits::<Lsb0>();
+                        if let Some(last) = input_bits_lsb.last_zero() {
+                            let last = last + 2;
+                            let max = bit_size;
+                            if last > max {
+                                return Err(DekuError::InvalidParam(Cow::from(format!(
+                                    "bit size {last} of input is larger than bit requested size {bit_size}",
+                                ))));
+                            }
                         }
                     }
 
@@ -1048,14 +1062,28 @@ macro_rules! ImplDekuWriteSigned {
                 } else {
                     const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                     // Check for extra bits before sending into writer
-                    if let Some(first) = input_bits.first_one() {
-                        let max = (MAX_TYPE_BITS - bit_size);
-                        if max+1 > first {
-                            return Err(DekuError::InvalidParam(Cow::from(format!(
-                                "bit size {} of input is larger than bit requested size {}",
-                                MAX_TYPE_BITS - first,
-                                bit_size,
-                            ))));
+                    if *self>0 {
+                        if let Some(first) = input_bits.first_one() {
+                            let max = (MAX_TYPE_BITS - bit_size);
+                            if max+1 > first {
+                                return Err(DekuError::InvalidParam(Cow::from(format!(
+                                    "bit size {} of input is larger than bit requested size {}",
+                                    MAX_TYPE_BITS - first,
+                                    bit_size,
+                                ))));
+                            }
+                        }
+                    }
+                    else {
+                        if let Some(first) = input_bits.first_zero() {
+                            let max = (MAX_TYPE_BITS - bit_size);
+                            if max+1 > first {
+                                return Err(DekuError::InvalidParam(Cow::from(format!(
+                                    "bit size {} of input is larger than bit requested size {}",
+                                    MAX_TYPE_BITS - first,
+                                    bit_size,
+                                ))));
+                            }
                         }
                     }
                     // Example read 10 bits u32 [0xAB, 0b11_000000]

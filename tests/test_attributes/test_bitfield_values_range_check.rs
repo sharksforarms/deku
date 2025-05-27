@@ -354,7 +354,7 @@ fn check_big_signed_i16_decode_encode_positive_negative_value() {
     pub struct TestStruct {
         #[deku(bits = "1")]
         pub a: bool,
-        #[deku(pad_bits_before = "15", bits = "16", endian = "big")]
+        #[deku(pad_bits_before = "15", bits = "16", endian = "big", bit_order = "msb")]
         pub b: i16,
     }
 
@@ -398,7 +398,12 @@ fn check_little_signed_i16_decode_encode_positive_negative_value() {
     pub struct TestStruct {
         #[deku(bits = "1")]
         pub a: bool,
-        #[deku(pad_bits_before = "15", bits = "16", endian = "little")]
+        #[deku(
+            pad_bits_before = "15",
+            bits = "16",
+            endian = "little",
+            bit_order = "msb"
+        )]
         pub b: i16,
     }
 

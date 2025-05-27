@@ -390,6 +390,9 @@ fn check_big_signed_i16_decode_encode_positive_negative_value() {
     let mut writer = Writer::new(&mut cursor2);
     val.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buffer2, buffer);
+
+    let mut cursor = Cursor::new(&buffer[0..1]);
+    assert!(TestStruct::from_reader((&mut cursor, 0)).is_err());
 }
 
 #[test]
@@ -439,6 +442,9 @@ fn check_little_signed_i16_decode_encode_positive_negative_value() {
     let mut writer = Writer::new(&mut cursor2);
     val.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buffer2, buffer);
+
+    let mut cursor = Cursor::new(&buffer[0..1]);
+    assert!(TestStruct::from_reader((&mut cursor, 0)).is_err());
 }
 
 #[test]
@@ -479,6 +485,9 @@ fn check_non_bitfield_big_signed_i16_decode_encode_positive_negative_value() {
     let mut writer = Writer::new(&mut cursor2);
     val.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buffer2, buffer);
+
+    let mut cursor = Cursor::new(&buffer[0..1]);
+    assert!(TestStruct::from_reader((&mut cursor, 0)).is_err());
 }
 
 #[test]
@@ -519,4 +528,7 @@ fn check_non_bitfield_little_signed_i16_decode_encode_positive_negative_value() 
     let mut writer = Writer::new(&mut cursor2);
     val.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buffer2, buffer);
+
+    let mut cursor = Cursor::new(&buffer[0..1]);
+    assert!(TestStruct::from_reader((&mut cursor, 0)).is_err());
 }

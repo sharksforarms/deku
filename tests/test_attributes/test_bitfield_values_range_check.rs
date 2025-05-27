@@ -435,3 +435,83 @@ fn check_little_signed_i16_decode_encode_positive_negative_value() {
     val.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buffer2, buffer);
 }
+
+#[test]
+fn check_non_bitfield_big_signed_i16_decode_encode_positive_negative_value() {
+    #[derive(Debug, PartialEq, Default, Clone, DekuRead, DekuWrite)]
+    pub struct TestStruct {
+        #[deku(endian = "big")]
+        pub b: i16,
+    }
+
+    let buffer = vec![0b00000000, 0b00000010];
+
+    let ((remaining_bytes, offset), mut test_struct) =
+        TestStruct::from_bytes((&buffer, 0)).expect("decoder error");
+
+    // everything consumed?
+    assert_eq!(offset, 0);
+    assert_eq!(remaining_bytes.len(), 0);
+
+    // check content
+    assert_eq!(test_struct.b, 2);
+
+    // write back and check
+    assert_eq!(buffer, test_struct.to_bytes().expect("encode error"));
+
+    test_struct.b = i16::MIN;
+    assert!(test_struct.to_bytes().is_ok());
+
+    test_struct.b = i16::MAX;
+    assert!(test_struct.to_bytes().is_ok());
+
+    let mut cursor = Cursor::new(buffer.clone());
+    let (_, val) = TestStruct::from_reader((&mut cursor, 0)).unwrap();
+    assert_eq!(val.b, 2);
+
+    let mut buffer2 = vec![];
+    let mut cursor2 = Cursor::new(&mut buffer2);
+    let mut writer = Writer::new(&mut cursor2);
+    val.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buffer2, buffer);
+}
+
+#[test]
+fn check_non_bitfield_little_signed_i16_decode_encode_positive_negative_value() {
+    #[derive(Debug, PartialEq, Default, Clone, DekuRead, DekuWrite)]
+    pub struct TestStruct {
+        #[deku(endian = "little")]
+        pub b: i16,
+    }
+
+    let buffer = vec![0b00000010, 0b00000000];
+
+    let ((remaining_bytes, offset), mut test_struct) =
+        TestStruct::from_bytes((&buffer, 0)).expect("decoder error");
+
+    // everything consumed?
+    assert_eq!(offset, 0);
+    assert_eq!(remaining_bytes.len(), 0);
+
+    // check content
+    assert_eq!(test_struct.b, 2);
+
+    // write back and check
+    assert_eq!(buffer, test_struct.to_bytes().expect("encode error"));
+
+    test_struct.b = i16::MIN;
+    assert!(test_struct.to_bytes().is_ok());
+
+    test_struct.b = i16::MAX;
+    assert!(test_struct.to_bytes().is_ok());
+
+    let mut cursor = Cursor::new(buffer.clone());
+    let (_, val) = TestStruct::from_reader((&mut cursor, 0)).unwrap();
+    assert_eq!(val.b, 2);
+
+    let mut buffer2 = vec![];
+    let mut cursor2 = Cursor::new(&mut buffer2);
+    let mut writer = Writer::new(&mut cursor2);
+    val.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buffer2, buffer);
+}

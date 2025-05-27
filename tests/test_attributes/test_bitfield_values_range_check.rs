@@ -35,10 +35,16 @@ fn check_big_unsigned_u10_decode_encode_positive_value() {
     test_struct.b = 1024;
     assert!(test_struct.to_bytes().is_err());
 
-    let mut cursor = Cursor::new(buffer);
+    let mut cursor = Cursor::new(buffer.clone());
     let (_, val) = TestStruct::from_reader((&mut cursor, 0)).unwrap();
     assert!(val.a);
     assert_eq!(val.b, 2);
+
+    let mut buffer2 = vec![];
+    let mut cursor2 = Cursor::new(&mut buffer2);
+    let mut writer = Writer::new(&mut cursor2);
+    val.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buffer2, buffer);
 }
 
 #[test]
@@ -74,10 +80,16 @@ fn check_little_unsigned_u10_decode_encode_positive_value() {
     test_struct.b = 1024;
     assert!(test_struct.to_bytes().is_err());
 
-    let mut cursor = Cursor::new(buffer);
+    let mut cursor = Cursor::new(buffer.clone());
     let (_, val) = TestStruct::from_reader((&mut cursor, 0)).unwrap();
     assert!(val.a);
     assert_eq!(val.b, 2);
+
+    let mut buffer2 = vec![];
+    let mut cursor2 = Cursor::new(&mut buffer2);
+    let mut writer = Writer::new(&mut cursor2);
+    val.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buffer2, buffer);
 }
 
 #[test]
@@ -152,10 +164,16 @@ fn check_little_signed_i10_decode_encode_positive_value() {
     test_struct.b = 512;
     assert!(test_struct.to_bytes().is_err());
 
-    let mut cursor = Cursor::new(buffer);
+    let mut cursor = Cursor::new(buffer.clone());
     let (_, val) = TestStruct::from_reader((&mut cursor, 0)).unwrap();
     assert!(val.a);
     assert_eq!(val.b, 2);
+
+    let mut buffer2 = vec![];
+    let mut cursor2 = Cursor::new(&mut buffer2);
+    let mut writer = Writer::new(&mut cursor2);
+    val.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buffer2, buffer);
 }
 
 #[test]
@@ -191,10 +209,16 @@ fn check_big_signed_i10_decode_encode_negative_value() {
     test_struct.b = -513;
     assert!(test_struct.to_bytes().is_err());
 
-    let mut cursor = Cursor::new(buffer);
+    let mut cursor = Cursor::new(buffer.clone());
     let (_, val) = TestStruct::from_reader((&mut cursor, 0)).unwrap();
     assert!(val.a);
     assert_eq!(val.b, -2);
+
+    let mut buffer2 = vec![];
+    let mut cursor2 = Cursor::new(&mut buffer2);
+    let mut writer = Writer::new(&mut cursor2);
+    val.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buffer2, buffer);
 }
 
 #[test]
@@ -230,10 +254,16 @@ fn check_little_signed_i10_decode_encode_negative_value() {
     test_struct.b = -513;
     assert!(test_struct.to_bytes().is_err());
 
-    let mut cursor = Cursor::new(buffer);
+    let mut cursor = Cursor::new(buffer.clone());
     let (_, val) = TestStruct::from_reader((&mut cursor, 0)).unwrap();
     assert!(val.a);
     assert_eq!(val.b, -2);
+
+    let mut buffer2 = vec![];
+    let mut cursor2 = Cursor::new(&mut buffer2);
+    let mut writer = Writer::new(&mut cursor2);
+    val.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buffer2, buffer);
 }
 
 #[test]
@@ -265,10 +295,16 @@ fn check_big_unsigned_u16_decode_encode_positive_value() {
     test_struct.b = 0xFFFF;
     assert!(test_struct.to_bytes().is_ok());
 
-    let mut cursor = Cursor::new(buffer);
+    let mut cursor = Cursor::new(buffer.clone());
     let (_, val) = TestStruct::from_reader((&mut cursor, 0)).unwrap();
     assert!(val.a);
     assert_eq!(val.b, 2);
+
+    let mut buffer2 = vec![];
+    let mut cursor2 = Cursor::new(&mut buffer2);
+    let mut writer = Writer::new(&mut cursor2);
+    val.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buffer2, buffer);
 }
 
 #[test]
@@ -300,10 +336,16 @@ fn check_little_unsigned_u16_decode_encode_positive_value() {
     test_struct.b = 0xFFFF;
     assert!(test_struct.to_bytes().is_ok());
 
-    let mut cursor = Cursor::new(buffer);
+    let mut cursor = Cursor::new(buffer.clone());
     let (_, val) = TestStruct::from_reader((&mut cursor, 0)).unwrap();
     assert!(val.a);
     assert_eq!(val.b, 2);
+
+    let mut buffer2 = vec![];
+    let mut cursor2 = Cursor::new(&mut buffer2);
+    let mut writer = Writer::new(&mut cursor2);
+    val.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buffer2, buffer);
 }
 
 #[test]
@@ -338,10 +380,16 @@ fn check_big_signed_i16_decode_encode_positive_negative_value() {
     test_struct.b = i16::MAX;
     assert!(test_struct.to_bytes().is_ok());
 
-    let mut cursor = Cursor::new(buffer);
+    let mut cursor = Cursor::new(buffer.clone());
     let (_, val) = TestStruct::from_reader((&mut cursor, 0)).unwrap();
     assert!(val.a);
     assert_eq!(val.b, 2);
+
+    let mut buffer2 = vec![];
+    let mut cursor2 = Cursor::new(&mut buffer2);
+    let mut writer = Writer::new(&mut cursor2);
+    val.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buffer2, buffer);
 }
 
 #[test]
@@ -376,8 +424,14 @@ fn check_little_signed_i16_decode_encode_positive_negative_value() {
     test_struct.b = i16::MAX;
     assert!(test_struct.to_bytes().is_ok());
 
-    let mut cursor = Cursor::new(buffer);
+    let mut cursor = Cursor::new(buffer.clone());
     let (_, val) = TestStruct::from_reader((&mut cursor, 0)).unwrap();
     assert!(val.a);
     assert_eq!(val.b, 2);
+
+    let mut buffer2 = vec![];
+    let mut cursor2 = Cursor::new(&mut buffer2);
+    let mut writer = Writer::new(&mut cursor2);
+    val.to_writer(&mut writer, ()).unwrap();
+    assert_eq!(buffer2, buffer);
 }

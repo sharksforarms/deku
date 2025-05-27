@@ -10,5 +10,5 @@ mod test_temp;
 #[cfg(feature = "bits")]
 mod test_temp_value_with_cond;
 #[cfg(feature = "bits")]
-mod test_signed_bitfield_values;
+mod test_bitfield_values_range_check;
 mod test_update;

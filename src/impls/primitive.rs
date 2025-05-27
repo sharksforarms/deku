@@ -757,7 +757,7 @@ macro_rules! ForwardDekuRead {
     };
 }
 
-macro_rules! ImplDekuWrite {
+macro_rules! ImplDekuWriteUnsigned {
     ($typ:ty) => {
         #[cfg(feature = "bits")]
         impl DekuWriter<(Endian, BitSize, Order)> for $typ {
@@ -934,6 +934,183 @@ macro_rules! ImplDekuWrite {
     };
 }
 
+macro_rules! ImplDekuWriteSigned {
+    ($typ:ty) => {
+        #[cfg(feature = "bits")]
+        impl DekuWriter<(Endian, BitSize, Order)> for $typ {
+            #[inline]
+            fn to_writer<W: Write + Seek>(
+                &self,
+                writer: &mut Writer<W>,
+                (endian, size, order): (Endian, BitSize, Order),
+            ) -> Result<(), DekuError> {
+                let input = match endian {
+                    Endian::Little => self.to_le_bytes(),
+                    Endian::Big => self.to_be_bytes(),
+                };
+
+                let bit_size: usize = size.0;
+
+                let input_bits = input.view_bits::<Msb0>();
+
+                if bit_size > input_bits.len() {
+                    return Err(DekuError::InvalidParam(Cow::from(format!(
+                        "bit size {} is larger then input {}",
+                        bit_size,
+                        input_bits.len()
+                    ))));
+                }
+
+                match (endian, order) {
+                    (Endian::Little, Order::Lsb0)
+                    | (Endian::Little, Order::Msb0)
+                    | (Endian::Big, Order::Lsb0) => {
+                        let mut remaining_bits = bit_size;
+                        for chunk in input_bits.chunks(8) {
+                            if chunk.len() > remaining_bits {
+                                writer.write_bits_order(
+                                    &chunk[chunk.len() - remaining_bits..],
+                                    order,
+                                )?;
+                                break;
+                            } else {
+                                writer.write_bits_order(&chunk, order)?;
+                            }
+                            remaining_bits -= chunk.len();
+                        }
+                    }
+                    (Endian::Big, Order::Msb0) => {
+                        // big endian
+                        // Example read 10 bits u32 [0xAB, 0b11_000000]
+                        // => [00000000, 00000000, 00000010, 10101111]
+                        writer.write_bits_order(
+                            &input_bits[input_bits.len() - bit_size..],
+                            Order::Msb0,
+                        )?;
+                    }
+                }
+
+                Ok(())
+            }
+        }
+
+        #[cfg(feature = "bits")]
+        impl DekuWriter<(Endian, BitSize)> for $typ {
+            #[inline(always)]
+            fn to_writer<W: Write + Seek>(
+                &self,
+                writer: &mut Writer<W>,
+                (endian, size): (Endian, BitSize),
+            ) -> Result<(), DekuError> {
+                let input = match endian {
+                    Endian::Little => self.to_le_bytes(),
+                    Endian::Big => self.to_be_bytes(),
+                };
+
+                let bit_size: usize = size.0;
+
+                let input_bits = input.view_bits::<Msb0>();
+
+                if bit_size > input_bits.len() {
+                    return Err(DekuError::InvalidParam(Cow::from(format!(
+                        "bit size {} is larger than input {}",
+                        bit_size,
+                        input_bits.len()
+                    ))));
+                }
+
+                if matches!(endian, Endian::Little) {
+                    // Check if this is a value that will fit inside the required bits, if
+                    // not, throw an error
+                    let input_bits_lsb = input.view_bits::<Lsb0>();
+                    if let Some(last) = input_bits_lsb.last_one() {
+                        let last = last + 2;
+                        let max = bit_size;
+                        if last > max {
+                            return Err(DekuError::InvalidParam(Cow::from(format!(
+                                "bit size {last} of input is larger than bit requested size {bit_size}",
+                            ))));
+                        }
+                    }
+
+                    // Example read 10 bits u32 [0xAB, 0b11_000000]
+                    // => [10101011, 00000011, 00000000, 00000000]
+                    let mut remaining_bits = bit_size;
+                    for chunk in input_bits.chunks(8) {
+                        if chunk.len() > remaining_bits {
+                            writer.write_bits(&chunk[chunk.len() - remaining_bits..])?;
+                            break;
+                        } else {
+                            writer.write_bits(&chunk)?;
+                        }
+                        remaining_bits -= chunk.len();
+                    }
+                } else {
+                    const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                    // Check for extra bits before sending into writer
+                    if let Some(first) = input_bits.first_one() {
+                        let max = (MAX_TYPE_BITS - bit_size);
+                        if max+1 > first {
+                            return Err(DekuError::InvalidParam(Cow::from(format!(
+                                "bit size {} of input is larger than bit requested size {}",
+                                MAX_TYPE_BITS - first,
+                                bit_size,
+                            ))));
+                        }
+                    }
+                    // Example read 10 bits u32 [0xAB, 0b11_000000]
+                    // => [00000000, 00000000, 00000010, 10101111]
+                    writer.write_bits(&input_bits[input_bits.len() - bit_size..])?;
+                }
+                Ok(())
+            }
+        }
+
+        impl DekuWriter<(Endian, ByteSize)> for $typ {
+            #[inline(always)]
+            fn to_writer<W: Write + Seek>(
+                &self,
+                writer: &mut Writer<W>,
+                (endian, size): (Endian, ByteSize),
+            ) -> Result<(), DekuError> {
+                let input = match endian {
+                    Endian::Little => self.to_le_bytes(),
+                    Endian::Big => self.to_be_bytes(),
+                };
+
+                const TYPE_SIZE: usize = core::mem::size_of::<$typ>();
+                if size.0 > TYPE_SIZE {
+                    return Err(DekuError::InvalidParam(Cow::from(format!(
+                        "byte size {} is larger then input {}",
+                        size.0, TYPE_SIZE
+                    ))));
+                }
+
+                let input = if matches!(endian, Endian::Big) {
+                    &input[TYPE_SIZE - size.0 as usize..]
+                } else {
+                    &input[..size.0 as usize]
+                };
+
+                writer.write_bytes(&input)?;
+                Ok(())
+            }
+        }
+
+        /// When using Endian and ByteSize, Order is not used
+        impl DekuWriter<(Endian, ByteSize, Order)> for $typ {
+            #[inline]
+            fn to_writer<W: Write + Seek>(
+                &self,
+                writer: &mut Writer<W>,
+                (endian, size, _order): (Endian, ByteSize, Order),
+            ) -> Result<(), DekuError> {
+                <$typ>::to_writer(self, writer, (endian, size))
+            }
+        }
+    };
+}
+
 macro_rules! ImplDekuWriteOnlyEndian {
     ($typ:ty) => {
         impl DekuWriter<Endian> for $typ {
@@ -1026,17 +1203,17 @@ macro_rules! ForwardDekuWrite {
         }
     };
 }
-macro_rules! ImplDekuTraitsBytes {
+macro_rules! ImplDekuTraitsBytesUnsigned {
     ($typ:ty) => {
         ImplDekuReadBytes!($typ, $typ);
-        ImplDekuWrite!($typ);
+        ImplDekuWriteUnsigned!($typ);
     };
     ($typ:ty, $inner:ty) => {
         ImplDekuReadBytes!($typ, $inner);
     };
 }
 
-macro_rules! ImplDekuTraits {
+macro_rules! ImplDekuTraitsUnsigned {
     ($typ:ty) => {
         ImplDekuReadBits!($typ, $typ);
         ForwardDekuRead!($typ);
@@ -1048,46 +1225,46 @@ macro_rules! ImplDekuTraits {
         ImplDekuReadBits!($typ, $inner);
         ForwardDekuRead!($typ);
 
-        ImplDekuWrite!($typ);
+        ImplDekuWriteUnsigned!($typ);
         ImplDekuWriteOnlyEndian!($typ);
         ForwardDekuWrite!($typ);
     };
 }
 
-macro_rules! ImplDekuTraitsSignExtend {
+macro_rules! ImplDekuTraitsSigned {
     ($typ:ty, $inner:ty) => {
         ImplDekuReadSignExtend!($typ, $inner);
         ForwardDekuRead!($typ);
 
-        ImplDekuWrite!($typ);
+        ImplDekuWriteSigned!($typ);
         ImplDekuWriteOnlyEndian!($typ);
         ForwardDekuWrite!($typ);
     };
 }
 
-ImplDekuTraits!(u8);
-ImplDekuTraits!(u16);
-ImplDekuTraitsBytes!(u16);
-ImplDekuTraits!(u32);
-ImplDekuTraitsBytes!(u32);
-ImplDekuTraits!(u64);
-ImplDekuTraitsBytes!(u64);
-ImplDekuTraits!(u128);
-ImplDekuTraitsBytes!(u128);
-ImplDekuTraits!(usize);
-ImplDekuTraitsBytes!(usize);
+ImplDekuTraitsUnsigned!(u8);
+ImplDekuTraitsUnsigned!(u16);
+ImplDekuTraitsBytesUnsigned!(u16);
+ImplDekuTraitsUnsigned!(u32);
+ImplDekuTraitsBytesUnsigned!(u32);
+ImplDekuTraitsUnsigned!(u64);
+ImplDekuTraitsBytesUnsigned!(u64);
+ImplDekuTraitsUnsigned!(u128);
+ImplDekuTraitsBytesUnsigned!(u128);
+ImplDekuTraitsUnsigned!(usize);
+ImplDekuTraitsBytesUnsigned!(usize);
 
-ImplDekuTraitsSignExtend!(i8, u8);
-ImplDekuTraitsSignExtend!(i16, u16);
-ImplDekuTraitsSignExtend!(i32, u32);
-ImplDekuTraitsSignExtend!(i64, u64);
-ImplDekuTraitsSignExtend!(i128, u128);
-ImplDekuTraitsSignExtend!(isize, usize);
+ImplDekuTraitsSigned!(i8, u8);
+ImplDekuTraitsSigned!(i16, u16);
+ImplDekuTraitsSigned!(i32, u32);
+ImplDekuTraitsSigned!(i64, u64);
+ImplDekuTraitsSigned!(i128, u128);
+ImplDekuTraitsSigned!(isize, usize);
 
-ImplDekuTraits!(f32, u32);
-ImplDekuTraitsBytes!(f32, u32);
-ImplDekuTraits!(f64, u64);
-ImplDekuTraitsBytes!(f64, u64);
+ImplDekuTraitsUnsigned!(f32, u32);
+ImplDekuTraitsBytesUnsigned!(f32, u32);
+ImplDekuTraitsUnsigned!(f64, u64);
+ImplDekuTraitsBytesUnsigned!(f64, u64);
 
 #[cfg(test)]
 mod tests {

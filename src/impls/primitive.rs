@@ -967,7 +967,7 @@ macro_rules! ImplDekuWriteDetails {
                 if matches!(endian, Endian::Little) {
                     // Check if this is a value that will fit inside the required bits, if
                     // not, throw an error
-                    if *self>0 {
+                    if *self>=0 {
                         let input_bits_lsb = input.view_bits::<Lsb0>();
                         if let Some(last) = input_bits_lsb.last_one() {
                             let last = last + 2;
@@ -1007,7 +1007,7 @@ macro_rules! ImplDekuWriteDetails {
                 } else {
                     const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                     // Check for extra bits before sending into writer
-                    if *self>0 {
+                    if *self>=0 {
                         if let Some(first) = input_bits.first_one() {
                             let max = (MAX_TYPE_BITS - bit_size);
                             if max+1 > first {

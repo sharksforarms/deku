@@ -1,3 +1,5 @@
+use core::mem;
+
 use no_std_io::io::{Read, Seek, Write};
 
 #[cfg(feature = "alloc")]
@@ -40,6 +42,11 @@ where
     Ctx: Copy,
     Predicate: FnMut(usize, &T) -> bool,
 {
+    // ZST detected, return empty vec
+    if mem::size_of::<T>() == 0 {
+        return Ok(Vec::new());
+    }
+
     let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
 
     let start_read = reader.bits_read;
@@ -67,6 +74,11 @@ where
     T: DekuReader<'a, Ctx>,
     Ctx: Copy,
 {
+    // ZST detected, return empty vec
+    if mem::size_of::<T>() == 0 {
+        return Ok(Vec::new());
+    }
+
     let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
     loop {
         if reader.end() {

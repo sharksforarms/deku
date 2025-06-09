@@ -230,3 +230,36 @@ fn test_units() {
     let new_bytes = a.to_bytes().unwrap();
     assert_eq!(bytes, &*new_bytes);
 }
+
+/// Issue 513
+#[test]
+fn test_zst_vec_1() {
+    #[derive(Debug, PartialEq, DekuRead)]
+    struct EmptyThing {}
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    struct ListOfThings {
+        #[deku(read_all)]
+        things: Vec<EmptyThing>,
+    }
+
+    let bytes = vec![];
+    let (y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
+    assert_eq!(x.things.len(), 0);
+}
+/// Issue 513
+#[test]
+fn test_zst_vec_2() {
+    #[derive(Debug, PartialEq, DekuRead)]
+    struct EmptyThing {}
+
+    #[derive(Debug, PartialEq, DekuRead)]
+    struct ListOfThings {
+        #[deku(bytes_read = "1")]
+        things: Vec<EmptyThing>,
+    }
+
+    let bytes = vec![];
+    let (y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
+    assert_eq!(x.things.len(), 0);
+}

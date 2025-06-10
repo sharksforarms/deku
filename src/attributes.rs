@@ -908,7 +908,7 @@ assert_eq!(
 value.items.push(0xFF);
 
 // update it, this will update the `count` field
-value.update().unwrap();
+value.update(()).unwrap();
 
 assert_eq!(
     DekuTest { count: 0x03, items: vec![0xAB, 0xCD, 0xFF] },

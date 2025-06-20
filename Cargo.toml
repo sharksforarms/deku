@@ -25,7 +25,7 @@ std = ["deku_derive/std", "bitvec?/std", "alloc", "no_std_io/std"]
 alloc = ["bitvec?/alloc"]
 logging = ["deku_derive/logging", "log"]
 no-assert-string = ["deku_derive/no-assert-string"]
-bits = ["dep:bitvec", "deku_derive/bits"]
+bits = ["dep:bitvec", "deku_derive/bits", "alloc" ]
 
 [dependencies]
 deku_derive = { version = "^0.19.1", path = "deku-derive", default-features = false}

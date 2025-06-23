@@ -188,6 +188,7 @@ impl<T: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for HashSet<T, S> {
     /// ```rust
     /// # use deku::{ctx::Endian, DekuWriter};
     /// # use deku::writer::Writer;
+    /// # #[cfg(feature = "bits")]
     /// # use deku::bitvec::{Msb0, bitvec};
     /// # use std::collections::HashSet;
     /// # use std::io::Cursor;
@@ -219,6 +220,7 @@ mod tests {
     use rstest::rstest;
     use rustc_hash::FxHashSet;
 
+    #[cfg(feature = "bits")]
     use crate::reader::Reader;
 
     use super::*;

@@ -72,9 +72,11 @@ where
     }
 }
 
+#[cfg(all(feature = "alloc", feature = "bits"))]
 #[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 mod tests {
+    use alloc::{vec, vec::Vec};
     use no_std_io::io::Cursor;
     use rstest::rstest;
 
@@ -82,7 +84,6 @@ mod tests {
     use crate::ctx::*;
     use crate::native_endian;
     use crate::reader::Reader;
-    #[cfg(feature = "bits")]
     use bitvec::prelude::*;
 
     #[rstest(input, expected,
@@ -103,7 +104,6 @@ mod tests {
     }
 
     // Note: Copied tests from vec.rs impl
-    #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes, expected_write,
         case::normal_le([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Little, Some(16), 2.into(), vec![0xBBAA, 0xDDCC].into_boxed_slice(), bits![u8, Msb0;], &[], vec![0xAA, 0xBB, 0xCC, 0xDD]),
         case::normal_be([0xAA, 0xBB, 0xCC, 0xDD].as_ref(), Endian::Big, Some(16), 2.into(), vec![0xAABB, 0xCCDD].into_boxed_slice(), bits![u8, Msb0;], &[], vec![0xAA, 0xBB, 0xCC, 0xDD]),

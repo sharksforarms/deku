@@ -4,7 +4,9 @@ use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::{Lifetime, LitStr};
+use syn::Lifetime;
+#[cfg(feature = "bits")]
+use syn::LitStr;
 
 use crate::Num;
 
@@ -424,15 +426,7 @@ fn assertion_failed(
     #[cfg(not(feature = "no-assert-string"))]
     {
         quote! {
-            extern crate alloc;
-            use alloc::borrow::Cow;
-            use alloc::format;
-            return Err(::#crate_::DekuError::Assertion(Cow::from(format!(
-                "{}.{} field failed assertion: {}",
-                #ident,
-                #field_ident_str,
-                #stringify,
-            ))));
+            return Err(::#crate_::deku_error!(::#crate_::DekuError::Assertion, "Field failed assertion", "{}.{}: {}", #ident, #field_ident_str, #stringify));
         }
     }
 }

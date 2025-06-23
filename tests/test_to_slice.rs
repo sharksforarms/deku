@@ -7,6 +7,7 @@ pub struct A {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_to_slice_bytes() {
     let bytes = [0x11, 0x22, 0x33];
     let a = A::from_bytes((&bytes, 0)).unwrap().1;
@@ -39,6 +40,7 @@ fn test_to_slice_bits() {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 #[should_panic(expected = "called `Result::unwrap()` on an `Err` value: Io(WriteZero)")]
 fn test_to_slice_panic_writer_failure() {
     let bytes = [0x11, 0x22, 0x33];

@@ -21,6 +21,36 @@ use crate::macros::deku_write::emit_deku_write;
 
 mod macros;
 
+// Pad attribute values are not bounded by the implementation, however, for
+// implementation purposes we need a concrete object to contain padding data.
+// To allow use of padding in constrained environments we define the object as
+// an array (by contrast to a vec). PAD_ARRAY_SIZE controls the length of
+// these arrays.
+//
+// The length of the padding array is chosen with the following considerations:
+//
+// - A loop is necessary to avoid arbitrarily picking an upper-bound for
+//   requested padding values
+//
+// - Given the loop there aren't any strong constraints on the size of the
+//   padding array
+//
+// - My estimate is padding requests tend to be in the range of 1-16 bytes.
+//   From a [brief inspection][github-search-pad-bytes] it seems that estimate
+//   is reasonable
+//
+// - We desire a value large enough to cover common cases and avoid unnecessary
+//   loop trips, but small enough not to cause trouble on the stack (for
+//   instance, requesting a page of zeros feels unreasonable)
+//
+// - Try to pick something that only requires 1 execution of the loop body for
+//   common cases.
+//
+// [github-search-pad-bytes]:
+//   https://github.com/search?q=pad_bytes_before+OR+pad_bytes_after&type=code
+#[cfg(not(feature = "bits"))]
+const PAD_ARRAY_SIZE: usize = 64;
+
 #[derive(Debug)]
 enum Id {
     TokenStream(TokenStream),

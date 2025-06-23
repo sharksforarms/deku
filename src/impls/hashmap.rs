@@ -82,8 +82,13 @@ where
     /// ```rust
     /// # use deku::ctx::*;
     /// # use deku::DekuReader;
+    /// # #[cfg(feature = "std")]
     /// # use std::collections::HashMap;
+    /// # #[cfg(feature = "std")]
     /// # use std::io::Cursor;
+    ///
+    /// # #[cfg(feature = "std")]
+    /// # fn main() {
     /// let mut input = Cursor::new(vec![100, 1, 2, 3, 4]);
     /// let mut reader = deku::reader::Reader::new(&mut input);
     /// let map =
@@ -91,6 +96,10 @@ where
     /// let mut expected = HashMap::<u8, u32>::default();
     /// expected.insert(100, 0x04030201);
     /// assert_eq!(expected, map)
+    /// # }
+    ///
+    /// # #[cfg(not(feature = "std"))]
+    /// # fn main() {}
     /// ```
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
@@ -198,9 +207,15 @@ impl<K: DekuWriter<Ctx>, V: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for H
     /// ```rust
     /// # use deku::{ctx::Endian, DekuWriter};
     /// # use deku::writer::Writer;
+    /// # #[cfg(feature = "bits")]
     /// # use deku::bitvec::{Msb0, bitvec};
+    /// # #[cfg(feature = "std")]
     /// # use std::collections::HashMap;
+    /// # #[cfg(feature = "std")]
     /// # use std::io::Cursor;
+    ///
+    /// # #[cfg(feature = "std")]
+    /// # fn main() {
     /// let mut out_buf = vec![];
     /// let mut cursor = Cursor::new(&mut out_buf);
     /// let mut writer = Writer::new(&mut cursor);
@@ -209,6 +224,10 @@ impl<K: DekuWriter<Ctx>, V: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for H
     /// map.to_writer(&mut writer, Endian::Big).unwrap();
     /// let expected: Vec<u8> = vec![100, 4, 3, 2, 1];
     /// assert_eq!(expected, out_buf);
+    /// # }
+    ///
+    /// # #[cfg(not(feature = "std"))]
+    /// fn main() {}
     /// ```
     fn to_writer<W: Write + Seek>(
         &self,
@@ -228,6 +247,7 @@ mod tests {
     use rstest::rstest;
     use rustc_hash::FxHashMap;
 
+    #[cfg(feature = "bits")]
     use crate::reader::Reader;
 
     use super::*;

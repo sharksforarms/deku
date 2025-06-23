@@ -59,6 +59,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "alloc")]
+    use alloc::vec;
     use no_std_io::io::Cursor;
     use rstest::rstest;
 
@@ -66,6 +68,7 @@ mod tests {
 
     use super::*;
 
+    #[cfg(feature = "alloc")]
     #[rstest(input, len, expected, expected_rest,
         case(
             b"test\0",

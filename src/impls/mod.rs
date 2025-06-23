@@ -6,6 +6,8 @@ mod primitive;
 mod slice;
 mod tuple;
 mod unit;
+
+#[cfg(feature = "alloc")]
 mod vec;
 
 #[cfg(feature = "alloc")]

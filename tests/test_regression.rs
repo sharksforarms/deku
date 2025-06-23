@@ -1,4 +1,8 @@
+#![cfg(feature = "std")]
+
 use deku::prelude::*;
+
+#[cfg(feature = "bits")]
 use std::io::Cursor;
 
 // Invalid alignment assumptions when converting

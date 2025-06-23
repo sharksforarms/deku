@@ -5,7 +5,7 @@ mod tests {
     use deku::prelude::*;
 
     use core::convert::TryFrom;
-    use std::io::{Read, Seek, Write};
+    use no_std_io::io::{Read, Seek, Write};
 
     #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
     #[deku(id_type = "u8", bits = "2")]

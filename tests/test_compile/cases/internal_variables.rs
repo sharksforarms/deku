@@ -49,7 +49,7 @@ struct TestMap {
     field_b: usize,
 }
 
-fn dummy_reader<R: std::io::Read + std::io::Seek>(
+fn dummy_reader<R: no_std_io::io::Read + no_std_io::io::Seek>(
     _offset: usize,
     _reader: &mut Reader<R>,
 ) -> Result<usize, DekuError> {
@@ -72,7 +72,7 @@ struct TestCtx {
     field_b: ChildCtx,
 }
 
-fn dummy_writer<W: std::io::Write + std::io::Seek>(
+fn dummy_writer<W: no_std_io::io::Write + no_std_io::io::Seek>(
     _offset: usize,
     _writer: &mut deku::writer::Writer<W>,
 ) -> Result<(), DekuError> {

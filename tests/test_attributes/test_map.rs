@@ -1,6 +1,6 @@
 use core::convert::TryFrom;
 
-use deku::prelude::*;
+use deku::{prelude::*, DekuError};
 
 #[test]
 fn test_map() {

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## Added
+
+- The `alloc` feature, allowing use in environments lacking a heap [#582](https://github.com/sharksforarms/deku/pull/582)
+
 ## [0.19.1] - 2025-05-22
 
 ## Added

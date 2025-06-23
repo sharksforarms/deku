@@ -3,11 +3,15 @@ use std::convert::TryFrom;
 use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
+#[cfg(feature = "bits")]
 use syn::LitStr;
 
+#[cfg(feature = "bits")]
+use crate::macros::gen_bit_order_from_str;
+
 use crate::macros::{
-    assertion_failed, gen_bit_order_from_str, gen_ctx_types_and_arg, gen_field_args,
-    gen_internal_field_ident, gen_struct_destruction, token_contains_string, wrap_default_ctx,
+    assertion_failed, gen_ctx_types_and_arg, gen_field_args, gen_internal_field_ident,
+    gen_struct_destruction, token_contains_string, wrap_default_ctx,
 };
 use crate::{from_token, DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
@@ -109,6 +113,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         });
 
+        #[cfg(feature = "alloc")]
         tokens.extend(quote! {
             const _: () = {
                 extern crate alloc;
@@ -124,7 +129,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     }
                 }
             };
+        });
 
+        tokens.extend(quote! {
             #[automatically_derived]
             impl #imp ::#crate_::DekuContainerWrite for #ident #wher {}
         });
@@ -364,6 +371,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         });
 
+        #[cfg(feature = "alloc")]
         tokens.extend(quote! {
             const _: () = {
                 extern crate alloc;
@@ -541,14 +549,8 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
         quote! {
             {
                 use core::convert::TryFrom;
-                extern crate alloc;
-                use alloc::borrow::Cow;
-                use alloc::format;
                 let __deku_pad = usize::try_from(#bit_size).map_err(|e|
-                    ::#crate_::DekuError::InvalidParam(Cow::from(format!(
-                        "Invalid padding param \"({})\": cannot convert to usize",
-                        stringify!(#bit_size)
-                    )))
+                    ::#crate_::deku_error!(::#crate_::DekuError::InvalidParam, "Invalid padding param, cannot convert to usize", "{}", stringify!(#bit_size))
                 )?;
                 __deku_writer.write_bits_order(::#crate_::bitvec::bitvec![u8, ::#crate_::bitvec::Msb0; 0; __deku_pad].as_bitslice(), #order)?;
             }
@@ -557,14 +559,8 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
         quote! {
             {
                 use core::convert::TryFrom;
-                extern crate alloc;
-                use alloc::borrow::Cow;
-                use alloc::format;
                 let __deku_pad = usize::try_from(#bit_size).map_err(|e|
-                    ::#crate_::DekuError::InvalidParam(Cow::from(format!(
-                        "Invalid padding param \"({})\": cannot convert to usize",
-                        stringify!(#bit_size)
-                    )))
+                    ::#crate_::deku_error!(::#crate_::DekuError::InvalidParam, "Invalid padding param, cannot convert to usize", "{}", stringify!(#bit_size))
                 )?;
                 __deku_writer.write_bits(::#crate_::bitvec::bitvec![u8, ::#crate_::bitvec::Msb0; 0; __deku_pad].as_bitslice())?;
             }
@@ -576,19 +572,20 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
 #[cfg(not(feature = "bits"))]
 fn emit_padding_bytes(bit_size: &TokenStream) -> TokenStream {
     let crate_ = super::get_crate_name();
+    let pad = crate::PAD_ARRAY_SIZE;
     quote! {
         {
             use core::convert::TryFrom;
-            extern crate alloc;
-            use alloc::borrow::Cow;
-            use alloc::format;
-            let __deku_pad = usize::try_from(#bit_size).map_err(|e|
-                ::#crate_::DekuError::InvalidParam(Cow::from(format!(
-                    "Invalid padding param \"({})\": cannot convert to usize",
-                    stringify!(#bit_size)
-                )))
+            let mut __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                ::#crate_::deku_error!(::#crate_::DekuError::InvalidParam, "Invalid padding param, cannot convert to usize", "{}", stringify!(#bit_size))
             )?;
-            __deku_writer.write_bytes(&vec![0; __deku_pad])?;
+
+            let __deku_pad_source = [0u8; #pad];
+            while __deku_pad > 0 {
+                let __deku_pad_chunk = core::cmp::min(__deku_pad_source.len(), __deku_pad);
+                __deku_writer.write_bytes(&__deku_pad_source[..__deku_pad_chunk])?;
+                __deku_pad -= __deku_pad_chunk;
+            }
         }
     }
 }

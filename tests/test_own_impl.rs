@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 #[test]
 fn test_own_impl() {
     use deku::prelude::*;

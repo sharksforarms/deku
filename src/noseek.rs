@@ -1,8 +1,5 @@
 //! Wrapper type that provides a fake [`Seek`] implementation.
 
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
-
 use crate::no_std_io::{Read, Result, Seek, SeekFrom, Write};
 
 /// A wrapper that provides a limited implementation of
@@ -74,6 +71,7 @@ impl<T: Read> Read for NoSeek<T> {
         Ok(n)
     }
 
+    #[cfg(feature = "std")]
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
         let n = self.inner.read_to_end(buf)?;
         self.pos += n as u64;

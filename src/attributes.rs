@@ -83,15 +83,18 @@ Example:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-// #[deku(endian = "little")] // top-level, defaults to system endianness
+#[deku(endian = "little")] // top-level, defaults to system endianness
 struct DekuTest {
     #[deku(endian = "big")] // field-level override
     field_be: u16,
     field_default: u16, // defaults to top-level
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0xAB, 0xCD, 0xAB, 0xCD];
 let mut cursor = Cursor::new(data);
 
@@ -107,12 +110,20 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, &*value);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 **Note**: The `endian` is passed as a context argument to sub-types
 
 Example:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::vec::Vec;
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -121,6 +132,7 @@ struct Child {
     field_a: u16
 }
 
+# #[cfg(feature = "alloc")]
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "little")] // top-level, defaults to system endianness
 struct DekuTest {
@@ -133,6 +145,8 @@ struct DekuTest {
     field_child: Child,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0xAB, 0xCD, 0xAB, 0xCD, 0xEF, 0xBE];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -148,6 +162,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(&*data, value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 # bit_order
@@ -156,6 +174,7 @@ Specify the field or containers bit order. By default all bits are read in `Msb0
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "bits")]
 # #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
 #[deku(bit_order = "lsb")]
 pub struct SquashfsV3 {
@@ -168,6 +187,9 @@ pub struct SquashfsV3 {
     mtime: u32,
     inode_number: u32,
 }
+
+# #[cfg(feature = "bits")]
+# fn main() {
 let data: &[u8] = &[
 //       inode_type
 //     ╭-----------
@@ -190,11 +212,16 @@ assert_eq!(
     },
     header,
 );
+# }
+#
+# #[cfg(not(feature = "bits"))]
+# fn main() {}
 ```
 With endian-ness:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "bits")]
 # #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
 #[deku(endian = "big", bit_order = "lsb")]
 pub struct BigEndian {
@@ -203,6 +230,9 @@ pub struct BigEndian {
     #[deku(bits = "3")]
     t: u8,
 }
+
+# #[cfg(feature = "bits")]
+# fn main() {
 let data = vec![0x40, 0x40];
 let big_endian = BigEndian::try_from(data.as_ref()).unwrap();
 assert_eq!(
@@ -214,11 +244,16 @@ assert_eq!(
 );
 let bytes = big_endian.to_bytes().unwrap();
 assert_eq!(bytes, data);
+# }
+#
+# #[cfg(not(feature = "bits"))]
+# fn main() {}
 ````
 ### Field Example
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "bits")]
 # #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
 pub struct LsbField {
     #[deku(bit_order = "lsb", bits = "13")]
@@ -226,11 +261,18 @@ pub struct LsbField {
     #[deku(bit_order = "lsb", bits = "3")]
     t: u8,
 }
+
+# #[cfg(feature = "bits")]
+# fn main() {
 let data = vec![0x40, 0x40];
 let more_first = LsbField::try_from(data.as_ref()).unwrap();
 assert_eq!(more_first, LsbField { offset: 0x40, t: 2 });
 let bytes = more_first.to_bytes().unwrap();
 assert_eq!(bytes, data);
+# }
+#
+# #[cfg(not(feature = "bits"))]
+# fn main() {}
 ```
 
 # magic
@@ -241,6 +283,10 @@ that type's data when writing.
 
 Example (top-level):
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::vec::Vec;
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -249,6 +295,8 @@ struct DekuTest {
     data: u8
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[b'd', b'e', b'k', b'u', 50];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -260,10 +308,18 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 Example (field):
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::vec::Vec;
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -272,6 +328,8 @@ struct DekuTest {
     data: u8
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[b'd', b'e', b'k', b'u', 50];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -283,6 +341,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 # seek_from_current
@@ -294,6 +356,7 @@ Field Example:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
@@ -303,6 +366,8 @@ struct DekuTest {
     byte: u8,
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01, 0x00, 0x02];
 let mut cursor = Cursor::new(data);
 
@@ -315,6 +380,10 @@ assert_eq!(
 
 let bytes = value.to_bytes().unwrap();
 assert_eq!(bytes, data);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 Top-Level Example (with ctx usage):
@@ -322,6 +391,7 @@ Top-Level Example (with ctx usage):
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(seek_from_current = "skip", ctx = "skip: usize")]
@@ -329,6 +399,8 @@ struct DekuTest {
     byte: u8,
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x00, 0x02];
 let mut cursor = Cursor::new(data);
 let mut reader = Reader::new(&mut cursor);
@@ -345,6 +417,10 @@ let mut cursor = Cursor::new(&mut buf);
 let mut writer = Writer::new(&mut cursor);
 let bytes = value.to_writer(&mut writer, 1).unwrap();
 assert_eq!(buf, data);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 # seek_from_end
@@ -356,6 +432,7 @@ Field Example:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
@@ -363,6 +440,8 @@ struct DekuTest {
     byte: u8,
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01, 0xff, 0x02];
 let mut cursor = Cursor::new(data);
 
@@ -380,6 +459,10 @@ let mut cursor = Cursor::new(&mut buf);
 let mut writer = Writer::new(&mut cursor);
 let _ = value.to_writer(&mut writer, ()).unwrap();
 assert_eq!(buf, data);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 Top-Level Example:
@@ -387,6 +470,7 @@ Top-Level Example:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(seek_from_end = "-2")]
@@ -394,6 +478,8 @@ struct DekuTest {
     byte: u8,
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01, 0xff, 0x02];
 let mut cursor = Cursor::new(data);
 
@@ -411,6 +497,10 @@ let mut cursor = Cursor::new(&mut buf);
 let mut writer = Writer::new(&mut cursor);
 let _ = value.to_writer(&mut writer, ()).unwrap();
 assert_eq!(buf, data);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 # seek_from_start
@@ -422,6 +512,7 @@ Field Example:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
@@ -429,6 +520,8 @@ struct DekuTest {
     byte: u8,
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01, 0xff, 0x02];
 let mut cursor = Cursor::new(data);
 
@@ -446,6 +539,10 @@ let mut cursor = Cursor::new(&mut buf);
 let mut writer = Writer::new(&mut cursor);
 let _ = value.to_writer(&mut writer, ()).unwrap();
 assert_eq!(buf, data);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 Top-Level Example:
@@ -453,6 +550,7 @@ Top-Level Example:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(seek_from_start = "2")]
@@ -460,6 +558,8 @@ struct DekuTest {
     byte: u8,
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01, 0xff, 0x02];
 let mut cursor = Cursor::new(data);
 
@@ -477,6 +577,10 @@ let mut cursor = Cursor::new(&mut buf);
 let mut writer = Writer::new(&mut cursor);
 let _ = value.to_writer(&mut writer, ()).unwrap();
 assert_eq!(buf, data);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 # seek_rewind
@@ -488,7 +592,9 @@ Field Example:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
+# #[cfg(feature = "std")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     byte_01: u8,
@@ -496,6 +602,8 @@ struct DekuTest {
     byte_02: u8,
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0xff];
 let mut cursor = Cursor::new(data);
 
@@ -507,6 +615,10 @@ assert_eq!(
 );
 let bytes = value.to_bytes().unwrap();
 assert_eq!(bytes, data);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 Top-Level Example:
@@ -514,13 +626,17 @@ Top-Level Example:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
+# #[cfg(feature = "std")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(seek_rewind)]
 struct DekuTest {
     byte: u8,
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0xff];
 let mut cursor = Cursor::new(data);
 
@@ -532,6 +648,10 @@ assert_eq!(
 );
 let bytes = value.to_bytes().unwrap();
 assert_eq!(bytes, data);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 
@@ -553,8 +673,14 @@ let data: &[u8] = &[0x00, 0x01, 0x02];
 
 let value = DekuTest::try_from(data);
 
+#[cfg(feature = "alloc")]
 assert_eq!(
-    Err(DekuError::Assertion("DekuTest.data field failed assertion: * data >= 8".into())),
+    Err(DekuError::Assertion("Field failed assertion: DekuTest.data: * data >= 8".into())),
+    value
+);
+#[cfg(not(feature = "alloc"))]
+assert_eq!(
+    Err(DekuError::Assertion("Field failed assertion".into())),
     value
 );
 ```
@@ -565,6 +691,10 @@ Assert equals after reading and before writing a field
 
 Example:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::vec::Vec;
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -573,6 +703,8 @@ struct DekuTest {
     data: u8,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0x01];
 
 let mut value = DekuTest::try_from(data).unwrap();
@@ -587,9 +719,13 @@ value.data = 0x02;
 let value: Result<Vec<u8>, DekuError> = value.try_into();
 
 assert_eq!(
-    Err(DekuError::Assertion("DekuTest.data field failed assertion: data == 0x01".into())),
+    Err(DekuError::Assertion("Field failed assertion: DekuTest.data: data == 0x01".into())),
     value
 );
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 # bits
@@ -600,8 +736,13 @@ Set the bit-size of the field
 
 Example:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::vec::Vec;
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "bits")]
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(bits = 2)]
@@ -611,6 +752,8 @@ struct DekuTest {
     field_c: u8, // defaults to size_of<u8>*8
 }
 
+# #[cfg(all(feature = "alloc", feature = "bits"))]
+# fn main() {
 let data: &[u8] = &[0b11_101010, 0xFF];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -626,14 +769,23 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(&*data, value);
+# }
+#
+# #[cfg(not(all(feature = "alloc", feature = "bits")))]
+# fn main() {}
 ```
 
 This attribute can also be set from a previous read:
 
 Example:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::vec::Vec;
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "bits")]
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     field_a_len: u8,
@@ -643,6 +795,8 @@ struct DekuTest {
     field_b: u8,
 }
 
+# #[cfg(all(feature = "alloc", feature = "bits"))]
+# fn main() {
 let data: &[u8] = &[0x02, 0b11_101010];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -658,6 +812,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(&*data, value);
+# }
+#
+# #[cfg(not(all(feature = "alloc", feature = "bits")))]
+# fn main() {}
 ```
 
 
@@ -669,6 +827,10 @@ Set the byte-size of the field
 
 Example:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::vec::Vec;
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -678,6 +840,8 @@ struct DekuTest {
     field_b: u8, // defaults to size_of<u8>
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0xAB, 0xCD, 0xFF];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -692,12 +856,20 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 This attribute can also be set from a previous read:
 
 Example:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::vec::Vec;
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -707,6 +879,8 @@ struct DekuTest {
     field_a: u32,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0x03, 0x01, 0x02, 0x03];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -721,6 +895,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 # count
@@ -729,8 +907,13 @@ Specify the field representing the length of the container, i.e. a Vec
 
 Example:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "alloc")]
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(update = "self.items.len()")]
@@ -739,6 +922,8 @@ struct DekuTest {
     items: Vec<u8>,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0x02, 0xAB, 0xCD];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -753,6 +938,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 **Note**: See [update](#update) for more information on the attribute!
@@ -767,6 +956,10 @@ Specify the field representing the total number of bytes to read into a containe
 See the following example, where `InnerDekuTest` is 2 bytes, so setting `bytes_read` to
 4 will read 2 items into the container:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -775,6 +968,7 @@ struct InnerDekuTest {
     field_b: u8
 }
 
+# #[cfg(feature = "alloc")]
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(update = "(self.items.len() / 2)")]
@@ -784,6 +978,8 @@ struct DekuTest {
     items: Vec<InnerDekuTest>,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0x04, 0xAB, 0xBC, 0xDE, 0xEF];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -800,6 +996,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(&*data, value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 **Note**: See [update](#update) for more information on the attribute!
@@ -824,13 +1024,17 @@ A good example of this is to read a null-terminated string:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::ffi::CString;
+# #[cfg(feature = "std")]
 # #[derive(Debug, PartialEq, DekuRead)]
 struct DekuTest {
     #[deku(until = "|v: &u8| *v == 0")]
     string: Vec<u8>
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[b'H', b'e', b'l', b'l', b'o', 0];
 let value = DekuTest::try_from(data).unwrap();
 
@@ -840,7 +1044,10 @@ assert_eq!(
     },
     value
 );
-
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 # read_all
 
@@ -848,6 +1055,10 @@ Read values into the container until [reader.end()] returns `true`.
 
 Example:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -856,12 +1067,15 @@ struct InnerDekuTest {
     field_b: u8
 }
 
+# #[cfg(feature = "alloc")]
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(read_all)]
     items: Vec<InnerDekuTest>,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0xAB, 0xBC, 0xDE, 0xEF];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -877,6 +1091,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(&*data, value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 # update
@@ -885,8 +1103,13 @@ Specify custom code to run on the field when `.update()` is called on the struct
 
 Example:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
 use core::convert::{TryInto, TryFrom};
 use deku::prelude::*;
+# #[cfg(feature = "alloc")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(update = "self.items.len()")]
@@ -895,6 +1118,8 @@ struct DekuTest {
     items: Vec<u8>,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0x02, 0xAB, 0xCD];
 
 // `mut` so it can be updated
@@ -918,6 +1143,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x03, 0xAB, 0xCD, 0xFF], value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 # temp
@@ -932,8 +1161,13 @@ struct/enum needs to be modified at compile time.
 
 Example:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "alloc")]
 #[deku_derive(DekuRead, DekuWrite)]
 #[derive(Debug, PartialEq)]
 struct DekuTest {
@@ -944,6 +1178,8 @@ struct DekuTest {
     items: Vec<u16>,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0x01, 0xBE, 0xEF];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -957,6 +1193,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0xBE, 0xEF], value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 
@@ -972,8 +1212,13 @@ struct/enum needs to be modified at compile time.
 
 Example:
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "alloc")]
 #[deku_derive(DekuRead, DekuWrite)]
 #[derive(Debug, PartialEq)]
 struct DekuTest {
@@ -984,11 +1229,17 @@ struct DekuTest {
     items: Vec<u16>,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let value = DekuTest {
     items: vec![0xDEAD, 0xBEEF]
 };
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x02, 0xDE, 0xAD, 0xBE, 0xEF], value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 # skip
@@ -1029,8 +1280,13 @@ Skip a number of bytes before reading, pad with 0x00s before writing
 Example:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "alloc")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 pub struct DekuTest {
     pub field_a: u8,
@@ -1038,6 +1294,8 @@ pub struct DekuTest {
     pub field_b: u8,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0xAA, 0xBB, 0xCC, 0xDD];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -1052,6 +1310,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0xAA, 0x00, 0x00, 0xDD], value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 # pad_bits_before
@@ -1061,8 +1323,13 @@ Skip a number of bytes before reading, pad with 0s before writing
 Example:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "bits")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(bits = 2)]
@@ -1071,6 +1338,8 @@ struct DekuTest {
     field_b: u8,
 }
 
+# #[cfg(all(feature = "alloc", feature = "bits"))]
+# fn main() {
 let data: &[u8] = &[0b10_01_1001];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -1085,6 +1354,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0b10_00_1001], value);
+# }
+#
+# #[cfg(not(all(feature = "alloc", feature = "bits")))]
+# fn main() {}
 ```
 
 # pad_bytes_after
@@ -1094,8 +1367,13 @@ Skip a number of bytes after reading, pad with 0x00s after writing
 Example:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "alloc")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 pub struct DekuTest {
     #[deku(pad_bytes_after = "2")]
@@ -1103,6 +1381,8 @@ pub struct DekuTest {
     pub field_b: u8,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0xAA, 0xBB, 0xCC, 0xDD];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -1117,6 +1397,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0xAA, 0x00, 0x00, 0xDD], value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 # pad_bits_after
@@ -1126,8 +1410,13 @@ Skip a number of bytes after reading, pad with 0s after writing
 Example:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "bits")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(bits = 2, pad_bits_after = "2")]
@@ -1136,6 +1425,8 @@ struct DekuTest {
     field_b: u8,
 }
 
+# #[cfg(all(feature = "alloc", feature = "bits"))]
+# fn main() {
 let data: &[u8] = &[0b10_01_1001];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -1150,6 +1441,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0b10_00_1001], value);
+# }
+#
+# #[cfg(not(all(feature = "alloc", feature = "bits")))]
+# fn main() {}
 ```
 
 # cond
@@ -1161,6 +1456,10 @@ Specify a condition to parse or skip a field
 Example:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -1174,6 +1473,8 @@ struct DekuTest {
     field_d: Option<u8>,
 }
 
+# #[cfg(feature = "alloc")]
+# fn main() {
 let data: &[u8] = &[0x01, 0x02];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -1187,6 +1488,10 @@ assert_eq!(
     vec![0x01, 0x02, 0x05],
     value.to_bytes().unwrap(),
 )
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 # default
@@ -1260,9 +1565,11 @@ Specify custom reader or writer tokens for reading a field or variant
 Example:
 ```rust
 use core::convert::{TryInto, TryFrom};
+# #[cfg(feature = "bits")]
 use deku::bitvec::{BitSlice, BitVec, Msb0};
 use deku::prelude::*;
 
+# #[cfg(feature = "std")]
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(
@@ -1272,6 +1579,7 @@ struct DekuTest {
     field_a: String,
 }
 
+# #[cfg(feature = "std")]
 impl DekuTest {
     /// Read and convert to String
     fn read<R: std::io::Read + std::io::Seek>(
@@ -1288,6 +1596,8 @@ impl DekuTest {
     }
 }
 
+# #[cfg(all(feature = "bits", feature = "std"))]
+# fn main() {
 let data: &[u8] = &[0x01];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -1299,6 +1609,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, &*value);
+# }
+#
+# #[cfg(not(all(feature = "bits", feature = "std")))]
+# fn main() {}
 ```
 
 # ctx
@@ -1323,6 +1637,7 @@ for example `#[deku("a, b")]`
 Example
 ```rust
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 #[derive(DekuRead, DekuWrite)]
 #[deku(ctx = "a: u8")]
@@ -1338,12 +1653,18 @@ struct Test {
     sub: Subtype
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01, 0x02];
 let mut cursor = Cursor::new(data);
 
 let (amt_read, value) = Test::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 **Note**: In addition, `endian`, `bytes` and `bits` use the `ctx` concept internally, examples below are equivalent:
@@ -1390,6 +1711,7 @@ values for the context
 Example:
 ```rust
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 #[derive(DekuRead, DekuWrite)]
 #[deku(ctx = "a: u8", ctx_default = "1")] // Defaults `a` to 1
@@ -1405,6 +1727,8 @@ struct Test {
     sub: Subtype
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01, 0x02];
 let mut cursor = Cursor::new(data);
 
@@ -1420,6 +1744,10 @@ let mut cursor = Cursor::new(data);
 
 let (amt_read, value) = Subtype::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(value.b, 0x01 + 0x02)
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 # id
@@ -1433,6 +1761,10 @@ This is useful in cases when the enum `id` is already consumed or is given exter
 Example:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::vec::Vec;
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -1452,6 +1784,8 @@ enum MyEnum {
     VariantB,
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01_u8, 0xff, 0xab];
 let ret_read = DekuTest::try_from(data).unwrap();
 
@@ -1466,6 +1800,10 @@ assert_eq!(
 
 let ret_write: Vec<u8> = ret_read.try_into().unwrap();
 assert_eq!(&*ret_write, data)
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 ## id (variant)
@@ -1481,6 +1819,7 @@ Example:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u8")]
@@ -1491,6 +1830,8 @@ enum DekuTest {
     VariantB(u8, u16),
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01, 0xFF, 0x02, 0xAB, 0xEF, 0xBE];
 let mut cursor = Cursor::new(data);
 
@@ -1513,12 +1854,17 @@ assert_eq!(
 
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x02, 0xAB, 0xEF, 0xBE], variant_bytes);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 Example discriminant
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[repr(u8)]
@@ -1528,6 +1874,8 @@ enum DekuTest {
     VariantB,
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01, 0x02];
 let mut cursor = Cursor::new(data);
 
@@ -1550,6 +1898,10 @@ assert_eq!(
 
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x02], variant_bytes);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 # id_endian
@@ -1608,6 +1960,7 @@ Example:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u8")]
@@ -1622,6 +1975,8 @@ enum DekuTest {
     VariantC(u8),
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x03, 0xFF];
 let mut cursor = Cursor::new(data);
 
@@ -1644,6 +1999,10 @@ assert_eq!(
 
 let variant_bytes: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0xFF], variant_bytes);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 # id_type
@@ -1660,14 +2019,18 @@ Example:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+# #[cfg(feature = "bits")]
 #[deku(id_type = "u8", bits = 4)]
 enum DekuTest {
     #[deku(id = 0b1001)]
     VariantA( #[deku(bits = 4)] u8, u8),
 }
 
+# #[cfg(all(feature = "bits", feature = "std"))]
+# fn main() {
 let data: &[u8] = &[0b1001_0110, 0xFF];
 let mut cursor = Cursor::new(data);
 
@@ -1680,6 +2043,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
+# }
+#
+# #[cfg(not(all(feature = "bits", feature = "std")))]
+# fn main() {}
 ```
 
 # bytes
@@ -1699,6 +2066,8 @@ enum DekuTest {
     VariantA(u8),
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0xEF, 0xBE, 0xFF];
 
 let value = DekuTest::try_from(data).unwrap();
@@ -1710,6 +2079,10 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 [reader.end()]: crate::reader::Reader::end()

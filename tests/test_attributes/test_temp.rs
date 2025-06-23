@@ -3,6 +3,7 @@ use core::convert::{TryFrom, TryInto};
 use deku::prelude::*;
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_temp_field_write() {
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
@@ -23,6 +24,7 @@ fn test_temp_field_write() {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_temp_field_value_ignore_on_read() {
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
@@ -45,6 +47,7 @@ fn test_temp_field_value_ignore_on_read() {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_temp_field() {
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
@@ -70,6 +73,7 @@ fn test_temp_field() {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_temp_field_unnamed() {
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
@@ -85,6 +89,7 @@ fn test_temp_field_unnamed() {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_temp_field_unnamed_write() {
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
@@ -101,6 +106,7 @@ fn test_temp_field_unnamed_write() {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_temp_enum_field() {
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
@@ -130,6 +136,7 @@ fn test_temp_enum_field() {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_temp_enum_field_write() {
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]

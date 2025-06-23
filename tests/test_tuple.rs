@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 use core::convert::{TryFrom, TryInto};
 
 use deku::prelude::*;

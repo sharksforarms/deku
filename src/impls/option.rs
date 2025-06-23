@@ -40,10 +40,11 @@ mod tests {
         assert_eq!(v, Some(0x04030201))
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn test_option_write() {
-        let mut writer = Writer::new(Cursor::new(vec![]));
+        let mut writer = Writer::new(Cursor::new(alloc::vec![]));
         Some(true).to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![1], writer.inner.into_inner());
+        assert_eq!(alloc::vec![1], writer.inner.into_inner());
     }
 }

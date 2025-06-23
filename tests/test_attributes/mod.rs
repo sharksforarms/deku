@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 mod test_assert;
 mod test_assert_eq;
 #[cfg(feature = "bits")]

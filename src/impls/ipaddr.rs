@@ -77,8 +77,10 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
     use no_std_io::io::Cursor;
     use rstest::rstest;
 

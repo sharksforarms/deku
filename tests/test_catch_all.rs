@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 #[cfg(test)]
 mod test {
     use core::convert::{TryFrom, TryInto};

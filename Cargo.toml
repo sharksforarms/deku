@@ -22,7 +22,7 @@ members = [
 [features]
 default = ["std", "bits"]
 std = ["deku_derive/std", "bitvec?/std", "alloc", "no_std_io/std"]
-alloc = ["bitvec?/alloc"]
+alloc = ["bitvec?/alloc", "deku_derive/alloc", "no_std_io/alloc" ]
 logging = ["deku_derive/logging", "log"]
 no-assert-string = ["deku_derive/no-assert-string"]
 bits = ["dep:bitvec", "deku_derive/bits", "alloc" ]
@@ -31,7 +31,7 @@ bits = ["dep:bitvec", "deku_derive/bits", "alloc" ]
 deku_derive = { version = "^0.19.1", path = "deku-derive", default-features = false}
 bitvec = { version = "1.0.1", default-features = false, optional = true }
 log = { version = "0.4.22", optional = true }
-no_std_io = { version = "0.9.0", default-features = false, features = ["alloc"], package = "no_std_io2" }
+no_std_io = { version = "0.9.0", default-features = false, package = "no_std_io2" }
 rustversion = "1.0.17"
 
 [dev-dependencies]
@@ -48,6 +48,7 @@ log = { version = "0.4.22" }
 [[bench]]
 name = "deku"
 harness = false
+required-features = ["alloc"]
 
 [lints]
 workspace = true
@@ -63,6 +64,7 @@ required-features = ["bits"]
 
 [[example]]
 name = "deku_input"
+required-features = ["std"]
 
 [[example]]
 name = "enums_catch_all"
@@ -70,6 +72,7 @@ required-features = ["bits"]
 
 [[example]]
 name = "enums"
+required-features = ["std"]
 
 [[example]]
 name = "example"
@@ -85,6 +88,8 @@ required-features = ["bits"]
 
 [[example]]
 name = "many"
+required-features = ["std"]
 
 [[example]]
 name = "read_all"
+required-features = ["std"]

@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use no_std_io::io::Cursor;
 
 use deku::{prelude::*, reader::Reader};
 use hexlit::hex;

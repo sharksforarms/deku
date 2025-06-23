@@ -1,4 +1,4 @@
-use std::io::{Cursor, Read, Seek};
+use no_std_io::io::{Cursor, Read, Seek};
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use deku::prelude::*;

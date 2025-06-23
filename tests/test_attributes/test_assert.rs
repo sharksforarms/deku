@@ -17,7 +17,7 @@ struct TestStruct {
         field_b: 0x02,
     }),
 
-    #[should_panic(expected = r#"Assertion("TestStruct.field_b field failed assertion: * field_a + * field_b >= 3")"#)]
+    #[should_panic(expected = r#"Assertion("Field failed assertion: TestStruct.field_b: * field_a + * field_b >= 3")"#)]
     case(&hex!("0101"), TestStruct::default())
 )]
 fn test_assert_read(input: &[u8], expected: TestStruct) {
@@ -31,7 +31,7 @@ fn test_assert_read(input: &[u8], expected: TestStruct) {
         field_b: 0x02,
     }, hex!("0102").to_vec()),
 
-    #[should_panic(expected = r#"Assertion("TestStruct.field_b field failed assertion: * field_a + * field_b >= 3")"#)]
+    #[should_panic(expected = r#"Assertion("Field failed assertion: TestStruct.field_b: * field_a + * field_b >= 3")"#)]
     case(TestStruct {
         field_a: 0x01,
         field_b: 0x01,

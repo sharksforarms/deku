@@ -448,7 +448,7 @@ let _ = value.to_writer(&mut writer, ()).unwrap();
 assert_eq!(buf, data);
 ```
 
-Top-Leve Example:
+Top-Level Example:
 
 ```rust
 # use deku::prelude::*;

@@ -2,7 +2,7 @@
 
 // TODO: These should be divided into smaller tests
 
-use std::convert::{TryFrom, TryInto};
+use core::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 
 use deku::prelude::*;

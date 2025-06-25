@@ -1,5 +1,5 @@
+use core::hash::{BuildHasher, Hash};
 use std::collections::HashSet;
-use std::hash::{BuildHasher, Hash};
 
 use crate::writer::Writer;
 use no_std_io::io::{Read, Seek, Write};

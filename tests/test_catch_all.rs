@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use std::convert::{TryFrom, TryInto};
+    use core::convert::{TryFrom, TryInto};
 
     use deku::prelude::*;
 

@@ -80,8 +80,8 @@ Precedence: field > top-level > system endianness (default)
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # use std::io::Cursor;
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 // #[deku(endian = "little")] // top-level, defaults to system endianness
@@ -112,8 +112,8 @@ assert_eq!(data, &*value);
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "endian", ctx = "endian: deku::ctx::Endian")] // context passed from `DekuTest` top-level endian
 struct Child {
@@ -153,8 +153,8 @@ assert_eq!(&*data, value);
 Specify the field or containers bit order. By default all bits are read in `Msb0` (Most significant bit) order.
 ### Top-Level Example
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
 #[deku(bit_order = "lsb")]
 pub struct SquashfsV3 {
@@ -192,8 +192,8 @@ assert_eq!(
 ```
 With endian-ness:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
 #[deku(endian = "big", bit_order = "lsb")]
 pub struct BigEndian {
@@ -216,8 +216,8 @@ assert_eq!(bytes, data);
 ````
 ### Field Example
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
 pub struct LsbField {
     #[deku(bit_order = "lsb", bits = "13")]
@@ -240,8 +240,8 @@ that type's data when writing.
 
 Example (top-level):
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(magic = b"deku")]
 struct DekuTest {
@@ -263,8 +263,8 @@ assert_eq!(data, value);
 
 Example (field):
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(magic = b"deku")]
@@ -291,9 +291,9 @@ Using the internal reader, seek to current position plus offset before reading f
 Field Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     // how many following bytes to skip
@@ -319,9 +319,9 @@ assert_eq!(bytes, data);
 Top-Level Example (with ctx usage):
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(seek_from_current = "skip", ctx = "skip: usize")]
 struct DekuTest {
@@ -353,9 +353,9 @@ Using the internal reader, seek to size of reader plus offset before reading fie
 Field Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(seek_from_end = "-2")]
@@ -384,9 +384,9 @@ assert_eq!(buf, data);
 Top-Level Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(seek_from_end = "-2")]
 struct DekuTest {
@@ -419,9 +419,9 @@ Using the internal reader, seek from reader start plus offset before reading fie
 Field Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(seek_from_start = "2")]
@@ -450,9 +450,9 @@ assert_eq!(buf, data);
 Top-Level Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(seek_from_start = "2")]
 struct DekuTest {
@@ -485,9 +485,9 @@ Rewind the internal reader to starting position.
 Field Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     byte_01: u8,
@@ -511,9 +511,9 @@ assert_eq!(bytes, data);
 Top-Level Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(seek_rewind)]
 struct DekuTest {
@@ -540,8 +540,8 @@ Assert a condition after reading and before writing a field
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(assert = "*data >= 8")]
@@ -564,8 +564,8 @@ Assert equals after reading and before writing a field
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(assert_eq = "0x01")]
@@ -599,8 +599,8 @@ Set the bit-size of the field
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(bits = 2)]
@@ -631,8 +631,8 @@ This attribute can also be set from a previous read:
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     field_a_len: u8,
@@ -668,8 +668,8 @@ Set the byte-size of the field
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(bytes = 2)]
@@ -697,8 +697,8 @@ This attribute can also be set from a previous read:
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     field_a_size: u8,
@@ -728,8 +728,8 @@ Specify the field representing the length of the container, i.e. a Vec
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(update = "self.items.len()")]
@@ -766,8 +766,8 @@ Specify the field representing the total number of bytes to read into a containe
 See the following example, where `InnerDekuTest` is 2 bytes, so setting `bytes_read` to
 4 will read 2 items into the container:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct InnerDekuTest {
     field_a: u8,
@@ -821,8 +821,8 @@ as to whether this should be the last item or not. If it returns true, then read
 
 A good example of this is to read a null-terminated string:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # use std::ffi::CString;
 # #[derive(Debug, PartialEq, DekuRead)]
 struct DekuTest {
@@ -847,8 +847,8 @@ Read values into the container until [reader.end()] returns `true`.
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct InnerDekuTest {
     field_a: u8,
@@ -884,8 +884,8 @@ Specify custom code to run on the field when `.update()` is called on the struct
 
 Example:
 ```rust
+use core::convert::{TryInto, TryFrom};
 use deku::prelude::*;
-use std::convert::{TryInto, TryFrom};
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(update = "self.items.len()")]
@@ -931,8 +931,8 @@ struct/enum needs to be modified at compile time.
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 #[deku_derive(DekuRead, DekuWrite)]
 #[derive(Debug, PartialEq)]
 struct DekuTest {
@@ -971,8 +971,8 @@ struct/enum needs to be modified at compile time.
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 #[deku_derive(DekuRead, DekuWrite)]
 #[derive(Debug, PartialEq)]
 struct DekuTest {
@@ -1001,8 +1001,8 @@ Defaults value to [default](#default)
 Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     field_a: u8,
@@ -1028,8 +1028,8 @@ Skip a number of bytes before reading, pad with 0x00s before writing
 Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 pub struct DekuTest {
     pub field_a: u8,
@@ -1060,8 +1060,8 @@ Skip a number of bytes before reading, pad with 0s before writing
 Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(bits = 2)]
@@ -1093,8 +1093,8 @@ Skip a number of bytes after reading, pad with 0x00s after writing
 Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 pub struct DekuTest {
     #[deku(pad_bytes_after = "2")]
@@ -1125,8 +1125,8 @@ Skip a number of bytes after reading, pad with 0s after writing
 Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(bits = 2, pad_bits_after = "2")]
@@ -1160,8 +1160,8 @@ Specify a condition to parse or skip a field
 Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     field_a: u8,
@@ -1197,8 +1197,8 @@ Defaults to `Default::default()`
 Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     field_a: u8,
@@ -1226,8 +1226,8 @@ Example:
 Read a `u8` and apply a function to convert it to a `String`.
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead)]
 struct DekuTest {
     #[deku(map = "|field: u8| -> Result<_, DekuError> { Ok(field.to_string()) }")]
@@ -1258,7 +1258,7 @@ Specify custom reader or writer tokens for reading a field or variant
 
 Example:
 ```rust
-use std::convert::{TryInto, TryFrom};
+use core::convert::{TryInto, TryFrom};
 use deku::bitvec::{BitSlice, BitVec, Msb0};
 use deku::prelude::*;
 
@@ -1432,8 +1432,8 @@ This is useful in cases when the enum `id` is already consumed or is given exter
 Example:
 
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     my_id: u8,
@@ -1478,9 +1478,9 @@ or [id (top-level)](#id-top-level)
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u8")]
 enum DekuTest {
@@ -1516,9 +1516,9 @@ assert_eq!(vec![0x02, 0xAB, 0xEF, 0xBE], variant_bytes);
 
 Example discriminant
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[repr(u8)]
 #[deku(id_type = "u8")]
@@ -1557,8 +1557,8 @@ Specify the endianness of the variant `id`, without mandating the same endiannes
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u16", id_endian = "big", endian = "little")]
 enum DekuTest {
@@ -1605,9 +1605,9 @@ The writing of the field will use the same options as the reading.
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u8")]
 enum DekuTest {
@@ -1657,9 +1657,9 @@ Set the bit size of the enum variant `id`
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
 # use std::io::Cursor;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u8", bits = 4)]
 enum DekuTest {
@@ -1689,8 +1689,8 @@ Set the byte size of the enum variant `id`
 
 Example:
 ```rust
+# use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# use std::convert::{TryInto, TryFrom};
 # #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u32", bytes = 2)]
 enum DekuTest {

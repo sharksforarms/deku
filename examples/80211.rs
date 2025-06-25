@@ -1,7 +1,7 @@
 use deku::ctx::Order;
 use deku::prelude::*;
 
-use std::convert::TryFrom;
+use core::convert::TryFrom;
 
 #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
 #[deku(id_type = "u8", bits = "2")]

@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use core::convert::TryFrom;
 
 use deku::prelude::*;
 

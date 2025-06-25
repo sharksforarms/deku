@@ -1,5 +1,5 @@
+use core::convert::{TryFrom, TryInto};
 use deku::prelude::*;
-use std::convert::{TryFrom, TryInto};
 
 fn main() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]

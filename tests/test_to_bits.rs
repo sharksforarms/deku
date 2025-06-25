@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use core::convert::TryFrom;
 
 #[cfg(feature = "bits")]
 use deku::bitvec::Lsb0;

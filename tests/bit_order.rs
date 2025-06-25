@@ -4,7 +4,7 @@ mod tests {
     use deku::ctx::{BitSize, Order};
     use deku::prelude::*;
 
-    use std::convert::TryFrom;
+    use core::convert::TryFrom;
     use std::io::{Read, Seek, Write};
 
     #[derive(Debug, DekuRead, DekuWrite, PartialEq)]

@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use core::convert::TryInto;
 
 use deku::ctx::BitSize;
 use deku::writer::Writer;

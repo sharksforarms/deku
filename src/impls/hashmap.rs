@@ -1,5 +1,5 @@
+use core::hash::{BuildHasher, Hash};
 use std::collections::HashMap;
-use std::hash::{BuildHasher, Hash};
 
 use no_std_io::io::{Read, Seek, Write};
 

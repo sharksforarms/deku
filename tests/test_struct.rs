@@ -4,7 +4,7 @@
 
 #![allow(clippy::unusual_byte_groupings)]
 
-use std::convert::{TryFrom, TryInto};
+use core::convert::{TryFrom, TryInto};
 
 use deku::prelude::*;
 

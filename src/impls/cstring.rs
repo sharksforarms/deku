@@ -1,6 +1,5 @@
-use alloc::borrow::Cow;
 use alloc::ffi::CString;
-use alloc::format;
+
 use alloc::vec::Vec;
 use no_std_io::io::{Read, Seek, Write};
 
@@ -32,7 +31,12 @@ impl DekuReader<'_> for CString {
             Vec::<u8>::from_reader_with_ctx(reader, (Limit::from(|b: &u8| *b == 0x00), ()))?;
 
         let value = CString::from_vec_with_nul(bytes).map_err(|e| {
-            DekuError::Parse(Cow::from(format!("Failed to convert Vec to CString: {e}")))
+            crate::deku_error!(
+                DekuError::Parse,
+                "Failed to convert Vec to CString",
+                "{}",
+                e
+            )
         })?;
 
         Ok(value)
@@ -50,7 +54,12 @@ where
         let bytes = Vec::from_reader_with_ctx(reader, (Limit::from(byte_size.0), ()))?;
 
         let value = CString::from_vec_with_nul(bytes).map_err(|e| {
-            DekuError::Parse(Cow::from(format!("Failed to convert Vec to CString: {e}")))
+            crate::deku_error!(
+                DekuError::Parse,
+                "Failed to convert Vec to CString",
+                "{}",
+                e
+            )
         })?;
 
         Ok(value)
@@ -95,7 +104,7 @@ mod tests {
             b"a",
         ),
 
-        #[should_panic(expected = "Parse(\"Failed to convert Vec to CString: data provided is not nul terminated\")")]
+        #[should_panic(expected = "Failed to convert Vec to CString")]
         case(
             b"test",
             Some(4),

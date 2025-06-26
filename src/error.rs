@@ -1,6 +1,6 @@
 //! Error module
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "descriptive-errors")]
 use alloc::borrow::Cow;
 
 use no_std_io::io::ErrorKind;
@@ -31,10 +31,10 @@ impl NeedSize {
     }
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "descriptive-errors")]
 type DekuErrorString = Cow<'static, str>;
 
-#[cfg(not(feature = "alloc"))]
+#[cfg(not(feature = "descriptive-errors"))]
 type DekuErrorString = &'static str;
 
 /// Deku errors
@@ -49,8 +49,6 @@ pub enum DekuError {
     InvalidParam(DekuErrorString),
     /// Assertion error from `assert` or `assert_eq` attributes
     Assertion(DekuErrorString),
-    /// Assertion error from `assert` or `assert_eq` attributes, without string
-    AssertionNoStr,
     /// Could not resolve `id` for variant
     IdVariantNotFound,
     /// IO error while reading or writing
@@ -76,7 +74,7 @@ pub enum DekuError {
 ///                     bit_size,
 ///                     input_size);
 /// ```
-#[cfg(feature = "alloc")]
+#[cfg(feature = "descriptive-errors")]
 #[macro_export]
 macro_rules! deku_error {
     ($p:path, $desc:expr, $fmt:expr, $($arg:expr),*) => {{
@@ -112,7 +110,7 @@ macro_rules! deku_error {
 ///                     bit_size,
 ///                     input_size);
 /// ```
-#[cfg(not(feature = "alloc"))]
+#[cfg(not(feature = "descriptive-errors"))]
 #[macro_export]
 macro_rules! deku_error {
     ($p:path, $desc:expr, $fmt:expr, $($arg:expr),*) => {{
@@ -158,8 +156,7 @@ impl core::fmt::Display for DekuError {
             ),
             DekuError::Parse(ref err) => write!(f, "Parse error: {err}"),
             DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {err}"),
-            DekuError::Assertion(ref err) => write!(f, "Assertion error: {err}"),
-            DekuError::AssertionNoStr => write!(f, "Assertion error"),
+            DekuError::Assertion(ref err) => write!(f, "{err}"),
             DekuError::IdVariantNotFound => write!(f, "Could not resolve `id` for variant"),
             DekuError::Io(ref e) => write!(f, "io errorr: {e:?}"),
         }
@@ -211,7 +208,6 @@ impl From<DekuError> for std::io::Error {
             DekuError::Parse(_) => io::Error::new(io::ErrorKind::InvalidData, error),
             DekuError::InvalidParam(_) => io::Error::new(io::ErrorKind::InvalidInput, error),
             DekuError::Assertion(_) => io::Error::new(io::ErrorKind::InvalidData, error),
-            DekuError::AssertionNoStr => io::Error::from(io::ErrorKind::InvalidData),
             DekuError::IdVariantNotFound => io::Error::new(io::ErrorKind::NotFound, error),
             DekuError::Io(e) => io::Error::new(e, error),
         }

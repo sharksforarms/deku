@@ -417,13 +417,6 @@ fn assertion_failed(
     } else {
         quote! { stringify!(#v) }
     };
-    #[cfg(feature = "no-assert-string")]
-    {
-        quote! {
-            return Err(::#crate_::DekuError::AssertionNoStr);
-        }
-    }
-    #[cfg(not(feature = "no-assert-string"))]
     {
         quote! {
             return Err(::#crate_::deku_error!(::#crate_::DekuError::Assertion, "Field failed assertion", "{}.{}: {}", #ident, #field_ident_str, #stringify));

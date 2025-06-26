@@ -672,12 +672,12 @@ let data: &[u8] = &[0x00, 0x01, 0x02];
 
 let value = DekuTest::try_from(data);
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "descriptive-errors")]
 assert_eq!(
     Err(DekuError::Assertion("Field failed assertion: DekuTest.data: * data >= 8".into())),
     value
 );
-#[cfg(not(feature = "alloc"))]
+#[cfg(not(feature = "descriptive-errors"))]
 assert_eq!(
     Err(DekuError::Assertion("Field failed assertion".into())),
     value
@@ -717,10 +717,16 @@ value.data = 0x02;
 
 let value: Result<Vec<u8>, DekuError> = value.try_into();
 
+# #[cfg(feature = "descriptive-errors")]
 assert_eq!(
     Err(DekuError::Assertion("Field failed assertion: DekuTest.data: data == 0x01".into())),
     value
 );
+# #[cfg(not(feature = "descriptive-errors"))]
+# assert_eq!(
+#    Err(DekuError::Assertion("Field failed assertion".into())),
+#    value
+# );
 # }
 #
 # #[cfg(not(feature = "alloc"))]

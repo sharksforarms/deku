@@ -34,6 +34,7 @@ pub struct NestedDeku {
 fn test_read_too_much_data() {
     #[derive(DekuRead)]
     pub struct TestStruct {
+        #[expect(dead_code)]
         #[deku(bits = 6)]
         pub field_a: u8,
     }

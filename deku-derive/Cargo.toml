@@ -16,7 +16,6 @@ proc-macro = true
 std = ["proc-macro-crate", "alloc"]
 alloc = []
 logging = []
-no-assert-string = []
 bits = []
 
 [dependencies]

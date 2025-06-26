@@ -96,8 +96,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "bits")]
-    use bitvec::prelude::*;
     use rstest::rstest;
     use std::io::Cursor;
 

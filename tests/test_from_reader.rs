@@ -65,7 +65,7 @@ fn test_from_reader_enum() {
     assert_eq!(amt_read, 6 + first_amt_read);
     assert_eq!(TestDeku::VariantB(0b10), ret_read);
 
-    c.rewind();
+    c.rewind().unwrap();
     let inner = &c.into_inner();
     let mut s = NoSeek::new(inner.as_slice());
     let (amt_read, ret_read) = TestDeku::from_reader((&mut s, 0)).unwrap();

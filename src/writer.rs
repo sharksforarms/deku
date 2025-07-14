@@ -300,33 +300,33 @@ mod tests {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
-        let mut bv = BitVec::<u8, Msb0>::from_slice(&[0xbb]);
-        writer.write_bits(&mut bv).unwrap();
+        let bv = BitVec::<u8, Msb0>::from_slice(&[0xbb]);
+        writer.write_bits(&bv).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 1, 1, 1, 1];
-        writer.write_bits(&mut bv).unwrap();
-        let mut bv = bitvec![u8, Msb0; 0, 0, 0, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 1, 1, 1, 1];
+        writer.write_bits(&bv).unwrap();
+        let bv = bitvec![u8, Msb0; 0, 0, 0, 1];
+        writer.write_bits(&bv).unwrap();
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 0, 0, 0, 1];
-        writer.write_bits(&mut bv).unwrap();
-        let mut bv = bitvec![u8, Msb0; 1, 1, 1, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 0, 0, 0, 1];
+        writer.write_bits(&bv).unwrap();
+        let bv = bitvec![u8, Msb0; 1, 1, 1, 1];
+        writer.write_bits(&bv).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 0, 0, 0, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 0, 0, 0, 1];
+        writer.write_bits(&bv).unwrap();
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 1, 1, 1, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 1, 1, 1, 1];
+        writer.write_bits(&bv).unwrap();
 
         assert_eq!(
             &mut out_buf.into_inner(),
@@ -340,8 +340,8 @@ mod tests {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
         assert_eq!(&mut out_buf.into_inner(), &mut vec![0xaa]);
     }

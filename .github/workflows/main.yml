@@ -20,10 +20,14 @@ jobs:
       - run: cargo build --all
       # test
       - run: cargo test --all
+      - run: cargo test --all-features
+      - run: cargo test --no-default-features
+      - run: cargo test --no-default-features --features=alloc
+      - run: cargo test --no-default-features --features=descriptive-errors
+      - run: cargo test --no-default-features --features=bits
+      - run: cargo test --no-default-features --features=logging
       # run examples
       - run: cargo run --example 2>&1 | grep -P '   ' | awk '{print $1}' | xargs -i cargo run --example {}
-      # test with no bits feature (don't test docs)
-      - run: cargo test --lib --examples --tests --features std --no-default-features
 
   # Only build on MSRV, since trybuild will fail on older version
   build-msrv:

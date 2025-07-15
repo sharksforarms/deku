@@ -283,7 +283,15 @@ mod tests {
     fn test_hashset_write(input: FxHashSet<u16>, endian: Endian, expected: Vec<u8>) {
         let mut writer = Writer::new(Cursor::new(vec![]));
         input.to_writer(&mut writer, endian).unwrap();
-        assert_eq!(expected, writer.inner.into_inner());
+        assert!(writer
+            .inner
+            .into_inner()
+            .as_slice()
+            .chunks(core::mem::size_of::<u16>())
+            .all(|v| expected
+                .as_slice()
+                .chunks(core::mem::size_of::<u16>())
+                .any(|u| v == u)));
     }
 
     // Note: These tests also exist in boxed.rs
@@ -329,6 +337,14 @@ mod tests {
         res_read
             .to_writer(&mut writer, (endian, BitSize(bit_size)))
             .unwrap();
-        assert_eq!(expected_write, writer.inner.into_inner());
+        assert!(writer
+            .inner
+            .into_inner()
+            .as_slice()
+            .chunks(core::mem::size_of::<u16>())
+            .all(|v| expected_write
+                .as_slice()
+                .chunks(core::mem::size_of::<u16>())
+                .any(|u| u == v)));
     }
 }

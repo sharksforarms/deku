@@ -245,7 +245,7 @@ fn test_zst_vec_1() {
     }
 
     let bytes = vec![];
-    let (y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
+    let (_y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
     assert_eq!(x.things.len(), 0);
 }
 /// Issue 513
@@ -261,6 +261,6 @@ fn test_zst_vec_2() {
     }
 
     let bytes = vec![];
-    let (y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
+    let (_y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
     assert_eq!(x.things.len(), 0);
 }

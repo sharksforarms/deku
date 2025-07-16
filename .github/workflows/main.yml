@@ -68,6 +68,7 @@ jobs:
           toolchain: nightly
           targets: thumbv7em-none-eabihf
       - run: cd ensure_no_std && cargo build --release --target thumbv7em-none-eabihf
+      - run: cd ensure_no_std && cargo build --release --target thumbv7em-none-eabihf --no-default-features
 
   ensure_wasm:
     name: Ensure wasm

@@ -469,7 +469,9 @@ mod tests {
         let data = vec![0x13, 0x0, 0b0111_0100, 0xFF];
         let (_, dt) = DekuTest::from_bytes((&data, 0)).unwrap();
         let to_bytes = dt.to_bytes().unwrap();
-        assert_eq!(dt.flag, 0b111_01);
+        #[allow(clippy::unusual_byte_groupings)]
+        let expected = 0b111_01;
+        assert_eq!(dt.flag, expected);
         assert_eq!(to_bytes, data);
     }
 }

@@ -66,43 +66,43 @@ mod tests {
 
     #[rstest(input, len, expected, expected_rest,
         case(
-            &[b't', b'e', b's', b't', b'\0'],
+            b"test\0",
             Some(5),
             CString::new("test").unwrap(),
             &[],
         ),
         case(
-            &[b't', b'e', b's', b't', b'\0'],
+            b"test\0",
             None,
             CString::new("test").unwrap(),
             &[],
         ),
         case(
-            &[b't', b'e', b's', b't', b'\0', b'a'],
+            b"test\0a",
             Some(5),
             CString::new("test").unwrap(),
-            &[b'a'],
+            b"a",
         ),
         case(
-            &[b't', b'e', b's', b't', b'\0', b'a'],
+            b"test\0a",
             None,
             CString::new("test").unwrap(),
-            &[b'a'],
+            b"a",
         ),
 
         #[should_panic(expected = "Parse(\"Failed to convert Vec to CString: data provided is not nul terminated\")")]
         case(
-            &[b't', b'e', b's', b't'],
+            b"test",
             Some(4),
             CString::new("test").unwrap(),
-            &[b'a'],
+            b"a",
         ),
 
         #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case(&[b't', b'e', b's', b't'], Some(5), CString::new("test").unwrap(), &[]),
+        case(b"test", Some(5), CString::new("test").unwrap(), &[]),
 
         #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case(&[b't', b'e', b's', b't'], None, CString::new("test").unwrap(), &[]),
+        case(b"test", None, CString::new("test").unwrap(), &[]),
     )]
     fn test_cstring_count(
         input: &[u8],

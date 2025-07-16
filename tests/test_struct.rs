@@ -1,3 +1,7 @@
+//! General smoke tests for structs
+
+// TODO: These should be divided into smaller tests
+
 #![allow(clippy::unusual_byte_groupings)]
 
 use std::convert::{TryFrom, TryInto};
@@ -5,9 +9,6 @@ use std::convert::{TryFrom, TryInto};
 use deku::prelude::*;
 
 mod test_common;
-
-/// General smoke tests for structs
-/// TODO: These should be divided into smaller tests
 
 // Common struct to test nesting
 #[cfg(feature = "bits")]

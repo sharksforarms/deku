@@ -73,6 +73,7 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::too_many_arguments)]
 mod tests {
     use no_std_io::io::Cursor;
     use rstest::rstest;

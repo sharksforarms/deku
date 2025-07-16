@@ -1,12 +1,13 @@
+//! General smoke tests for enums
+
+// TODO: These should be divided into smaller tests
+
 use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 
 use deku::prelude::*;
 use hexlit::hex;
 use rstest::*;
-
-/// General smoke tests for enums
-/// TODO: These should be divided into smaller tests
 
 #[cfg(feature = "bits")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]

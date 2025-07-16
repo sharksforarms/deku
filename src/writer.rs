@@ -300,33 +300,33 @@ mod tests {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
-        let mut bv = BitVec::<u8, Msb0>::from_slice(&[0xbb]);
-        writer.write_bits(&mut bv).unwrap();
+        let bv = BitVec::<u8, Msb0>::from_slice(&[0xbb]);
+        writer.write_bits(&bv).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 1, 1, 1, 1];
-        writer.write_bits(&mut bv).unwrap();
-        let mut bv = bitvec![u8, Msb0; 0, 0, 0, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 1, 1, 1, 1];
+        writer.write_bits(&bv).unwrap();
+        let bv = bitvec![u8, Msb0; 0, 0, 0, 1];
+        writer.write_bits(&bv).unwrap();
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 0, 0, 0, 1];
-        writer.write_bits(&mut bv).unwrap();
-        let mut bv = bitvec![u8, Msb0; 1, 1, 1, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 0, 0, 0, 1];
+        writer.write_bits(&bv).unwrap();
+        let bv = bitvec![u8, Msb0; 1, 1, 1, 1];
+        writer.write_bits(&bv).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 0, 0, 0, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 0, 0, 0, 1];
+        writer.write_bits(&bv).unwrap();
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 1, 1, 1, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 1, 1, 1, 1];
+        writer.write_bits(&bv).unwrap();
 
         assert_eq!(
             &mut out_buf.into_inner(),
@@ -340,8 +340,8 @@ mod tests {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
         assert_eq!(&mut out_buf.into_inner(), &mut vec![0xaa]);
     }
@@ -357,7 +357,7 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1], Order::Msb0)
             .unwrap();
-        writer.finalize();
+        writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b1010_0101]);
 
         let mut out_buf = Cursor::new(vec![]);
@@ -368,7 +368,7 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1], Order::Lsb0)
             .unwrap();
-        writer.finalize();
+        writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b0101_1010]);
 
         let mut out_buf = Cursor::new(vec![]);
@@ -379,7 +379,7 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1], Order::Lsb0)
             .unwrap();
-        writer.finalize();
+        writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b1010_0101]);
 
         let mut out_buf = Cursor::new(vec![]);
@@ -390,7 +390,7 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1, 0, 1], Order::Msb0)
             .unwrap();
-        writer.finalize();
+        writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b1010_1001, 0b0101_0000]);
 
         let mut out_buf = Cursor::new(vec![]);
@@ -401,7 +401,7 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1, 0, 1], Order::Lsb0)
             .unwrap();
-        writer.finalize();
+        writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b110_1010, 0b0101_0000]);
 
         let mut out_buf = Cursor::new(vec![]);
@@ -412,7 +412,7 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1, 0, 1], Order::Msb0)
             .unwrap();
-        writer.finalize();
+        writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b0101_0110, 0b1010_0000]);
     }
 }

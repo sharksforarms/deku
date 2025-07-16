@@ -51,7 +51,7 @@ jobs:
         with:
           toolchain: stable
 
-      - run: cargo clippy -- -D warnings
+      - run: cargo clippy --all-targets -- -D warnings
       - run: cargo fmt --all -- --check
 
   ensure_no_std:

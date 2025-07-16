@@ -1,3 +1,7 @@
+//! General smoke tests for structs
+
+// TODO: These should be divided into smaller tests
+
 #![allow(clippy::unusual_byte_groupings)]
 
 use std::convert::{TryFrom, TryInto};
@@ -5,9 +9,6 @@ use std::convert::{TryFrom, TryInto};
 use deku::prelude::*;
 
 mod test_common;
-
-/// General smoke tests for structs
-/// TODO: These should be divided into smaller tests
 
 // Common struct to test nesting
 #[cfg(feature = "bits")]
@@ -34,6 +35,7 @@ pub struct NestedDeku {
 fn test_read_too_much_data() {
     #[derive(DekuRead)]
     pub struct TestStruct {
+        #[expect(dead_code)]
         #[deku(bits = 6)]
         pub field_a: u8,
     }
@@ -244,7 +246,7 @@ fn test_zst_vec_1() {
     }
 
     let bytes = vec![];
-    let (y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
+    let (_y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
     assert_eq!(x.things.len(), 0);
 }
 /// Issue 513
@@ -260,6 +262,6 @@ fn test_zst_vec_2() {
     }
 
     let bytes = vec![];
-    let (y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
+    let (_y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
     assert_eq!(x.things.len(), 0);
 }

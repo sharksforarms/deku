@@ -201,6 +201,7 @@ impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Vec<T> {
 }
 
 #[cfg(test)]
+#[allow(clippy::too_many_arguments)]
 mod tests {
     #[cfg(feature = "bits")]
     use crate::bitvec::{bits, BitSlice, Msb0};

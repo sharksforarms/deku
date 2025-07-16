@@ -57,7 +57,7 @@ fn test_seek_ctx_before(input: &[u8], ctx: usize, expected: SeekCtxBefore) {
     let mut buf = vec![];
     let mut cursor = Cursor::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
-    let _ = ret_read.to_writer(&mut writer, ctx).unwrap();
+    ret_read.to_writer(&mut writer, ctx).unwrap();
     assert_eq!(buf, input);
 }
 
@@ -84,7 +84,7 @@ fn test_seek_ctx_start(input: &[u8], expected: SeekCtxBeforeStart) {
     let mut buf = vec![];
     let mut cursor = Cursor::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
-    let _ = ret_read.to_writer(&mut writer, ()).unwrap();
+    ret_read.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buf, input);
 }
 
@@ -111,7 +111,7 @@ fn test_seek_ctx_end(input: &[u8], expected: SeekCtxBeforeEnd) {
     let mut buf = vec![0, 0, 0];
     let mut cursor = Cursor::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
-    let _ = ret_read.to_writer(&mut writer, ()).unwrap();
+    ret_read.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buf, input);
 }
 
@@ -138,12 +138,12 @@ fn test_seek_ctx_no_seek(input: &[u8], expected: SeekCtxNoSeek) {
     let mut buf = vec![];
     let mut cursor = Cursor::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
-    let _ = ret_read.to_writer(&mut writer, ()).unwrap();
+    ret_read.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buf, input);
 
     let mut buf = vec![];
     let mut cursor = NoSeek::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
-    let _ = ret_read.to_writer(&mut writer, ()).unwrap();
+    ret_read.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buf, input);
 }

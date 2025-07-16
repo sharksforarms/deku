@@ -1,6 +1,5 @@
 #[test]
 #[cfg(feature = "bits")]
-#[cfg(not(tarpaulin))]
 #[cfg_attr(miri, ignore)]
 fn test_compile() {
     let t = trybuild::TestCases::new();

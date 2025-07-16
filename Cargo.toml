@@ -44,6 +44,7 @@ trybuild = "1.0.99"
 rustc-hash = "=2.1.0"
 env_logger = "0.11.5"
 assert_hex = "0.4.1"
+log = { version = "0.4.22" }
 
 [[bench]]
 name = "deku"

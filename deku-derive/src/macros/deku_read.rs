@@ -254,29 +254,24 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 variant_id_pat.clone()
             }
         } else if has_discriminant {
-            match input.repr {
-                None => {
+            let Some(repr) = input.repr else {
+                return Err(syn::Error::new(
+                    variant.ident.span(),
+                    "DekuRead: `id_type` must be specified on non-unit variants",
+                ));
+            };
+            if let Some(id_type) = id_type {
+                let Some(id_type_repr) = from_token(id_type.clone()) else {
                     return Err(syn::Error::new(
                         variant.ident.span(),
-                        "DekuRead: `id_type` must be specified on non-unit variants",
+                        "DekuRead: `repr` must be specified on non-unit variants",
                     ));
-                }
-                Some(repr) => {
-                    if let Some(id_type) = id_type {
-                        if let Some(id_type_repr) = from_token(id_type.clone()) {
-                            if id_type_repr != repr {
-                                return Err(syn::Error::new(
-                                    variant.ident.span(),
-                                    "DekuRead: `repr` must match `id_type`",
-                                ));
-                            }
-                        } else {
-                            return Err(syn::Error::new(
-                                variant.ident.span(),
-                                "DekuRead: `repr` must be specified on non-unit variants",
-                            ));
-                        }
-                    }
+                };
+                if id_type_repr != repr {
+                    return Err(syn::Error::new(
+                        variant.ident.span(),
+                        "DekuRead: `repr` must match `id_type`",
+                    ));
                 }
             }
             let ident = &variant.ident;

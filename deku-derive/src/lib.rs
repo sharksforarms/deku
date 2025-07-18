@@ -184,7 +184,7 @@ struct DekuData {
     bit_order: Option<syn::LitStr>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ReprType {
     U8,
     U16,

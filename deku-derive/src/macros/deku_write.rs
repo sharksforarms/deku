@@ -267,7 +267,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 // if the variant has fields, the first must be storing the id
                 quote! {}
             } else if has_discriminant {
-                match &input.repr {
+                match input.repr {
                     None => {
                         return Err(syn::Error::new(
                             variant.ident.span(),
@@ -277,7 +277,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     Some(repr) => {
                         if let Some(id_type) = id_type {
                             if let Some(id_type_repr) = from_token(id_type.clone()) {
-                                if id_type_repr != *repr {
+                                if id_type_repr != repr {
                                     return Err(syn::Error::new(
                                         variant.ident.span(),
                                         "DekuWrite: `repr` must match `id_type`",

@@ -274,11 +274,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     ));
                 }
             }
+            let repr_type: TokenStream = repr.into();
             let ident = &variant.ident;
             let internal_ident = gen_internal_field_ident(&quote!(#ident));
             pre_match_tokens.push(quote! {
                 // https://doc.rust-lang.org/reference/items/enumerations.html#r-items.enum.discriminant.access-memory
-                let #internal_ident = unsafe { *(&Self::#ident as *const Self as *const #id_type) };
+                let #internal_ident = unsafe { *(&Self::#ident as *const Self as *const #repr_type) };
             });
             quote! { _ if __deku_variant_id == #internal_ident }
         } else {

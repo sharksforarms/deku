@@ -362,3 +362,48 @@ fn test_variable_endian_enum(input: &[u8], expected: VariableEndian) {
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(input.to_vec(), ret_write);
 }
+
+#[test]
+fn test_repr_assignment_with_id_via_ctx() {
+    use deku::ctx::Endian;
+
+    #[derive(Debug, DekuRead, DekuWrite, Eq, PartialEq)]
+    #[deku(ctx = "endian: Endian, mid: u8", id = "mid", endian = "endian")]
+    #[repr(u8)]
+    enum Body {
+        First = 0x00,
+        #[deku(id = "0x01")]
+        Second(u8),
+    }
+
+    #[derive(Debug, DekuRead, DekuWrite, Eq, PartialEq)]
+    #[deku(endian = "little")]
+    struct Message {
+        id: u8,
+        header: u16,
+        #[deku(ctx = "*id")]
+        body: Body,
+    }
+
+    let input = [0u8, 1u8, 0u8];
+    let mut cursor = Cursor::new(input);
+    assert_eq!(
+        Message {
+            id: 0,
+            header: 1,
+            body: Body::First,
+        },
+        Message::from_reader((&mut cursor, 0)).unwrap().1
+    );
+
+    let input = [1u8, 2u8, 0u8, 3u8];
+    let mut cursor = Cursor::new(input);
+    assert_eq!(
+        Message {
+            id: 1,
+            header: 2,
+            body: Body::Second(3),
+        },
+        Message::from_reader((&mut cursor, 0)).unwrap().1
+    );
+}

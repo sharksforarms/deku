@@ -90,6 +90,25 @@ impl core::fmt::Display for DekuError {
     }
 }
 
+#[cfg(not(feature = "std"))]
+impl core::error::Error for DekuError {}
+
+#[cfg(not(feature = "std"))]
+impl From<DekuError> for no_std_io::io::Error {
+    fn from(error: DekuError) -> Self {
+        use no_std_io::io;
+        match error {
+            DekuError::Incomplete(_) => io::Error::new(io::ErrorKind::UnexpectedEof, error),
+            DekuError::Parse(_) => io::Error::new(io::ErrorKind::InvalidData, error),
+            DekuError::InvalidParam(_) => io::Error::new(io::ErrorKind::InvalidInput, error),
+            DekuError::Assertion(_) => io::Error::new(io::ErrorKind::InvalidData, error),
+            DekuError::AssertionNoStr => io::Error::from(io::ErrorKind::InvalidData),
+            DekuError::IdVariantNotFound => io::Error::new(io::ErrorKind::NotFound, error),
+            DekuError::Io(e) => io::Error::new(e, error),
+        }
+    }
+}
+
 #[cfg(feature = "std")]
 impl std::error::Error for DekuError {
     fn cause(&self) -> Option<&dyn std::error::Error> {
@@ -112,6 +131,3 @@ impl From<DekuError> for std::io::Error {
         }
     }
 }
-
-#[cfg(feature = "error_in_core")]
-impl core::error::Error for DekuError {}

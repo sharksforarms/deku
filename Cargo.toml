@@ -25,7 +25,6 @@ std = ["deku_derive/std", "bitvec?/std", "alloc", "no_std_io/std"]
 alloc = ["bitvec?/alloc"]
 logging = ["deku_derive/logging", "log"]
 no-assert-string = ["deku_derive/no-assert-string"]
-error_in_core = []
 bits = ["dep:bitvec", "deku_derive/bits"]
 
 [dependencies]

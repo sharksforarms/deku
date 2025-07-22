@@ -184,7 +184,7 @@ struct DekuData {
     bit_order: Option<syn::LitStr>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ReprType {
     U8,
     U16,
@@ -196,6 +196,23 @@ enum ReprType {
     I32,
     I64,
     I128,
+}
+
+impl From<ReprType> for TokenStream {
+    fn from(value: ReprType) -> Self {
+        match value {
+            ReprType::U8 => quote! { u8 },
+            ReprType::U16 => quote! { u16 },
+            ReprType::U32 => quote! { u32 },
+            ReprType::U64 => quote! { u64 },
+            ReprType::U128 => quote! { u128 },
+            ReprType::I8 => quote! { i8 },
+            ReprType::I16 => quote! { i16 },
+            ReprType::I32 => quote! { i32 },
+            ReprType::I64 => quote! { i64 },
+            ReprType::I128 => quote! { i128 },
+        }
+    }
 }
 
 fn from_token(ts: TokenStream) -> Option<ReprType> {

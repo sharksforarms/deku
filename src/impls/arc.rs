@@ -1,7 +1,6 @@
-use no_std_io::io::{Read, Seek, Write};
-use std::sync::Arc;
-
+use alloc::sync::Arc;
 use alloc::vec::Vec;
+use no_std_io::io::{Read, Seek, Write};
 
 use crate::ctx::Limit;
 use crate::reader::Reader;

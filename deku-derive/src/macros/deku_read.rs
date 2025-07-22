@@ -137,7 +137,10 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             } else {
                 (__deku_reader.bits_read - (__deku_reader.bits_read % 8)) / 8
             };
-            Ok(((&__deku_input.0[idx..], __deku_reader.bits_read % 8), __deku_value))
+            let Some(rest) = __deku_input.0.get(idx..) else {
+                return Err(deku::DekuError::Incomplete(deku::prelude::NeedSize::new(8 * (idx - __deku_input.0.len()))));
+            };
+            Ok(((rest, __deku_reader.bits_read % 8), __deku_value))
         };
 
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
@@ -432,7 +435,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             } else {
                 (__deku_reader.bits_read - (__deku_reader.bits_read % 8)) / 8
             };
-            Ok(((&__deku_input.0[idx..], __deku_reader.bits_read % 8), __deku_value))
+            let Some(rest) = __deku_input.0.get(idx..) else {
+                return Err(deku::DekuError::Incomplete(deku::prelude::NeedSize::new(8 * (idx - __deku_input.0.len()))));
+            };
+            Ok(((rest, __deku_reader.bits_read % 8), __deku_value))
         };
 
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));

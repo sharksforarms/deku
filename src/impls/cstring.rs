@@ -1,6 +1,8 @@
 use alloc::borrow::Cow;
+use alloc::ffi::CString;
+use alloc::format;
+use alloc::vec::Vec;
 use no_std_io::io::{Read, Seek, Write};
-use std::ffi::CString;
 
 use crate::reader::Reader;
 use crate::writer::Writer;

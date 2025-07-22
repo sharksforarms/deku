@@ -8,13 +8,13 @@ mod tuple;
 mod unit;
 mod vec;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 mod arc;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 mod cow;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 mod cstring;
 
 #[cfg(feature = "std")]

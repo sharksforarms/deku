@@ -1,7 +1,3 @@
-use std::convert::{TryFrom, TryInto};
-
-use deku::prelude::*;
-
 #[cfg(feature = "bits")]
 mod test_pad_bits_after;
 #[cfg(feature = "bits")]
@@ -10,55 +6,60 @@ mod test_pad_bytes_after;
 mod test_pad_bytes_before;
 
 #[cfg(feature = "bits")]
-#[test]
-#[allow(clippy::identity_op)]
-fn test_pad_bits_before_and_pad_bytes_before() {
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    struct TestStruct {
-        #[deku(bits = 2)]
-        field_a: u8,
-        #[deku(pad_bits_before = "5 + 1", pad_bytes_before = "0 + 1")]
-        field_b: u8,
+#[cfg(test)]
+mod test {
+    use core::convert::{TryFrom, TryInto};
+
+    use deku::prelude::*;
+    #[test]
+    #[allow(clippy::identity_op)]
+    fn test_pad_bits_before_and_pad_bytes_before() {
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        struct TestStruct {
+            #[deku(bits = 2)]
+            field_a: u8,
+            #[deku(pad_bits_before = "5 + 1", pad_bytes_before = "0 + 1")]
+            field_b: u8,
+        }
+
+        let data: Vec<u8> = vec![0b10_000000, 0xaa, 0xbb];
+
+        let ret_read = TestStruct::try_from(data.as_slice()).unwrap();
+
+        assert_eq!(
+            TestStruct {
+                field_a: 0b10,
+                field_b: 0xbb,
+            },
+            ret_read
+        );
+
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+        assert_eq!(vec![0b10_000000, 0x00, 0xbb], ret_write);
     }
 
-    let data: Vec<u8> = vec![0b10_000000, 0xaa, 0xbb];
+    #[test]
+    fn test_pad_bits_after_and_pad_bytes_after() {
+        #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+        struct TestStruct {
+            #[deku(bits = 2, pad_bits_after = "6", pad_bytes_after = "1")]
+            field_a: u8,
+            field_b: u8,
+        }
 
-    let ret_read = TestStruct::try_from(data.as_slice()).unwrap();
+        let data: Vec<u8> = vec![0b10_000000, 0xaa, 0xbb];
 
-    assert_eq!(
-        TestStruct {
-            field_a: 0b10,
-            field_b: 0xbb,
-        },
-        ret_read
-    );
+        let ret_read = TestStruct::try_from(data.as_slice()).unwrap();
 
-    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(vec![0b10_000000, 0x00, 0xbb], ret_write);
-}
+        assert_eq!(
+            TestStruct {
+                field_a: 0b10,
+                field_b: 0xbb,
+            },
+            ret_read
+        );
 
-#[cfg(feature = "bits")]
-#[test]
-fn test_pad_bits_after_and_pad_bytes_after() {
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    struct TestStruct {
-        #[deku(bits = 2, pad_bits_after = "6", pad_bytes_after = "1")]
-        field_a: u8,
-        field_b: u8,
+        let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+        assert_eq!(vec![0b10_000000, 0x00, 0xbb], ret_write);
     }
-
-    let data: Vec<u8> = vec![0b10_000000, 0xaa, 0xbb];
-
-    let ret_read = TestStruct::try_from(data.as_slice()).unwrap();
-
-    assert_eq!(
-        TestStruct {
-            field_a: 0b10,
-            field_b: 0xbb,
-        },
-        ret_read
-    );
-
-    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(vec![0b10_000000, 0x00, 0xbb], ret_write);
 }

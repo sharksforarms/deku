@@ -1,13 +1,8 @@
 use no_std_io::io::{Read, Seek, Write};
 
-#[cfg(feature = "alloc")]
-use alloc::borrow::Cow;
-#[cfg(feature = "alloc")]
-use alloc::format;
-
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{DekuError, DekuReader, DekuWriter};
+use crate::{deku_error, DekuError, DekuReader, DekuWriter};
 
 impl<'a, Ctx> DekuReader<'a, Ctx> for bool
 where
@@ -23,9 +18,12 @@ where
         let ret = match val {
             0x01 => Ok(true),
             0x00 => Ok(false),
-            _ => Err(DekuError::Parse(Cow::from(format!(
-                "cannot parse bool value: {val}",
-            )))),
+            _ => Err(deku_error!(
+                DekuError::Parse,
+                "cannot parse bool value",
+                "{}",
+                val
+            )),
         }?;
 
         Ok(ret)
@@ -55,7 +53,9 @@ mod tests {
     use no_std_io::io::Cursor;
     use rstest::rstest;
 
-    use crate::{ctx::BitSize, reader::Reader};
+    #[cfg(feature = "bits")]
+    use crate::ctx::BitSize;
+    use crate::reader::Reader;
 
     use super::*;
 
@@ -63,7 +63,7 @@ mod tests {
         case(&hex!("00"), false),
         case(&hex!("01"), true),
 
-        #[should_panic(expected = "Parse(\"cannot parse bool value: 2\")")]
+        #[should_panic(expected = "cannot parse bool value")]
         case(&hex!("02"), false),
     )]
     fn test_bool(input: &[u8], expected: bool) {
@@ -84,22 +84,23 @@ mod tests {
         assert!(res_read);
     }
 
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "alloc", feature = "bits"))]
     #[test]
     fn test_writer_bits() {
-        let mut writer = Writer::new(Cursor::new(vec![]));
+        let mut writer = Writer::new(Cursor::new(alloc::vec![]));
         true.to_writer(&mut writer, BitSize(1)).unwrap();
-        assert_eq!(vec![true], writer.rest());
+        assert_eq!(alloc::vec![true], writer.rest());
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn test_writer() {
-        let mut writer = Writer::new(Cursor::new(vec![]));
+        let mut writer = Writer::new(Cursor::new(alloc::vec![]));
         true.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![1], writer.inner.into_inner());
+        assert_eq!(alloc::vec![1], writer.inner.into_inner());
 
-        let mut writer = Writer::new(Cursor::new(vec![]));
+        let mut writer = Writer::new(Cursor::new(alloc::vec![]));
         false.to_writer(&mut writer, ()).unwrap();
-        assert_eq!(vec![0], writer.inner.into_inner());
+        assert_eq!(alloc::vec![0], writer.inner.into_inner());
     }
 }

@@ -22,6 +22,7 @@ impl<Ctx: Copy> DekuWriter<Ctx> for () {
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use crate::reader::Reader;

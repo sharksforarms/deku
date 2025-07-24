@@ -81,6 +81,7 @@ ImplDekuTupleTraits! { A, B, C, D, E, F, G, H, I, }
 ImplDekuTupleTraits! { A, B, C, D, E, F, G, H, I, J, }
 ImplDekuTupleTraits! { A, B, C, D, E, F, G, H, I, J, K, }
 
+#[cfg(all(feature = "alloc", feature = "std"))]
 #[cfg(test)]
 mod tests {
     use rstest::rstest;

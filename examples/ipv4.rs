@@ -1,4 +1,4 @@
-use std::net::Ipv4Addr;
+use core::net::Ipv4Addr;
 
 use deku::prelude::*;
 use hexlit::hex;
@@ -50,7 +50,7 @@ pub struct Ipv4Header {
 fn main() {
     let test_data = hex!("4500004b0f490000801163a591fea0ed91fd02cb").to_vec();
 
-    let mut cursor = std::io::Cursor::new(test_data.clone());
+    let mut cursor = no_std_io::io::Cursor::new(test_data.clone());
     let mut reader = deku::reader::Reader::new(&mut cursor);
     let ip_header = Ipv4Header::from_reader_with_ctx(&mut reader, ()).unwrap();
 

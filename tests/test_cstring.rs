@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use deku::prelude::*;
 
 use std::ffi::CString;

@@ -1,4 +1,9 @@
-use std::convert::{TryFrom, TryInto};
+#![cfg(feature = "alloc")]
+
+extern crate alloc;
+use alloc::vec::Vec;
+
+use core::convert::{TryFrom, TryInto};
 
 use deku::prelude::*;
 

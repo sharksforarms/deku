@@ -1,4 +1,4 @@
-use std::convert::{TryFrom, TryInto};
+use core::convert::{TryFrom, TryInto};
 
 use deku::prelude::*;
 
@@ -45,9 +45,7 @@ fn test_pad_bits_before_not_enough() {
 }
 
 #[test]
-#[should_panic(
-    expected = r#"InvalidParam("Invalid padding param \"(- 1)\": cannot convert to usize")"#
-)]
+#[should_panic(expected = r#"InvalidParam("Invalid padding param, cannot convert to usize: - 1")"#)]
 fn test_pad_bits_before_read_err() {
     #[derive(PartialEq, Debug, DekuRead)]
     struct TestStruct {
@@ -63,9 +61,7 @@ fn test_pad_bits_before_read_err() {
 }
 
 #[test]
-#[should_panic(
-    expected = r#"InvalidParam("Invalid padding param \"(- 1)\": cannot convert to usize")"#
-)]
+#[should_panic(expected = r#"InvalidParam("Invalid padding param, cannot convert to usize: - 1")"#)]
 fn test_pad_bits_before_write_err() {
     #[derive(PartialEq, Debug, DekuWrite)]
     struct TestStruct {

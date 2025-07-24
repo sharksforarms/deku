@@ -22,11 +22,11 @@ name = "ensure_no_std"
 path = "src/main.rs"
 
 [features]
-default = ["alloc"]
+default = ["alloc", "deku/alloc", "deku/bits" ]
 alloc = []
 
 [dependencies]
 cortex-m-rt = "0.7.3"
-deku = { path = "../", default-features = false, features = ["alloc", "bits"] }
+deku = { path = "../", default-features = false }
 embedded-alloc = "0.6.0"
 

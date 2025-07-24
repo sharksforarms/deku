@@ -4,8 +4,8 @@ mod tests {
     use deku::ctx::{BitSize, Order};
     use deku::prelude::*;
 
-    use std::convert::TryFrom;
-    use std::io::{Read, Seek, Write};
+    use core::convert::TryFrom;
+    use no_std_io::io::{Read, Seek, Write};
 
     #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
     #[deku(id_type = "u8", bits = "2")]

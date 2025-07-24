@@ -1,4 +1,6 @@
-use std::convert::{TryFrom, TryInto};
+#![cfg(feature = "alloc")]
+
+use core::convert::{TryFrom, TryInto};
 
 use deku::prelude::*;
 use hexlit::hex;

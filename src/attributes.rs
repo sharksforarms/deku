@@ -59,7 +59,6 @@ enum DekuEnum {
 | [cond](#cond) | field | Conditional expression for the field
 | [default](#default) | field | Provide default value. Used with [skip](#skip) or [cond](#cond)
 | [map](#map) | field | Specify a function or lambda to apply to the result of the read
-| [bits](#bits) | field | Set the bit-size of the field
 | [reader](#readerwriter) | variant, field | Custom reader code
 | [writer](#readerwriter) | variant, field | Custom writer code
 | [ctx](#ctx) | top-level, field| Context list for context sensitive parsing

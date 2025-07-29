@@ -28,7 +28,7 @@ darling = "0.20"
 proc-macro-crate = { version = "3.2.0", optional = true }
 
 [dev-dependencies]
-rstest = "0.25"
+rstest = "0.26"
 
 [lints]
 workspace = true

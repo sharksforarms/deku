@@ -35,6 +35,7 @@ but we could also use [from_reader](DekuContainerRead::from_reader).
 ```rust
 use deku::prelude::*;
 
+# #[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
 struct DekuTest {
@@ -45,6 +46,8 @@ struct DekuTest {
     field_c: u16,
 }
 
+# #[cfg(feature = "bits")]
+# fn main() {
 let data: Vec<u8> = vec![0b0110_1001, 0xBE, 0xEF];
 let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 assert_eq!(DekuTest {
@@ -57,6 +60,10 @@ val.field_c = 0xC0FE;
 
 let data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
+# }
+#
+# #[cfg(not(feature = "bits"))]
+# fn main() {}
 ```
 
 # Composing
@@ -65,6 +72,7 @@ Deku structs/enums can be composed as long as they implement [DekuReader] / [Dek
 can be derived by using the `DekuRead` and `DekuWrite` Derive macros.
 
 ```rust
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 use deku::prelude::*;
 
@@ -80,6 +88,8 @@ struct DekuHeader(u8);
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuData(u16);
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: Vec<u8> = vec![0xAA, 0xEF, 0xBE];
 let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 assert_eq!(DekuTest {
@@ -89,6 +99,10 @@ assert_eq!(DekuTest {
 
 let data_out = val.to_bytes().unwrap();
 assert_eq!(data, data_out);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 # Vec
@@ -104,9 +118,11 @@ If the length of Vec changes, the original field specified in `count` will not g
 Calling `.update()` can be used to "update" the field!
 
 ```rust
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 use deku::prelude::*;
 
+# #[cfg(feature = "alloc")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(update = "self.data.len()")]
@@ -115,6 +131,8 @@ struct DekuTest {
     data: Vec<u8>,
 }
 
+# #[cfg(all(feature = "alloc", feature = "std"))]
+# fn main() {
 let data: Vec<u8> = vec![0x02, 0xBE, 0xEF, 0xFF, 0xFF];
 let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
 assert_eq!(DekuTest {
@@ -144,7 +162,10 @@ assert_eq!(DekuTest {
     count: 0x03,
     data: vec![0xBE, 0xEF, 0xAA]
 }, val);
-
+# }
+#
+# #[cfg(not(all(feature = "alloc", feature = "std")))]
+# fn main() {}
 ```
 
 # Enums
@@ -170,6 +191,7 @@ based on the field marked with `default`.
 Example:
 
 ```rust
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 use deku::prelude::*;
 
@@ -182,6 +204,8 @@ enum DekuTest {
     VariantB(u16),
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01, 0x02, 0xEF, 0xBE];
 let mut cursor = Cursor::new(data);
 
@@ -191,6 +215,10 @@ assert_eq!(DekuTest::VariantA , val);
 // cursor now points at 0x02
 let (_, val) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(DekuTest::VariantB(0xBEEF) , val);
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 # Context
@@ -202,6 +230,7 @@ For more information see [ctx attribute](attributes#ctx)
 Example:
 
 ```rust
+# #[cfg(feature = "std")]
 # use std::io::Cursor;
 use deku::prelude::*;
 
@@ -219,12 +248,18 @@ struct Root {
     sub: Subtype
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let data: &[u8] = &[0x01, 0x02];
 let mut cursor = Cursor::new(data);
 
 let (amt_read, value) = Root::from_reader((&mut cursor, 0)).unwrap();
 assert_eq!(value.a, 0x01);
 assert_eq!(value.sub.b, 0x01 + 0x02)
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 # `Read` supported
@@ -235,7 +270,9 @@ This functions as an alias for [std::io](https://doc.rust-lang.org/stable/std/io
 using `no_std`.
 
 ```rust, no_run
+# #[cfg(feature = "std")]
 # use std::io::{Seek, SeekFrom, Read};
+# #[cfg(feature = "std")]
 # use std::fs::File;
 # use deku::prelude::*;
 #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone)]
@@ -246,15 +283,23 @@ struct EcHdr {
     padding1: [u8; 3],
 }
 
+# #[cfg(feature = "std")]
+# fn main() {
 let mut file = File::options().read(true).open("file").unwrap();
 let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 # `Write` supported
 Parsers can be created that directly write to a source implementing [Write](crate::no_std_io::Write).
 
 ```rust, no_run
+# #[cfg(feature = "std")]
 # use std::io::{Seek, SeekFrom, Read};
+# #[cfg(feature = "std")]
 # use std::fs::File;
 # use deku::prelude::*;
 #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone)]
@@ -262,9 +307,16 @@ Parsers can be created that directly write to a source implementing [Write](crat
 struct Hdr {
     version: u8,
 }
+
+# #[cfg(feature = "std")]
+# fn main() {
 let hdr = Hdr { version: 0xf0 };
 let mut file = File::options().write(true).open("file").unwrap();
 hdr.to_writer(&mut Writer::new(file), ());
+# }
+#
+# #[cfg(not(feature = "std"))]
+# fn main() {}
 ```
 
 # Internal variables and previously read fields
@@ -276,6 +328,7 @@ Example:
 
 ```rust
 # use deku::prelude::*;
+# #[cfg(feature = "alloc")]
 #[derive(DekuRead)]
 struct DekuTest {
     num_items: u8,
@@ -300,6 +353,7 @@ Conditionally included if referenced:
 Example:
 ```rust
 # use deku::prelude::*;
+# #[cfg(feature = "alloc")]
 #[derive(DekuRead)]
 #[deku(ctx = "size: u32")]
 pub struct EncodedString {
@@ -381,6 +435,8 @@ pub use deku_derive::*;
 pub mod attributes;
 pub mod ctx;
 pub mod error;
+
+#[macro_use]
 mod impls;
 pub mod noseek;
 pub mod prelude;
@@ -404,7 +460,9 @@ pub trait DekuReader<'a, Ctx = ()> {
     ///
     /// # Example
     /// ```rust, no_run
+    /// # #[cfg(feature = "std")]
     /// # use std::io::{Seek, SeekFrom, Read};
+    /// # #[cfg(feature = "std")]
     /// # use std::fs::File;
     /// # use deku::prelude::*;
     /// # use deku::ctx::Endian;
@@ -415,10 +473,16 @@ pub trait DekuReader<'a, Ctx = ()> {
     ///     version: u8,
     /// }
     ///
+    /// # #[cfg(feature = "std")]
+    /// # fn main() {
     /// let mut file = File::options().read(true).open("file").unwrap();
     /// file.seek(SeekFrom::Start(0)).unwrap();
     /// let mut reader = Reader::new(&mut file);
     /// let ec = EcHdr::from_reader_with_ctx(&mut reader, Endian::Big).unwrap();
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "std"))]
+    /// fn main() {}
     /// ```
     fn from_reader_with_ctx<R: no_std_io::Read + no_std_io::Seek>(
         reader: &mut Reader<R>,
@@ -448,7 +512,9 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     ///
     /// # Example
     /// ```rust, no_run
+    /// # #[cfg(feature = "std")]
     /// # use std::io::{Seek, SeekFrom, Read};
+    /// # #[cfg(feature = "std")]
     /// # use std::fs::File;
     /// # use deku::prelude::*;
     /// #[derive(Debug, DekuRead, DekuWrite, PartialEq, Eq, Clone)]
@@ -457,9 +523,16 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     ///     magic: [u8; 4],
     ///     version: u8,
     /// }
+    ///
+    /// # #[cfg(feature = "std")]
+    /// # fn main() {
     /// let mut file = File::options().read(true).open("file").unwrap();
     /// file.seek(SeekFrom::Start(0)).unwrap();
     /// let ec = EcHdr::from_reader((&mut file, 0)).unwrap();
+    /// # }
+    /// #
+    /// # #[cfg(not(feature = "std"))]
+    /// # fn main() {}
     /// ```
     fn from_reader<R: no_std_io::Read + no_std_io::Seek>(
         input: (&'a mut R, usize),
@@ -519,6 +592,7 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     /// let bytes = s.to_bytes().unwrap();
     /// assert_eq!(bytes, [0x01, 0x02, 0x00, 0x03, 0x00, 0x00, 0x00]);
     /// ````
+    #[cfg(feature = "alloc")]
     #[inline(always)]
     fn to_bytes(&self) -> Result<Vec<u8>, DekuError> {
         let mut out_buf = Vec::new();

@@ -74,11 +74,14 @@ where
 #[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 mod tests {
+    #[cfg(feature = "alloc")]
+    use alloc::vec;
     use no_std_io::io::Cursor;
     use rstest::rstest;
 
     use super::*;
-    use crate::ctx::*;
+    #[cfg(feature = "bits")]
+    use crate::ctx::{BitSize, Endian};
     use crate::native_endian;
     use crate::reader::Reader;
     #[cfg(feature = "bits")]

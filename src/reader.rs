@@ -1,13 +1,17 @@
 //! Reader for reader functions
 
-use core::cmp::Ordering;
-
 #[cfg(feature = "bits")]
 use bitvec::prelude::*;
 use no_std_io::io::{ErrorKind, Read, Seek, SeekFrom};
 
 use crate::{ctx::Order, prelude::NeedSize, DekuError};
-use alloc::{vec, vec::Vec};
+
+#[cfg(feature = "bits")]
+use alloc::vec;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+#[cfg(feature = "bits")]
+use core::cmp::Ordering;
 
 #[cfg(feature = "logging")]
 use log;
@@ -100,9 +104,12 @@ impl<R: Read + Seek> Reader<R> {
     /// to a full byte.
     ///
     /// ```rust
-    /// use std::io::Cursor;
     /// use deku::prelude::*;
     ///
+    /// # #[cfg(feature = "std")]
+    /// use std::io::Cursor;
+    ///
+    /// # #[cfg(feature = "bits")]
     /// #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
     /// #[deku(endian = "big")]
     /// struct DekuTest {
@@ -111,9 +118,12 @@ impl<R: Read + Seek> Reader<R> {
     ///     #[deku(bits = 2)]
     ///     field_b: u8,
     /// }
+    ///
+    /// # #[cfg(feature = "bits")]
+    /// # fn main() {
     /// //                       |         | <= this entire byte is Read
     /// let data: Vec<u8> = vec![0b0110_1101, 0xbe, 0xef];
-    /// let mut cursor = Cursor::new(data);
+    /// let mut cursor = no_std_io::io::Cursor::new(data);
     /// let mut reader = Reader::new(&mut cursor);
     /// let val = DekuTest::from_reader_with_ctx(&mut reader, ()).unwrap();
     /// assert_eq!(DekuTest {
@@ -123,8 +133,13 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// // last 2 bits in that byte
     /// assert_eq!(reader.rest(), vec![false, true]);
+    /// # }
+    ///
+    /// # #[cfg(not(feature = "bits"))]
+    /// # fn main() {}
     /// ```
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn rest(&mut self) -> Vec<bool> {
         #[cfg(feature = "bits")]
         match &self.leftover {
@@ -438,12 +453,12 @@ impl<R: Read + Seek> Reader<R> {
         &mut self,
         amt: usize,
         buf: &mut [u8],
-        order: Order,
+        _order: Order,
     ) -> Result<ReaderRet, DekuError> {
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_leftover(buf, byte, amt),
             #[cfg(feature = "bits")]
-            Some(Leftover::Bits(_)) => Ok(ReaderRet::Bits(self.read_bits(amt * 8, order)?)),
+            Some(Leftover::Bits(_)) => Ok(ReaderRet::Bits(self.read_bits(amt * 8, _order)?)),
             _ => unreachable!(),
         }
     }
@@ -527,12 +542,12 @@ impl<R: Read + Seek> Reader<R> {
     fn read_bytes_const_other<const N: usize>(
         &mut self,
         buf: &mut [u8; N],
-        order: Order,
+        _order: Order,
     ) -> Result<ReaderRet, DekuError> {
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_const_leftover(buf, byte),
             #[cfg(feature = "bits")]
-            Some(Leftover::Bits(_)) => Ok(ReaderRet::Bits(self.read_bits(N * 8, order)?)),
+            Some(Leftover::Bits(_)) => Ok(ReaderRet::Bits(self.read_bits(N * 8, _order)?)),
             _ => unreachable!(),
         }
     }

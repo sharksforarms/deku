@@ -2,5 +2,4 @@
 
 mod test_attributes;
 mod test_compile;
-#[cfg(feature = "bits")]
 mod test_to_bits;

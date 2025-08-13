@@ -25,6 +25,7 @@ enum NestedEnum {
 #[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(id_type = "u32", bytes = 2, ctx = "_endian: Endian")]
+#[expect(dead_code)]
 enum NestedEnum2 {
     #[deku(id = "0x01")]
     VarA(u8),

@@ -260,9 +260,21 @@ impl<W: Write + Seek> Writer<W> {
             log::trace!("finalized: {} bits leftover", self.leftover.0.len());
 
             // add bits to be byte aligned so we can write
-            self.leftover
-                .0
-                .extend_from_bitslice(&bitvec![u8, Msb0; 0; 8 - self.leftover.0.len()]);
+            if self.leftover.1 == Order::Msb0 {
+                #[cfg(feature = "logging")]
+                log::trace!("finalized: msb0 padding");
+
+                self.leftover
+                    .0
+                    .extend_from_bitslice(&bitvec![u8, Msb0; 0; 8 - self.leftover.0.len()]);
+            } else {
+                #[cfg(feature = "logging")]
+                log::trace!("finalized: lsb0 padding");
+
+                let tmp = self.leftover.0.clone();
+                self.leftover.0 = bitvec![u8, Msb0; 0; 8 - tmp.len()];
+                self.leftover.0.extend_from_bitslice(&tmp);
+            }
             let mut buf = alloc::vec![0x00; self.leftover.0.len() / 8];
 
             // write as many leftover to the buffer (as we can, can't write bits just bytes)
@@ -402,7 +414,7 @@ mod tests {
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1, 0, 1], Order::Lsb0)
             .unwrap();
         writer.finalize().unwrap();
-        assert_eq!(out_buf.into_inner(), [0b110_1010, 0b0101_0000]);
+        assert_eq!(out_buf.into_inner(), [0b0110_1010, 0b0000_0101]);
 
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
@@ -414,5 +426,16 @@ mod tests {
             .unwrap();
         writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b0101_0110, 0b1010_0000]);
+
+        let mut out_buf = Cursor::new(vec![]);
+        let mut writer = Writer::new(&mut out_buf);
+        writer
+            .write_bits_order(&bitvec![u8, Msb0; 1, 0, 1, 0, 1, 0], Order::Msb0)
+            .unwrap();
+        writer
+            .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1, 0, 1], Order::Lsb0)
+            .unwrap();
+        writer.finalize().unwrap();
+        assert_eq!(out_buf.into_inner(), [0b1001_0101, 0b0000_1010]);
     }
 }

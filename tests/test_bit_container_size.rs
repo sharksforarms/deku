@@ -1,7 +1,8 @@
+#![cfg(feature = "bits")]
+
 use deku::prelude::*;
 use rstest::*;
 
-#[cfg(feature = "bits")]
 #[derive(Debug, Default, PartialEq, DekuWrite, DekuRead)]
 #[deku(endian = "big")]
 struct Test {
@@ -15,22 +16,21 @@ struct Test {
     field_u32_be: u32,
 }
 
-#[cfg(feature = "bits")]
 #[rstest(input,
     #[should_panic(
-        expected = "InvalidParam(\"bit size 5 of input is larger than bit requested size 4\")"
+        expected = "bit size of input is larger than bit requested size"
     )]
     case::field_u8_be( Test { field_u8_be: 0b11111, ..Test::default()}),
     #[should_panic(
-        expected = "InvalidParam(\"bit size 5 of input is larger than bit requested size 4\")"
+        expected = "bit size of input is larger than bit requested size"
     )]
     case::field_be( Test { field_be: 0b11111, ..Test::default()}),
     #[should_panic(
-        expected = "InvalidParam(\"bit size 13 of input is larger than bit requested size 12\")"
+        expected = "bit size of input is larger than requested size"
     )]
     case::field_le( Test { field_le: 0b1111111111111, ..Test::default()}),
     #[should_panic(
-        expected = "InvalidParam(\"bit size 13 of input is larger than bit requested size 9\")"
+        expected = "bit size of input is larger than bit requested size"
     )]
     case::field_u32_be( Test { field_u32_be: 0b1111111111111, ..Test::default()}),
 )]

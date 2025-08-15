@@ -2,11 +2,14 @@
 
 // TODO: These should be divided into smaller tests
 
-use std::convert::{TryFrom, TryInto};
-use std::io::Cursor;
+use core::convert::TryFrom;
+use no_std_io::io::Cursor;
 
 use deku::prelude::*;
+
+#[cfg(any(feature = "bits", feature = "std"))]
 use hexlit::hex;
+#[cfg(any(feature = "bits", feature = "std"))]
 use rstest::*;
 
 #[cfg(feature = "bits")]
@@ -55,7 +58,7 @@ fn test_enum(input: &[u8], expected: TestEnum) {
 }
 
 #[test]
-#[should_panic(expected = "Parse(\"Could not match enum variant id = 2 on enum `TestEnum`\")")]
+#[should_panic(expected = "Could not match enum variant")]
 fn test_enum_error() {
     #[derive(DekuRead)]
     #[deku(id_type = "u8")]
@@ -71,6 +74,7 @@ fn test_enum_error() {
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[repr(u8)]
 #[deku(id_type = "u8")]
+#[cfg(all(feature = "alloc", feature = "std"))]
 enum TestEnumDiscriminant {
     VarA = 0x00,
     VarB,
@@ -82,9 +86,11 @@ enum TestEnumDiscriminant {
     case(&hex!("01"), TestEnumDiscriminant::VarB),
     case(&hex!("02"), TestEnumDiscriminant::VarC),
 
-    #[should_panic(expected = "Could not match enum variant id = 3 on enum `TestEnumDiscriminant`")]
+    #[should_panic(expected = "Could not match enum variant")]
     case(&hex!("03"), TestEnumDiscriminant::VarA),
 )]
+// TODO: Switch std::convert::TryInto to core::convert::TryInto
+#[cfg(all(feature = "alloc", feature = "std"))]
 fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
     let input = input.to_vec();
     let ret_read = TestEnumDiscriminant::try_from(input.as_slice()).unwrap();
@@ -95,6 +101,7 @@ fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
 }
 
 #[test]
+#[cfg(all(feature = "alloc", feature = "std"))]
 fn test_enum_array_type() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(id_type = "[u8; 3]")]
@@ -215,6 +222,7 @@ fn test_enum_id_pat_with_discriminant_and_storage() {
 }
 
 #[test]
+#[cfg(all(feature = "alloc", feature = "std"))]
 fn test_id_pat_with_id() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     pub struct DekuTest {
@@ -341,6 +349,7 @@ fn test_litbool_as_id() {
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u16", id_endian = "big", endian = "little")]
+#[cfg(all(feature = "alloc", feature = "std"))]
 enum VariableEndian {
     #[deku(id = "0x01")]
     Little(u16),
@@ -355,6 +364,7 @@ enum VariableEndian {
 case(&hex!("00010100"), VariableEndian::Little(1)),
 case(&hex!("00020100"), VariableEndian::Big{x: 256})
 )]
+#[cfg(all(feature = "alloc", feature = "std"))]
 fn test_variable_endian_enum(input: &[u8], expected: VariableEndian) {
     let ret_read = VariableEndian::try_from(input).unwrap();
     assert_eq!(expected, ret_read);

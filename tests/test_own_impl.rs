@@ -1,11 +1,13 @@
+#![cfg(feature = "std")]
+
 #[test]
 fn test_own_impl() {
     use deku::prelude::*;
     use std::io::{Read, Seek, SeekFrom};
+    #[expect(dead_code)]
     pub enum Data {
         /// On read: Save current stream_position() as `Offset`, seek `header.filesize`
         /// This will be used to seek this this position if we want to extract *just* this file
-        #[expect(dead_code)]
         Offset(u64),
     }
 

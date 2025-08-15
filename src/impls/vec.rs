@@ -2,7 +2,6 @@ use core::mem;
 
 use no_std_io::io::{Read, Seek, Write};
 
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 use crate::reader::Reader;
@@ -179,14 +178,23 @@ impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Vec<T> {
     /// ```rust
     /// # use deku::{ctx::Endian, DekuWriter};
     /// # use deku::writer::Writer;
+    /// # #[cfg(feature = "bits")]
     /// # use deku::bitvec::{Msb0, bitvec};
+    /// # #[cfg(feature = "std")]
     /// # use std::io::Cursor;
+    ///
+    /// # #[cfg(feature = "std")]
+    /// # fn main() {
     /// let data = vec![1u8];
     /// let mut out_buf = vec![];
     /// let mut cursor = Cursor::new(&mut out_buf);
     /// let mut writer = Writer::new(&mut cursor);
     /// data.to_writer(&mut writer, Endian::Big).unwrap();
     /// assert_eq!(data, out_buf.to_vec());
+    /// # }
+    ///
+    /// # #[cfg(not(feature = "std"))]
+    /// # fn main() {}
     /// ```
     fn to_writer<W: Write + Seek>(
         &self,
@@ -200,6 +208,7 @@ impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Vec<T> {
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 mod tests {
@@ -208,6 +217,7 @@ mod tests {
     use rstest::rstest;
     use std::io::Cursor;
 
+    #[cfg(feature = "bits")]
     use crate::reader::Reader;
 
     use super::*;
@@ -291,6 +301,7 @@ mod tests {
         assert_eq!(expected_rest_bytes, buf);
     }
 
+    #[cfg(feature = "alloc")]
     #[rstest(input, endian, expected,
         case::normal(vec![0xAABB, 0xCCDD], Endian::Little, vec![0xBB, 0xAA, 0xDD, 0xCC]),
     )]

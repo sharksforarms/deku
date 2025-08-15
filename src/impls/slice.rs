@@ -93,13 +93,16 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;
     use rstest::rstest;
     use std::io::Cursor;
 
-    use crate::{ctx::Endian, reader::Reader, writer::Writer, DekuReader};
+    use crate::{ctx::Endian, writer::Writer};
+    #[cfg(feature = "bits")]
+    use crate::{reader::Reader, DekuReader};
 
     #[cfg(feature = "bits")]
     #[rstest(input,endian,expected,

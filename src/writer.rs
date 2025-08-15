@@ -9,12 +9,12 @@ use no_std_io::io::{Seek, SeekFrom, Write};
 #[cfg(feature = "logging")]
 use log;
 
+#[cfg(feature = "bits")]
 use crate::ctx::Order;
+
 use crate::DekuError;
 
-#[cfg(feature = "alloc")]
-use alloc::borrow::ToOwned;
-
+#[cfg(feature = "bits")]
 const fn bits_of<T>() -> usize {
     core::mem::size_of::<T>().saturating_mul(<u8>::BITS as usize)
 }
@@ -71,6 +71,8 @@ impl<W: Write + Seek> Writer<W> {
         bits: &BitSlice<u8, Msb0>,
         order: Order,
     ) -> Result<(), DekuError> {
+        use alloc::borrow::ToOwned;
+
         #[cfg(feature = "logging")]
         log::trace!("attempting {} bits : {}", bits.len(), bits);
 
@@ -299,6 +301,7 @@ impl<W: Write + Seek> Writer<W> {
     }
 }
 
+#[cfg(all(feature = "std", feature = "bits"))]
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
@@ -307,7 +310,6 @@ mod tests {
     use hexlit::hex;
 
     #[test]
-    #[cfg(feature = "bits")]
     fn test_writer_bits() {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
@@ -347,7 +349,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "bits")]
     fn test_writer_bytes() {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
@@ -359,7 +360,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "bits")]
     fn test_bit_order() {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);

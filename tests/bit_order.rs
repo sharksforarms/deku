@@ -1,6 +1,7 @@
 #[cfg(feature = "bits")]
 mod tests {
     use assert_hex::assert_eq_hex;
+    use bitvec::prelude::*;
     use deku::ctx::{BitSize, Order};
     use deku::prelude::*;
 
@@ -473,5 +474,58 @@ mod tests {
         let expected = 0b111_01;
         assert_eq!(dt.flag, expected);
         assert_eq!(to_bytes, data);
+    }
+
+    #[test]
+    fn test_three_bits_roundtrip() {
+        #[derive(Clone, Debug, PartialEq, DekuRead, DekuWrite)]
+        pub struct StructWithThreeLeadingBits {
+            #[deku(bits = "3", bit_order = "lsb")]
+            pub bitflags: u8,
+            pub pba: PacketByteArray,
+        }
+
+        #[derive(Clone, Debug, PartialEq, Default)]
+        pub struct PacketByteArray(pub [u8; 2]);
+
+        impl DekuReader<'_, ()> for PacketByteArray {
+            fn from_reader_with_ctx<R: Read + Seek>(
+                reader: &mut Reader<R>,
+                _ctx: (),
+            ) -> Result<Self, DekuError> {
+                let mut buffer = [0u8; 2];
+                for slot in buffer.iter_mut() {
+                    *slot = reader.read_bits(8, Order::Lsb0)?.unwrap().load_le();
+                }
+
+                Ok(PacketByteArray(buffer))
+            }
+        }
+
+        impl DekuWriter<()> for PacketByteArray {
+            fn to_writer<W: Write + Seek>(
+                &self,
+                writer: &mut Writer<W>,
+                _: (),
+            ) -> Result<(), DekuError> {
+                let data = BitVec::from_iter(self.0.as_slice().as_bits::<Lsb0>().iter().rev());
+                writer.write_bits_order(&data, Order::Lsb0)
+            }
+        }
+
+        let obj = StructWithThreeLeadingBits {
+            bitflags: 0b110,
+            pba: PacketByteArray([12, 175]),
+        };
+
+        let bytes = obj.to_bytes().unwrap();
+
+        assert_eq!([0b0110_0110, 0b0111_1000, 0b0000_0101], *bytes);
+        assert_eq!(
+            obj,
+            StructWithThreeLeadingBits::from_bytes((&bytes, 0))
+                .unwrap()
+                .1
+        );
     }
 }

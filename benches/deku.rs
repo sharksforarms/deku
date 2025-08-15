@@ -1,4 +1,4 @@
-use std::io::{Cursor, Read, Seek};
+use no_std_io::io::{Cursor, Read, Seek};
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use deku::prelude::*;
@@ -132,6 +132,7 @@ pub fn read_all_vs_count_vs_read_exact(c: &mut Criterion) {
 
     #[derive(DekuRead, DekuWrite)]
     #[deku(ctx = "len: usize")]
+    #[expect(dead_code)]
     pub struct CountFromCtxWrapper {
         #[deku(count = "len")]
         pub data: Vec<u8>,

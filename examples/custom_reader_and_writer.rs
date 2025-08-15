@@ -1,11 +1,11 @@
-use std::convert::TryInto;
+use core::convert::TryInto;
 
 use deku::ctx::BitSize;
 use deku::writer::Writer;
 use deku::{prelude::*, DekuWriter};
-use no_std_io::io::{Seek, Write};
+use no_std_io::io::{Cursor, Read, Seek, Write};
 
-fn bit_flipper_read<R: std::io::Read + std::io::Seek>(
+fn bit_flipper_read<R: Read + Seek>(
     field_a: u8,
     reader: &mut Reader<R>,
     bit_size: BitSize,
@@ -59,7 +59,7 @@ struct DekuTest {
 
 fn main() {
     let test_data = [0x01, 0b1001_0110];
-    let mut cursor = std::io::Cursor::new(test_data);
+    let mut cursor = Cursor::new(test_data);
 
     let (_read_amt, ret_read) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 

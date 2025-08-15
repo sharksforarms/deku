@@ -4,8 +4,10 @@
 
 #![allow(clippy::unusual_byte_groupings)]
 
-use std::convert::{TryFrom, TryInto};
+#[cfg(any(feature = "bits", feature = "std"))]
+use core::convert::{TryFrom, TryInto};
 
+#[cfg(any(feature = "alloc", feature = "bits", feature = "std"))]
 use deku::prelude::*;
 
 mod test_common;
@@ -169,6 +171,7 @@ fn test_named_struct() {
     assert_eq!(test_data, ret_write);
 }
 
+#[cfg(all(feature = "alloc", feature = "std"))]
 #[test]
 fn test_raw_identifiers_struct() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -187,6 +190,7 @@ fn test_raw_identifiers_struct() {
     assert_eq!(test_data, ret_write);
 }
 
+#[cfg(feature = "alloc")]
 #[test]
 fn test_big_endian() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -217,6 +221,7 @@ fn test_big_endian() {
     assert_eq!(&bytes[..2], &*new_bytes);
 }
 
+#[cfg(feature = "alloc")]
 #[test]
 fn test_units() {
     #[derive(DekuRead, DekuWrite)]
@@ -234,6 +239,7 @@ fn test_units() {
 }
 
 /// Issue 513
+#[cfg(feature = "alloc")]
 #[test]
 fn test_zst_vec_1() {
     #[derive(Debug, PartialEq, DekuRead)]
@@ -250,6 +256,7 @@ fn test_zst_vec_1() {
     assert_eq!(x.things.len(), 0);
 }
 /// Issue 513
+#[cfg(feature = "alloc")]
 #[test]
 fn test_zst_vec_2() {
     #[derive(Debug, PartialEq, DekuRead)]

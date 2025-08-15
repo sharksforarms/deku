@@ -1,14 +1,10 @@
-#[cfg(feature = "alloc")]
-use alloc::borrow::Cow;
-#[cfg(feature = "alloc")]
-use alloc::format;
 use core::num::*;
 use no_std_io::io::{Read, Seek, Write};
 
 use crate::ctx::*;
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{DekuError, DekuReader, DekuWriter};
+use crate::{deku_error, DekuError, DekuReader, DekuWriter};
 
 macro_rules! ImplDekuTraitsCtx {
     ($typ:ty, $readtype:ty, $ctx_arg:tt, $ctx_type:tt) => {
@@ -21,7 +17,7 @@ macro_rules! ImplDekuTraitsCtx {
                 let value = <$typ>::new(value);
 
                 match value {
-                    None => Err(DekuError::Parse(Cow::from(format!("NonZero assertion")))),
+                    None => Err(deku_error!(DekuError::Parse, "NonZero assertion")),
                     Some(v) => Ok(v),
                 }
             }
@@ -76,6 +72,7 @@ ImplDekuTraits!(NonZeroI64, i64);
 ImplDekuTraits!(NonZeroI128, i128);
 ImplDekuTraits!(NonZeroIsize, isize);
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;

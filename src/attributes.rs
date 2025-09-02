@@ -2054,6 +2054,25 @@ assert_eq!(data, value);
 # fn main() {}
 ```
 
+
+When using `id_type` with non-unit variants, Deku requires [primitive representation](https://doc.rust-lang.org/reference/type-layout.html#primitive-representations).
+Deku uses this for calculating the discriminant when reading and writing.
+```rust
+# use core::convert::{TryInto, TryFrom};
+# use deku::prelude::*;
+# #[cfg(feature = "std")]
+# use std::io::Cursor;
+#[derive(Copy, Clone, Debug, DekuRead, DekuWrite)]
+#[deku(endian = "endian", ctx = "endian: deku::ctx::Endian", id_type = "u8")]
+#[repr(u8)]
+enum OpKind {
+    Id = 0,
+    Opcode = 255,
+}
+```
+
+
+
 # bytes
 
 Set the byte size of the enum variant `id`

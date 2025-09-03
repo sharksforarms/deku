@@ -264,7 +264,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             let Some(repr) = input.repr else {
                 return Err(syn::Error::new(
                     variant.ident.span(),
-                    "DekuRead: `id_type` must be specified on non-unit variants",
+                    "DekuRead: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`",
                 ));
             };
             if let Some(id_type) = id_type {

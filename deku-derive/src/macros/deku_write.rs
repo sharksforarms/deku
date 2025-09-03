@@ -278,7 +278,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     None => {
                         return Err(syn::Error::new(
                             variant.ident.span(),
-                            "DekuWrite: `id_type` must be specified on non-unit variants",
+                            "DekuWrite: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`",
                         ));
                     }
                     Some(repr) => {

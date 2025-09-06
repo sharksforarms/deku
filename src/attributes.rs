@@ -232,13 +232,13 @@ pub struct BigEndian {
 
 # #[cfg(feature = "bits")]
 # fn main() {
-let data = vec![0x40, 0x40];
+let data = vec![0x10, 0x81];
 let big_endian = BigEndian::try_from(data.as_ref()).unwrap();
 assert_eq!(
     big_endian,
     BigEndian {
-        offset: 0x4000,
-        t: 2
+        offset: 0x1001,
+        t: 0b100,
     }
 );
 let bytes = big_endian.to_bytes().unwrap();

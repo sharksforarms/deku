@@ -329,13 +329,13 @@ mod tests {
 
     #[test]
     fn test_bit_order_more_first_be() {
-        let data = vec![0x40, 0x40];
+        let data = vec![0x10, 0x81];
         let more_first = MoreFirstBe::try_from(data.as_ref()).unwrap();
         assert_eq!(
             more_first,
             MoreFirstBe {
-                offset: 0x4000,
-                t: 2
+                offset: 0x1001,
+                t: 0b100,
             }
         );
 
@@ -530,6 +530,7 @@ mod tests {
     }
 
     /// Issue 576
+    #[cfg(feature = "descriptive-errors")]
     #[test]
     fn test_idempotency() {
         #[derive(DekuRead, DekuWrite, Debug)]
@@ -547,6 +548,7 @@ mod tests {
     }
 
     /// Issue 576
+    #[cfg(feature = "descriptive-errors")]
     #[test]
     fn test_idempotency_multi_byte() {
         #[derive(DekuRead, DekuWrite, Debug)]
@@ -558,8 +560,108 @@ mod tests {
             t: u8,
         }
 
-        let bytes = [0x40, 0x40];
+        let bytes = [0x10, 0x81];
         let data = MoreFirstBe::try_from(bytes.as_slice()).unwrap();
         assert_eq!(data.to_bytes().unwrap(), bytes);
+    }
+
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    #[should_panic(expected = "bit size of input is larger than requested size: 32 exceeds 31")]
+    fn test_invalid_bit_size_1() {
+        #[derive(DekuRead, DekuWrite)]
+        #[deku(endian = "little")]
+        struct Foo {
+            #[deku(bits = "31")]
+            num: u32,
+            #[deku(bits = "1")]
+            flag: bool,
+        }
+
+        let f = Foo {
+            num: u32::MAX,
+            flag: true,
+        };
+        f.to_bytes().unwrap();
+    }
+
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    #[should_panic(expected = "bit size of input is larger than requested size: 32 exceeds 31")]
+    fn test_invalid_bit_size_2() {
+        #[derive(DekuRead, DekuWrite)]
+        #[deku(endian = "little")]
+        struct Foo {
+            #[deku(bits = "31", bit_order = "msb")]
+            num: u32,
+            #[deku(bits = "1")]
+            flag: bool,
+        }
+
+        let f = Foo {
+            num: u32::MAX,
+            flag: true,
+        };
+        f.to_bytes().unwrap();
+    }
+
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    #[should_panic(expected = "bit size of input is larger than requested size: 32 exceeds 31")]
+    fn test_invalid_bit_size_3() {
+        #[derive(DekuRead, DekuWrite)]
+        #[deku(endian = "little")]
+        struct Foo {
+            #[deku(bits = "31", bit_order = "lsb")]
+            num: u32,
+            #[deku(bits = "1")]
+            flag: bool,
+        }
+
+        let f = Foo {
+            num: u32::MAX,
+            flag: true,
+        };
+        f.to_bytes().unwrap();
+    }
+
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    #[should_panic(expected = "bit size of input is larger than requested size: 32 exceeds 31")]
+    fn test_invalid_bit_size_4() {
+        #[derive(DekuRead, DekuWrite)]
+        #[deku(endian = "big")]
+        struct Foo {
+            #[deku(bits = "31", bit_order = "msb")]
+            num: u32,
+            #[deku(bits = "1")]
+            flag: bool,
+        }
+
+        let f = Foo {
+            num: u32::MAX,
+            flag: true,
+        };
+        f.to_bytes().unwrap();
+    }
+
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    #[should_panic(expected = "bit size of input is larger than requested size: 32 exceeds 31")]
+    fn test_invalid_bit_size_5() {
+        #[derive(DekuRead, DekuWrite)]
+        #[deku(endian = "big")]
+        struct Foo {
+            #[deku(bits = "31", bit_order = "lsb")]
+            num: u32,
+            #[deku(bits = "1")]
+            flag: bool,
+        }
+
+        let f = Foo {
+            num: u32::MAX,
+            flag: true,
+        };
+        f.to_bytes().unwrap();
     }
 }

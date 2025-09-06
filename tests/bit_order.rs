@@ -528,4 +528,38 @@ mod tests {
                 .1
         );
     }
+
+    /// Issue 576
+    #[test]
+    fn test_idempotency() {
+        #[derive(DekuRead, DekuWrite, Debug)]
+        #[deku(endian = "big", bit_order = "lsb")]
+        pub struct Foo {
+            #[deku(bits = "8")]
+            f1: u16,
+        }
+
+        let bytes = [0x01];
+
+        let foo = Foo::try_from(bytes.as_slice()).unwrap();
+        assert_eq!(0x01, foo.f1);
+        assert_eq!(foo.to_bytes().unwrap(), bytes);
+    }
+
+    /// Issue 576
+    #[test]
+    fn test_idempotency_multi_byte() {
+        #[derive(DekuRead, DekuWrite, Debug)]
+        #[deku(endian = "big", bit_order = "lsb")]
+        pub struct MoreFirstBe {
+            #[deku(bits = "13")]
+            offset: u16,
+            #[deku(bits = "3")]
+            t: u8,
+        }
+
+        let bytes = [0x40, 0x40];
+        let data = MoreFirstBe::try_from(bytes.as_slice()).unwrap();
+        assert_eq!(data.to_bytes().unwrap(), bytes);
+    }
 }

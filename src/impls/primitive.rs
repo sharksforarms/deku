@@ -801,9 +801,7 @@ macro_rules! ImplDekuWrite {
                 }
 
                 match (endian, order) {
-                    (Endian::Little, Order::Lsb0)
-                    | (Endian::Little, Order::Msb0)
-                    | (Endian::Big, Order::Lsb0) => {
+                    (Endian::Little, Order::Lsb0) | (Endian::Little, Order::Msb0) => {
                         let mut remaining_bits = bit_size;
                         for chunk in input_bits.chunks(8) {
                             if chunk.len() > remaining_bits {
@@ -816,6 +814,28 @@ macro_rules! ImplDekuWrite {
                                 writer.write_bits_order(&chunk, order)?;
                             }
                             remaining_bits -= chunk.len();
+                        }
+                    }
+                    (Endian::Big, Order::Lsb0) => {
+                        if bit_size <= 8 {
+                            writer.write_bits_order(
+                                &input_bits[input_bits.len() - bit_size..],
+                                order,
+                            )?;
+                        } else {
+                            let mut remaining_bits = bit_size;
+                            for chunk in input_bits.chunks(8) {
+                                if chunk.len() > remaining_bits {
+                                    writer.write_bits_order(
+                                        &chunk[chunk.len() - remaining_bits..],
+                                        order,
+                                    )?;
+                                    break;
+                                } else {
+                                    writer.write_bits_order(&chunk, order)?;
+                                }
+                                remaining_bits -= chunk.len();
+                            }
                         }
                     }
                     (Endian::Big, Order::Msb0) => {

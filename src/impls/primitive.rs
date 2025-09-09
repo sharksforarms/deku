@@ -802,6 +802,21 @@ macro_rules! ImplDekuWrite {
 
                 match (endian, order) {
                     (Endian::Little, Order::Lsb0) | (Endian::Little, Order::Msb0) => {
+                        let input_bits_lsb = input.view_bits::<Lsb0>();
+                        if let Some(last) = input_bits_lsb.last_one() {
+                            let last = last + 1;
+                            let max = bit_size;
+                            if last > max {
+                                return Err(deku_error!(
+                                    DekuError::InvalidParam,
+                                    "bit size of input is larger than requested size",
+                                    "{} exceeds {}",
+                                    last,
+                                    bit_size
+                                ));
+                            }
+                        }
+
                         let mut remaining_bits = bit_size;
                         for chunk in input_bits.chunks(8) {
                             if chunk.len() > remaining_bits {
@@ -817,6 +832,20 @@ macro_rules! ImplDekuWrite {
                         }
                     }
                     (Endian::Big, Order::Lsb0) => {
+                        const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                        if let Some(first) = input_bits.first_one() {
+                            let max = MAX_TYPE_BITS - bit_size;
+                            if max > first {
+                                return Err(deku_error!(
+                                    DekuError::InvalidParam,
+                                    "bit size of input is larger than requested size",
+                                    "{} exceeds {}",
+                                    MAX_TYPE_BITS - first,
+                                    bit_size
+                                ));
+                            }
+                        }
+
                         if bit_size <= 8 {
                             writer.write_bits_order(
                                 &input_bits[input_bits.len() - bit_size..],
@@ -839,6 +868,20 @@ macro_rules! ImplDekuWrite {
                         }
                     }
                     (Endian::Big, Order::Msb0) => {
+                        const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                        if let Some(first) = input_bits.first_one() {
+                            let max = MAX_TYPE_BITS - bit_size;
+                            if max > first {
+                                return Err(deku_error!(
+                                    DekuError::InvalidParam,
+                                    "bit size of input is larger than requested size",
+                                    "{} exceeds {}",
+                                    MAX_TYPE_BITS - first,
+                                    bit_size
+                                ));
+                            }
+                        }
+
                         // big endian
                         // Example read 10 bits u32 [0xAB, 0b11_000000]
                         // => [00000000, 00000000, 00000010, 10101111]

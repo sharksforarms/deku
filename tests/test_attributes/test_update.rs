@@ -18,7 +18,7 @@ fn test_update() {
     assert_eq!(TestStruct { field_a: 0x01 }, ret_read);
 
     // `field_a` field should now be increased
-    ret_read.update().unwrap();
+    ret_read.update(()).unwrap();
     assert_eq!(0x05, ret_read.field_a);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
@@ -53,7 +53,7 @@ fn test_update_from_field() {
     ret_read.data.push(0xff);
 
     // `count` field should now be increased
-    ret_read.update().unwrap();
+    ret_read.update(()).unwrap();
     assert_eq!(3, ret_read.count);
 
     // Write
@@ -75,5 +75,5 @@ fn test_update_error() {
 
     let mut val = TestStruct { count: 0x01 };
 
-    val.update().unwrap();
+    val.update(()).unwrap();
 }

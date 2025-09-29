@@ -334,9 +334,17 @@ impl<R: Read + Seek> Reader<R> {
                         log::trace!("extend(used): {}", used);
                         ret.extend_from_bitslice(used);
                         if let Some(front_bits) = front_bits {
+                            // TODO: may not be correct for all cases!
+                            // Apply endianness to front bits
+                            let front_bits_endian: BitVec = front_bits
+                                .chunks(8)
+                                .rev()
+                                .flat_map(|chunk| chunk.iter().by_vals())
+                                .collect();
+
                             #[cfg(feature = "logging")]
-                            log::trace!("extend(front_bits): {}", front_bits);
-                            ret.extend_from_bitslice(front_bits);
+                            log::trace!("extend(front_bits): {}", front_bits_endian);
+                            ret.extend_from_bitslice(&front_bits_endian);
                         }
                         if let Some(Leftover::Bits(bits)) = &self.leftover {
                             #[cfg(feature = "logging")]

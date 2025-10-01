@@ -2,7 +2,7 @@ use assert_hex::assert_eq_hex;
 use deku::prelude::*;
 
 #[test]
-fn test_lsb_le_misaligned_1() {
+fn test_lsb_le_misaligned_middle() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
     #[deku(bit_order = "lsb", endian = "little")]
     pub struct TestStruct {
@@ -29,18 +29,17 @@ fn test_lsb_le_misaligned_1() {
     const RAW_DATA: &[u8] = &[0xAD, 0xDC, 0x32, 0xF1];
 
     let parsed = TestStruct::from_bytes((RAW_DATA, 0)).unwrap().1;
-    println!("{parsed:#02x?}");
 
-    let manual = TestStruct {
-        field_a: (u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x0000_0001) as u8,
+    let expected = TestStruct {
+        field_a: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x0000_0001) as u8),
         field_b: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x0000_0002) >> 1) as u8,
         field_c: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x0000_0004) >> 2) as u8,
-        field_d: (u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x3FFF_FFF8) >> 3,
+        field_d: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x3FFF_FFF8) >> 3),
         field_e: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0xC000_0000) >> 30) as u8,
     };
 
     assert_eq_hex!(
-        manual,
+        expected,
         TestStruct {
             field_a: 0x1,
             field_b: 0x0,
@@ -48,9 +47,149 @@ fn test_lsb_le_misaligned_1() {
             field_d: 0x6265B95,
             field_e: 0x3,
         },
-        "Unexpected manual calculation"
+        "Incorrect manual calculation"
     );
-    assert_eq_hex!(parsed, manual, "Invalid deku calculation");
+    assert_eq_hex!(parsed, expected, "Invalid deku calculation");
+}
+
+#[test]
+fn test_lsb_le_misaligned_right() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(bit_order = "lsb", endian = "little")]
+    pub struct TestStruct {
+        #[deku(bits = 5)]
+        pub field_a: u8, // Bits 0-4
+        #[deku(bits = 27)]
+        pub field_b: u32, // Bits 5-31
+    }
+
+    const RAW_DATA: &[u8] = &[0xAD, 0xDC, 0x32, 0xF1];
+
+    let parsed = TestStruct::from_bytes((RAW_DATA, 0)).unwrap().1;
+
+    let expected = TestStruct {
+        field_a: (u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x0000_001F) as u8,
+        field_b: (u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0xFFFF_FFE0) >> 5,
+    };
+
+    assert_eq_hex!(
+        expected,
+        TestStruct {
+            field_a: 0xD,
+            field_b: 0x0789_96E5,
+        },
+        "Incorrect manual calculation"
+    );
+    assert_eq_hex!(parsed, expected, "Invalid deku calculation");
+}
+
+#[test]
+fn test_lsb_le_misaligned_left() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(bit_order = "lsb", endian = "little")]
+    pub struct TestStruct {
+        #[deku(bits = 27)]
+        pub field_a: u32, // Bits 0-26
+        #[deku(bits = 5)]
+        pub field_b: u8, // Bits 27-31
+    }
+
+    const RAW_DATA: &[u8] = &[0xAD, 0xDC, 0x32, 0xF1];
+
+    let parsed = TestStruct::from_bytes((RAW_DATA, 0)).unwrap().1;
+
+    let expected = TestStruct {
+        field_a: (u32::from_le_bytes(RAW_DATA.try_into().unwrap())) & 0x07FF_FFFF,
+        field_b: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0xF800_0000) >> 27) as u8,
+    };
+
+    assert_eq_hex!(
+        expected,
+        TestStruct {
+            field_a: 0x0132_DCAD,
+            field_b: 0x1E,
+        },
+        "Incorrect manual calculation"
+    );
+    assert_eq_hex!(parsed, expected, "Invalid deku calculation");
+}
+
+#[test]
+fn test_lsb_le_aligned_left() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(bit_order = "lsb", endian = "little")]
+    pub struct TestStruct {
+        #[deku(bits = 24)]
+        pub field_a: u32, // Bits 0-23
+        #[deku(bits = 8)]
+        pub field_b: u8, // Bits 24-31
+    }
+
+    const RAW_DATA: &[u8] = &[0xAD, 0xDC, 0x32, 0xF1];
+
+    let parsed = TestStruct::from_bytes((RAW_DATA, 0)).unwrap().1;
+
+    let expected = TestStruct {
+        field_a: (u32::from_le_bytes(RAW_DATA.try_into().unwrap())) & 0x00FF_FFFF,
+        field_b: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0xFF00_0000) >> 24) as u8,
+    };
+
+    assert_eq_hex!(
+        expected,
+        TestStruct {
+            field_a: 0x0032_DCAD,
+            field_b: 0xF1,
+        },
+        "Incorrect manual calculation"
+    );
+    assert_eq_hex!(parsed, expected, "Invalid deku calculation");
+}
+
+#[test]
+fn test_lsb_le_aligned_mixed() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(bit_order = "lsb", endian = "little")]
+    pub struct TestStruct {
+        #[deku(bits = 16)]
+        pub field_a: u16, // Bits 0-15
+        #[deku(bits = 1)]
+        pub field_b: u8, // Bit 16
+        #[deku(bits = 2)]
+        pub field_c: u8, // Bits 17-18
+        #[deku(bits = 4)]
+        pub field_d: u8, // Bits 19-22
+        #[deku(bits = 6)]
+        pub field_e: u8, // Bits 23-28
+        #[deku(bits = 3)]
+        pub field_f: u8, // Bits 29-31
+    }
+
+    const RAW_DATA: &[u8] = &[0xAD, 0xDC, 0x32, 0xF1];
+
+    let parsed = TestStruct::from_bytes((RAW_DATA, 0)).unwrap().1;
+
+    let expected = TestStruct {
+        field_a: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x0000_FFFF) as u16),
+        field_b: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x0001_0000) >> 16) as u8,
+        field_c: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x0006_0000) >> 17) as u8,
+        field_d: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x0078_0000) >> 19) as u8,
+        field_e: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x1F80_0000) >> 23) as u8,
+        field_f: ((u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0xE000_0000) >> 29) as u8,
+    };
+
+    assert_eq_hex!(
+        expected,
+        TestStruct {
+            field_a: 0xDCAD,
+            field_b: 0x0,
+            field_c: 0x1,
+            field_d: 0x6,
+            field_e: 0x22,
+            field_f: 0x7,
+        },
+        "Incorrect manual calculation"
+    );
+    assert_eq_hex!(parsed, expected, "Invalid deku calculation");
 }
 
 #[test]

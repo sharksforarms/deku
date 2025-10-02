@@ -340,8 +340,8 @@ impl<R: Read + Seek> Reader<R> {
                                 .flat_map(|chunk| chunk.iter().by_vals())
                                 .collect::<BitVec<u8, _>>();
                             if amt % 8 != 0 {
-                                // TODO: may not be correct for all cases!
-                                // Apply endianness to front bits
+                                // WA: required to apply endianness for cases where the field is not aligned with the byte boundary
+                                // (see https://github.com/sharksforarms/deku/issues/603)
                                 front_bits = &front_bits_le;
                             }
 

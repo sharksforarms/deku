@@ -191,13 +191,13 @@ macro_rules! ImplDekuReadBits {
                     }
                 }
 
-                // if read from Lsb order and it's escpecially cursed since its not just within one byte...
+                // if read from Lsb order and it's especially cursed since its not just within one byte...
                 // read_bits returned: [0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1]
                 //                     | second     |    first            |
                 // we want to read from right to left when lsb (without using BitVec BitFields)
                 //
                 // Turning this into [0x23, 0x01] (then appending till type size)
-                if order == Order::Lsb0 && bit_slice.len() > 8 {
+                if order == Order::Lsb0 && bit_slice.len() > 8 && pad != 0 {
                     let mut bits = BitVec::<u8, Msb0>::with_capacity(bit_slice.len() + pad);
 
                     bits.extend_from_bitslice(&bit_slice);

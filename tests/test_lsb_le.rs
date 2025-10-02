@@ -115,6 +115,37 @@ fn test_lsb_le_misaligned_left() {
 }
 
 #[test]
+fn test_lsb_le_aligned_right() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(bit_order = "lsb", endian = "little")]
+    pub struct TestStruct {
+        #[deku(bits = 8)]
+        pub field_a: u8, // Bits 0-7
+        #[deku(bits = 24)]
+        pub field_b: u32, // Bits 8-31
+    }
+
+    const RAW_DATA: &[u8] = &[0xAD, 0xDC, 0x32, 0xF1];
+
+    let parsed = TestStruct::from_bytes((RAW_DATA, 0)).unwrap().1;
+
+    let expected = TestStruct {
+        field_a: (u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0x0000_00FF) as u8,
+        field_b: (u32::from_le_bytes(RAW_DATA.try_into().unwrap()) & 0xFFFF_FF00) >> 8,
+    };
+
+    assert_eq_hex!(
+        expected,
+        TestStruct {
+            field_a: 0xAD,
+            field_b: 0x00F1_32DC,
+        },
+        "Incorrect manual calculation"
+    );
+    assert_eq_hex!(parsed, expected, "Invalid deku calculation");
+}
+
+#[test]
 fn test_lsb_le_aligned_left() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
     #[deku(bit_order = "lsb", endian = "little")]
@@ -210,4 +241,25 @@ fn test_lsb_le_misaligned_2() {
     assert_eq!(data, b"\xbc\x0a\xf0\xde");
     let (_, actual) = Header::from_bytes((&data[..], 0)).unwrap();
     assert_eq!(actual, reference);
+}
+
+#[test]
+fn test_invalid_lsb_bit_split_squashfs_v3() {
+    #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+    #[deku(endian = "little", bit_order = "lsb")]
+    pub struct Dir {
+        #[deku(bits = "19")]
+        pub file_size: u32,
+        #[deku(bits = "13")]
+        pub offset: u16,
+    }
+
+    let expected_file_size = 38u32;
+    let expected_offset = 44u16;
+    let combined = ((expected_offset as u32) << 19) | expected_file_size;
+    let test_data = combined.to_le_bytes();
+    let (_, result) = Dir::from_bytes((&test_data, 0)).unwrap();
+    assert_eq!(result.file_size, expected_file_size);
+    assert_eq!(result.offset, expected_offset);
+    assert_eq!(test_data, &*result.to_bytes().unwrap());
 }

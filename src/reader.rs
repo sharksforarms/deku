@@ -347,7 +347,7 @@ impl<R: Read + Seek> Reader<R> {
 
                             #[cfg(feature = "logging")]
                             log::trace!("extend(front_bits): {}", front_bits);
-                            ret.extend_from_bitslice(&front_bits);
+                            ret.extend_from_bitslice(front_bits);
                         }
                         if let Some(Leftover::Bits(bits)) = &self.leftover {
                             #[cfg(feature = "logging")]

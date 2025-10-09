@@ -207,12 +207,11 @@ use deku::prelude::*;
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(id_type = "u8", bits = 2, bit_order = "lsb")]
 #[repr(u8)]
-pub enum DekuTest
-{
-	VariantA = 0,
-	VariantB = 1,
-	VariantC = 2,
-	VariantD = 3
+pub enum DekuTest {
+    VariantA = 0,
+    VariantB = 1,
+    VariantC = 2,
+    VariantD = 3
 }
 
 let data: &[u8] = &[0x0D]; // 00 00 11 01 => A A D B

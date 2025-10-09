@@ -154,11 +154,16 @@ error: DekuWrite: `id_type` with non-unit variants requires primitive representa
 213 |     Base = 0x00,
     |     ^^^^
 
-error[E0732]: `#[repr(inttype)]` must be specified
+error[E0732]: `#[repr(inttype)]` must be specified for enums with explicit discriminants and non-unit variants
    --> tests/test_compile/cases/enum_validation.rs:138:1
     |
 138 | pub enum Test19 {
     | ^^^^^^^^^^^^^^^
+139 |     A = 0,
+    |         - explicit discriminant specified here
+140 |     #[deku(id_pat = "_")]
+141 |     B(u8),
+    |     - non-unit discriminant declared here
 
 error[E0308]: `?` operator has incompatible types
    --> tests/test_compile/cases/enum_validation.rs:104:28

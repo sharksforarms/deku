@@ -420,7 +420,7 @@ mod tests {
 
         let string_data = data
             .iter()
-            .map(|f| (format!("{f:08b}").chars().rev().collect()))
+            .map(|f| format!("{f:08b}").chars().rev().collect())
             .collect::<Vec<String>>()
             .join("");
 

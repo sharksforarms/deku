@@ -333,7 +333,18 @@ impl<R: Read + Seek> Reader<R> {
                         #[cfg(feature = "logging")]
                         log::trace!("extend(used): {}", used);
                         ret.extend_from_bitslice(used);
-                        if let Some(front_bits) = front_bits {
+                        if let Some(mut front_bits) = front_bits {
+                            let front_bits_le = front_bits
+                                .chunks(8)
+                                .rev()
+                                .flat_map(|chunk| chunk.iter().by_vals())
+                                .collect::<BitVec<u8, _>>();
+                            if amt % 8 != 0 {
+                                // WA: required to apply endianness for cases where the field is not aligned with the byte boundary
+                                // (see https://github.com/sharksforarms/deku/issues/603)
+                                front_bits = &front_bits_le;
+                            }
+
                             #[cfg(feature = "logging")]
                             log::trace!("extend(front_bits): {}", front_bits);
                             ret.extend_from_bitslice(front_bits);

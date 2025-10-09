@@ -4,12 +4,16 @@ use darling::ast::{Data, Fields};
 use darling::ToTokens;
 use proc_macro2::TokenStream;
 use quote::quote;
+#[cfg(feature = "bits")]
 use syn::LitStr;
 use syn::{Ident, LitByteStr};
 
+#[cfg(feature = "bits")]
+use crate::macros::gen_bit_order_from_str;
+
 use crate::macros::{
-    assertion_failed, gen_bit_order_from_str, gen_ctx_types_and_arg, gen_field_args,
-    gen_internal_field_idents, token_contains_string, wrap_default_ctx,
+    assertion_failed, gen_ctx_types_and_arg, gen_field_args, gen_internal_field_idents,
+    token_contains_string, wrap_default_ctx,
 };
 use crate::{from_token, DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
 
@@ -137,7 +141,10 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             } else {
                 (__deku_reader.bits_read - (__deku_reader.bits_read % 8)) / 8
             };
-            Ok(((&__deku_input.0[idx..], __deku_reader.bits_read % 8), __deku_value))
+            let Some(rest) = __deku_input.0.get(idx..) else {
+                return Err(deku::DekuError::Incomplete(deku::prelude::NeedSize::new(8 * (idx - __deku_input.0.len()))));
+            };
+            Ok(((rest, __deku_reader.bits_read % 8), __deku_value))
         };
 
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
@@ -254,36 +261,32 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 variant_id_pat.clone()
             }
         } else if has_discriminant {
-            match &input.repr {
-                None => {
+            let Some(repr) = input.repr else {
+                return Err(syn::Error::new(
+                    variant.ident.span(),
+                    "DekuRead: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`",
+                ));
+            };
+            if let Some(id_type) = id_type {
+                let Some(id_type_repr) = from_token(id_type.clone()) else {
                     return Err(syn::Error::new(
                         variant.ident.span(),
-                        "DekuRead: `id_type` must be specified on non-unit variants",
+                        "DekuRead: `repr` must be specified on non-unit variants",
+                    ));
+                };
+                if id_type_repr != repr {
+                    return Err(syn::Error::new(
+                        variant.ident.span(),
+                        "DekuRead: `repr` must match `id_type`",
                     ));
                 }
-                Some(repr) => {
-                    if let Some(id_type) = id_type {
-                        if let Some(id_type_repr) = from_token(id_type.clone()) {
-                            if id_type_repr != *repr {
-                                return Err(syn::Error::new(
-                                    variant.ident.span(),
-                                    "DekuRead: `repr` must match `id_type`",
-                                ));
-                            }
-                        } else {
-                            return Err(syn::Error::new(
-                                variant.ident.span(),
-                                "DekuRead: `repr` must be specified on non-unit variants",
-                            ));
-                        }
-                    }
-                }
             }
+            let repr_type: TokenStream = repr.into();
             let ident = &variant.ident;
             let internal_ident = gen_internal_field_ident(&quote!(#ident));
             pre_match_tokens.push(quote! {
                 // https://doc.rust-lang.org/reference/items/enumerations.html#r-items.enum.discriminant.access-memory
-                let #internal_ident = <#id_type>::try_from(unsafe { *(&Self::#ident as *const Self as *const #id_type) })?;
+                let #internal_ident = unsafe { *(&Self::#ident as *const Self as *const #repr_type) };
             });
             quote! { _ if __deku_variant_id == #internal_ident }
         } else {
@@ -357,16 +360,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     if !has_default_match && default_reader.is_none() {
         variant_matches.push(quote! {
             _ => {
-                extern crate alloc;
-                use alloc::borrow::Cow;
-                use alloc::format;
-                return Err(::#crate_::DekuError::Parse(
-                            Cow::from(format!(
-                                "Could not match enum variant id = {:?} on enum `{}`",
-                                __deku_variant_id,
-                                #ident_as_string
-                            ))
-                        ));
+                return Err(::#crate_::deku_error!(::#crate_::DekuError::Parse, "Could not match enum variant", "ID {:?} not found on {}", __deku_variant_id, #ident_as_string));
             }
         });
     }
@@ -436,7 +430,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             } else {
                 (__deku_reader.bits_read - (__deku_reader.bits_read % 8)) / 8
             };
-            Ok(((&__deku_input.0[idx..], __deku_reader.bits_read % 8), __deku_value))
+            let Some(rest) = __deku_input.0.get(idx..) else {
+                return Err(deku::DekuError::Incomplete(deku::prelude::NeedSize::new(8 * (idx - __deku_input.0.len()))));
+            };
+            Ok(((rest, __deku_reader.bits_read % 8), __deku_value))
         };
 
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
@@ -538,10 +535,7 @@ fn emit_magic_read_lit(crate_: &Ident, magic: &LitByteStr) -> TokenStream {
         for __deku_byte in __deku_magic {
             let __deku_read_byte = u8::from_reader_with_ctx(__deku_reader, ())?;
             if *__deku_byte != __deku_read_byte {
-                extern crate alloc;
-                use alloc::borrow::Cow;
-                use alloc::format;
-                return Err(::#crate_::DekuError::Parse(Cow::from(format!("Missing magic value {:?}", #magic))));
+                return Err(::#crate_::deku_error!(::#crate_::DekuError::Parse, "Missing magic value", "{:?}", #magic));
             }
         }
     }
@@ -613,18 +607,12 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
         let order = gen_bit_order_from_str(bit_order).unwrap();
         quote! {
             {
-                use core::convert::TryFrom;
-                // TODO: I hope this consts in most cases?
                 extern crate alloc;
-                use alloc::borrow::Cow;
-                use alloc::format;
-                let __deku_pad = usize::try_from(#bit_size).map_err(|e|
-                    ::#crate_::DekuError::InvalidParam(Cow::from(format!(
-                        "Invalid padding param \"({})\": cannot convert to usize",
-                        stringify!(#bit_size)
-                    )))
-                )?;
 
+                use core::convert::TryFrom;
+                let __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                    ::#crate_::deku_error!(::#crate_::DekuError::InvalidParam, "Invalid padding param, cannot convert ot usize", "{}", stringify!(#bit_size))
+                )?;
 
                 if (__deku_pad % 8) == 0 {
                     let bytes_read = __deku_pad / 8;
@@ -640,18 +628,12 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
     } else {
         quote! {
             {
-                use core::convert::TryFrom;
-                // TODO: I hope this consts in most cases?
                 extern crate alloc;
-                use alloc::borrow::Cow;
-                use alloc::format;
-                let __deku_pad = usize::try_from(#bit_size).map_err(|e|
-                    ::#crate_::DekuError::InvalidParam(Cow::from(format!(
-                        "Invalid padding param \"({})\": cannot convert to usize",
-                        stringify!(#bit_size)
-                    )))
-                )?;
 
+                use core::convert::TryFrom;
+                let __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                    ::#crate_::deku_error!(::#crate_::DekuError::InvalidParam, "Invalid padding param, cannot convert to usize", "{}", stringify!(#bit_size))
+                )?;
 
                 if (__deku_pad % 8) == 0 {
                     let bytes_read = __deku_pad / 8;
@@ -671,22 +653,20 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
 #[cfg(not(feature = "bits"))]
 fn emit_padding_bytes(bit_size: &TokenStream) -> TokenStream {
     let crate_ = super::get_crate_name();
+    let pad = crate::PAD_ARRAY_SIZE;
     quote! {
         {
             use core::convert::TryFrom;
-            extern crate alloc;
-            use alloc::borrow::Cow;
-            use alloc::format;
-            let __deku_pad = usize::try_from(#bit_size).map_err(|e|
-                ::#crate_::DekuError::InvalidParam(Cow::from(format!(
-                    "Invalid padding param \"({})\": cannot convert to usize",
-                    stringify!(#bit_size)
-                )))
+            let mut __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                ::#crate_::deku_error!(::#crate_::DekuError::InvalidParam, "Invalid padding param, cannot convert to usize", "{}", stringify!(#bit_size))
             )?;
 
-
-            let mut buf = alloc::vec![0; __deku_pad];
-            let _ = __deku_reader.read_bytes(__deku_pad, &mut buf, ::#crate_::ctx::Order::default())?;
+            while __deku_pad > 0 {
+                let mut __deku_pad_source = [0u8; #pad];
+                let __deku_pad_chunk = core::cmp::min(__deku_pad_source.len(), __deku_pad);
+                __deku_reader.read_bytes(__deku_pad_chunk, &mut __deku_pad_source[..__deku_pad_chunk], ::#crate_::ctx::Order::default())?;
+                __deku_pad -= __deku_pad_chunk;
+            }
         }
     }
 }
@@ -1092,9 +1072,7 @@ pub fn emit_try_from(
                 let mut cursor = ::#crate_::no_std_io::Cursor::new(input);
                 let (amt_read, res) = <Self as ::#crate_::DekuContainerRead>::from_reader((&mut cursor, 0))?;
                 if (amt_read / 8) != total_len {
-                    extern crate alloc;
-                    use alloc::borrow::Cow;
-                    return Err(::#crate_::DekuError::Parse(Cow::from("Too much data")));
+                    return Err(::#crate_::deku_error!(::#crate_::DekuError::Parse, "Too much data"));
                 }
                 Ok(res)
             }

@@ -1,4 +1,4 @@
-use std::borrow::{Borrow, Cow};
+use alloc::borrow::{Borrow, Cow};
 
 use no_std_io::io::{Read, Seek, Write};
 
@@ -37,12 +37,15 @@ where
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "alloc")]
+    use alloc::vec;
     use no_std_io::io::Cursor;
     use rstest::rstest;
 
     use super::*;
     use crate::{native_endian, reader::Reader};
 
+    #[cfg(feature = "alloc")]
     #[rstest(input, expected,
         case(
             &[0xEF, 0xBE],

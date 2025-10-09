@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use deku::prelude::*;
 
 use std::ffi::CString;
@@ -9,7 +11,7 @@ fn test_cstring_no_ctx() {
         s: CString,
     }
 
-    let bytes = &[b't', b'e', b's', b't', b'\0'];
+    let bytes = b"test\0";
     let (_, d) = Data::from_bytes((bytes, 0)).unwrap();
     assert_eq!(d.s, CString::new("test").unwrap());
 }
@@ -36,7 +38,7 @@ fn test_cstring_valid_bytes() {
         s: CString,
     }
 
-    let bytes = &[b't', b'e', b's', b't', b'\0'];
+    let bytes = b"test\0";
     let (_, d) = Data::from_bytes((bytes, 0)).unwrap();
     assert_eq!(d.s, CString::new("test").unwrap());
 }
@@ -52,7 +54,7 @@ fn test_cstring_trailing_nul() {
         s: CString,
     }
 
-    let bytes = &[b't', b'e', b's', b't', b'\0', b'\0'];
+    let bytes = b"test\0\0";
     let (_, d) = Data::from_bytes((bytes, 0)).unwrap();
     assert_eq!(d.s, CString::new("test").unwrap());
 }

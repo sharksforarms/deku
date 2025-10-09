@@ -13,9 +13,9 @@ rust-version = "1.81"
 proc-macro = true
 
 [features]
-std = ["proc-macro-crate"]
+std = ["proc-macro-crate", "alloc"]
+alloc = []
 logging = []
-no-assert-string = []
 bits = []
 
 [dependencies]

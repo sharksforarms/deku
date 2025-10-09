@@ -1,4 +1,4 @@
-use std::convert::{TryFrom, TryInto};
+use core::convert::{TryFrom, TryInto};
 
 use deku::prelude::*;
 
@@ -46,7 +46,7 @@ fn test_pad_bytes_before_not_enough() {
 #[cfg(feature = "bits")]
 #[test]
 #[should_panic(
-    expected = r#"InvalidParam("Invalid padding param \"(((- 2) * 8))\": cannot convert to usize")"#
+    expected = r#"InvalidParam("Invalid padding param, cannot convert to usize: ((- 2) * 8)")"#
 )]
 fn test_pad_bytes_before_read_err() {
     #[derive(PartialEq, Debug, DekuRead)]
@@ -65,7 +65,7 @@ fn test_pad_bytes_before_read_err() {
 #[cfg(feature = "bits")]
 #[test]
 #[should_panic(
-    expected = r#"InvalidParam("Invalid padding param \"(((- 2) * 8))\": cannot convert to usize")"#
+    expected = r#"InvalidParam("Invalid padding param, cannot convert to usize: ((- 2) * 8)")"#
 )]
 fn test_pad_bytes_before_write_err() {
     #[derive(PartialEq, Debug, DekuWrite)]

@@ -1,6 +1,3 @@
-use alloc::borrow::Cow;
-#[cfg(feature = "alloc")]
-use alloc::format;
 use core::convert::TryInto;
 
 #[cfg(feature = "bits")]
@@ -10,7 +7,7 @@ use no_std_io::io::{Read, Seek, Write};
 use crate::ctx::*;
 use crate::reader::{Reader, ReaderRet};
 use crate::writer::Writer;
-use crate::{DekuError, DekuReader, DekuWriter};
+use crate::{deku_error, DekuError, DekuReader, DekuWriter};
 
 /// "Read" trait: read bits and construct type
 #[cfg(feature = "bits")]
@@ -54,7 +51,7 @@ impl DekuReader<'_, (Endian, ByteSize, Order)> for u8 {
     #[inline(always)]
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
-        (endian, size, order): (Endian, ByteSize, Order),
+        (_endian, _size, order): (Endian, ByteSize, Order),
     ) -> Result<u8, DekuError> {
         const MAX_TYPE_BYTES: usize = core::mem::size_of::<u8>();
         let mut buf = [0; MAX_TYPE_BYTES];
@@ -64,9 +61,9 @@ impl DekuReader<'_, (Endian, ByteSize, Order)> for u8 {
             #[cfg(feature = "bits")]
             ReaderRet::Bits(bits) => {
                 let Some(bits) = bits else {
-                    return Err(DekuError::Parse(Cow::from("no bits read from reader")));
+                    return Err(deku_error!(DekuError::Parse, "no bits read from reader"));
                 };
-                let a = <u8>::read(&bits, (endian, size))?;
+                let a = <u8>::read(&bits, (_endian, _size))?;
                 a.1
             }
         };
@@ -104,11 +101,13 @@ impl DekuWriter<(Endian, BitSize, Order)> for u8 {
         let input_bits = input.view_bits::<Msb0>();
 
         if bit_size > input_bits.len() {
-            return Err(DekuError::InvalidParam(Cow::from(format!(
-                "bit size {} is larger than input {}",
+            return Err(deku_error!(
+                DekuError::InvalidParam,
+                "Bit size is larger than input",
+                "{} exceeds {}",
                 bit_size,
                 input_bits.len()
-            ))));
+            ));
         }
 
         // Check for extra bits before sending into writer
@@ -116,11 +115,13 @@ impl DekuWriter<(Endian, BitSize, Order)> for u8 {
         if let Some(first) = input_bits.first_one() {
             let max = MAX_TYPE_BITS - bit_size;
             if max > first {
-                return Err(DekuError::InvalidParam(Cow::from(format!(
-                    "bit size {} of input is larger than bit requested size {}",
+                return Err(deku_error!(
+                    DekuError::InvalidParam,
+                    "bit size of input is larger than bit requested size",
+                    "{} exceeds {}",
                     MAX_TYPE_BITS - first,
-                    bit_size,
-                ))));
+                    bit_size
+                ));
             }
         }
         writer.write_bits_order(&input_bits[input_bits.len() - bit_size..], order)?;
@@ -190,13 +191,13 @@ macro_rules! ImplDekuReadBits {
                     }
                 }
 
-                // if read from Lsb order and it's escpecially cursed since its not just within one byte...
+                // if read from Lsb order and it's especially cursed since its not just within one byte...
                 // read_bits returned: [0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1]
                 //                     | second     |    first            |
                 // we want to read from right to left when lsb (without using BitVec BitFields)
                 //
                 // Turning this into [0x23, 0x01] (then appending till type size)
-                if order == Order::Lsb0 && bit_slice.len() > 8 {
+                if order == Order::Lsb0 && bit_slice.len() > 8 && pad != 0 {
                     let mut bits = BitVec::<u8, Msb0>::with_capacity(bit_slice.len() + pad);
 
                     bits.extend_from_bitslice(&bit_slice);
@@ -363,14 +364,17 @@ macro_rules! ImplDekuReadBits {
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 if size.0 > MAX_TYPE_BITS {
-                    return Err(DekuError::Parse(Cow::from(format!(
-                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits",
+                    return Err(deku_error!(
+                        DekuError::Parse,
+                        "too much data",
+                        "container of {} bits cannot hold {} bits",
+                        MAX_TYPE_BITS,
                         size.0
-                    ))));
+                    ));
                 }
                 let bits = reader.read_bits(size.0, Order::default())?;
                 let Some(bits) = bits else {
-                    return Err(DekuError::Parse(Cow::from("no bits read from reader")));
+                    return Err(deku_error!(DekuError::Parse, "no bits read from reader"));
                 };
                 let a = <$typ>::read(&bits, (endian, size))?;
                 Ok(a.1)
@@ -386,16 +390,17 @@ macro_rules! ImplDekuReadBits {
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 if size.0 > MAX_TYPE_BITS {
-                    return Err(DekuError::Parse(Cow::from(format!(
-                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits",
+                    return Err(deku_error!(
+                        DekuError::Parse,
+                        "too much data",
+                        "container of {} cannot hold {} bits",
+                        MAX_TYPE_BITS,
                         size.0
-                    ))));
+                    ));
                 }
                 let bits = reader.read_bits(size.0, order)?;
                 let Some(bits) = bits else {
-                    return Err(DekuError::Parse(Cow::from(format!(
-                        "no bits read from reader",
-                    ))));
+                    return Err(deku_error!(DekuError::Parse, "no bits read from reader"));
                 };
                 let a = <$typ>::read(&bits, (endian, size, order))?;
                 Ok(a.1)
@@ -442,10 +447,13 @@ macro_rules! ImplDekuReadBytes {
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
                 if size.0 > MAX_TYPE_BYTES {
-                    return Err(DekuError::Parse(Cow::from(format!(
-                        "too much data: container of {MAX_TYPE_BYTES} bytes cannot hold {} bytes",
+                    return Err(deku_error!(
+                        DekuError::Parse,
+                        "too much data",
+                        "container of {} bytes cannot hold {} bytes",
+                        MAX_TYPE_BYTES,
                         size.0
-                    ))));
+                    ));
                 }
                 let mut buf = [0; MAX_TYPE_BYTES];
                 let ret = reader.read_bytes(size.0, &mut buf, order)?;
@@ -469,7 +477,7 @@ macro_rules! ImplDekuReadBytes {
                     }
                     #[cfg(feature = "bits")]
                     ReaderRet::Bits(None) => {
-                        return Err(DekuError::Parse(Cow::from("no bits read from reader")));
+                        return Err(deku_error!(DekuError::Parse, "no bits read from reader"));
                     }
                 };
                 Ok(a)
@@ -571,14 +579,17 @@ macro_rules! ImplDekuReadSignExtend {
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                 if size.0 > MAX_TYPE_BITS {
-                    return Err(DekuError::Parse(Cow::from(format!(
-                        "too much data: container of {MAX_TYPE_BITS} bits cannot hold {} bits",
+                    return Err(deku_error!(
+                        DekuError::Parse,
+                        "too much data",
+                        "container of {} bits cannot hold {} bits",
+                        MAX_TYPE_BITS,
                         size.0
-                    ))));
+                    ));
                 }
                 let bits = reader.read_bits(size.0, order)?;
                 let Some(bits) = bits else {
-                    return Err(DekuError::Parse(Cow::from("no bits read from reader")));
+                    return Err(deku_error!(DekuError::Parse, "no bits read from reader"));
                 };
                 let a = <$typ>::read(&bits, (endian, size, order))?;
                 Ok(a.1)
@@ -593,10 +604,13 @@ macro_rules! ImplDekuReadSignExtend {
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
                 if size.0 > MAX_TYPE_BYTES {
-                    return Err(DekuError::Parse(Cow::from(format!(
-                        "too much data: container of {MAX_TYPE_BYTES} bytes cannot hold {} bytes",
+                    return Err(deku_error!(
+                        DekuError::Parse,
+                        "too much data",
+                        "container of {} bytes cannot hold {} bytes",
+                        MAX_TYPE_BYTES,
                         size.0
-                    ))));
+                    ));
                 }
                 let mut buf = [0; MAX_TYPE_BYTES];
                 let ret = reader.read_bytes(size.0, &mut buf, order)?;
@@ -620,7 +634,7 @@ macro_rules! ImplDekuReadSignExtend {
                     }
                     #[cfg(feature = "bits")]
                     ReaderRet::Bits(None) => {
-                        return Err(DekuError::Parse(Cow::from("no bits read from reader")));
+                        return Err(deku_error!(DekuError::Parse, "no bits read from reader"));
                     }
                 };
                 Ok(a)
@@ -678,7 +692,7 @@ macro_rules! ForwardDekuRead {
                     }
                     #[cfg(feature = "bits")]
                     ReaderRet::Bits(None) => {
-                        return Err(DekuError::Parse(Cow::from("no bits read from reader")));
+                        return Err(deku_error!(DekuError::Parse, "no bits read from reader"));
                     }
                 };
                 Ok(a)
@@ -777,17 +791,32 @@ macro_rules! ImplDekuWrite {
                 let input_bits = input.view_bits::<Msb0>();
 
                 if bit_size > input_bits.len() {
-                    return Err(DekuError::InvalidParam(Cow::from(format!(
-                        "bit size {} is larger then input {}",
+                    return Err(deku_error!(
+                        DekuError::InvalidParam,
+                        "bit size is larger than input",
+                        "{} exceeds {}",
                         bit_size,
                         input_bits.len()
-                    ))));
+                    ));
                 }
 
                 match (endian, order) {
-                    (Endian::Little, Order::Lsb0)
-                    | (Endian::Little, Order::Msb0)
-                    | (Endian::Big, Order::Lsb0) => {
+                    (Endian::Little, Order::Lsb0) | (Endian::Little, Order::Msb0) => {
+                        let input_bits_lsb = input.view_bits::<Lsb0>();
+                        if let Some(last) = input_bits_lsb.last_one() {
+                            let last = last + 1;
+                            let max = bit_size;
+                            if last > max {
+                                return Err(deku_error!(
+                                    DekuError::InvalidParam,
+                                    "bit size of input is larger than requested size",
+                                    "{} exceeds {}",
+                                    last,
+                                    bit_size
+                                ));
+                            }
+                        }
+
                         let mut remaining_bits = bit_size;
                         for chunk in input_bits.chunks(8) {
                             if chunk.len() > remaining_bits {
@@ -802,7 +831,57 @@ macro_rules! ImplDekuWrite {
                             remaining_bits -= chunk.len();
                         }
                     }
+                    (Endian::Big, Order::Lsb0) => {
+                        const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                        if let Some(first) = input_bits.first_one() {
+                            let max = MAX_TYPE_BITS - bit_size;
+                            if max > first {
+                                return Err(deku_error!(
+                                    DekuError::InvalidParam,
+                                    "bit size of input is larger than requested size",
+                                    "{} exceeds {}",
+                                    MAX_TYPE_BITS - first,
+                                    bit_size
+                                ));
+                            }
+                        }
+
+                        if bit_size <= 8 {
+                            writer.write_bits_order(
+                                &input_bits[input_bits.len() - bit_size..],
+                                order,
+                            )?;
+                        } else {
+                            let mut remaining_bits = bit_size;
+                            for chunk in input_bits.chunks(8) {
+                                if chunk.len() > remaining_bits {
+                                    writer.write_bits_order(
+                                        &chunk[chunk.len() - remaining_bits..],
+                                        order,
+                                    )?;
+                                    break;
+                                } else {
+                                    writer.write_bits_order(&chunk, order)?;
+                                }
+                                remaining_bits -= chunk.len();
+                            }
+                        }
+                    }
                     (Endian::Big, Order::Msb0) => {
+                        const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+                        if let Some(first) = input_bits.first_one() {
+                            let max = MAX_TYPE_BITS - bit_size;
+                            if max > first {
+                                return Err(deku_error!(
+                                    DekuError::InvalidParam,
+                                    "bit size of input is larger than requested size",
+                                    "{} exceeds {}",
+                                    MAX_TYPE_BITS - first,
+                                    bit_size
+                                ));
+                            }
+                        }
+
                         // big endian
                         // Example read 10 bits u32 [0xAB, 0b11_000000]
                         // => [00000000, 00000000, 00000010, 10101111]
@@ -833,10 +912,13 @@ macro_rules! ImplDekuWrite {
 
                 const TYPE_SIZE: usize = core::mem::size_of::<$typ>();
                 if size.0 > TYPE_SIZE {
-                    return Err(DekuError::InvalidParam(Cow::from(format!(
-                        "byte size {} is larger then input {}",
-                        size.0, TYPE_SIZE
-                    ))));
+                    return Err(deku_error!(
+                        DekuError::InvalidParam,
+                        "byte size is larger than input",
+                        "{} exceeds {}",
+                        size.0,
+                        TYPE_SIZE
+                    ));
                 }
 
                 let input = if matches!(endian, Endian::Big) {
@@ -884,11 +966,13 @@ macro_rules! ImplDekuWriteDetails {
                 let input_bits = input.view_bits::<Msb0>();
 
                 if bit_size > input_bits.len() {
-                    return Err(DekuError::InvalidParam(Cow::from(format!(
-                        "bit size {} is larger than input {}",
+                    return Err(deku_error!(
+                        DekuError::InvalidParam,
+                        "bit size is larger than input",
+                        "{} exceeds {}",
                         bit_size,
                         input_bits.len()
-                    ))));
+                    ));
                 }
 
                 if matches!(endian, Endian::Little) {
@@ -899,9 +983,13 @@ macro_rules! ImplDekuWriteDetails {
                         let last = last + 1;
                         let max = bit_size;
                         if last > max {
-                            return Err(DekuError::InvalidParam(Cow::from(format!(
-                                "bit size {last} of input is larger than bit requested size {bit_size}",
-                            ))));
+                            return Err(deku_error!(
+                                DekuError::InvalidParam,
+                                "bit size of input is larger than requested size",
+                                "{} exceeds {}",
+                                last,
+                                bit_size
+                            ));
                         }
                     }
 
@@ -923,11 +1011,13 @@ macro_rules! ImplDekuWriteDetails {
                     if let Some(first) = input_bits.first_one() {
                         let max = (MAX_TYPE_BITS - bit_size);
                         if max > first {
-                            return Err(DekuError::InvalidParam(Cow::from(format!(
-                                "bit size {} of input is larger than bit requested size {}",
+                            return Err(deku_error!(
+                                DekuError::InvalidParam,
+                                "bit size of input is larger than bit requested size",
+                                "{} exceeds {}",
                                 MAX_TYPE_BITS - first,
-                                bit_size,
-                            ))));
+                                bit_size
+                            ));
                         }
                     }
                     // Example read 10 bits u32 [0xAB, 0b11_000000]
@@ -957,37 +1047,46 @@ macro_rules! ImplDekuWriteDetails {
                 let input_bits = input.view_bits::<Msb0>();
 
                 if bit_size > input_bits.len() {
-                    return Err(DekuError::InvalidParam(Cow::from(format!(
-                        "bit size {} is larger than input {}",
+                    return Err(deku_error!(
+                        DekuError::InvalidParam,
+                        "bit size is larger than input",
+                        "{} exceeds {}",
                         bit_size,
                         input_bits.len()
-                    ))));
+                    ));
                 }
 
                 if matches!(endian, Endian::Little) {
                     // Check if this is a value that will fit inside the required bits, if
                     // not, throw an error
-                    if *self>=0 {
+                    if *self >= 0 {
                         let input_bits_lsb = input.view_bits::<Lsb0>();
                         if let Some(last) = input_bits_lsb.last_one() {
                             let last = last + 2;
                             let max = bit_size;
                             if last > max {
-                                return Err(DekuError::InvalidParam(Cow::from(format!(
-                                    "bit size {last} of input is larger than bit requested size {bit_size}",
-                                ))));
+                                return Err(deku_error!(
+                                    DekuError::InvalidParam,
+                                    "bit size of input is larger than bit requested size",
+                                    "{} exceeds {}",
+                                    last,
+                                    bit_size
+                                ));
                             }
                         }
-                    }
-                    else {
+                    } else {
                         let input_bits_lsb = input.view_bits::<Lsb0>();
                         if let Some(last) = input_bits_lsb.last_zero() {
                             let last = last + 2;
                             let max = bit_size;
                             if last > max {
-                                return Err(DekuError::InvalidParam(Cow::from(format!(
-                                    "bit size {last} of input is larger than bit requested size {bit_size}",
-                                ))));
+                                return Err(deku_error!(
+                                    DekuError::InvalidParam,
+                                    "bit size of input is larger than requested bit size",
+                                    "{} exceeds {}",
+                                    last,
+                                    bit_size
+                                ));
                             }
                         }
                     }
@@ -1007,27 +1106,30 @@ macro_rules! ImplDekuWriteDetails {
                 } else {
                     const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                     // Check for extra bits before sending into writer
-                    if *self>=0 {
+                    if *self >= 0 {
                         if let Some(first) = input_bits.first_one() {
                             let max = (MAX_TYPE_BITS - bit_size);
-                            if max+1 > first {
-                                return Err(DekuError::InvalidParam(Cow::from(format!(
-                                    "bit size {} of input is larger than bit requested size {}",
+                            if max + 1 > first {
+                                return Err(deku_error!(
+                                    DekuError::InvalidParam,
+                                    "bit size of input is larger than bit requested size",
+                                    "{} exceeds {}",
                                     MAX_TYPE_BITS - first,
-                                    bit_size,
-                                ))));
+                                    bit_size
+                                ));
                             }
                         }
-                    }
-                    else {
+                    } else {
                         if let Some(first) = input_bits.first_zero() {
                             let max = (MAX_TYPE_BITS - bit_size);
-                            if max+1 > first {
-                                return Err(DekuError::InvalidParam(Cow::from(format!(
-                                    "bit size {} of input is larger than bit requested size {}",
+                            if max + 1 > first {
+                                return Err(deku_error!(
+                                    DekuError::InvalidParam,
+                                    "bit size of input is larger than bit requested size",
+                                    "{} exceeds {}",
                                     MAX_TYPE_BITS - first,
-                                    bit_size,
-                                ))));
+                                    bit_size
+                                ));
                             }
                         }
                     }
@@ -1196,6 +1298,7 @@ ImplDekuTraitsBytesUnsigned!(f32, u32);
 ImplDekuTraitsUnsigned!(f64, u64);
 ImplDekuTraitsBytesUnsigned!(f64, u64);
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
@@ -1389,9 +1492,9 @@ mod tests {
         case::normal_le(0xDDCC_BBAA, Endian::Little, None, vec![0xAA, 0xBB, 0xCC, 0xDD], vec![]),
         case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA], vec![]),
         case::bit_size_be_smaller(0x03AB, Endian::Big, Some(10), vec![0b11_1010_10], vec![true, true]),
-        #[should_panic(expected = "InvalidParam(\"bit size 100 is larger than input 32\")")]
+        #[should_panic(expected = "InvalidParam(\"bit size is larger than input: 100 exceeds 32\")")]
         case::bit_size_le_bigger(0x03AB, Endian::Little, Some(100), vec![0xAB, 0b11_000000], vec![true, true]),
-        #[should_panic(expected = "InvalidParam(\"bit size 10 of input is larger than bit requested size 5\")")]
+        #[should_panic(expected = "InvalidParam(\"bit size of input is larger than requested size: 10 exceeds 5\")")]
         case::bit_size_larger(0x03AB, Endian::Little, Some(5), vec![], vec![]),
     )]
     fn test_bit_writer(
@@ -1416,7 +1519,7 @@ mod tests {
         case::normal_le(0xDDCC_BBAA, Endian::Little, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
         case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),
         case::byte_size_be_smaller(0x00FFABAA, Endian::Big, Some(2), vec![0xab, 0xaa]),
-        #[should_panic(expected = "InvalidParam(\"byte size 10 is larger then input 4\")")]
+        #[should_panic(expected = "InvalidParam(\"byte size is larger than input: 10 exceeds 4\")")]
         case::byte_size_le_bigger(0x03AB, Endian::Little, Some(10), vec![0xAB, 0b11_000000]),
     )]
     fn test_byte_writer(input: u32, endian: Endian, byte_size: Option<usize>, expected: Vec<u8>) {
@@ -1461,6 +1564,7 @@ mod tests {
         assert_hex::assert_eq_hex!(expected_write, writer.inner.into_inner());
     }
 
+    #[cfg(feature = "bits")]
     macro_rules! TestSignExtending {
         ($test_name:ident, $typ:ty) => {
             #[test]
@@ -1489,6 +1593,7 @@ mod tests {
     #[cfg(feature = "bits")]
     TestSignExtending!(test_sign_extend_isize, isize);
 
+    #[cfg(feature = "bits")]
     macro_rules! TestSignExtendingPanic {
         ($test_name:ident, $typ:ty, $size:expr) => {
             #[test]
@@ -1499,11 +1604,13 @@ mod tests {
                 let res_read =
                     <$typ>::from_reader_with_ctx(&mut reader, (Endian::Little, BitSize($size + 1)));
                 assert_eq!(
-                    DekuError::Parse(Cow::from(format!(
-                        "too much data: container of {} bits cannot hold {} bits",
+                    deku_error!(
+                        DekuError::Parse,
+                        "too much data",
+                        "container of {} bits cannot hold {} bits",
                         $size,
                         $size + 1
-                    ))),
+                    ),
                     res_read.err().unwrap()
                 );
             }

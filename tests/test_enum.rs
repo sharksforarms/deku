@@ -1,12 +1,16 @@
-use std::convert::{TryFrom, TryInto};
-use std::io::Cursor;
+//! General smoke tests for enums
+
+// TODO: These should be divided into smaller tests
+
+use core::convert::TryFrom;
+use no_std_io::io::Cursor;
 
 use deku::prelude::*;
-use hexlit::hex;
-use rstest::*;
 
-/// General smoke tests for enums
-/// TODO: These should be divided into smaller tests
+#[cfg(any(feature = "bits", feature = "std"))]
+use hexlit::hex;
+#[cfg(any(feature = "bits", feature = "std"))]
+use rstest::*;
 
 #[cfg(feature = "bits")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -54,7 +58,7 @@ fn test_enum(input: &[u8], expected: TestEnum) {
 }
 
 #[test]
-#[should_panic(expected = "Parse(\"Could not match enum variant id = 2 on enum `TestEnum`\")")]
+#[should_panic(expected = "Could not match enum variant")]
 fn test_enum_error() {
     #[derive(DekuRead)]
     #[deku(id_type = "u8")]
@@ -70,6 +74,7 @@ fn test_enum_error() {
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[repr(u8)]
 #[deku(id_type = "u8")]
+#[cfg(all(feature = "alloc", feature = "std"))]
 enum TestEnumDiscriminant {
     VarA = 0x00,
     VarB,
@@ -81,9 +86,11 @@ enum TestEnumDiscriminant {
     case(&hex!("01"), TestEnumDiscriminant::VarB),
     case(&hex!("02"), TestEnumDiscriminant::VarC),
 
-    #[should_panic(expected = "Could not match enum variant id = 3 on enum `TestEnumDiscriminant`")]
+    #[should_panic(expected = "Could not match enum variant")]
     case(&hex!("03"), TestEnumDiscriminant::VarA),
 )]
+// TODO: Switch std::convert::TryInto to core::convert::TryInto
+#[cfg(all(feature = "alloc", feature = "std"))]
 fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
     let input = input.to_vec();
     let ret_read = TestEnumDiscriminant::try_from(input.as_slice()).unwrap();
@@ -94,6 +101,7 @@ fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
 }
 
 #[test]
+#[cfg(all(feature = "alloc", feature = "std"))]
 fn test_enum_array_type() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(id_type = "[u8; 3]")]
@@ -214,6 +222,7 @@ fn test_enum_id_pat_with_discriminant_and_storage() {
 }
 
 #[test]
+#[cfg(all(feature = "alloc", feature = "std"))]
 fn test_id_pat_with_id() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     pub struct DekuTest {
@@ -340,6 +349,7 @@ fn test_litbool_as_id() {
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 #[deku(id_type = "u16", id_endian = "big", endian = "little")]
+#[cfg(all(feature = "alloc", feature = "std"))]
 enum VariableEndian {
     #[deku(id = "0x01")]
     Little(u16),
@@ -354,10 +364,56 @@ enum VariableEndian {
 case(&hex!("00010100"), VariableEndian::Little(1)),
 case(&hex!("00020100"), VariableEndian::Big{x: 256})
 )]
+#[cfg(all(feature = "alloc", feature = "std"))]
 fn test_variable_endian_enum(input: &[u8], expected: VariableEndian) {
     let ret_read = VariableEndian::try_from(input).unwrap();
     assert_eq!(expected, ret_read);
 
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(input.to_vec(), ret_write);
+}
+
+#[test]
+fn test_repr_assignment_with_id_via_ctx() {
+    use deku::ctx::Endian;
+
+    #[derive(Debug, DekuRead, DekuWrite, Eq, PartialEq)]
+    #[deku(ctx = "endian: Endian, mid: u8", id = "mid", endian = "endian")]
+    #[repr(u8)]
+    enum Body {
+        First = 0x00,
+        #[deku(id = "0x01")]
+        Second(u8),
+    }
+
+    #[derive(Debug, DekuRead, DekuWrite, Eq, PartialEq)]
+    #[deku(endian = "little")]
+    struct Message {
+        id: u8,
+        header: u16,
+        #[deku(ctx = "*id")]
+        body: Body,
+    }
+
+    let input = [0u8, 1u8, 0u8];
+    let mut cursor = Cursor::new(input);
+    assert_eq!(
+        Message {
+            id: 0,
+            header: 1,
+            body: Body::First,
+        },
+        Message::from_reader((&mut cursor, 0)).unwrap().1
+    );
+
+    let input = [1u8, 2u8, 0u8, 3u8];
+    let mut cursor = Cursor::new(input);
+    assert_eq!(
+        Message {
+            id: 1,
+            header: 2,
+            body: Body::Second(3),
+        },
+        Message::from_reader((&mut cursor, 0)).unwrap().1
+    );
 }

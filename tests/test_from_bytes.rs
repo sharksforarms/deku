@@ -1,6 +1,7 @@
+#![cfg(feature = "bits")]
+
 use deku::prelude::*;
 
-#[cfg(feature = "bits")]
 #[test]
 fn test_from_bytes_struct() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -29,7 +30,6 @@ fn test_from_bytes_struct() {
     assert_eq!(0, i);
 }
 
-#[cfg(feature = "bits")]
 #[test]
 fn test_from_bytes_enum() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -55,7 +55,6 @@ fn test_from_bytes_enum() {
     assert_eq!(0b0101_1010u8, rest[0]);
 }
 
-#[cfg(feature = "bits")]
 #[test]
 fn test_from_bytes_long() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -80,4 +79,31 @@ fn test_from_bytes_long() {
     assert_eq!(1, rest.len());
     assert_eq!(6, i);
     assert_eq!(0b0101_1010u8, rest[0]);
+}
+
+#[test]
+fn test_from_bytes_short_with_seek() {
+    #[derive(Debug, DekuRead, Eq, PartialEq)]
+    #[deku(ctx = "mid: u8", id = "mid")]
+    enum Sneaky {
+        #[deku(id = 0)]
+        Zero,
+        #[deku(id = 1)]
+        One,
+    }
+
+    #[derive(Debug, DekuRead, Eq, PartialEq)]
+    struct Seeky {
+        id: u8,
+        // Use seek to force an out-of-bounds slice for remaining data
+        #[deku(seek_from_current = "1")]
+        #[deku(ctx = "*id")]
+        body: Sneaky,
+    }
+
+    let bytes: [u8; 1] = [0x01];
+    assert_eq!(
+        Err(DekuError::Incomplete(NeedSize::new(8))),
+        Seeky::from_bytes((&bytes, 0))
+    );
 }

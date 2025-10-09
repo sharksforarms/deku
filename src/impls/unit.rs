@@ -22,6 +22,7 @@ impl<Ctx: Copy> DekuWriter<Ctx> for () {
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use crate::reader::Reader;
@@ -37,6 +38,7 @@ mod tests {
 
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
+        #[allow(clippy::let_unit_value)]
         let res_read = <()>::from_reader_with_ctx(&mut reader, ()).unwrap();
         assert_eq!((), res_read);
 

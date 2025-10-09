@@ -1,6 +1,6 @@
-use std::io::{Cursor, Read, Seek};
+use no_std_io::io::{Cursor, Read, Seek};
 
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use deku::prelude::*;
 
 #[cfg(feature = "bits")]
@@ -55,7 +55,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     c.bench_function("deku_write_byte", |b| {
         b.iter(|| {
-            deku_write(black_box(&DekuBytes {
+            deku_write(std::hint::black_box(&DekuBytes {
                 data_00: 0x00,
                 data_01: 0x02,
                 data_02: 0x03,
@@ -74,7 +74,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     #[cfg(feature = "bits")]
     c.bench_function("deku_write_bits", |b| {
         b.iter(|| {
-            deku_write(black_box(&DekuBits {
+            deku_write(std::hint::black_box(&DekuBits {
                 data_01: 0x01,
                 data_02: 0x03,
                 data_03: 0x06,
@@ -91,7 +91,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         )
     });
     c.bench_function("deku_write_enum", |b| {
-        b.iter(|| deku_write(black_box(&DekuEnum::VariantA(0x02))))
+        b.iter(|| deku_write(std::hint::black_box(&DekuEnum::VariantA(0x02))))
     });
 
     let deku_write_vec_input = DekuVec {
@@ -107,7 +107,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         )
     });
     c.bench_function("deku_write_vec", |b| {
-        b.iter(|| deku_write(black_box(&deku_write_vec_input)))
+        b.iter(|| deku_write(std::hint::black_box(&deku_write_vec_input)))
     });
 }
 
@@ -132,20 +132,21 @@ pub fn read_all_vs_count_vs_read_exact(c: &mut Criterion) {
 
     #[derive(DekuRead, DekuWrite)]
     #[deku(ctx = "len: usize")]
+    #[expect(dead_code)]
     pub struct CountFromCtxWrapper {
         #[deku(count = "len")]
         pub data: Vec<u8>,
     }
 
     c.bench_function("read_all_bytes", |b| {
-        b.iter(|| AllWrapper::from_bytes(black_box((&[1; 1500], 0))))
+        b.iter(|| AllWrapper::from_bytes(std::hint::black_box((&[1; 1500], 0))))
     });
 
     c.bench_function("read_all", |b| {
         b.iter(|| {
             let mut cursor = Cursor::new([1u8; 1500].as_ref());
             let mut reader = Reader::new(&mut cursor);
-            AllWrapper::from_reader_with_ctx(black_box(&mut reader), ())
+            AllWrapper::from_reader_with_ctx(std::hint::black_box(&mut reader), ())
         })
     });
 
@@ -153,7 +154,7 @@ pub fn read_all_vs_count_vs_read_exact(c: &mut Criterion) {
         b.iter(|| {
             let mut cursor = Cursor::new([1u8; 1500].as_ref());
             let mut reader = Reader::new(&mut cursor);
-            CountWrapper::from_reader_with_ctx(black_box(&mut reader), ())
+            CountWrapper::from_reader_with_ctx(std::hint::black_box(&mut reader), ())
         })
     });
 
@@ -161,7 +162,7 @@ pub fn read_all_vs_count_vs_read_exact(c: &mut Criterion) {
         b.iter(|| {
             let mut cursor = Cursor::new([1u8; 1500].as_ref());
             let mut reader = Reader::new(&mut cursor);
-            CountWrapper::from_reader_with_ctx(black_box(&mut reader), ())
+            CountWrapper::from_reader_with_ctx(std::hint::black_box(&mut reader), ())
         })
     });
 
@@ -169,7 +170,7 @@ pub fn read_all_vs_count_vs_read_exact(c: &mut Criterion) {
         b.iter(|| {
             let mut cursor = Cursor::new([1u8; 1500].as_ref());
             let mut reader = Reader::new(&mut cursor);
-            CountNonSpecialize::from_reader_with_ctx(black_box(&mut reader), ())
+            CountNonSpecialize::from_reader_with_ctx(std::hint::black_box(&mut reader), ())
         })
     });
 }

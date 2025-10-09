@@ -1,13 +1,16 @@
+//! General smoke tests for structs
+
+// TODO: These should be divided into smaller tests
+
 #![allow(clippy::unusual_byte_groupings)]
 
-use std::convert::{TryFrom, TryInto};
+#[cfg(any(feature = "bits", feature = "std"))]
+use core::convert::{TryFrom, TryInto};
 
+#[cfg(any(feature = "alloc", feature = "bits", feature = "std"))]
 use deku::prelude::*;
 
 mod test_common;
-
-/// General smoke tests for structs
-/// TODO: These should be divided into smaller tests
 
 // Common struct to test nesting
 #[cfg(feature = "bits")]
@@ -34,6 +37,7 @@ pub struct NestedDeku {
 fn test_read_too_much_data() {
     #[derive(DekuRead)]
     pub struct TestStruct {
+        #[expect(dead_code)]
         #[deku(bits = 6)]
         pub field_a: u8,
     }
@@ -167,6 +171,7 @@ fn test_named_struct() {
     assert_eq!(test_data, ret_write);
 }
 
+#[cfg(all(feature = "alloc", feature = "std"))]
 #[test]
 fn test_raw_identifiers_struct() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -185,6 +190,7 @@ fn test_raw_identifiers_struct() {
     assert_eq!(test_data, ret_write);
 }
 
+#[cfg(feature = "alloc")]
 #[test]
 fn test_big_endian() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -215,6 +221,7 @@ fn test_big_endian() {
     assert_eq!(&bytes[..2], &*new_bytes);
 }
 
+#[cfg(feature = "alloc")]
 #[test]
 fn test_units() {
     #[derive(DekuRead, DekuWrite)]
@@ -232,6 +239,7 @@ fn test_units() {
 }
 
 /// Issue 513
+#[cfg(feature = "alloc")]
 #[test]
 fn test_zst_vec_1() {
     #[derive(Debug, PartialEq, DekuRead)]
@@ -244,10 +252,11 @@ fn test_zst_vec_1() {
     }
 
     let bytes = vec![];
-    let (y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
+    let (_y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
     assert_eq!(x.things.len(), 0);
 }
 /// Issue 513
+#[cfg(feature = "alloc")]
 #[test]
 fn test_zst_vec_2() {
     #[derive(Debug, PartialEq, DekuRead)]
@@ -260,6 +269,6 @@ fn test_zst_vec_2() {
     }
 
     let bytes = vec![];
-    let (y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
+    let (_y, x) = ListOfThings::from_bytes((&bytes, 0)).unwrap();
     assert_eq!(x.things.len(), 0);
 }

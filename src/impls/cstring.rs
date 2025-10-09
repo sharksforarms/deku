@@ -1,6 +1,7 @@
-use alloc::borrow::Cow;
+use alloc::ffi::CString;
+
+use alloc::vec::Vec;
 use no_std_io::io::{Read, Seek, Write};
-use std::ffi::CString;
 
 use crate::reader::Reader;
 use crate::writer::Writer;
@@ -30,7 +31,12 @@ impl DekuReader<'_> for CString {
             Vec::<u8>::from_reader_with_ctx(reader, (Limit::from(|b: &u8| *b == 0x00), ()))?;
 
         let value = CString::from_vec_with_nul(bytes).map_err(|e| {
-            DekuError::Parse(Cow::from(format!("Failed to convert Vec to CString: {e}")))
+            crate::deku_error!(
+                DekuError::Parse,
+                "Failed to convert Vec to CString",
+                "{}",
+                e
+            )
         })?;
 
         Ok(value)
@@ -48,7 +54,12 @@ where
         let bytes = Vec::from_reader_with_ctx(reader, (Limit::from(byte_size.0), ()))?;
 
         let value = CString::from_vec_with_nul(bytes).map_err(|e| {
-            DekuError::Parse(Cow::from(format!("Failed to convert Vec to CString: {e}")))
+            crate::deku_error!(
+                DekuError::Parse,
+                "Failed to convert Vec to CString",
+                "{}",
+                e
+            )
         })?;
 
         Ok(value)
@@ -57,6 +68,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "alloc")]
+    use alloc::vec;
     use no_std_io::io::Cursor;
     use rstest::rstest;
 
@@ -64,45 +77,46 @@ mod tests {
 
     use super::*;
 
+    #[cfg(feature = "alloc")]
     #[rstest(input, len, expected, expected_rest,
         case(
-            &[b't', b'e', b's', b't', b'\0'],
+            b"test\0",
             Some(5),
             CString::new("test").unwrap(),
             &[],
         ),
         case(
-            &[b't', b'e', b's', b't', b'\0'],
+            b"test\0",
             None,
             CString::new("test").unwrap(),
             &[],
         ),
         case(
-            &[b't', b'e', b's', b't', b'\0', b'a'],
+            b"test\0a",
             Some(5),
             CString::new("test").unwrap(),
-            &[b'a'],
+            b"a",
         ),
         case(
-            &[b't', b'e', b's', b't', b'\0', b'a'],
+            b"test\0a",
             None,
             CString::new("test").unwrap(),
-            &[b'a'],
+            b"a",
         ),
 
-        #[should_panic(expected = "Parse(\"Failed to convert Vec to CString: data provided is not nul terminated\")")]
+        #[should_panic(expected = "Failed to convert Vec to CString")]
         case(
-            &[b't', b'e', b's', b't'],
+            b"test",
             Some(4),
             CString::new("test").unwrap(),
-            &[b'a'],
+            b"a",
         ),
 
         #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case(&[b't', b'e', b's', b't'], Some(5), CString::new("test").unwrap(), &[]),
+        case(b"test", Some(5), CString::new("test").unwrap(), &[]),
 
         #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
-        case(&[b't', b'e', b's', b't'], None, CString::new("test").unwrap(), &[]),
+        case(b"test", None, CString::new("test").unwrap(), &[]),
     )]
     fn test_cstring_count(
         input: &[u8],

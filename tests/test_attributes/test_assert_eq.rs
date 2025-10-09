@@ -1,4 +1,4 @@
-use std::convert::{TryFrom, TryInto};
+use core::convert::{TryFrom, TryInto};
 
 use deku::prelude::*;
 use hexlit::hex;
@@ -17,7 +17,7 @@ struct TestStruct {
         field_b: 0x01,
     }),
 
-    #[should_panic(expected = r#"Assertion("TestStruct.field_b field failed assertion: field_b == * field_a")"#)]
+    #[should_panic(expected = r#"Assertion("Field failed assertion: TestStruct.field_b: field_b == * field_a")"#)]
     case(&hex!("0102"), TestStruct::default())
 )]
 fn test_assert_eq_read(input: &[u8], expected: TestStruct) {
@@ -31,7 +31,7 @@ fn test_assert_eq_read(input: &[u8], expected: TestStruct) {
         field_b: 0x01,
     }, hex!("0101").to_vec()),
 
-    #[should_panic(expected = r#"Assertion("TestStruct.field_b field failed assertion: field_b == * field_a")"#)]
+    #[should_panic(expected = r#"Assertion("Field failed assertion: TestStruct.field_b: field_b == * field_a")"#)]
     case(TestStruct {
         field_a: 0x01,
         field_b: 0x02,

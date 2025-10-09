@@ -9,12 +9,12 @@ use no_std_io::io::{Seek, SeekFrom, Write};
 #[cfg(feature = "logging")]
 use log;
 
+#[cfg(feature = "bits")]
 use crate::ctx::Order;
+
 use crate::DekuError;
 
-#[cfg(feature = "alloc")]
-use alloc::borrow::ToOwned;
-
+#[cfg(feature = "bits")]
 const fn bits_of<T>() -> usize {
     core::mem::size_of::<T>().saturating_mul(<u8>::BITS as usize)
 }
@@ -71,6 +71,8 @@ impl<W: Write + Seek> Writer<W> {
         bits: &BitSlice<u8, Msb0>,
         order: Order,
     ) -> Result<(), DekuError> {
+        use alloc::borrow::ToOwned;
+
         #[cfg(feature = "logging")]
         log::trace!("attempting {} bits : {}", bits.len(), bits);
 
@@ -260,9 +262,21 @@ impl<W: Write + Seek> Writer<W> {
             log::trace!("finalized: {} bits leftover", self.leftover.0.len());
 
             // add bits to be byte aligned so we can write
-            self.leftover
-                .0
-                .extend_from_bitslice(&bitvec![u8, Msb0; 0; 8 - self.leftover.0.len()]);
+            if self.leftover.1 == Order::Msb0 {
+                #[cfg(feature = "logging")]
+                log::trace!("finalized: msb0 padding");
+
+                self.leftover
+                    .0
+                    .extend_from_bitslice(&bitvec![u8, Msb0; 0; 8 - self.leftover.0.len()]);
+            } else {
+                #[cfg(feature = "logging")]
+                log::trace!("finalized: lsb0 padding");
+
+                let tmp = self.leftover.0.clone();
+                self.leftover.0 = bitvec![u8, Msb0; 0; 8 - tmp.len()];
+                self.leftover.0.extend_from_bitslice(&tmp);
+            }
             let mut buf = alloc::vec![0x00; self.leftover.0.len() / 8];
 
             // write as many leftover to the buffer (as we can, can't write bits just bytes)
@@ -287,6 +301,7 @@ impl<W: Write + Seek> Writer<W> {
     }
 }
 
+#[cfg(all(feature = "std", feature = "bits"))]
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
@@ -295,38 +310,37 @@ mod tests {
     use hexlit::hex;
 
     #[test]
-    #[cfg(feature = "bits")]
     fn test_writer_bits() {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
-        let mut bv = BitVec::<u8, Msb0>::from_slice(&[0xbb]);
-        writer.write_bits(&mut bv).unwrap();
+        let bv = BitVec::<u8, Msb0>::from_slice(&[0xbb]);
+        writer.write_bits(&bv).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 1, 1, 1, 1];
-        writer.write_bits(&mut bv).unwrap();
-        let mut bv = bitvec![u8, Msb0; 0, 0, 0, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 1, 1, 1, 1];
+        writer.write_bits(&bv).unwrap();
+        let bv = bitvec![u8, Msb0; 0, 0, 0, 1];
+        writer.write_bits(&bv).unwrap();
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 0, 0, 0, 1];
-        writer.write_bits(&mut bv).unwrap();
-        let mut bv = bitvec![u8, Msb0; 1, 1, 1, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 0, 0, 0, 1];
+        writer.write_bits(&bv).unwrap();
+        let bv = bitvec![u8, Msb0; 1, 1, 1, 1];
+        writer.write_bits(&bv).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 0, 0, 0, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 0, 0, 0, 1];
+        writer.write_bits(&bv).unwrap();
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
-        let mut bv = bitvec![u8, Msb0; 1, 1, 1, 1];
-        writer.write_bits(&mut bv).unwrap();
+        let bv = bitvec![u8, Msb0; 1, 1, 1, 1];
+        writer.write_bits(&bv).unwrap();
 
         assert_eq!(
             &mut out_buf.into_inner(),
@@ -335,19 +349,17 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "bits")]
     fn test_writer_bytes() {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
 
-        let mut input = hex!("aa");
-        writer.write_bytes(&mut input).unwrap();
+        let input = hex!("aa");
+        writer.write_bytes(&input).unwrap();
 
         assert_eq!(&mut out_buf.into_inner(), &mut vec![0xaa]);
     }
 
     #[test]
-    #[cfg(feature = "bits")]
     fn test_bit_order() {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
@@ -357,7 +369,7 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1], Order::Msb0)
             .unwrap();
-        writer.finalize();
+        writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b1010_0101]);
 
         let mut out_buf = Cursor::new(vec![]);
@@ -368,7 +380,7 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1], Order::Lsb0)
             .unwrap();
-        writer.finalize();
+        writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b0101_1010]);
 
         let mut out_buf = Cursor::new(vec![]);
@@ -379,7 +391,7 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1], Order::Lsb0)
             .unwrap();
-        writer.finalize();
+        writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b1010_0101]);
 
         let mut out_buf = Cursor::new(vec![]);
@@ -390,7 +402,7 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1, 0, 1], Order::Msb0)
             .unwrap();
-        writer.finalize();
+        writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b1010_1001, 0b0101_0000]);
 
         let mut out_buf = Cursor::new(vec![]);
@@ -401,8 +413,8 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1, 0, 1], Order::Lsb0)
             .unwrap();
-        writer.finalize();
-        assert_eq!(out_buf.into_inner(), [0b110_1010, 0b0101_0000]);
+        writer.finalize().unwrap();
+        assert_eq!(out_buf.into_inner(), [0b0110_1010, 0b0000_0101]);
 
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);
@@ -412,7 +424,18 @@ mod tests {
         writer
             .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1, 0, 1], Order::Msb0)
             .unwrap();
-        writer.finalize();
+        writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b0101_0110, 0b1010_0000]);
+
+        let mut out_buf = Cursor::new(vec![]);
+        let mut writer = Writer::new(&mut out_buf);
+        writer
+            .write_bits_order(&bitvec![u8, Msb0; 1, 0, 1, 0, 1, 0], Order::Msb0)
+            .unwrap();
+        writer
+            .write_bits_order(&bitvec![u8, Msb0; 0, 1, 0, 1, 0, 1], Order::Lsb0)
+            .unwrap();
+        writer.finalize().unwrap();
+        assert_eq!(out_buf.into_inner(), [0b1001_0101, 0b0000_1010]);
     }
 }

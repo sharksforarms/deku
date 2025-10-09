@@ -6,15 +6,17 @@ mod primitive;
 mod slice;
 mod tuple;
 mod unit;
+
+#[cfg(feature = "alloc")]
 mod vec;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 mod arc;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 mod cow;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 mod cstring;
 
 #[cfg(feature = "std")]

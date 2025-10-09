@@ -1,11 +1,12 @@
 #[cfg(feature = "bits")]
 mod tests {
     use assert_hex::assert_eq_hex;
+    use bitvec::prelude::*;
     use deku::ctx::{BitSize, Order};
     use deku::prelude::*;
 
-    use std::convert::TryFrom;
-    use std::io::{Read, Seek, Write};
+    use core::convert::TryFrom;
+    use no_std_io::io::{Read, Seek, Write};
 
     #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
     #[deku(id_type = "u8", bits = "2")]
@@ -328,13 +329,13 @@ mod tests {
 
     #[test]
     fn test_bit_order_more_first_be() {
-        let data = vec![0x40, 0x40];
+        let data = vec![0x10, 0x81];
         let more_first = MoreFirstBe::try_from(data.as_ref()).unwrap();
         assert_eq!(
             more_first,
             MoreFirstBe {
-                offset: 0x4000,
-                t: 2
+                offset: 0x1001,
+                t: 0b100,
             }
         );
 
@@ -419,7 +420,7 @@ mod tests {
 
         let string_data = data
             .iter()
-            .map(|f| (format!("{:08b}", f).chars().rev().collect()))
+            .map(|f| format!("{f:08b}").chars().rev().collect())
             .collect::<Vec<String>>()
             .join("");
 
@@ -469,7 +470,198 @@ mod tests {
         let data = vec![0x13, 0x0, 0b0111_0100, 0xFF];
         let (_, dt) = DekuTest::from_bytes((&data, 0)).unwrap();
         let to_bytes = dt.to_bytes().unwrap();
-        assert_eq!(dt.flag, 0b111_01);
+        #[allow(clippy::unusual_byte_groupings)]
+        let expected = 0b111_01;
+        assert_eq!(dt.flag, expected);
         assert_eq!(to_bytes, data);
+    }
+
+    #[test]
+    fn test_three_bits_roundtrip() {
+        #[derive(Clone, Debug, PartialEq, DekuRead, DekuWrite)]
+        pub struct StructWithThreeLeadingBits {
+            #[deku(bits = "3", bit_order = "lsb")]
+            pub bitflags: u8,
+            pub pba: PacketByteArray,
+        }
+
+        #[derive(Clone, Debug, PartialEq, Default)]
+        pub struct PacketByteArray(pub [u8; 2]);
+
+        impl DekuReader<'_, ()> for PacketByteArray {
+            fn from_reader_with_ctx<R: Read + Seek>(
+                reader: &mut Reader<R>,
+                _ctx: (),
+            ) -> Result<Self, DekuError> {
+                let mut buffer = [0u8; 2];
+                for slot in buffer.iter_mut() {
+                    *slot = reader.read_bits(8, Order::Lsb0)?.unwrap().load_le();
+                }
+
+                Ok(PacketByteArray(buffer))
+            }
+        }
+
+        impl DekuWriter<()> for PacketByteArray {
+            fn to_writer<W: Write + Seek>(
+                &self,
+                writer: &mut Writer<W>,
+                _: (),
+            ) -> Result<(), DekuError> {
+                let data = BitVec::from_iter(self.0.as_slice().as_bits::<Lsb0>().iter().rev());
+                writer.write_bits_order(&data, Order::Lsb0)
+            }
+        }
+
+        let obj = StructWithThreeLeadingBits {
+            bitflags: 0b110,
+            pba: PacketByteArray([12, 175]),
+        };
+
+        let bytes = obj.to_bytes().unwrap();
+
+        assert_eq!([0b0110_0110, 0b0111_1000, 0b0000_0101], *bytes);
+        assert_eq!(
+            obj,
+            StructWithThreeLeadingBits::from_bytes((&bytes, 0))
+                .unwrap()
+                .1
+        );
+    }
+
+    /// Issue 576
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    fn test_idempotency() {
+        #[derive(DekuRead, DekuWrite, Debug)]
+        #[deku(endian = "big", bit_order = "lsb")]
+        pub struct Foo {
+            #[deku(bits = "8")]
+            f1: u16,
+        }
+
+        let bytes = [0x01];
+
+        let foo = Foo::try_from(bytes.as_slice()).unwrap();
+        assert_eq!(0x01, foo.f1);
+        assert_eq!(foo.to_bytes().unwrap(), bytes);
+    }
+
+    /// Issue 576
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    fn test_idempotency_multi_byte() {
+        #[derive(DekuRead, DekuWrite, Debug)]
+        #[deku(endian = "big", bit_order = "lsb")]
+        pub struct MoreFirstBe {
+            #[deku(bits = "13")]
+            offset: u16,
+            #[deku(bits = "3")]
+            t: u8,
+        }
+
+        let bytes = [0x10, 0x81];
+        let data = MoreFirstBe::try_from(bytes.as_slice()).unwrap();
+        assert_eq!(data.to_bytes().unwrap(), bytes);
+    }
+
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    #[should_panic(expected = "bit size of input is larger than requested size: 32 exceeds 31")]
+    fn test_invalid_bit_size_1() {
+        #[derive(DekuRead, DekuWrite)]
+        #[deku(endian = "little")]
+        struct Foo {
+            #[deku(bits = "31")]
+            num: u32,
+            #[deku(bits = "1")]
+            flag: bool,
+        }
+
+        let f = Foo {
+            num: u32::MAX,
+            flag: true,
+        };
+        f.to_bytes().unwrap();
+    }
+
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    #[should_panic(expected = "bit size of input is larger than requested size: 32 exceeds 31")]
+    fn test_invalid_bit_size_2() {
+        #[derive(DekuRead, DekuWrite)]
+        #[deku(endian = "little")]
+        struct Foo {
+            #[deku(bits = "31", bit_order = "msb")]
+            num: u32,
+            #[deku(bits = "1")]
+            flag: bool,
+        }
+
+        let f = Foo {
+            num: u32::MAX,
+            flag: true,
+        };
+        f.to_bytes().unwrap();
+    }
+
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    #[should_panic(expected = "bit size of input is larger than requested size: 32 exceeds 31")]
+    fn test_invalid_bit_size_3() {
+        #[derive(DekuRead, DekuWrite)]
+        #[deku(endian = "little")]
+        struct Foo {
+            #[deku(bits = "31", bit_order = "lsb")]
+            num: u32,
+            #[deku(bits = "1")]
+            flag: bool,
+        }
+
+        let f = Foo {
+            num: u32::MAX,
+            flag: true,
+        };
+        f.to_bytes().unwrap();
+    }
+
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    #[should_panic(expected = "bit size of input is larger than requested size: 32 exceeds 31")]
+    fn test_invalid_bit_size_4() {
+        #[derive(DekuRead, DekuWrite)]
+        #[deku(endian = "big")]
+        struct Foo {
+            #[deku(bits = "31", bit_order = "msb")]
+            num: u32,
+            #[deku(bits = "1")]
+            flag: bool,
+        }
+
+        let f = Foo {
+            num: u32::MAX,
+            flag: true,
+        };
+        f.to_bytes().unwrap();
+    }
+
+    #[cfg(feature = "descriptive-errors")]
+    #[test]
+    #[should_panic(expected = "bit size of input is larger than requested size: 32 exceeds 31")]
+    fn test_invalid_bit_size_5() {
+        #[derive(DekuRead, DekuWrite)]
+        #[deku(endian = "big")]
+        struct Foo {
+            #[deku(bits = "31", bit_order = "lsb")]
+            num: u32,
+            #[deku(bits = "1")]
+            flag: bool,
+        }
+
+        let f = Foo {
+            num: u32::MAX,
+            flag: true,
+        };
+        f.to_bytes().unwrap();
     }
 }

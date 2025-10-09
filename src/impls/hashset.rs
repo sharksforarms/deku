@@ -1,5 +1,5 @@
+use core::hash::{BuildHasher, Hash};
 use std::collections::HashSet;
-use std::hash::{BuildHasher, Hash};
 
 use crate::writer::Writer;
 use no_std_io::io::{Read, Seek, Write};
@@ -188,6 +188,7 @@ impl<T: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for HashSet<T, S> {
     /// ```rust
     /// # use deku::{ctx::Endian, DekuWriter};
     /// # use deku::writer::Writer;
+    /// # #[cfg(feature = "bits")]
     /// # use deku::bitvec::{Msb0, bitvec};
     /// # use std::collections::HashSet;
     /// # use std::io::Cursor;
@@ -211,6 +212,7 @@ impl<T: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for HashSet<T, S> {
 }
 
 #[cfg(test)]
+#[allow(clippy::too_many_arguments)]
 mod tests {
     #[cfg(feature = "bits")]
     use crate::bitvec::{bits, BitSlice, Msb0};
@@ -218,6 +220,7 @@ mod tests {
     use rstest::rstest;
     use rustc_hash::FxHashSet;
 
+    #[cfg(feature = "bits")]
     use crate::reader::Reader;
 
     use super::*;

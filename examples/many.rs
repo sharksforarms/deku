@@ -28,5 +28,5 @@ fn main() {
         Limit::new_count(10_0000),
     );
 
-    println!("{:?}", ret);
+    println!("{ret:?}");
 }

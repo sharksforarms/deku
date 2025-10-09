@@ -1,3 +1,5 @@
+#![cfg(feature = "bits")]
+
 use alloc_counter::AllocCounterSystem;
 use deku::ctx::Endian;
 use deku::prelude::*;
@@ -7,14 +9,12 @@ use deku::prelude::*;
 #[global_allocator]
 static A: AllocCounterSystem = AllocCounterSystem;
 
-#[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(ctx = "_endian: Endian")]
 struct NestedStruct {
     field_a: u8,
 }
 
-#[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(id_type = "u8", ctx = "_endian: Endian")]
 enum NestedEnum {
@@ -22,15 +22,14 @@ enum NestedEnum {
     VarA(u8),
 }
 
-#[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(id_type = "u32", bytes = 2, ctx = "_endian: Endian")]
+#[expect(dead_code)]
 enum NestedEnum2 {
     #[deku(id = "0x01")]
     VarA(u8),
 }
 
-#[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
 struct TestDeku {
@@ -48,18 +47,19 @@ struct TestDeku {
                  //field_i: NestedEnum2,
 }
 
-#[cfg(feature = "bits")]
 mod tests {
     use alloc_counter::count_alloc;
     use hexlit::hex;
 
     use super::*;
 
+    use no_std_io::io::Cursor;
+
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_simple() {
         let input = hex!("aa_bbbb_cc_0102_dd_ffffff_aa_0100ff");
-        let mut cursor = std::io::Cursor::new(input);
+        let mut cursor = Cursor::new(input);
 
         assert_eq!(
             count_alloc(|| {
@@ -74,7 +74,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn test_simple_write() {
         let input = hex!("aa_bbbb_cc_0102_dd_ffffff_aa_0100ff");
-        let mut cursor = std::io::Cursor::new(input);
+        let mut cursor = Cursor::new(input);
         let t = TestDeku::from_reader((&mut cursor, 0)).unwrap().1;
 
         assert_eq!(
@@ -90,7 +90,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn test_to_slice() {
         let input = hex!("aa_bbbb_cc_0102_dd_ffffff_aa_0100ff");
-        let mut cursor = std::io::Cursor::new(input);
+        let mut cursor = Cursor::new(input);
         let t = TestDeku::from_reader((&mut cursor, 0)).unwrap().1;
 
         let mut out = [0x00; 100];

@@ -88,13 +88,13 @@ error: DekuWrite: cannot determine write `id`. must provide storage for the id o
 132 |     B,
     |     ^
 
-error: DekuWrite: `id_type` must be specified on non-unit variants
+error: DekuWrite: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`
    --> tests/test_compile/cases/enum_validation.rs:139:5
     |
 139 |     A = 0,
     |     ^
 
-error: DekuRead: `id_type` must be specified on non-unit variants
+error: DekuRead: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`
    --> tests/test_compile/cases/enum_validation.rs:148:5
     |
 148 |     Base = 0x00,
@@ -106,25 +106,25 @@ error: DekuRead: `repr` must match `id_type`
 156 |     Base = 0x00,
     |     ^^^^
 
-error: DekuRead: `id_type` must be specified on non-unit variants
+error: DekuRead: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`
    --> tests/test_compile/cases/enum_validation.rs:163:5
     |
 163 |     Base = 0x00,
     |     ^^^^
 
-error: DekuRead: `id_type` must be specified on non-unit variants
+error: DekuRead: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`
    --> tests/test_compile/cases/enum_validation.rs:170:5
     |
 170 |     Base = 0x00,
     |     ^^^^
 
-error: DekuRead: `id_type` must be specified on non-unit variants
+error: DekuRead: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`
    --> tests/test_compile/cases/enum_validation.rs:177:5
     |
 177 |     Base = 0x00,
     |     ^^^^
 
-error: DekuWrite: `id_type` must be specified on non-unit variants
+error: DekuWrite: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`
    --> tests/test_compile/cases/enum_validation.rs:184:5
     |
 184 |     Base = 0x00,
@@ -136,29 +136,34 @@ error: DekuWrite: `repr` must match `id_type`
 192 |     Base = 0x00,
     |     ^^^^
 
-error: DekuWrite: `id_type` must be specified on non-unit variants
+error: DekuWrite: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`
    --> tests/test_compile/cases/enum_validation.rs:199:5
     |
 199 |     Base = 0x00,
     |     ^^^^
 
-error: DekuWrite: `id_type` must be specified on non-unit variants
+error: DekuWrite: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`
    --> tests/test_compile/cases/enum_validation.rs:206:5
     |
 206 |     Base = 0x00,
     |     ^^^^
 
-error: DekuWrite: `id_type` must be specified on non-unit variants
+error: DekuWrite: `id_type` with non-unit variants requires primitive representation i.e. `repr(inttype)`
    --> tests/test_compile/cases/enum_validation.rs:213:5
     |
 213 |     Base = 0x00,
     |     ^^^^
 
-error[E0732]: `#[repr(inttype)]` must be specified
+error[E0732]: `#[repr(inttype)]` must be specified for enums with explicit discriminants and non-unit variants
    --> tests/test_compile/cases/enum_validation.rs:138:1
     |
 138 | pub enum Test19 {
     | ^^^^^^^^^^^^^^^
+139 |     A = 0,
+    |         - explicit discriminant specified here
+140 |     #[deku(id_pat = "_")]
+141 |     B(u8),
+    |     - non-unit discriminant declared here
 
 error[E0308]: `?` operator has incompatible types
    --> tests/test_compile/cases/enum_validation.rs:104:28

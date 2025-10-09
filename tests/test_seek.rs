@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use deku::{noseek::NoSeek, prelude::*};
 use hexlit::hex;
 use rstest::*;
@@ -23,6 +25,7 @@ pub struct Test {
     case(&hex!("0200002030"), Test{ skip_u8: 2, byte: 0x20, byte_after: 0x30, byte_after_rewind: 0x02, byte_again: 0x00, another: 0x30 }),
     case(&hex!("00ffaa"), Test{ skip_u8: 0, byte: 0xff, byte_after: 0xaa, byte_after_rewind: 0x00, byte_again: 0xaa, another: 0xaa }),
 )]
+#[cfg(feature = "alloc")]
 fn test_seek(input: &[u8], expected: Test) {
     let input = input.to_vec();
     let mut cursor = std::io::Cursor::new(input.clone());
@@ -44,6 +47,7 @@ pub struct SeekCtxBefore {
     case(&hex!("0003"), 1, SeekCtxBefore{ byte: 0x03 }),
     case(&hex!("000004"), 2, SeekCtxBefore{ byte: 0x04 }),
 )]
+#[cfg(feature = "std")]
 fn test_seek_ctx_before(input: &[u8], ctx: usize, expected: SeekCtxBefore) {
     use std::io::Cursor;
     let input = input.to_vec();
@@ -57,7 +61,7 @@ fn test_seek_ctx_before(input: &[u8], ctx: usize, expected: SeekCtxBefore) {
     let mut buf = vec![];
     let mut cursor = Cursor::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
-    let _ = ret_read.to_writer(&mut writer, ctx).unwrap();
+    ret_read.to_writer(&mut writer, ctx).unwrap();
     assert_eq!(buf, input);
 }
 
@@ -71,6 +75,7 @@ pub struct SeekCtxBeforeStart {
     case(&hex!("0003"), SeekCtxBeforeStart{ byte: 0x03 }),
     case(&hex!("00ff"), SeekCtxBeforeStart{ byte: 0xff }),
 )]
+#[cfg(feature = "std")]
 fn test_seek_ctx_start(input: &[u8], expected: SeekCtxBeforeStart) {
     use std::io::Cursor;
     let input = input.to_vec();
@@ -84,7 +89,7 @@ fn test_seek_ctx_start(input: &[u8], expected: SeekCtxBeforeStart) {
     let mut buf = vec![];
     let mut cursor = Cursor::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
-    let _ = ret_read.to_writer(&mut writer, ()).unwrap();
+    ret_read.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buf, input);
 }
 
@@ -98,6 +103,7 @@ pub struct SeekCtxBeforeEnd {
     case(&hex!("000300"), SeekCtxBeforeEnd{ byte: 0x03 }),
     case(&hex!("00ff00"), SeekCtxBeforeEnd{ byte: 0xff }),
 )]
+#[cfg(feature = "std")]
 fn test_seek_ctx_end(input: &[u8], expected: SeekCtxBeforeEnd) {
     use std::io::Cursor;
     let input = input.to_vec();
@@ -111,7 +117,7 @@ fn test_seek_ctx_end(input: &[u8], expected: SeekCtxBeforeEnd) {
     let mut buf = vec![0, 0, 0];
     let mut cursor = Cursor::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
-    let _ = ret_read.to_writer(&mut writer, ()).unwrap();
+    ret_read.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buf, input);
 }
 
@@ -125,6 +131,7 @@ pub struct SeekCtxNoSeek {
     case(&hex!("03"), SeekCtxNoSeek { byte: 0x03 }),
     case(&hex!("ff"), SeekCtxNoSeek { byte: 0xff }),
 )]
+#[cfg(feature = "std")]
 fn test_seek_ctx_no_seek(input: &[u8], expected: SeekCtxNoSeek) {
     use std::io::Cursor;
     let input = input.to_vec();
@@ -138,12 +145,12 @@ fn test_seek_ctx_no_seek(input: &[u8], expected: SeekCtxNoSeek) {
     let mut buf = vec![];
     let mut cursor = Cursor::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
-    let _ = ret_read.to_writer(&mut writer, ()).unwrap();
+    ret_read.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buf, input);
 
     let mut buf = vec![];
     let mut cursor = NoSeek::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
-    let _ = ret_read.to_writer(&mut writer, ()).unwrap();
+    ret_read.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buf, input);
 }

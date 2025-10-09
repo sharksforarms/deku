@@ -1,20 +1,20 @@
-use std::convert::TryInto;
+use core::convert::TryInto;
 
 use deku::ctx::BitSize;
 use deku::writer::Writer;
 use deku::{prelude::*, DekuWriter};
-use no_std_io::io::{Seek, Write};
+use no_std_io::io::{Cursor, Read, Seek, Write};
 
-fn bit_flipper_read<R: std::io::Read + std::io::Seek>(
+fn bit_flipper_read<R: Read + Seek>(
     field_a: u8,
     reader: &mut Reader<R>,
     bit_size: BitSize,
 ) -> Result<u8, DekuError> {
     // Access to previously read fields
-    println!("field_a = 0x{:X}", field_a);
+    println!("field_a = 0x{field_a:X}");
 
     // Size of the current field
-    println!("bit_size: {:?}", bit_size);
+    println!("bit_size: {bit_size:?}");
 
     // read field_b, calling original func
     let value = u8::from_reader_with_ctx(reader, bit_size)?;
@@ -32,13 +32,13 @@ fn bit_flipper_write<W: Write + Seek>(
     bit_size: BitSize,
 ) -> Result<(), DekuError> {
     // Access to previously written fields
-    println!("field_a = 0x{:X}", field_a);
+    println!("field_a = 0x{field_a:X}");
 
     // value of field_b
-    println!("field_b = 0x{:X}", field_b);
+    println!("field_b = 0x{field_b:X}");
 
     // Size of the current field
-    println!("bit_size: {:?}", bit_size);
+    println!("bit_size: {bit_size:?}");
 
     // flip the bits on value if field_a is 0x01
     let value = if field_a == 0x01 { !field_b } else { field_b };
@@ -59,7 +59,7 @@ struct DekuTest {
 
 fn main() {
     let test_data = [0x01, 0b1001_0110];
-    let mut cursor = std::io::Cursor::new(test_data);
+    let mut cursor = Cursor::new(test_data);
 
     let (_read_amt, ret_read) = DekuTest::from_reader((&mut cursor, 0)).unwrap();
 

@@ -2,6 +2,7 @@
 
 pub trait FromBeBytes: Sized {
     type Bytes;
+    #[allow(dead_code)]
     fn from_be_bytes(_: Self::Bytes) -> Self;
 }
 

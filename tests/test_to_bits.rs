@@ -1,4 +1,4 @@
-#![cfg(feature = "bits")]
+#![cfg(all(feature = "alloc", feature = "bits"))]
 
 use core::convert::TryFrom;
 

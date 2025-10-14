@@ -1,3 +1,4 @@
+#[cfg(all(feature = "alloc", feature = "bits"))]
 #[derive(PartialEq, Debug, deku::DekuRead, deku::DekuWrite)]
 #[deku(id_type = "u8")]
 enum TestEnum {

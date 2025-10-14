@@ -1,4 +1,4 @@
-#![cfg(feature = "bits")]
+#![cfg(all(feature = "alloc", feature = "bits"))]
 
 use alloc_counter::AllocCounterSystem;
 use deku::ctx::Endian;

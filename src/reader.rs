@@ -19,7 +19,7 @@ pub enum ReaderRet {
     /// Successfully read bytes
     Bytes,
     /// Successfully read bits
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "bits", feature = "alloc"))]
     Bits(Option<BitVec<u8, Msb0>>),
 }
 
@@ -411,7 +411,7 @@ impl<R: Read + Seek> Reader<R> {
     /// # Params
     /// `amt`    - Amount of bits that will be read
     #[inline(never)]
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "bits", feature = "alloc"))]
     pub fn read_bits(
         &mut self,
         amt: usize,
@@ -658,13 +658,13 @@ impl<R: Read + Seek> Reader<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "alloc", feature = "bits"))]
     use alloc::vec;
     use hexlit::hex;
     use no_std_io::io::Cursor;
 
     #[test]
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "alloc", feature = "bits"))]
     fn test_end() {
         let input = hex!("aabb");
         let mut cursor = Cursor::new(input);
@@ -696,7 +696,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "alloc", feature = "bits"))]
     fn test_bits_less() {
         let input = hex!("aa");
         let mut cursor = Cursor::new(input);
@@ -717,7 +717,7 @@ mod tests {
         assert_eq!(reader.bits_read, 8);
     }
 
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "alloc", feature = "bits"))]
     #[test]
     fn test_bit_order() {
         // Lsb0 one byte
@@ -836,9 +836,11 @@ mod tests {
         assert_eq!(bits, Some(bitvec![u8, Msb0; 0, 1, 0, 1]));
     }
 
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "alloc", feature = "bits"))]
     #[test]
     fn test_long_unaligned_bytes_read() {
+        use alloc::vec;
+
         let input = vec![0xff; 0xff * 2];
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);

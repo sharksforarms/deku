@@ -63,6 +63,7 @@ fn test_update_from_field() {
 
 /// Update error
 #[test]
+#[cfg(feature = "descriptive-errors")]
 #[should_panic(
     expected = "Parse(\"error parsing int: out of range integral type conversion attempted\")"
 )]

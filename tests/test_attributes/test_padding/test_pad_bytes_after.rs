@@ -28,6 +28,7 @@ fn test_pad_bytes_after() {
 }
 
 #[test]
+#[cfg(feature = "descriptive-errors")]
 #[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
 fn test_pad_bytes_after_not_enough() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -43,7 +44,7 @@ fn test_pad_bytes_after_not_enough() {
 }
 
 // TODO: add cfg test with updated msg for not(bits)
-#[cfg(feature = "bits")]
+#[cfg(all(feature = "bits", feature = "descriptive-errors"))]
 #[test]
 #[should_panic(
     expected = r#"InvalidParam("Invalid padding param, cannot convert to usize: ((- 2) * 8)")"#
@@ -62,7 +63,7 @@ fn test_pad_bytes_after_read_err() {
 }
 
 // TODO: add cfg test with updated msg for not(bits)
-#[cfg(feature = "bits")]
+#[cfg(all(feature = "bits", feature = "descriptive-errors"))]
 #[test]
 #[should_panic(
     expected = r#"InvalidParam("Invalid padding param, cannot convert to usize: ((- 2) * 8)")"#

@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 //! General smoke tests for structs
 
 // TODO: These should be divided into smaller tests

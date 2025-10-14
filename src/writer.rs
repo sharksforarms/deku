@@ -57,7 +57,7 @@ impl<W: Write + Seek> Writer<W> {
 
     /// Return the unused bits
     #[inline]
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "bits", feature = "alloc"))]
     pub fn rest(&mut self) -> alloc::vec::Vec<bool> {
         self.leftover.0.as_bitslice().iter().by_vals().collect()
     }

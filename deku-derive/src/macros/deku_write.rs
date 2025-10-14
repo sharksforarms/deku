@@ -99,7 +99,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-        #[cfg(feature = "bits")]
+        #[cfg(all(feature = "alloc", feature = "bits"))]
         tokens.extend(quote! {
             #[automatically_derived]
              impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {
@@ -357,7 +357,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // Implement `DekuContainerWrite` for types that don't need a context
     if input.ctx.is_none() || (input.ctx.is_some() && input.ctx_default.is_some()) {
-        #[cfg(feature = "bits")]
+        #[cfg(all(feature = "alloc", feature = "bits"))]
         tokens.extend(quote! {
             #[automatically_derived]
              impl #imp core::convert::TryFrom<#ident> for ::#crate_::bitvec::BitVec<u8, ::#crate_::bitvec::Msb0> #wher {

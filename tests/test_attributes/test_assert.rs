@@ -1,7 +1,10 @@
+#[cfg(feature = "descriptive-errors")]
 use core::convert::{TryFrom, TryInto};
 
 use deku::prelude::*;
+#[cfg(feature = "descriptive-errors")]
 use hexlit::hex;
+#[cfg(feature = "descriptive-errors")]
 use rstest::rstest;
 
 #[derive(Default, PartialEq, Debug, DekuRead, DekuWrite)]
@@ -11,6 +14,7 @@ struct TestStruct {
     field_b: u8,
 }
 
+#[cfg(feature = "descriptive-errors")]
 #[rstest(input, expected,
     case(&hex!("0102"), TestStruct {
         field_a: 0x01,
@@ -25,6 +29,7 @@ fn test_assert_read(input: &[u8], expected: TestStruct) {
     assert_eq!(expected, ret_read);
 }
 
+#[cfg(feature = "descriptive-errors")]
 #[rstest(input, expected,
     case(TestStruct {
         field_a: 0x01,

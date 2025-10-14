@@ -24,7 +24,7 @@ default = ["std", "bits", "descriptive-errors"]
 std = ["deku_derive/std", "bitvec?/std", "alloc", "no_std_io/std"]
 alloc = ["bitvec?/alloc", "deku_derive/alloc", "no_std_io/alloc" ]
 logging = ["deku_derive/logging", "log"]
-bits = ["dep:bitvec", "deku_derive/bits", "alloc" ]
+bits = ["dep:bitvec", "deku_derive/bits" ]
 descriptive-errors = ["alloc"]
 
 [dependencies]
@@ -60,7 +60,7 @@ manual-unwrap-or-default = "allow"
 
 [[example]]
 name = "custom_reader_and_writer"
-required-features = ["bits"]
+required-features = ["alloc", "bits"]
 
 [[example]]
 name = "deku_input"
@@ -68,7 +68,7 @@ required-features = ["std"]
 
 [[example]]
 name = "enums_catch_all"
-required-features = ["bits"]
+required-features = ["alloc", "bits"]
 
 [[example]]
 name = "enums"
@@ -76,11 +76,11 @@ required-features = ["std"]
 
 [[example]]
 name = "example"
-required-features = ["bits"]
+required-features = ["alloc", "bits"]
 
 [[example]]
 name = "ipv4"
-required-features = ["bits"]
+required-features = ["alloc", "bits"]
 
 [[example]]
 name = "80211"

@@ -43,6 +43,7 @@ fn test_cstring_valid_bytes() {
     assert_eq!(d.s, CString::new("test").unwrap());
 }
 
+#[cfg(feature = "descriptive-errors")]
 #[should_panic(
     expected = "Failed to convert Vec to CString: data provided contains an interior nul byte at pos 4"
 )]

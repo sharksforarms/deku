@@ -444,12 +444,12 @@ macro_rules! ImplDekuReadBytes {
                             <$typ>::from_be_bytes(buf.try_into().unwrap())
                         }
                     }
-                    #[cfg(feature = "bits")]
+                    #[cfg(all(feature = "bits", feature = "alloc"))]
                     ReaderRet::Bits(Some(bits)) => {
                         let a = <$typ>::read(&bits, (endian, size, order))?;
                         a.1
                     }
-                    #[cfg(feature = "bits")]
+                    #[cfg(all(feature = "bits", feature = "alloc"))]
                     ReaderRet::Bits(None) => {
                         return Err(deku_error!(DekuError::Parse, "no bits read from reader"));
                     }
@@ -602,12 +602,12 @@ macro_rules! ImplDekuReadSignExtend {
                             <$typ>::from_be_bytes(buf.try_into().unwrap())
                         }
                     }
-                    #[cfg(feature = "bits")]
+                    #[cfg(all(feature = "bits", feature = "alloc"))]
                     ReaderRet::Bits(Some(bits)) => {
                         let a = <$typ>::read(&bits, (endian, size, order))?;
                         a.1
                     }
-                    #[cfg(feature = "bits")]
+                    #[cfg(all(feature = "bits", feature = "alloc"))]
                     ReaderRet::Bits(None) => {
                         return Err(deku_error!(DekuError::Parse, "no bits read from reader"));
                     }
@@ -1370,7 +1370,7 @@ mod tests {
         native_endian!(-0.006_f64)
     );
 
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "bits", feature = "descriptive-errors"))]
     #[rstest(input, endian, bit_size, expected, expected_rest_bits, expected_rest_bytes,
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(32), 0xAABB_CCDD, bits![u8, Msb0;], &[]),
         case::normal([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(32), 0xDDCC_BBAA, bits![u8, Msb0;], &[]),
@@ -1412,6 +1412,7 @@ mod tests {
         assert_eq!(expected_rest_bytes, buf);
     }
 
+    #[cfg(feature = "descriptive-errors")]
     #[rstest(input, endian, byte_size, expected, expected_rest_bytes,
         case::normal_be([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Big, Some(4), 0xDDCC_BBAA, &[]),
         case::normal_le([0xDD, 0xCC, 0xBB, 0xAA].as_ref(), Endian::Little, Some(4), 0xAABB_CCDD, &[]),
@@ -1448,7 +1449,7 @@ mod tests {
         assert_eq!(expected_rest_bytes, buf);
     }
 
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "bits", feature = "descriptive-errors"))]
     #[rstest(input, endian, bit_size, expected, expected_leftover,
         case::normal_le(0xDDCC_BBAA, Endian::Little, None, vec![0xAA, 0xBB, 0xCC, 0xDD], vec![]),
         case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA], vec![]),
@@ -1476,6 +1477,7 @@ mod tests {
         assert_eq!(expected, writer.inner.into_inner());
     }
 
+    #[cfg(feature = "descriptive-errors")]
     #[rstest(input, endian, byte_size, expected,
         case::normal_le(0xDDCC_BBAA, Endian::Little, None, vec![0xAA, 0xBB, 0xCC, 0xDD]),
         case::normal_be(0xDDCC_BBAA, Endian::Big, None, vec![0xDD, 0xCC, 0xBB, 0xAA]),

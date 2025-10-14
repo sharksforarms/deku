@@ -29,6 +29,7 @@ fn test_pad_bits_before() {
 }
 
 #[test]
+#[cfg(feature = "descriptive-errors")]
 #[should_panic(expected = "Incomplete(NeedSize { bits: 2 })")]
 fn test_pad_bits_before_not_enough() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
@@ -45,6 +46,7 @@ fn test_pad_bits_before_not_enough() {
 }
 
 #[test]
+#[cfg(feature = "descriptive-errors")]
 #[should_panic(expected = r#"InvalidParam("Invalid padding param, cannot convert to usize: - 1")"#)]
 fn test_pad_bits_before_read_err() {
     #[derive(PartialEq, Debug, DekuRead)]
@@ -61,6 +63,7 @@ fn test_pad_bits_before_read_err() {
 }
 
 #[test]
+#[cfg(feature = "descriptive-errors")]
 #[should_panic(expected = r#"InvalidParam("Invalid padding param, cannot convert to usize: - 1")"#)]
 fn test_pad_bits_before_write_err() {
     #[derive(PartialEq, Debug, DekuWrite)]

@@ -35,7 +35,7 @@ but we could also use [from_reader](DekuContainerRead::from_reader).
 ```rust
 use deku::prelude::*;
 
-# #[cfg(feature = "bits")]
+# #[cfg(all(feature = "alloc", feature = "bits"))]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
 struct DekuTest {
@@ -46,7 +46,7 @@ struct DekuTest {
     field_c: u16,
 }
 
-# #[cfg(feature = "bits")]
+# #[cfg(all(feature = "alloc", feature = "bits"))]
 # fn main() {
 let data: Vec<u8> = vec![0b0110_1001, 0xBE, 0xEF];
 let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
@@ -62,7 +62,7 @@ let data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 # }
 #
-# #[cfg(not(feature = "bits"))]
+# #[cfg(not(all(feature = "alloc", feature = "bits")))]
 # fn main() {}
 ```
 
@@ -709,7 +709,7 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     /// assert_eq!(deku::bitvec::bitvec![1, 1, 1, 1, 0, 0, 0, 1, 1], bits);
     /// ```
     #[inline(always)]
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "bits", feature = "alloc"))]
     fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError> {
         let mut out_buf = Vec::new();
         let mut cursor = no_std_io::Cursor::new(&mut out_buf);

@@ -23,6 +23,4 @@ enum TestEnum {
     VarDefault { id: u8, value: u8 },
 }
 
-fn main() {
-    
-}
+fn main() {}

@@ -53,8 +53,6 @@ mod tests {
     use no_std_io::io::Cursor;
     use rstest::rstest;
 
-    #[cfg(feature = "bits")]
-    use crate::ctx::BitSize;
     use crate::reader::Reader;
 
     use super::*;
@@ -87,6 +85,8 @@ mod tests {
     #[cfg(all(feature = "alloc", feature = "bits"))]
     #[test]
     fn test_writer_bits() {
+        use crate::ctx::BitSize;
+
         let mut writer = Writer::new(Cursor::new(alloc::vec![]));
         true.to_writer(&mut writer, BitSize(1)).unwrap();
         assert_eq!(alloc::vec![true], writer.rest());

@@ -29,7 +29,7 @@ fn test_pad_bits_before() {
 }
 
 #[test]
-#[should_panic(expected = "Incomplete(NeedSize { bits: 6 })")]
+#[should_panic(expected = "Incomplete(NeedSize { bits: 2 })")]
 fn test_pad_bits_before_not_enough() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct TestStruct {

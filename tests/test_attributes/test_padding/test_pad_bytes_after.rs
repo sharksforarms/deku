@@ -28,7 +28,7 @@ fn test_pad_bytes_after() {
 }
 
 #[test]
-#[should_panic(expected = "Incomplete(NeedSize { bits: 24 })")]
+#[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
 fn test_pad_bytes_after_not_enough() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct TestStruct {

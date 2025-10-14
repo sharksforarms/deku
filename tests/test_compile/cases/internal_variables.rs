@@ -1,5 +1,6 @@
 use deku::prelude::*;
 
+#[cfg(feature = "alloc")]
 #[derive(DekuRead, DekuWrite)]
 struct TestCount {
     field_a: u8,
@@ -7,6 +8,7 @@ struct TestCount {
     field_b: Vec<u8>,
 }
 
+#[cfg(feature = "alloc")]
 #[derive(DekuRead, DekuWrite)]
 struct TestBitRead {
     field_a: u8,
@@ -14,6 +16,7 @@ struct TestBitRead {
     field_b: Vec<u8>,
 }
 
+#[cfg(feature = "alloc")]
 #[derive(DekuRead, DekuWrite)]
 struct TestBytesRead {
     field_a: u8,
@@ -21,6 +24,7 @@ struct TestBytesRead {
     field_b: Vec<u8>,
 }
 
+#[cfg(feature = "alloc")]
 #[derive(DekuRead, DekuWrite)]
 struct TestUntil {
     field_a: u8,

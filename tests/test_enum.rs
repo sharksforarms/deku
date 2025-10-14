@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 //! General smoke tests for enums
 
 // TODO: These should be divided into smaller tests

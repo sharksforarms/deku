@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.20.1](https://github.com/sharksforarms/deku/compare/deku-v0.20.0...deku-v0.20.1) - 2025-10-15
+
+### Other
+
+- update release-plz.toml
+- release v0.20.0 ([#610](https://github.com/sharksforarms/deku/pull/610))
+
 ## [0.20.0](https://github.com/sharksforarms/deku/compare/deku-v0.19.1...deku-v0.20.0) - 2025-10-15
 
 ### Fixed

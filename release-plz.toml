@@ -8,3 +8,4 @@ changelog_include = ["deku_derive"]
 name = "deku_derive"
 changelog_update = false
 git_release_enable = false
+git_tag_enable = false

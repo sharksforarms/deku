@@ -1,0 +1,10 @@
+[workspace]
+
+[[package]]
+name = "deku"
+changelog_include = ["deku_derive"]
+
+[[package]]
+name = "deku_derive"
+changelog_update = false
+git_release_enable = false

@@ -229,9 +229,12 @@ assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 Of course, trivial c-style enums works just as well too:
 
 ```rust
-# use std::io::Cursor;
-use deku::prelude::*;
+# #[cfg(feature = "bits")]
+# use deku::prelude::*;
+# #[cfg(feature = "bits")]
+# use deku::no_std_io::Cursor;
 
+# #[cfg(feature = "bits")]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(id_type = "u8", bits = 2, bit_order = "lsb")]
 #[repr(u8)]
@@ -242,6 +245,8 @@ pub enum DekuTest {
     VariantD = 3
 }
 
+# #[cfg(feature = "bits")]
+# fn main() {
 let data: &[u8] = &[0x0D]; // 00 00 11 01 => A A D B
 let mut cursor = Cursor::new(data);
 let mut reader = Reader::new(&mut cursor);
@@ -254,6 +259,10 @@ assert_eq!(DekuTest::VariantD , val);
 
 let val = DekuTest::from_reader_with_ctx(&mut reader, ()).unwrap();
 assert_eq!(DekuTest::VariantA , val);
+# }
+#
+# #[cfg(not(feature = "bits"))]
+# fn main() {}
 ```
 
 # Context

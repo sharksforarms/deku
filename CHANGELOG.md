@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+## [0.20.0](https://github.com/sharksforarms/deku/compare/deku-v0.19.1...deku-v0.20.0) - 2025-10-15
+
+### Fixed
+
+- remove unsafe slice MaybeUninit::uninit().assume_init() ([#601](https://github.com/sharksforarms/deku/pull/601))
+
+### Other
+
+- update deps ([#612](https://github.com/sharksforarms/deku/pull/612))
+- Fix #571: Add more documentation about ctx in the first example ([#574](https://github.com/sharksforarms/deku/pull/574))
+- introduce release-plz
+- Fix reading little endian fields in LSB order when not aligned to byte boundaries ([#604](https://github.com/sharksforarms/deku/pull/604))
+- Ensure bits fit in container ([#598](https://github.com/sharksforarms/deku/pull/598))
+- Fix big endian bit_order lsb writing ([#597](https://github.com/sharksforarms/deku/pull/597))
+- Improve error message for id_type and missing repr ([#596](https://github.com/sharksforarms/deku/pull/596))
+- Fix bit order padding logic in Writer::finalize and update tests ([#595](https://github.com/sharksforarms/deku/pull/595))
+- Expose `alloc` as a selectable feature ([#582](https://github.com/sharksforarms/deku/pull/582))
+- Removed duplicate `bits` entry from the 'List of attributes' section of attributes docs ([#588](https://github.com/sharksforarms/deku/pull/588))
+- Fix DekuRead for #[repr(...)] enums constructed using `id` via `ctx` and whose variants assign discriminant values  ([#577](https://github.com/sharksforarms/deku/pull/577))
+- Change arc/cow/cstring requirements from std to alloc ([#579](https://github.com/sharksforarms/deku/pull/579))
+- deku_read: Use checked slice for remaining data ([#581](https://github.com/sharksforarms/deku/pull/581))
+- Implements From<DekuError> for no_std_io::io::Error in no_std context ([#578](https://github.com/sharksforarms/deku/pull/578))
+- Warnings and clippy fixes ([#575](https://github.com/sharksforarms/deku/pull/575))
+- hashset: tests: Handle arbitrary iteration order of HashSet ([#573](https://github.com/sharksforarms/deku/pull/573))
+- add map attribute to list ([#570](https://github.com/sharksforarms/deku/pull/570))
+- Return empty vec for read_to_end ZST ([#566](https://github.com/sharksforarms/deku/pull/566))
+- Bugfix/signed values in bitfields ([#565](https://github.com/sharksforarms/deku/pull/565))
+- Fix writer dropping count of bytes written for unaligned writes ([#561](https://github.com/sharksforarms/deku/pull/561))
+- Fix CString byte length reading ([#563](https://github.com/sharksforarms/deku/pull/563))
+
 ## Added
 
 - The `alloc` feature, allowing use in environments lacking a heap [#582](https://github.com/sharksforarms/deku/pull/582)

@@ -77,15 +77,18 @@ can be derived by using the `DekuRead` and `DekuWrite` Derive macros.
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "big")]
 struct DekuTest {
     header: DekuHeader,
     data: DekuData,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(ctx = "endian: deku::ctx::Endian")] // context passed from `DekuTest` top-level endian
 struct DekuHeader(u8);
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(ctx = "endian: deku::ctx::Endian")] // context passed from `DekuTest` top-level endian
 struct DekuData(u16);
 
 # #[cfg(feature = "std")]
@@ -104,6 +107,8 @@ assert_eq!(data, data_out);
 # #[cfg(not(feature = "std"))]
 # fn main() {}
 ```
+
+Note that because we explicitly specify the endian on the top-level struct, we must pass the endian to all children via the context. Several attributes trigger this requirement, such as [endian](attributes#endian), [bit_order](attributes#bit_order), and [bits](attributes#bits). If you are getting errors of the format `mismatched types, expected A, found B` on the `DekuRead` and/or `DekuWrite` `#[derive]` attribute, then you need to update the [ctx](attributes#ctx).
 
 # Vec
 
@@ -218,6 +223,45 @@ assert_eq!(DekuTest::VariantB(0xBEEF) , val);
 # }
 #
 # #[cfg(not(feature = "std"))]
+# fn main() {}
+```
+
+Of course, trivial c-style enums works just as well too:
+
+```rust
+# #[cfg(feature = "bits")]
+# use deku::prelude::*;
+# #[cfg(feature = "bits")]
+# use deku::no_std_io::Cursor;
+
+# #[cfg(feature = "bits")]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(id_type = "u8", bits = 2, bit_order = "lsb")]
+#[repr(u8)]
+pub enum DekuTest {
+    VariantA = 0,
+    VariantB = 1,
+    VariantC = 2,
+    VariantD = 3
+}
+
+# #[cfg(feature = "bits")]
+# fn main() {
+let data: &[u8] = &[0x0D]; // 00 00 11 01 => A A D B
+let mut cursor = Cursor::new(data);
+let mut reader = Reader::new(&mut cursor);
+
+let val = DekuTest::from_reader_with_ctx(&mut reader, ()).unwrap();
+assert_eq!(DekuTest::VariantB , val);
+
+let val = DekuTest::from_reader_with_ctx(&mut reader, ()).unwrap();
+assert_eq!(DekuTest::VariantD , val);
+
+let val = DekuTest::from_reader_with_ctx(&mut reader, ()).unwrap();
+assert_eq!(DekuTest::VariantA , val);
+# }
+#
+# #[cfg(not(feature = "bits"))]
 # fn main() {}
 ```
 

@@ -26,7 +26,7 @@ default = ["alloc", "deku/alloc", "deku/bits" ]
 alloc = []
 
 [dependencies]
-cortex-m-rt = "0.7.3"
+cortex-m-rt = "0.7.5"
 deku = { path = "../", default-features = false }
 embedded-alloc = "0.6.0"
 

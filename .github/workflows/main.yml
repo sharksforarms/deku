@@ -61,14 +61,17 @@ jobs:
   ensure_no_std:
     name: Ensure no_std
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [thumbv7em-none-eabihf, thumbv6m-none-eabi]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
-          targets: thumbv7em-none-eabihf
-      - run: cd ensure_no_std && cargo build --release --target thumbv7em-none-eabihf
-      - run: cd ensure_no_std && cargo build --release --target thumbv7em-none-eabihf --no-default-features
+          targets: ${{ matrix.target }}
+      - run: cd ensure_no_std && cargo build --release --target ${{ matrix.target }}
+      - run: cd ensure_no_std && cargo build --release --target ${{ matrix.target }} --no-default-features
 
   ensure_wasm:
     name: Ensure wasm

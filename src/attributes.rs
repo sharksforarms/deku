@@ -220,7 +220,7 @@ With endian-ness:
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# #[cfg(feature = "bits")]
+# #[cfg(all(feature = "alloc", feature = "bits"))]
 # #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
 #[deku(endian = "big", bit_order = "lsb")]
 pub struct BigEndian {
@@ -230,7 +230,7 @@ pub struct BigEndian {
     t: u8,
 }
 
-# #[cfg(feature = "bits")]
+# #[cfg(all(feature = "alloc", feature = "bits"))]
 # fn main() {
 let data = vec![0x10, 0x81];
 let big_endian = BigEndian::try_from(data.as_ref()).unwrap();
@@ -245,14 +245,14 @@ let bytes = big_endian.to_bytes().unwrap();
 assert_eq!(bytes, data);
 # }
 #
-# #[cfg(not(feature = "bits"))]
+# #[cfg(not(all(feature = "alloc", feature = "bits")))]
 # fn main() {}
 ````
 ### Field Example
 ```rust
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# #[cfg(feature = "bits")]
+# #[cfg(all(feature = "alloc", feature = "bits"))]
 # #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
 pub struct LsbField {
     #[deku(bit_order = "lsb", bits = "13")]
@@ -261,7 +261,7 @@ pub struct LsbField {
     t: u8,
 }
 
-# #[cfg(feature = "bits")]
+# #[cfg(all(feature = "alloc", feature = "bits"))]
 # fn main() {
 let data = vec![0x40, 0x40];
 let more_first = LsbField::try_from(data.as_ref()).unwrap();
@@ -270,7 +270,7 @@ let bytes = more_first.to_bytes().unwrap();
 assert_eq!(bytes, data);
 # }
 #
-# #[cfg(not(feature = "bits"))]
+# #[cfg(not(all(feature = "alloc", feature = "bits")))]
 # fn main() {}
 ```
 
@@ -1334,7 +1334,7 @@ Example:
 # use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# #[cfg(feature = "bits")]
+# #[cfg(all(feature = "alloc", feature = "bits"))]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(bits = 2)]
@@ -1421,7 +1421,7 @@ Example:
 # use alloc::{vec, vec::Vec};
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
-# #[cfg(feature = "bits")]
+# #[cfg(all(feature = "alloc", feature = "bits"))]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     #[deku(bits = 2, pad_bits_after = "2")]
@@ -1570,7 +1570,7 @@ Specify custom reader or writer tokens for reading a field or variant
 Example:
 ```rust
 use core::convert::{TryInto, TryFrom};
-# #[cfg(feature = "bits")]
+# #[cfg(all(feature = "alloc", feature = "bits"))]
 use deku::bitvec::{BitSlice, BitVec, Msb0};
 use deku::prelude::*;
 

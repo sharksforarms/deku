@@ -117,7 +117,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             use ::#crate_::DekuReader as _;
             let __deku_reader = &mut deku::reader::Reader::new(__deku_input.0);
             if __deku_input.1 != 0 {
-                __deku_reader.skip_bits(__deku_input.1)?;
+                __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
 
             let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
@@ -131,7 +131,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
             let mut __deku_reader = &mut deku::reader::Reader::new(&mut __deku_cursor);
             if __deku_input.1 != 0 {
-                __deku_reader.skip_bits(__deku_input.1)?;
+                __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
 
             let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
@@ -406,7 +406,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             use ::#crate_::DekuReader as _;
             let __deku_reader = &mut deku::reader::Reader::new(__deku_input.0);
             if __deku_input.1 != 0 {
-                __deku_reader.skip_bits(__deku_input.1)?;
+                __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
 
             let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
@@ -420,7 +420,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
             let mut __deku_reader = &mut deku::reader::Reader::new(&mut __deku_cursor);
             if __deku_input.1 != 0 {
-                __deku_reader.skip_bits(__deku_input.1)?;
+                __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
 
             let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
@@ -620,8 +620,7 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
                     // TODO: use skip_bytes, or Seek in the future?
                     let _ = __deku_reader.read_bytes(bytes_read, &mut buf, #order)?;
                 } else {
-                    // TODO: use skip_bits, or Seek in the future?
-                    let _ = __deku_reader.read_bits(__deku_pad, #order)?;
+                    __deku_reader.skip_bits(__deku_pad, #order)?;
                 }
             }
         }
@@ -641,8 +640,7 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
                     // TODO: use skip_bytes, or Seek in the future?
                     let _ = __deku_reader.read_bytes(bytes_read, &mut buf, ::#crate_::ctx::Order::default())?;
                 } else {
-                    // TODO: use skip_bits, or Seek in the future?
-                    let _ = __deku_reader.read_bits(__deku_pad, ::#crate_::ctx::Order::default())?;
+                    __deku_reader.skip_bits(__deku_pad, ::#crate_::ctx::Order::default())?;
                 }
             }
         }

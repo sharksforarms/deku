@@ -1,3 +1,4 @@
+#[cfg(all(feature = "alloc", feature = "bits"))]
 #[derive(PartialEq, Debug, deku::DekuRead, deku::DekuWrite)]
 #[deku(id_type = "u8")]
 enum TestEnum {
@@ -22,6 +23,4 @@ enum TestEnum {
     VarDefault { id: u8, value: u8 },
 }
 
-fn main() {
-    
-}
+fn main() {}

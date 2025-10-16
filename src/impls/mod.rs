@@ -10,7 +10,7 @@ mod unit;
 #[cfg(feature = "alloc")]
 mod vec;
 
-#[cfg(feature = "alloc")]
+#[cfg(all(feature = "alloc", target_has_atomic = "ptr"))]
 mod arc;
 
 #[cfg(feature = "alloc")]

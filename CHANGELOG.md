@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.20.1](https://github.com/sharksforarms/deku/compare/deku-v0.20.0...deku-v0.20.1) - 2025-10-22
+
+### Other
+
+- add `thumbv6m-none-eabi` target to ensure_no_std step ([#616](https://github.com/sharksforarms/deku/pull/616))
+- update release-plz.toml
+- release v0.20.0 ([#610](https://github.com/sharksforarms/deku/pull/610))
+
 ## [0.20.0](https://github.com/sharksforarms/deku/compare/deku-v0.19.1...deku-v0.20.0) - 2025-10-15
 
 ### Fixed

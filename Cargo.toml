@@ -9,7 +9,7 @@ keywords = ["deku", "bits", "serialization", "deserialization", "struct"]
 categories = ["encoding", "parsing", "no-std"]
 description = "bit level serialization/deserialization proc-macro for structs"
 readme = "README.md"
-rust-version = "1.81"
+rust-version = "1.82"
 
 [lib]
 bench = false

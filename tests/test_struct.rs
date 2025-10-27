@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 //! General smoke tests for structs
 
 // TODO: These should be divided into smaller tests
@@ -31,9 +33,9 @@ pub struct NestedDeku {
     pub inner: DoubleNestedDeku,
 }
 
-#[cfg(feature = "bits")]
+#[cfg(all(feature = "bits", feature = "descriptive-errors"))]
 #[test]
-#[should_panic(expected = r#"Parse("Too much data")"#)]
+#[should_panic(expected = r#"Parse("Too much data: Read 0 but total length was 100")"#)]
 fn test_read_too_much_data() {
     #[derive(DekuRead)]
     pub struct TestStruct {

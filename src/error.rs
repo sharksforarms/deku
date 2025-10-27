@@ -213,3 +213,9 @@ impl From<DekuError> for std::io::Error {
         }
     }
 }
+
+impl From<no_std_io::io::Error> for DekuError {
+    fn from(value: no_std_io::io::Error) -> Self {
+        DekuError::Io(value.kind())
+    }
+}

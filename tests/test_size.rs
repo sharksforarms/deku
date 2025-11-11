@@ -242,6 +242,7 @@ fn test_enum_uses_max_variant_size() {
     assert_eq!(MixedSizeEnum::SIZE_BYTES, Some(9));
 }
 
+#[cfg(feature = "alloc")]
 #[test]
 fn test_enum_actual_vs_max_size() {
     #[derive(Debug, DekuRead, DekuWrite, DekuSize)]
@@ -273,6 +274,7 @@ fn test_enum_actual_vs_max_size() {
     );
 }
 
+#[cfg(feature = "alloc")]
 #[test]
 fn test_unit_variants_are_zero_size() {
     #[derive(Debug, DekuRead, DekuWrite, DekuSize)]

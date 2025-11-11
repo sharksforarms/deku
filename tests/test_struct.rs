@@ -16,14 +16,14 @@ mod test_common;
 
 // Common struct to test nesting
 #[cfg(feature = "bits")]
-#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
 pub struct DoubleNestedDeku {
     pub data: u16,
 }
 
 #[cfg(feature = "bits")]
 // Common struct to test nesting
-#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
 pub struct NestedDeku {
     #[deku(bits = 6)]
     pub nest_a: u8,
@@ -31,6 +31,13 @@ pub struct NestedDeku {
     pub nest_b: u8,
 
     pub inner: DoubleNestedDeku,
+}
+
+#[cfg(feature = "bits")]
+#[test]
+fn test_nested_struct_sizes() {
+    assert_eq!(DoubleNestedDeku::SIZE_BYTES, Some(2));
+    assert_eq!(NestedDeku::SIZE_BYTES, Some(3));
 }
 
 #[cfg(all(feature = "bits", feature = "descriptive-errors"))]

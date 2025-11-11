@@ -1259,6 +1259,33 @@ ImplDekuTraitsBytesUnsigned!(f32, u32);
 ImplDekuTraitsUnsigned!(f64, u64);
 ImplDekuTraitsBytesUnsigned!(f64, u64);
 
+use crate::DekuSize;
+
+macro_rules! ImplDekuSize {
+    ($typ:ty) => {
+        impl DekuSize for $typ {
+            const SIZE_BITS: usize = core::mem::size_of::<$typ>() * 8;
+        }
+    };
+}
+
+ImplDekuSize!(u8);
+ImplDekuSize!(u16);
+ImplDekuSize!(u32);
+ImplDekuSize!(u64);
+ImplDekuSize!(u128);
+ImplDekuSize!(usize);
+
+ImplDekuSize!(i8);
+ImplDekuSize!(i16);
+ImplDekuSize!(i32);
+ImplDekuSize!(i64);
+ImplDekuSize!(i128);
+ImplDekuSize!(isize);
+
+ImplDekuSize!(f32);
+ImplDekuSize!(f64);
+
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {

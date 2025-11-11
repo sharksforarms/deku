@@ -94,6 +94,10 @@ where
     }
 }
 
+impl<T: crate::DekuSize, const N: usize> crate::DekuSize for [T; N] {
+    const SIZE_BITS: usize = T::SIZE_BITS * N;
+}
+
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {

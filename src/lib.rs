@@ -363,6 +363,61 @@ hdr.to_writer(&mut Writer::new(file), ());
 # fn main() {}
 ```
 
+# DekuSize
+
+For types with a known, fixed size at compile-time, the `DekuSize` trait provides
+constant `SIZE_BITS` and `SIZE_BYTES` values. This is useful for creating correctly sized
+buffers in embedded or no_std,no_alloc environments where dynamic allocation is not available.
+
+```rust
+use deku::prelude::*;
+
+#[derive(DekuRead, DekuWrite, DekuSize)]
+#[deku(endian = "big")]
+struct Message {
+    msg_type: u8,
+    payload: [u8; 16],
+    checksum: u16,
+}
+
+assert_eq!(Message::SIZE_BYTES, Some(19));
+
+const BUFFER_SIZE: usize = Message::SIZE_BYTES.unwrap();
+let mut buffer = [0u8; BUFFER_SIZE];
+
+let msg = Message {
+    msg_type: 0x01,
+    payload: [0xFF; 16],
+    checksum: 0xABCD,
+};
+
+let written = msg.to_slice(&mut buffer).unwrap();
+assert_eq!(written, BUFFER_SIZE);
+```
+
+For enums, `SIZE_BITS` represents the discriminant plus the maximum variant size:
+
+```rust
+use deku::prelude::*;
+
+#[derive(DekuRead, DekuWrite, DekuSize)]
+#[deku(id_type = "u8")]
+enum Packet {
+    #[deku(id = "1")]
+    Small { data: u16 },
+    #[deku(id = "2")]
+    Large { data: u64 },
+}
+
+assert_eq!(Packet::SIZE_BYTES, Some(9));
+
+const MAX_SIZE: usize = Packet::SIZE_BYTES.unwrap();
+let mut buffer = [0u8; MAX_SIZE];
+```
+
+Note: Variable-size types like `Vec` do not implement `DekuSize` as their size
+cannot be known at compile-time.
+
 # Internal variables and previously read fields
 
 Along similar lines to [Context](#context) variables, previously read variables
@@ -732,6 +787,35 @@ pub trait DekuUpdate {
 pub trait DekuEnumExt<'__deku, T> {
     /// Obtain `id` of a given enum variant
     fn deku_id(&self) -> Result<T, DekuError>;
+}
+
+/// Trait for types with a known, fixed binary size at compile-time
+///
+/// Only implemented for fixed-size types (primitives, arrays, structs/enums composed
+/// entirely of fixed-size fields). Variable-size types like `Vec` do not implement this.
+///
+/// ```rust
+/// use deku::prelude::*;
+///
+/// #[derive(DekuRead, DekuWrite, DekuSize)]
+/// struct Packet {
+///     header: u8,
+///     value: u32,
+/// }
+///
+/// const SIZE: usize = Packet::SIZE_BYTES.unwrap();
+/// let mut buffer = [0u8; SIZE];
+/// ```
+pub trait DekuSize {
+    /// Size in bits when serialized
+    const SIZE_BITS: usize;
+
+    /// Size in bytes if byte-aligned, `None` otherwise
+    const SIZE_BYTES: Option<usize> = if Self::SIZE_BITS % 8 == 0 {
+        Some(Self::SIZE_BITS / 8)
+    } else {
+        None
+    };
 }
 
 impl<T, Ctx> DekuWriter<Ctx> for &T

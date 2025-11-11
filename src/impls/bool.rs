@@ -47,6 +47,10 @@ where
     }
 }
 
+impl crate::DekuSize for bool {
+    const SIZE_BITS: usize = 8;
+}
+
 #[cfg(test)]
 mod tests {
     use hexlit::hex;

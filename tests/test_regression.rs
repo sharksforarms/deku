@@ -12,18 +12,18 @@ use std::io::Cursor;
 #[cfg(feature = "bits")]
 #[test]
 fn issue_224() {
-    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite, DekuSize)]
     pub struct Packet {
         pub data: Data,
     }
 
-    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite, DekuSize)]
     pub struct Data {
         pub one: One,
         pub two: Two,
     }
 
-    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite, DekuSize)]
     #[repr(u8)]
     #[deku(id_type = "u8", bits = 2)]
     pub enum One {
@@ -32,7 +32,7 @@ fn issue_224() {
         Stop = 2,
     }
 
-    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite, DekuSize)]
     #[deku(id_type = "u8", bits = 4)]
     pub enum Two {
         #[deku(id = "0b0000")]
@@ -45,21 +45,34 @@ fn issue_224() {
         Allocate(Op2),
     }
 
-    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite, DekuSize)]
     pub struct Op1 {
         #[deku(bits = 2)]
         pub i: u8,
         #[deku(bits = 4)]
         pub o: u8,
     }
+    assert_eq!(Op1::SIZE_BITS, 6);
+    assert_eq!(Op1::SIZE_BYTES, None);
 
-    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite, DekuSize)]
     pub struct Op2 {
         #[deku(bits = 8)]
         pub w: u8,
         #[deku(bits = 6)]
         pub j: u8,
     }
+    assert_eq!(Op2::SIZE_BITS, 14);
+    assert_eq!(Op2::SIZE_BYTES, None);
+
+    assert_eq!(One::SIZE_BITS, 2);
+    assert_eq!(One::SIZE_BYTES, None);
+    assert_eq!(Two::SIZE_BITS, 18);
+    assert_eq!(Two::SIZE_BYTES, None);
+    assert_eq!(Data::SIZE_BITS, 20);
+    assert_eq!(Data::SIZE_BYTES, None);
+    assert_eq!(Packet::SIZE_BITS, 20);
+    assert_eq!(Packet::SIZE_BYTES, None);
 
     let packet = Packet {
         data: Data {
@@ -81,7 +94,7 @@ mod issue_282 {
 
     #[test]
     fn be() {
-        #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+        #[derive(Debug, PartialEq, DekuRead, DekuWrite, DekuSize)]
         #[deku(endian = "big")]
         struct BitsBytes {
             #[deku(bits = 24)]
@@ -90,6 +103,7 @@ mod issue_282 {
             #[deku(bytes = 3)]
             bytes: u32,
         }
+        assert_eq!(BitsBytes::SIZE_BYTES, Some(6));
 
         let expected: u32 = 11280317;
         let [zero, a, b, c] = expected.to_be_bytes();
@@ -107,7 +121,7 @@ mod issue_282 {
 
     #[test]
     fn le() {
-        #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+        #[derive(Debug, PartialEq, DekuRead, DekuWrite, DekuSize)]
         #[deku(endian = "little")]
         struct BitsBytes {
             #[deku(bits = 24)]
@@ -116,6 +130,7 @@ mod issue_282 {
             #[deku(bytes = 3)]
             bytes: u32,
         }
+        assert_eq!(BitsBytes::SIZE_BYTES, Some(6));
 
         let expected: u32 = 11280317;
         let [a, b, c, zero] = expected.to_le_bytes();
@@ -363,31 +378,35 @@ fn issue_310() {
 fn issue_397() {
     use deku::prelude::*;
 
-    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite)]
+    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite, DekuSize)]
     struct Header {
         kind: PacketType,
     }
+    assert_eq!(Header::SIZE_BYTES, Some(1));
 
-    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite)]
+    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite, DekuSize)]
     #[deku(id_type = "u8", endian = "big")]
     enum PacketType {
         #[deku(id = 0)]
         Zero,
     }
+    assert_eq!(PacketType::SIZE_BYTES, Some(1));
 
-    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite)]
+    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite, DekuSize)]
     struct Packet {
         header: Header,
         #[deku(ctx = "header")]
         payload: Payload,
     }
+    assert_eq!(Packet::SIZE_BYTES, Some(2));
 
-    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite)]
+    #[derive(Debug, Copy, Clone, PartialEq, DekuRead, DekuWrite, DekuSize)]
     #[deku(ctx = "header: &Header", id = "header.kind")]
     enum Payload {
         #[deku(id = "PacketType::Zero")]
         Zero(u8),
     }
+    assert_eq!(Payload::SIZE_BYTES, Some(1));
     let _ = Packet::from_bytes((&[0x00, 0x01], 0));
 }
 

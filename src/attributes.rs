@@ -141,6 +141,7 @@ struct Child {
 // as long as `endian` attribute is specified in the parent struct either at top-level or field position,
 // even when we do not care about the endianness of the parent struct,
 // in this case, since we know that the struct is always big-endian, we use `_` to ignore the passed value.
+# #[cfg(feature = "alloc")]
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big", ctx = "_: deku::ctx::Endian")]
 struct NetworkBuffer {
@@ -259,6 +260,7 @@ pub struct BigEndian {
 }
 
 // Similar to `endian`, any child struct also must use `ctx` attribute to receive the `bit_order` attribute from the parent struct.
+# #[cfg(feature = "bits")]
 # #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
 #[deku(endian = "big", bit_order = "msb", ctx = "_: deku::ctx::Endian, _: deku::ctx::Order")]
 pub struct Child {

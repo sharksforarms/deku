@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 //! General smoke tests for enums
 
 // TODO: These should be divided into smaller tests
@@ -7,9 +9,9 @@ use no_std_io::io::Cursor;
 
 use deku::prelude::*;
 
-#[cfg(any(feature = "bits", feature = "std"))]
+#[allow(unused_imports)]
 use hexlit::hex;
-#[cfg(any(feature = "bits", feature = "std"))]
+#[allow(unused_imports)]
 use rstest::*;
 
 #[cfg(feature = "bits")]
@@ -37,7 +39,7 @@ enum TestEnum {
     VarDefault { id: u8, value: u8 },
 }
 
-#[cfg(feature = "bits")]
+#[cfg(all(feature = "bits", feature = "descriptive-errors"))]
 #[rstest(input,expected,
     case(&hex!("01AB"), TestEnum::VarA(0xAB)),
     case(&hex!("0269"), TestEnum::VarB(0b0110, 0b1001)),
@@ -45,7 +47,7 @@ enum TestEnum {
     case(&hex!("0402AABB"), TestEnum::VarD(0x02, vec![0xAA, 0xBB])),
     case(&hex!("FF01"), TestEnum::VarDefault{id: 0xFF, value: 0x01}),
 
-    #[should_panic(expected = "Parse(\"Too much data\")")]
+    #[should_panic(expected = "Parse(\"Too much data: Read 2 but total length was 3\")")]
     case(&hex!("FFFFFF"), TestEnum::VarA(0xFF)),
 )]
 fn test_enum(input: &[u8], expected: TestEnum) {

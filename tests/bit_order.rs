@@ -1,4 +1,4 @@
-#[cfg(feature = "bits")]
+#[cfg(all(feature = "alloc", feature = "bits"))]
 mod tests {
     use assert_hex::assert_eq_hex;
     use bitvec::prelude::*;

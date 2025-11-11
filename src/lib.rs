@@ -35,7 +35,7 @@ but we could also use [from_reader](DekuContainerRead::from_reader).
 ```rust
 use deku::prelude::*;
 
-# #[cfg(feature = "bits")]
+# #[cfg(all(feature = "alloc", feature = "bits"))]
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
 struct DekuTest {
@@ -46,7 +46,7 @@ struct DekuTest {
     field_c: u16,
 }
 
-# #[cfg(feature = "bits")]
+# #[cfg(all(feature = "alloc", feature = "bits"))]
 # fn main() {
 let data: Vec<u8> = vec![0b0110_1001, 0xBE, 0xEF];
 let (_rest, mut val) = DekuTest::from_bytes((data.as_ref(), 0)).unwrap();
@@ -62,7 +62,7 @@ let data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0b0110_1001, 0xC0, 0xFE], data_out);
 # }
 #
-# #[cfg(not(feature = "bits"))]
+# #[cfg(not(all(feature = "alloc", feature = "bits")))]
 # fn main() {}
 ```
 
@@ -470,9 +470,21 @@ pub mod no_std_io {
 /// re-export of bitvec
 #[cfg(feature = "bits")]
 pub mod bitvec {
+    pub use bitvec::field::BitField;
     pub use bitvec::prelude::*;
     pub use bitvec::view::BitView;
 }
+
+#[cfg(feature = "bits")]
+use ::bitvec::array::BitArray;
+#[cfg(feature = "bits")]
+use ::bitvec::order::BitOrder;
+#[cfg(feature = "bits")]
+use ::bitvec::slice::BitSlice;
+#[cfg(feature = "bits")]
+use ::bitvec::store::BitStore;
+#[cfg(feature = "bits")]
+use ::bitvec::view::BitViewSized;
 
 pub use deku_derive::*;
 
@@ -697,15 +709,15 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     /// assert_eq!(deku::bitvec::bitvec![1, 1, 1, 1, 0, 0, 0, 1, 1], bits);
     /// ```
     #[inline(always)]
-    #[cfg(feature = "bits")]
+    #[cfg(all(feature = "bits", feature = "alloc"))]
     fn to_bits(&self) -> Result<bitvec::BitVec<u8, bitvec::Msb0>, DekuError> {
         let mut out_buf = Vec::new();
         let mut cursor = no_std_io::Cursor::new(&mut out_buf);
         let mut __deku_writer = Writer::new(&mut cursor);
         DekuWriter::to_writer(self, &mut __deku_writer, ())?;
-        let mut leftover = __deku_writer.leftover;
+        let leftover = __deku_writer.leftover;
         let mut bv = bitvec::BitVec::from_slice(&out_buf);
-        bv.append(&mut leftover.0);
+        bv.extend_from_bitslice(leftover.0.as_bitslice());
         Ok(bv)
     }
 }
@@ -735,6 +747,172 @@ where
     ) -> Result<(), DekuError> {
         <T>::to_writer(self, writer, ctx)?;
         Ok(())
+    }
+}
+
+/// Like BitVec but with bounded, local storage
+#[cfg(feature = "bits")]
+#[derive(Clone, Debug)]
+pub struct BoundedBitVec<A, O>
+where
+    A: BitViewSized,
+    O: BitOrder,
+{
+    bits: crate::bitvec::BitArray<A, O>,
+    size: usize,
+}
+
+#[cfg(feature = "bits")]
+impl<A, O> From<BitArray<A, O>> for BoundedBitVec<A, O>
+where
+    A: BitViewSized,
+    O: BitOrder,
+{
+    fn from(value: BitArray<A, O>) -> Self {
+        Self {
+            bits: value.clone(),
+            size: value.len(),
+        }
+    }
+}
+
+#[cfg(feature = "bits")]
+impl<A, O> From<&BitSlice<A::Store, O>> for BoundedBitVec<A, O>
+where
+    A: BitViewSized,
+    O: BitOrder,
+{
+    fn from(value: &BitSlice<A::Store, O>) -> Self {
+        let mut bbv = BoundedBitVec::new();
+        bbv.extend_from_bitslice(value);
+        bbv
+    }
+}
+
+#[cfg(feature = "bits")]
+impl<A, O> From<&mut BitSlice<<A::Store as BitStore>::Alias, O>> for BoundedBitVec<A, O>
+where
+    A: BitViewSized,
+    O: BitOrder,
+{
+    fn from(value: &mut BitSlice<<A::Store as BitStore>::Alias, O>) -> Self {
+        let mut bbv = BoundedBitVec::new();
+        let end = value.len();
+        debug_assert!(end <= bbv.bits.len());
+        bbv.bits[..end]
+            .split_at_mut(end)
+            .0
+            .copy_from_bitslice(value);
+        bbv.size = value.len();
+        bbv
+    }
+}
+
+#[cfg(all(feature = "bits", feature = "alloc"))]
+impl<A, O> From<crate::bitvec::BitVec<A::Store, O>> for BoundedBitVec<A, O>
+where
+    A: BitViewSized,
+    O: BitOrder,
+{
+    fn from(value: crate::bitvec::BitVec<A::Store, O>) -> Self {
+        let mut bbv = Self::new();
+        bbv.extend_from_bitslice(value.as_bitslice());
+        bbv
+    }
+}
+
+#[cfg(feature = "bits")]
+impl<A, O> From<&[bool]> for BoundedBitVec<A, O>
+where
+    A: BitViewSized,
+    O: BitOrder,
+{
+    fn from(value: &[bool]) -> Self {
+        let mut bbv = BoundedBitVec::new();
+        for v in value {
+            bbv.push(*v);
+        }
+        bbv
+    }
+}
+
+#[cfg(feature = "bits")]
+impl<A, O> BoundedBitVec<A, O>
+where
+    A: BitViewSized,
+    O: BitOrder,
+{
+    fn new() -> Self {
+        Self {
+            bits: crate::bitvec::BitArray::ZERO,
+            size: 0,
+        }
+    }
+
+    fn as_bitslice(&self) -> &BitSlice<A::Store, O> {
+        assert!(self.size <= self.bits.len());
+        &self.bits[..self.size]
+    }
+
+    fn as_mut_bitslice(&mut self) -> &mut BitSlice<A::Store, O> {
+        assert!(self.size <= self.bits.len());
+        &mut self.bits[..self.size]
+    }
+
+    fn as_raw_slice(&self) -> &[A::Store] {
+        self.bits.as_raw_slice()
+    }
+
+    fn capacity(&self) -> usize {
+        self.bits.len()
+    }
+
+    fn clear(&mut self) {
+        self.size = 0;
+    }
+
+    fn extend_from_bitslice(&mut self, bits: &BitSlice<A::Store, O>) {
+        assert!(self.size + bits.len() <= self.bits.len());
+        self.bits
+            .get_mut(self.size..{ self.size + bits.len() })
+            .expect("Asserted already")
+            .copy_from_bitslice(bits);
+        self.size += bits.len();
+    }
+
+    fn is_empty(&self) -> bool {
+        self.size == 0
+    }
+
+    fn is_full(&self) -> bool {
+        self.size == self.bits.len()
+    }
+
+    fn len(&self) -> usize {
+        self.size
+    }
+
+    fn insert(&mut self, index: usize, value: bool) {
+        assert!(self.size < self.bits.len());
+        assert!(index < self.size);
+        let (_left, right) = self.bits.split_at_mut(index);
+        right.shift_right(1);
+        right.set(0, value);
+        self.size += 1;
+    }
+
+    fn push(&mut self, value: bool) {
+        assert!(self.len() < self.bits.len());
+        *self.bits.get_mut(self.size).expect("Bad index") = value;
+        self.size += 1;
+    }
+
+    fn split_off(&mut self, index: usize) -> Self {
+        assert!(index < self.size);
+        let (left, right) = self.bits[..self.size].split_at(index);
+        debug_assert_eq!(left.len() + right.len(), self.size);
+        self.size = left.len();
+        right.into()
     }
 }
 

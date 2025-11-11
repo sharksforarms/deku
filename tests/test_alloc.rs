@@ -1,4 +1,4 @@
-#![cfg(feature = "bits")]
+#![cfg(all(feature = "alloc", feature = "bits"))]
 
 use alloc_counter::AllocCounterSystem;
 use deku::ctx::Endian;
@@ -66,7 +66,7 @@ mod tests {
                 let _ = TestDeku::from_reader((&mut cursor, 0)).unwrap();
             })
             .0,
-            (6, 0, 6)
+            (1, 0, 1)
         );
     }
 
@@ -82,7 +82,7 @@ mod tests {
                 t.to_bytes().unwrap();
             })
             .0,
-            (3, 1, 3)
+            (1, 1, 1)
         );
     }
 
@@ -100,7 +100,7 @@ mod tests {
                 t.to_slice(&mut out).unwrap();
             })
             .0,
-            (2, 0, 2)
+            (0, 0, 0)
         );
     }
 }

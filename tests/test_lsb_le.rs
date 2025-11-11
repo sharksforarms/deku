@@ -226,6 +226,7 @@ fn test_lsb_le_aligned_mixed() {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_lsb_le_misaligned_2() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
     #[deku(endian = "little", bit_order = "lsb")]
@@ -246,6 +247,7 @@ fn test_lsb_le_misaligned_2() {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_invalid_lsb_bit_split_squashfs_v3() {
     #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
     #[deku(endian = "little", bit_order = "lsb")]

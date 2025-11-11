@@ -26,6 +26,7 @@ jobs:
       - run: cargo test --no-default-features --features=descriptive-errors
       - run: cargo test --no-default-features --features=bits
       - run: cargo test --no-default-features --features=logging
+      - run: cargo test --no-default-features --features=bits,alloc
       # run examples
       - run: cargo run --example 2>&1 | grep -P '   ' | awk '{print $1}' | xargs -i cargo run --example {}
 
@@ -36,7 +37,7 @@ jobs:
       matrix:
         toolchain:
             # msrv
-          - 1.81
+          - 1.82
 
     steps:
       - uses: actions/checkout@v4

@@ -117,7 +117,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             use ::#crate_::DekuReader as _;
             let __deku_reader = &mut deku::reader::Reader::new(__deku_input.0);
             if __deku_input.1 != 0 {
-                __deku_reader.skip_bits(__deku_input.1)?;
+                __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
 
             let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
@@ -131,7 +131,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
             let mut __deku_reader = &mut deku::reader::Reader::new(&mut __deku_cursor);
             if __deku_input.1 != 0 {
-                __deku_reader.skip_bits(__deku_input.1)?;
+                __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
 
             let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
@@ -406,7 +406,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             use ::#crate_::DekuReader as _;
             let __deku_reader = &mut deku::reader::Reader::new(__deku_input.0);
             if __deku_input.1 != 0 {
-                __deku_reader.skip_bits(__deku_input.1)?;
+                __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
 
             let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
@@ -420,7 +420,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
             let mut __deku_reader = &mut deku::reader::Reader::new(&mut __deku_cursor);
             if __deku_input.1 != 0 {
-                __deku_reader.skip_bits(__deku_input.1)?;
+                __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
 
             let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
@@ -607,43 +607,21 @@ fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStre
         let order = gen_bit_order_from_str(bit_order).unwrap();
         quote! {
             {
-                extern crate alloc;
-
                 use core::convert::TryFrom;
                 let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                     ::#crate_::deku_error!(::#crate_::DekuError::InvalidParam, "Invalid padding param, cannot convert ot usize", "{}", stringify!(#bit_size))
                 )?;
-
-                if (__deku_pad % 8) == 0 {
-                    let bytes_read = __deku_pad / 8;
-                    let mut buf = alloc::vec![0; bytes_read];
-                    // TODO: use skip_bytes, or Seek in the future?
-                    let _ = __deku_reader.read_bytes(bytes_read, &mut buf, #order)?;
-                } else {
-                    // TODO: use skip_bits, or Seek in the future?
-                    let _ = __deku_reader.read_bits(__deku_pad, #order)?;
-                }
+                __deku_reader.skip_bits(__deku_pad, #order)?;
             }
         }
     } else {
         quote! {
             {
-                extern crate alloc;
-
                 use core::convert::TryFrom;
                 let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                     ::#crate_::deku_error!(::#crate_::DekuError::InvalidParam, "Invalid padding param, cannot convert to usize", "{}", stringify!(#bit_size))
                 )?;
-
-                if (__deku_pad % 8) == 0 {
-                    let bytes_read = __deku_pad / 8;
-                    let mut buf = alloc::vec![0; bytes_read];
-                    // TODO: use skip_bytes, or Seek in the future?
-                    let _ = __deku_reader.read_bytes(bytes_read, &mut buf, ::#crate_::ctx::Order::default())?;
-                } else {
-                    // TODO: use skip_bits, or Seek in the future?
-                    let _ = __deku_reader.read_bits(__deku_pad, ::#crate_::ctx::Order::default())?;
-                }
+                __deku_reader.skip_bits(__deku_pad, ::#crate_::ctx::Order::default())?;
             }
         }
     }
@@ -1070,9 +1048,14 @@ pub fn emit_try_from(
             fn try_from(input: &#lifetime [u8]) -> core::result::Result<Self, Self::Error> {
                 let total_len = input.len();
                 let mut cursor = ::#crate_::no_std_io::Cursor::new(input);
-                let (amt_read, res) = <Self as ::#crate_::DekuContainerRead>::from_reader((&mut cursor, 0))?;
-                if (amt_read / 8) != total_len {
-                    return Err(::#crate_::deku_error!(::#crate_::DekuError::Parse, "Too much data"));
+                let (bits_read, res) = <Self as ::#crate_::DekuContainerRead>::from_reader((&mut cursor, 0))?;
+                let bytes_read = bits_read / 8;
+                if bytes_read < total_len {
+                    return Err(::#crate_::deku_error!(::#crate_::DekuError::Parse, "Too much data", "Read {} but total length was {}", {bits_read / 8}, total_len));
+                }
+                // Possible Seek beyond end
+                if bytes_read > total_len {
+                    return Err(::#crate_::DekuError::Incomplete(::#crate_::error::NeedSize::new(bits_read - { total_len * 8 })));
                 }
                 Ok(res)
             }

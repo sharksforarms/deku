@@ -115,7 +115,13 @@ assert_eq!(data, &*value);
 # fn main() {}
 ```
 
-**Note**: The `endian` is passed as a context argument to sub-types
+**Note**: The `endian`, as well as attributes `bit_order`, `bits`, `bytes`, `count`, is passed as a context argument to sub-types when specified.
+Any child struct, if present, must use `ctx` attribute to **receive** the argument.
+Otherwise, you may see an error like this on `DekuRead` and `DekuWrite` trait in the `derive` macro:
+```text
+mismatched types
+expected `()`, found `Endian`
+```
 
 Example:
 ```rust
@@ -131,6 +137,21 @@ struct Child {
     field_a: u16
 }
 
+// The `ctx` attribute here is **always** necessary to receive the context argument passed from the parent struct
+// as long as `endian` attribute is specified in the parent struct either at top-level or field position,
+// even when we do not care about the endianness of the parent struct,
+// in this case, since we know that the struct is always big-endian, we use `_` to ignore the passed value.
+# #[cfg(feature = "alloc")]
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "big", ctx = "_: deku::ctx::Endian")]
+struct NetworkBuffer {
+    type_: u8,
+    #[deku(update = "self.payload.len()")]
+    length: u16,
+    #[deku(count = "length")]
+    payload: Vec<u8>
+}
+
 # #[cfg(feature = "alloc")]
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "little")] // top-level, defaults to system endianness
@@ -142,11 +163,13 @@ struct DekuTest {
     // because a top-level endian is specified,
     // it is passed as a context
     field_child: Child,
+
+    buf: NetworkBuffer
 }
 
 # #[cfg(feature = "alloc")]
 # fn main() {
-let data: &[u8] = &[0xAB, 0xCD, 0xAB, 0xCD, 0xEF, 0xBE];
+let data: &[u8] = &[0xAB, 0xCD, 0xAB, 0xCD, 0xEF, 0xBE, 0x00, 0x00, 0x04, 0xDE, 0xAD, 0xBE, 0xEF];
 
 let value = DekuTest::try_from(data).unwrap();
 
@@ -154,7 +177,12 @@ assert_eq!(
     DekuTest {
        field_be: 0xABCD,
        field_default: 0xCDAB,
-       field_child: Child { field_a: 0xBEEF }
+       field_child: Child { field_a: 0xBEEF },
+       buf: NetworkBuffer {
+            type_: 0,
+            length: 4,
+            payload: 0xDEADBEEFu32.to_be_bytes().to_vec()
+       }
     },
     value
 );
@@ -228,17 +256,41 @@ pub struct BigEndian {
     offset: u16,
     #[deku(bits = "3")]
     t: u8,
+    child: Child
+}
+
+// Similar to `endian`, any child struct also must use `ctx` attribute to receive the `bit_order` attribute from the parent struct.
+# #[cfg(feature = "bits")]
+# #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+#[deku(endian = "big", bit_order = "msb", ctx = "_: deku::ctx::Endian, _: deku::ctx::Order")]
+pub struct Child {
+    field_a: u8,
+    #[deku(bits = "1")]
+    flag1: bool,
+    #[deku(bits = "1")]
+    flag2: bool,
+    #[deku(bits = "1")]
+    flag3: bool,
+    #[deku(bits = "5")]
+    field_b: u8,
 }
 
 # #[cfg(all(feature = "alloc", feature = "bits"))]
 # fn main() {
-let data = vec![0x10, 0x81];
+let data = vec![0x10, 0x81, 0xAB, 0b10010110];
 let big_endian = BigEndian::try_from(data.as_ref()).unwrap();
 assert_eq!(
     big_endian,
     BigEndian {
         offset: 0x1001,
         t: 0b100,
+        child: Child {
+            field_a: 0xAB,
+            flag1: true,
+            flag2: false,
+            flag3: false,
+            field_b: 0b10110,
+        }
     }
 );
 let bytes = big_endian.to_bytes().unwrap();
@@ -1624,7 +1676,9 @@ assert_eq!(data, &*value);
 
 This attribute allows sending and receiving context (variables/values) to sub-parsers/writers
 
-**Note**: `endian`, `bytes`, `bits`, `count` attributes use `ctx` internally, see examples below
+**Note**: `endian`, `bit_order`, `bytes`, `bits`, `count` attributes use `ctx` internally.
+Any child struct whose parent struct specifies these attributes **MUST** receive them in `ctx`.
+See examples below, and those in [`endian`](#endian) and [`bit_order`](#bit_order)
 
 **top-level**: The value of a ctx attribute is a function argument list,
 for example `#[deku(ctx = "a: u8, b: String")]`

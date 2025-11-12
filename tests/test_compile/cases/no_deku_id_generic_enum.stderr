@@ -1,4 +1,4 @@
-error[E0599]: no method named `deku_id` found for enum `Body` in the current scope
+error[E0599]: no method named `deku_id` found for enum `Body<T>` in the current scope
   --> tests/test_compile/cases/no_deku_id_generic_enum.rs:12:7
    |
  5 | pub enum Body<T: for<'a> DekuReader<'a>> {

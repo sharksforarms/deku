@@ -39,5 +39,5 @@ warning: unreachable expression
    |          unreachable expression
    |          any code following this `match` expression is unreachable, as all arms diverge
    |
-   = note: `#[warn(unreachable_code)]` on by default
+   = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
    = note: this warning originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)

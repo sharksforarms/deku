@@ -6,7 +6,7 @@ use deku::prelude::*;
 use hexlit::hex;
 use rstest::*;
 
-#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
 #[deku(id_type = "u8")]
 enum TestEnum {
     #[deku(id = "1")]
@@ -17,6 +17,8 @@ enum TestEnum {
     case(&mut hex!("01ABFFAA"), TestEnum::VarA((0xAB, 0xAAFF))),
 )]
 fn test_enum(input: &mut [u8], expected: TestEnum) {
+    assert_eq!(TestEnum::SIZE_BYTES, Some(4));
+
     let input = input.to_vec();
     let ret_read = TestEnum::try_from(input.as_slice()).unwrap();
     assert_eq!(expected, ret_read);

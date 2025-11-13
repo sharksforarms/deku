@@ -462,6 +462,17 @@ impl DekuData {
     fn emit_writer_checked(&self) -> Result<TokenStream, syn::Error> {
         emit_deku_write(self)
     }
+
+    /// Emit a size implementation
+    fn emit_size(&self) -> TokenStream {
+        self.emit_size_checked()
+            .unwrap_or_else(|e| e.to_compile_error())
+    }
+
+    /// Emit a size implementation, no compile_error
+    fn emit_size_checked(&self) -> Result<TokenStream, syn::Error> {
+        macros::deku_size::emit_deku_size(self)
+    }
 }
 
 /// Common variables from `DekuData` for `emit_enum` read/write functions
@@ -1237,6 +1248,15 @@ pub fn proc_deku_read(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     match DekuData::from_input(input.into()) {
         Ok(data) => data.emit_writer().into(),
+        Err(err) => err.into(),
+    }
+}
+
+/// Entry function for `DekuSize` proc-macro
+#[proc_macro_derive(DekuSize, attributes(deku))]
+pub fn proc_deku_size(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    match DekuData::from_input(input.into()) {
+        Ok(data) => data.emit_size().into(),
         Err(err) => err.into(),
     }
 }

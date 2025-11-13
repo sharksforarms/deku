@@ -81,6 +81,26 @@ ImplDekuTupleTraits! { A, B, C, D, E, F, G, H, I, }
 ImplDekuTupleTraits! { A, B, C, D, E, F, G, H, I, J, }
 ImplDekuTupleTraits! { A, B, C, D, E, F, G, H, I, J, K, }
 
+macro_rules! ImplDekuSizeTuple {
+    ( $($T:ident,)+ ) => {
+        impl<$($T: crate::DekuSize),+> crate::DekuSize for ($($T,)+) {
+            const SIZE_BITS: usize = 0 $(+ $T::SIZE_BITS)+;
+        }
+    };
+}
+
+ImplDekuSizeTuple! { A, }
+ImplDekuSizeTuple! { A, B, }
+ImplDekuSizeTuple! { A, B, C, }
+ImplDekuSizeTuple! { A, B, C, D, }
+ImplDekuSizeTuple! { A, B, C, D, E, }
+ImplDekuSizeTuple! { A, B, C, D, E, F, }
+ImplDekuSizeTuple! { A, B, C, D, E, F, G, }
+ImplDekuSizeTuple! { A, B, C, D, E, F, G, H, }
+ImplDekuSizeTuple! { A, B, C, D, E, F, G, H, I, }
+ImplDekuSizeTuple! { A, B, C, D, E, F, G, H, I, J, }
+ImplDekuSizeTuple! { A, B, C, D, E, F, G, H, I, J, K, }
+
 #[cfg(all(feature = "alloc", feature = "std"))]
 #[cfg(test)]
 mod tests {

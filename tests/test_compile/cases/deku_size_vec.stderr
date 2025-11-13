@@ -1,0 +1,32 @@
+error[E0277]: the trait bound `Vec<u8>: deku::DekuSize` is not satisfied
+ --> tests/test_compile/cases/deku_size_vec.rs:3:10
+  |
+3 | #[derive(DekuSize)]
+  |          ^^^^^^^^ the trait `deku::DekuSize` is not implemented for `Vec<u8>`
+  |
+  = help: the following other types implement trait `deku::DekuSize`:
+            (A, B)
+            (A, B, C)
+            (A, B, C, D)
+            (A, B, C, D, E)
+            (A, B, C, D, E, F)
+            (A, B, C, D, E, F, G)
+            (A, B, C, D, E, F, G, H)
+            (A, B, C, D, E, F, G, H, I)
+          and $N others
+  = help: see issue #48214
+  = note: this error originates in the derive macro `DekuSize` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: the associated item `SIZE_BITS` exists for struct `Test`, but its trait bounds were not satisfied
+ --> tests/test_compile/cases/deku_size_vec.rs:9:23
+  |
+4 | struct Test {
+  | ----------- associated item `SIZE_BITS` not found for this struct because it doesn't satisfy `Test: deku::DekuSize`
+...
+9 |     let _size = Test::SIZE_BITS;
+  |                       ^^^^^^^^^ associated item cannot be called on `Test` due to unsatisfied trait bounds
+  |
+  = note: trait bound `Vec<u8>: deku::DekuSize` was not satisfied
+  = help: items from traits can only be used if the trait is implemented and in scope
+  = note: the following trait defines an item `SIZE_BITS`, perhaps you need to implement it:
+          candidate #1: `deku::DekuSize`

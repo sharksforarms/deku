@@ -73,7 +73,7 @@ fn test_enum_error() {
     let _ret_read = TestEnum::try_from(test_data.as_slice()).unwrap();
 }
 
-#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+#[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
 #[repr(u8)]
 #[deku(id_type = "u8")]
 #[cfg(all(feature = "alloc", feature = "std"))]
@@ -94,6 +94,8 @@ enum TestEnumDiscriminant {
 // TODO: Switch std::convert::TryInto to core::convert::TryInto
 #[cfg(all(feature = "alloc", feature = "std"))]
 fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
+    assert_eq!(TestEnumDiscriminant::SIZE_BYTES, Some(1));
+
     let input = input.to_vec();
     let ret_read = TestEnumDiscriminant::try_from(input.as_slice()).unwrap();
     assert_eq!(expected, ret_read);
@@ -105,7 +107,7 @@ fn test_enum_discriminant(input: &[u8], expected: TestEnumDiscriminant) {
 #[test]
 #[cfg(all(feature = "alloc", feature = "std"))]
 fn test_enum_array_type() {
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
     #[deku(id_type = "[u8; 3]")]
     enum TestEnumArray {
         #[deku(id = b"123")]
@@ -115,6 +117,8 @@ fn test_enum_array_type() {
         #[deku(id_pat = "_")]
         VarC([u8; 3]),
     }
+
+    assert_eq!(TestEnumArray::SIZE_BYTES, Some(6));
 
     let input = b"123".to_vec();
 
@@ -136,14 +140,14 @@ fn test_enum_array_type() {
 #[cfg(feature = "bits")]
 #[test]
 fn test_enum_id_pat_with_discriminant() {
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
     struct DekuTest {
         inner: TestEnum,
         #[deku(bits = 5)]
         rest: u8,
     }
 
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
     #[deku(id_type = "u8", bits = "3")]
     #[repr(u8)]
     enum TestEnum {
@@ -152,6 +156,10 @@ fn test_enum_id_pat_with_discriminant() {
         #[deku(id_pat = "_")]
         VarC,
     }
+
+    assert_eq!(TestEnum::SIZE_BITS, 3);
+    assert_eq!(TestEnum::SIZE_BYTES, None);
+    assert_eq!(DekuTest::SIZE_BYTES, Some(1));
 
     let input = &[0b001_00101];
     let ret_read = DekuTest::try_from(input.as_slice()).unwrap();
@@ -181,14 +189,7 @@ fn test_enum_id_pat_with_discriminant() {
 #[cfg(feature = "bits")]
 #[test]
 fn test_enum_id_pat_with_discriminant_and_storage() {
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    struct DekuTest {
-        inner: TestEnumStorage,
-        #[deku(bits = 5)]
-        rest: u8,
-    }
-
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
     #[deku(id_type = "u8", bits = "3")]
     #[repr(u8)]
     enum TestEnumStorage {
@@ -197,6 +198,16 @@ fn test_enum_id_pat_with_discriminant_and_storage() {
         #[deku(id_pat = "_")]
         VarC(u8),
     }
+    assert_eq!(TestEnumStorage::SIZE_BITS, 11);
+    assert_eq!(TestEnumStorage::SIZE_BYTES, None);
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
+    struct DekuTest {
+        inner: TestEnumStorage,
+        #[deku(bits = 5)]
+        rest: u8,
+    }
+    assert_eq!(DekuTest::SIZE_BYTES, Some(2));
 
     let input = &[0b001_00101];
     let ret_read = DekuTest::try_from(input.as_slice()).unwrap();
@@ -226,14 +237,7 @@ fn test_enum_id_pat_with_discriminant_and_storage() {
 #[test]
 #[cfg(all(feature = "alloc", feature = "std"))]
 fn test_id_pat_with_id() {
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
-    pub struct DekuTest {
-        my_id: u8,
-        #[deku(ctx = "*my_id")]
-        enum_from_id: MyEnum,
-    }
-
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
     #[deku(ctx = "my_id: u8", id = "my_id")]
     pub enum MyEnum {
         #[deku(id_pat = "1..=2")]
@@ -246,6 +250,15 @@ fn test_id_pat_with_id() {
         #[deku(id_pat = "_")]
         VariantB,
     }
+    assert_eq!(MyEnum::SIZE_BYTES, Some(2));
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
+    pub struct DekuTest {
+        my_id: u8,
+        #[deku(ctx = "*my_id")]
+        enum_from_id: MyEnum,
+    }
+    assert_eq!(DekuTest::SIZE_BYTES, Some(3));
 
     let input = [0x01, 0x02];
     let mut cursor = Cursor::new(input);
@@ -287,7 +300,7 @@ fn test_id_pat_with_id() {
 #[test]
 #[cfg(feature = "bits")]
 fn id_pat_with_id_bits() {
-    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
     #[deku(id_type = "u8", bits = "2")]
     pub enum IdPatBits {
         #[deku(id = 1)]
@@ -296,6 +309,7 @@ fn id_pat_with_id_bits() {
         #[deku(id_pat = "_")]
         B(u8, #[deku(bits = 6)] u8),
     }
+    assert_eq!(IdPatBits::SIZE_BITS, 8 + 8);
 
     let input = [0b1100_1111];
     let mut cursor = Cursor::new(input);
@@ -309,15 +323,17 @@ fn id_pat_with_id_bits() {
 fn test_litbool_as_id() {
     use deku::prelude::*;
 
-    #[derive(DekuRead, DekuWrite, Debug, PartialEq, Eq)]
+    #[derive(DekuRead, DekuWrite, DekuSize, Debug, PartialEq, Eq)]
     pub struct A {
         #[deku(bits = 1)]
         bit: bool,
         #[deku(ctx = "*bit")]
         var: Var,
     }
+    assert_eq!(A::SIZE_BITS, 16);
+    assert_eq!(A::SIZE_BYTES, Some(2));
 
-    #[derive(DekuRead, DekuWrite, Debug, PartialEq, Eq)]
+    #[derive(DekuRead, DekuWrite, DekuSize, Debug, PartialEq, Eq)]
     #[deku(id = "bit", ctx = "bit: bool")]
     pub enum Var {
         #[deku(id = false)]
@@ -325,6 +341,8 @@ fn test_litbool_as_id() {
         #[deku(id = true)]
         True(#[deku(bits = 15)] u16),
     }
+    assert_eq!(Var::SIZE_BITS, 15);
+
     let input = [0b1000_0000, 0xff];
     let mut cursor = Cursor::new(input);
     let (_, v) = A::from_reader((&mut cursor, 0)).unwrap();
@@ -379,7 +397,7 @@ fn test_variable_endian_enum(input: &[u8], expected: VariableEndian) {
 fn test_repr_assignment_with_id_via_ctx() {
     use deku::ctx::Endian;
 
-    #[derive(Debug, DekuRead, DekuWrite, Eq, PartialEq)]
+    #[derive(Debug, DekuRead, DekuWrite, DekuSize, Eq, PartialEq)]
     #[deku(ctx = "endian: Endian, mid: u8", id = "mid", endian = "endian")]
     #[repr(u8)]
     enum Body {
@@ -387,8 +405,9 @@ fn test_repr_assignment_with_id_via_ctx() {
         #[deku(id = "0x01")]
         Second(u8),
     }
+    assert_eq!(Body::SIZE_BYTES, Some(1));
 
-    #[derive(Debug, DekuRead, DekuWrite, Eq, PartialEq)]
+    #[derive(Debug, DekuRead, DekuWrite, DekuSize, Eq, PartialEq)]
     #[deku(endian = "little")]
     struct Message {
         id: u8,
@@ -396,6 +415,8 @@ fn test_repr_assignment_with_id_via_ctx() {
         #[deku(ctx = "*id")]
         body: Body,
     }
+
+    assert_eq!(Message::SIZE_BYTES, Some(4));
 
     let input = [0u8, 1u8, 0u8];
     let mut cursor = Cursor::new(input);

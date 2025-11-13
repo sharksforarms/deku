@@ -1,6 +1,6 @@
 use deku::prelude::*;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, DekuSize)]
 struct DekuTest {
     field_a: u8,
     field_b: u8,
@@ -23,6 +23,7 @@ pub fn rw() {
     );
 
     // Test writing
-    let mut buf = [0; 20];
+    const BUF_SIZE: usize = DekuTest::SIZE_BYTES.unwrap();
+    let mut buf = [0; BUF_SIZE];
     let _val = val.to_slice(&mut buf).unwrap();
 }

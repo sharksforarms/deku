@@ -11,6 +11,7 @@ use syn::LitStr;
 use crate::Num;
 
 pub(crate) mod deku_read;
+pub(crate) mod deku_size;
 pub(crate) mod deku_write;
 
 #[cfg(feature = "proc-macro-crate")]

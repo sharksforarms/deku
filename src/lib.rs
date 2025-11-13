@@ -161,7 +161,7 @@ let data_out = val.to_bytes().unwrap();
 assert_eq!(vec![0x02, 0xBE, 0xEF, 0xAA], data_out);
 
 // Use `update` to update `count`
-val.update().unwrap();
+val.update(()).unwrap();
 
 assert_eq!(DekuTest {
     count: 0x03,
@@ -778,9 +778,9 @@ pub trait DekuContainerWrite: DekuWriter<()> {
 }
 
 /// "Updater" trait: apply mutations to a type
-pub trait DekuUpdate {
+pub trait DekuUpdate<Ctx = ()> {
     /// Apply updates
-    fn update(&mut self) -> Result<(), DekuError>;
+    fn update(&mut self, ctx: Ctx) -> Result<(), DekuError>;
 }
 
 /// "Extended Enum" trait: obtain additional enum information

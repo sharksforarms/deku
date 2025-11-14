@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.20.1](https://github.com/sharksforarms/deku/compare/deku-v0.20.0...deku-v0.20.1) - 2025-11-13
+
+### Added
+
+- Add `DekuSize` ([#618](https://github.com/sharksforarms/deku/pull/618))
+
+### Other
+
+- Improved documentation on how `endian` etc. interacts with `ctx` ([#623](https://github.com/sharksforarms/deku/pull/623))
+- Lift alloc requirement for bits feature ([#614](https://github.com/sharksforarms/deku/pull/614))
+
 ## [0.20.0](https://github.com/sharksforarms/deku/compare/deku-v0.19.1...deku-v0.20.0) - 2025-10-15
 
 ### Fixed

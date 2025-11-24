@@ -267,3 +267,35 @@ fn test_invalid_lsb_bit_split_squashfs_v3() {
     assert_eq!(result.offset, expected_offset);
     assert_eq!(test_data, &*result.to_bytes().unwrap());
 }
+
+#[test]
+fn test_misaligned_pad_bits_aaelf32_flags() {
+    env_logger::init();
+    #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+    #[deku(endian = "little", bit_order = "lsb")]
+    pub struct AaElf32Flags {
+        #[deku(bits = "1", pad_bits_before = "9")]
+        ef_arm_abi_float_soft: bool,
+        #[deku(bits = "1")]
+        ef_arm_abi_float_hard: bool,
+        #[deku(bits = "1", pad_bits_before = "11")]
+        ef_arm_gccmask: bool,
+        #[deku(bits = "1")]
+        ef_arm_be8: bool,
+        ef_arm_abimask: u8,
+    }
+
+    let word = 83886592u32;
+    let bytes = word.to_le_bytes();
+    let (_, flags) = AaElf32Flags::from_bytes((&bytes, 0)).unwrap();
+    assert_eq!(
+        AaElf32Flags {
+            ef_arm_abi_float_soft: true,
+            ef_arm_abi_float_hard: false,
+            ef_arm_gccmask: false,
+            ef_arm_be8: false,
+            ef_arm_abimask: 5,
+        },
+        flags
+    );
+}

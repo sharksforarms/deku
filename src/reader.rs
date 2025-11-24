@@ -189,24 +189,26 @@ impl<R: Read + Seek> Reader<R> {
     /// This will increment `bits_read`.
     // TODO: maybe send into read_bytes() if amt >= 8
     #[inline]
-    pub fn skip_bits(&mut self, amt: usize, _order: Order) -> Result<(), DekuError> {
+    #[allow(unused_mut)]
+    pub fn skip_bits(&mut self, mut amt: usize, _order: Order) -> Result<(), DekuError> {
         #[cfg(feature = "bits")]
         {
             #[cfg(feature = "logging")]
             log::trace!("skip_bits: {amt}");
 
-            let bytes_amt = amt / 8;
-            let mut bits_amt = amt % 8;
-
             if let Some(Leftover::Bits(bits)) = &self.leftover {
                 let mut buf = bitarr!(u8, Msb0; 0; 8);
-                let needed = core::cmp::min(bits_amt, bits.len());
-                bits_amt -= needed;
+                let needed = core::cmp::min(amt, bits.len());
+                amt -= needed;
                 self.read_bits_into(&mut buf[..needed], _order)?;
             }
 
+            let bytes_amt = amt / 8;
+            let bits_amt = amt % 8;
+
             // first, seek with bytes
             if bytes_amt != 0 {
+                debug_assert_eq!(self.bits_read % 8, 0);
                 self.seek(SeekFrom::Current(
                     i64::try_from(bytes_amt).expect("could not convert seek usize into i64"),
                 ))

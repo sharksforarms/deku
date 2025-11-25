@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.20.2](https://github.com/sharksforarms/deku/compare/deku-v0.20.1...deku-v0.20.2) - 2025-11-25
+
+### Other
+
+- Fix recursive DekuSize impl ([#628](https://github.com/sharksforarms/deku/pull/628))
+
 ## [0.20.1](https://github.com/sharksforarms/deku/compare/deku-v0.20.0...deku-v0.20.1) - 2025-11-24
 
 ### Added

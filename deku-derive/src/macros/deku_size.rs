@@ -105,7 +105,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let DekuDataStruct {
         imp: _,
         wher: _,
-        ident,
+        ident: _,
         fields,
     } = DekuDataStruct::try_from(input)?;
 
@@ -115,6 +115,8 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let mut where_clause = where_clause.cloned();
     add_field_bounds(&mut where_clause, fields.iter().copied(), &crate_);
+
+    let ident = &input.ident;
 
     let tokens = quote! {
         impl #imp_generics ::#crate_::DekuSize for #ident #ty_generics #where_clause {
@@ -132,7 +134,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         imp: _,
         wher: _,
         variants,
-        ident,
+        ident: _,
         id,
         id_type,
         id_args: _,
@@ -164,6 +166,8 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     for variant in variants.iter() {
         add_field_bounds(&mut where_clause, variant.fields.iter(), &crate_);
     }
+
+    let ident = &input.ident;
 
     let tokens = quote! {
         impl #imp_generics ::#crate_::DekuSize for #ident #ty_generics #where_clause {

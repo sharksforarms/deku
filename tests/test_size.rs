@@ -430,3 +430,18 @@ fn test_enum_with_bits_discriminant_and_data() {
     assert_eq!(SmallDiscriminant::SIZE_BITS, 28);
     assert_eq!(SmallDiscriminant::SIZE_BYTES, None);
 }
+
+#[test]
+fn test_generic_struct_with_deku_size() {
+    #[derive(Debug, DekuRead, DekuWrite, DekuSize)]
+    struct GenericStruct<T>
+    where
+        T: DekuSize + for<'a> DekuReader<'a> + DekuWriter,
+    {
+        value: T,
+    }
+
+    assert_eq!(GenericStruct::<u8>::SIZE_BYTES, Some(1));
+    assert_eq!(GenericStruct::<u16>::SIZE_BYTES, Some(2));
+    assert_eq!(GenericStruct::<u32>::SIZE_BYTES, Some(4));
+}

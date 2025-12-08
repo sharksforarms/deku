@@ -37,7 +37,7 @@ rustversion = "1.0.22"
 [dev-dependencies]
 rstest = "0.26.1"
 hexlit = "0.5.5"
-criterion = "0.7.0"
+criterion = "0.8.1"
 alloc_counter = "0.0.4"
 trybuild = "1.0.112"
 rustc-hash = "=2.1.1"

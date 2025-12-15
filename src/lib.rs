@@ -487,7 +487,7 @@ environment, you will see logging messages as Deku does its deserialising.
 
 # Reducing parser code size
 
-- With the use of the `no-assert-string` feature, you can remove the strings Deku adds to assertion errors.
+- Disabling the `descriptive-errors` feature removes the strings Deku adds to assertion errors by default.
 - `DekuError` whenever possible will use a `'static str`, to make the errors compile away when following a
   guide such as [min-sized-rust](https://github.com/johnthagen/min-sized-rust).
 

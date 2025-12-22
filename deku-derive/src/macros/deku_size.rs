@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use darling::ast::Data;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::spanned::Spanned;
 
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData};
 
@@ -43,6 +44,22 @@ fn calculate_fields_size<'a>(
     });
 
     quote! { 0 #(+ #field_sizes)* }
+}
+
+/// Check if struct/enum has seek attributes
+fn has_seek_attributes(input: &DekuData) -> bool {
+    input.seek_rewind
+        || input.seek_from_current.is_some()
+        || input.seek_from_end.is_some()
+        || input.seek_from_start.is_some()
+}
+
+/// Check if field has seek attributes
+fn field_has_seek_attributes(field: &FieldData) -> bool {
+    field.seek_rewind
+        || field.seek_from_current.is_some()
+        || field.seek_from_end.is_some()
+        || field.seek_from_start.is_some()
 }
 
 /// Add DekuSize trait bounds to where clause for fields that need them

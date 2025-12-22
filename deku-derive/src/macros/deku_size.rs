@@ -133,6 +133,20 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         fields,
     } = DekuDataStruct::try_from(input)?;
 
+    for field in fields.iter().copied() {
+        if field_has_seek_attributes(field) {
+            let field_name = field
+                .ident
+                .as_ref()
+                .map(|i| i.to_string())
+                .unwrap_or_else(|| "unnamed field".to_string());
+            return Err(syn::Error::new(
+                field.ty.span(),
+                format!("DekuSize cannot be derived for types with seek attributes on field '{}'. Seek operations make size unpredictable.", field_name),
+            ));
+        }
+    }
+
     let size_calculation = calculate_fields_size(fields.iter().copied(), &crate_);
 
     let (imp_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -170,6 +184,22 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         id_type,
         id_args: _,
     } = DekuDataEnum::try_from(input)?;
+
+    for variant in variants.iter() {
+        for field in variant.fields.iter() {
+            if field_has_seek_attributes(field) {
+                let field_name = field
+                    .ident
+                    .as_ref()
+                    .map(|i| i.to_string())
+                    .unwrap_or_else(|| "unnamed field".to_string());
+                return Err(syn::Error::new(
+                    field.ty.span(),
+                    format!("DekuSize cannot be derived for types with seek attributes on field '{}'. Seek operations make size unpredictable.", field_name),
+                ));
+            }
+        }
+    }
 
     let discriminant_size = calculate_discriminant_size(input, id, id_type, &crate_);
 

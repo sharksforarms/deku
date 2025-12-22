@@ -1,0 +1,18 @@
+error: DekuSize cannot be derived for types with seek attributes (seek_rewind, seek_from_current, seek_from_end, seek_from_start). Seek operations make size unpredictable.
+ --> tests/test_compile/cases/deku_size_seek_enum.rs:5:6
+  |
+5 | enum SeekEnum {
+  |      ^^^^^^^^
+
+error[E0599]: no variant or associated item named `SIZE_BITS` found for enum `SeekEnum` in the current scope
+  --> tests/test_compile/cases/deku_size_seek_enum.rs:11:23
+   |
+ 5 | enum SeekEnum {
+   | ------------- variant or associated item `SIZE_BITS` not found for this enum
+...
+11 |     let _ = SeekEnum::SIZE_BITS;
+   |                       ^^^^^^^^^ variant or associated item not found in `SeekEnum`
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `SIZE_BITS`, perhaps you need to implement it:
+           candidate #1: `deku::DekuSize`

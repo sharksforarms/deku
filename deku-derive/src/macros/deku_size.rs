@@ -119,6 +119,13 @@ fn calculate_discriminant_size(
 fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
 
+    if has_seek_attributes(input) {
+        return Err(syn::Error::new(
+            input.ident.span(),
+            "DekuSize cannot be derived for types with seek attributes (seek_rewind, seek_from_current, seek_from_end, seek_from_start). Seek operations make size unpredictable.",
+        ));
+    }
+
     let DekuDataStruct {
         imp: _,
         wher: _,
@@ -146,6 +153,13 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
 fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
+
+    if has_seek_attributes(input) {
+        return Err(syn::Error::new(
+            input.ident.span(),
+            "DekuSize cannot be derived for types with seek attributes (seek_rewind, seek_from_current, seek_from_end, seek_from_start). Seek operations make size unpredictable.",
+        ));
+    }
 
     let DekuDataEnum {
         imp: _,

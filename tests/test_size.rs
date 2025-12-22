@@ -562,3 +562,118 @@ fn test_nested_struct_with_magic() {
     assert_eq!(InnerWithMagic::SIZE_BYTES, Some(4));
     assert_eq!(OuterWithMagic::SIZE_BYTES, Some(8));
 }
+
+#[test]
+fn test_struct_with_pad_bytes_before() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct PadBeforeStruct {
+        field_a: u8,
+        #[deku(pad_bytes_before = "2")]
+        field_b: u8,
+    }
+
+    assert_eq!(PadBeforeStruct::SIZE_BYTES, Some(4));
+    assert_eq!(PadBeforeStruct::SIZE_BITS, 32);
+}
+
+#[test]
+fn test_struct_with_pad_bytes_after() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct PadAfterStruct {
+        #[deku(pad_bytes_after = "3")]
+        field_a: u8,
+        field_b: u8,
+    }
+
+    assert_eq!(PadAfterStruct::SIZE_BYTES, Some(5));
+    assert_eq!(PadAfterStruct::SIZE_BITS, 40);
+}
+
+#[test]
+fn test_struct_with_pad_bytes_before_and_after() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct PadBothStruct {
+        #[deku(pad_bytes_before = "1", pad_bytes_after = "2")]
+        field_a: u8,
+        field_b: u16,
+    }
+
+    assert_eq!(PadBothStruct::SIZE_BYTES, Some(6));
+    assert_eq!(PadBothStruct::SIZE_BITS, 48);
+}
+
+#[test]
+#[cfg(feature = "bits")]
+fn test_struct_with_pad_bits_before() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    #[deku(endian = "big")]
+    struct PadBitsBefore {
+        #[deku(bits = 4)]
+        field_a: u8,
+        #[deku(pad_bits_before = "4")]
+        #[deku(bits = 4)]
+        field_b: u8,
+    }
+
+    assert_eq!(PadBitsBefore::SIZE_BITS, 12);
+    assert_eq!(PadBitsBefore::SIZE_BYTES, None);
+}
+
+#[test]
+#[cfg(feature = "bits")]
+fn test_struct_with_pad_bits_after() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    #[deku(endian = "big")]
+    struct PadBitsAfter {
+        #[deku(bits = 3, pad_bits_after = "5")]
+        field_a: u8,
+        field_b: u8,
+    }
+
+    assert_eq!(PadBitsAfter::SIZE_BITS, 16);
+    assert_eq!(PadBitsAfter::SIZE_BYTES, Some(2));
+}
+
+#[test]
+#[cfg(feature = "bits")]
+fn test_struct_with_mixed_padding() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    #[deku(endian = "big")]
+    struct MixedPadding {
+        #[deku(pad_bits_before = "2", pad_bytes_before = "1")]
+        #[deku(bits = 6)]
+        field_a: u8,
+        field_b: u8,
+    }
+
+    assert_eq!(MixedPadding::SIZE_BITS, 24);
+    assert_eq!(MixedPadding::SIZE_BYTES, Some(3));
+}
+
+#[test]
+fn test_struct_without_padding() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct NoPaddingStruct {
+        field_a: u8,
+        field_b: u16,
+    }
+
+    assert_eq!(NoPaddingStruct::SIZE_BYTES, Some(3));
+    assert_eq!(NoPaddingStruct::SIZE_BITS, 24);
+}
+
+#[test]
+fn test_multiple_fields_with_padding() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct MultiplePadding {
+        #[deku(pad_bytes_before = "1")]
+        field_a: u8,
+        #[deku(pad_bytes_after = "2")]
+        field_b: u8,
+        #[deku(pad_bytes_before = "1", pad_bytes_after = "1")]
+        field_c: u8,
+    }
+
+    assert_eq!(MultiplePadding::SIZE_BYTES, Some(8));
+    assert_eq!(MultiplePadding::SIZE_BITS, 64);
+}

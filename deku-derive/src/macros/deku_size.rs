@@ -36,6 +36,21 @@ fn calculate_fields_size<'a>(
             components.push(quote! { #magic_size });
         }
 
+        #[cfg(feature = "bits")]
+        {
+            if let Some(pad_before) =
+                calculate_padding_size(f.pad_bits_before.as_ref(), f.pad_bytes_before.as_ref())
+            {
+                components.push(pad_before);
+            }
+        }
+        #[cfg(not(feature = "bits"))]
+        {
+            if let Some(pad_before) = calculate_padding_size(f.pad_bytes_before.as_ref()) {
+                components.push(pad_before);
+            }
+        }
+
         let field_type = &f.ty;
         #[cfg(feature = "bits")]
         if let Some(bits) = &f.bits {
@@ -51,6 +66,21 @@ fn calculate_fields_size<'a>(
             components.push(quote! { (#bytes) * 8 });
         } else {
             components.push(quote! { <#field_type as ::#crate_::DekuSize>::SIZE_BITS });
+        }
+
+        #[cfg(feature = "bits")]
+        {
+            if let Some(pad_after) =
+                calculate_padding_size(f.pad_bits_after.as_ref(), f.pad_bytes_after.as_ref())
+            {
+                components.push(pad_after);
+            }
+        }
+        #[cfg(not(feature = "bits"))]
+        {
+            if let Some(pad_after) = calculate_padding_size(f.pad_bytes_after.as_ref()) {
+                components.push(pad_after);
+            }
         }
 
         if components.is_empty() {
@@ -83,6 +113,29 @@ fn field_has_seek_attributes(field: &FieldData) -> bool {
 fn calculate_magic_size(magic: &syn::LitByteStr) -> TokenStream {
     let magic_len = magic.value().len();
     quote! { #magic_len * 8 }
+}
+
+/// Calculate padding size (with bits feature)
+#[cfg(feature = "bits")]
+fn calculate_padding_size(
+    pad_bits: Option<&TokenStream>,
+    pad_bytes: Option<&TokenStream>,
+) -> Option<TokenStream> {
+    match (pad_bits, pad_bytes) {
+        (Some(bits), Some(bytes)) => Some(quote! { (#bits) + ((#bytes) * 8) }),
+        (Some(bits), None) => Some(quote! { (#bits) }),
+        (None, Some(bytes)) => Some(quote! { ((#bytes) * 8) }),
+        (None, None) => None,
+    }
+}
+
+/// Calculate padding size (without bits feature)
+#[cfg(not(feature = "bits"))]
+fn calculate_padding_size(pad_bytes: Option<&TokenStream>) -> Option<TokenStream> {
+    match pad_bytes {
+        Some(bytes) => Some(quote! { ((#bytes) * 8) }),
+        None => None,
+    }
 }
 
 /// Add DekuSize trait bounds to where clause for fields that need them

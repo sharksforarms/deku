@@ -445,3 +445,120 @@ fn test_generic_struct_with_deku_size() {
     assert_eq!(GenericStruct::<u16>::SIZE_BYTES, Some(2));
     assert_eq!(GenericStruct::<u32>::SIZE_BYTES, Some(4));
 }
+
+#[test]
+fn test_struct_with_top_level_magic() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    #[deku(magic = b"DEKU")]
+    struct MagicStruct {
+        a: u8,
+        b: u16,
+    }
+
+    assert_eq!(MagicStruct::SIZE_BYTES, Some(7));
+    assert_eq!(MagicStruct::SIZE_BITS, 56);
+}
+
+#[test]
+fn test_enum_with_top_level_magic() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    #[deku(magic = b"TEST", id_type = "u8")]
+    enum MagicEnum {
+        #[deku(id = 0)]
+        Small(u8),
+        #[deku(id = 1)]
+        Large(u32),
+    }
+
+    assert_eq!(MagicEnum::SIZE_BYTES, Some(9));
+    assert_eq!(MagicEnum::SIZE_BITS, 72);
+}
+
+#[test]
+fn test_struct_with_field_level_magic() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct FieldMagicStruct {
+        #[deku(magic = b"HDR")]
+        header: u8,
+        data: u16,
+    }
+
+    assert_eq!(FieldMagicStruct::SIZE_BYTES, Some(6));
+    assert_eq!(FieldMagicStruct::SIZE_BITS, 48);
+}
+
+#[test]
+fn test_struct_with_both_magic_types() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    #[deku(magic = b"TOP")]
+    struct BothMagicStruct {
+        #[deku(magic = b"FLD")]
+        field: u8,
+        data: u32,
+    }
+
+    assert_eq!(BothMagicStruct::SIZE_BYTES, Some(11));
+    assert_eq!(BothMagicStruct::SIZE_BITS, 88);
+}
+
+#[test]
+#[cfg(feature = "bits")]
+fn test_enum_with_magic_and_bit_discriminant() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    #[deku(magic = b"AB", id_type = "u8", bits = 4)]
+    enum BitMagicEnum {
+        #[deku(id = 0)]
+        A {
+            #[deku(bits = 4)]
+            val: u8,
+        },
+        #[deku(id = 1)]
+        B { x: u8 },
+    }
+
+    assert_eq!(BitMagicEnum::SIZE_BITS, 28);
+    assert_eq!(BitMagicEnum::SIZE_BYTES, None);
+}
+
+#[test]
+fn test_multiple_field_magic() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct MultiFieldMagic {
+        #[deku(magic = b"A")]
+        field_a: u8,
+        #[deku(magic = b"BB")]
+        field_b: u16,
+        #[deku(magic = b"CCC")]
+        field_c: u32,
+    }
+
+    assert_eq!(MultiFieldMagic::SIZE_BYTES, Some(13));
+}
+
+#[test]
+fn test_empty_struct_with_magic() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    #[deku(magic = b"EMPTY")]
+    struct EmptyMagicStruct;
+
+    assert_eq!(EmptyMagicStruct::SIZE_BYTES, Some(5));
+}
+
+#[test]
+fn test_nested_struct_with_magic() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    #[deku(magic = b"IN")]
+    struct InnerWithMagic {
+        value: u16,
+    }
+
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    #[deku(magic = b"OUT")]
+    struct OuterWithMagic {
+        inner: InnerWithMagic,
+        footer: u8,
+    }
+
+    assert_eq!(InnerWithMagic::SIZE_BYTES, Some(4));
+    assert_eq!(OuterWithMagic::SIZE_BYTES, Some(8));
+}

@@ -24,26 +24,43 @@ fn calculate_fields_size<'a>(
     fields: impl IntoIterator<Item = &'a FieldData>,
     crate_: &syn::Ident,
 ) -> TokenStream {
-    let field_sizes = fields.into_iter().filter_map(|f| {
-        if !f.temp {
-            let field_type = &f.ty;
+    let field_components = fields.into_iter().filter_map(|f| {
+        if f.temp {
+            return None;
+        }
 
-            #[cfg(feature = "bits")]
-            if let Some(bits) = &f.bits {
-                return Some(quote! { (#bits) });
-            }
+        let mut components = Vec::new();
 
-            if let Some(bytes) = &f.bytes {
-                return Some(quote! { (#bytes) * 8 });
-            }
+        if let Some(magic) = &f.magic {
+            let magic_size = calculate_magic_size(magic);
+            components.push(quote! { #magic_size });
+        }
 
-            Some(quote! { <#field_type as ::#crate_::DekuSize>::SIZE_BITS })
+        let field_type = &f.ty;
+        #[cfg(feature = "bits")]
+        if let Some(bits) = &f.bits {
+            components.push(quote! { (#bits) });
+        } else if let Some(bytes) = &f.bytes {
+            components.push(quote! { (#bytes) * 8 });
         } else {
+            components.push(quote! { <#field_type as ::#crate_::DekuSize>::SIZE_BITS });
+        }
+
+        #[cfg(not(feature = "bits"))]
+        if let Some(bytes) = &f.bytes {
+            components.push(quote! { (#bytes) * 8 });
+        } else {
+            components.push(quote! { <#field_type as ::#crate_::DekuSize>::SIZE_BITS });
+        }
+
+        if components.is_empty() {
             None
+        } else {
+            Some(quote! { #(#components)+* })
         }
     });
 
-    quote! { 0 #(+ #field_sizes)* }
+    quote! { 0 #(+ (#field_components))* }
 }
 
 /// Check if struct/enum has seek attributes
@@ -60,6 +77,12 @@ fn field_has_seek_attributes(field: &FieldData) -> bool {
         || field.seek_from_current.is_some()
         || field.seek_from_end.is_some()
         || field.seek_from_start.is_some()
+}
+
+/// Calculate the size in bits of a magic byte string
+fn calculate_magic_size(magic: &syn::LitByteStr) -> TokenStream {
+    let magic_len = magic.value().len();
+    quote! { #magic_len * 8 }
 }
 
 /// Add DekuSize trait bounds to where clause for fields that need them
@@ -147,6 +170,12 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
     }
 
+    let magic_size = if let Some(magic) = &input.magic {
+        calculate_magic_size(magic)
+    } else {
+        quote! { 0 }
+    };
+
     let size_calculation = calculate_fields_size(fields.iter().copied(), &crate_);
 
     let (imp_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -158,7 +187,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let tokens = quote! {
         impl #imp_generics ::#crate_::DekuSize for #ident #ty_generics #where_clause {
-            const SIZE_BITS: usize = #size_calculation;
+            const SIZE_BITS: usize = #magic_size + #size_calculation;
         }
     };
 
@@ -201,6 +230,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         }
     }
 
+    let magic_size = if let Some(magic) = &input.magic {
+        calculate_magic_size(magic)
+    } else {
+        quote! { 0 }
+    };
+
     let discriminant_size = calculate_discriminant_size(input, id, id_type, &crate_);
 
     let variant_sizes = variants
@@ -232,7 +267,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let tokens = quote! {
         impl #imp_generics ::#crate_::DekuSize for #ident #ty_generics #where_clause {
-            const SIZE_BITS: usize = #discriminant_size + #max_variant_size;
+            const SIZE_BITS: usize = #magic_size + #discriminant_size + #max_variant_size;
         }
     };
 

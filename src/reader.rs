@@ -660,8 +660,6 @@ impl<R: Read + Seek> Reader<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(all(feature = "alloc", feature = "bits"))]
-    use alloc::vec;
     use hexlit::hex;
     use no_std_io::io::Cursor;
 

@@ -286,3 +286,30 @@ fn test_enum_endian_ctx() {
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(ret_write, test_data)
 }
+
+#[test]
+fn test_use_implicit_index_of_array() {
+    #[deku_derive(DekuRead, DekuWrite)]
+    #[derive(PartialEq, Debug)]
+    struct A {
+        #[deku(temp, temp_value = "items.len().try_into().unwrap()")]
+        n: u8,
+        #[deku(count = "n")]
+        items: Vec<B>,
+    }
+    #[deku_derive(DekuRead, DekuWrite)]
+    #[derive(PartialEq, Debug)]
+    struct B {
+        x: u8,
+        y: u8,
+        #[deku(temp, temp_value = "0")]
+        idx: u8,
+    }
+
+    let test_data = A {
+        items: vec![B { x: 8, y: 9 }, B { x: 4, y: 3 }],
+    };
+
+    let ret_write: Vec<u8> = test_data.try_into().unwrap();
+    assert_eq!(vec![2, 8, 9, 0, 4, 3, 0], ret_write);
+}

@@ -289,20 +289,26 @@ fn test_enum_endian_ctx() {
 
 #[test]
 fn test_use_implicit_index_of_array() {
+    #[derive(Debug, Clone, Copy)]
+    struct IndexContext {
+        idx: usize,
+    }
+
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
     struct A {
         #[deku(temp, temp_value = "items.len().try_into().unwrap()")]
         n: u8,
-        #[deku(count = "n")]
+        #[deku(count = "n", ctx = "IndexContext { idx: 0 }")]
         items: Vec<B>,
     }
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
+    #[deku(ctx = "idx: IndexContext")]
     struct B {
         x: u8,
         y: u8,
-        #[deku(temp, temp_value = "0")]
+        #[deku(temp, temp_value = "ctx.idx")]
         idx: u8,
     }
 

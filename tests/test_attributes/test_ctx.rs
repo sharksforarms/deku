@@ -293,29 +293,42 @@ fn test_use_implicit_index_of_array() {
     struct IndexContext {
         idx: usize,
     }
-
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
     struct A {
         #[deku(temp, temp_value = "items.len().try_into().unwrap()")]
         n: u8,
-        #[deku(count = "n", ctx = "IndexContext { idx: 0 }")]
+        #[deku(count = "n", writer = "write_items(deku::writer, &self.items)")]
+        //#[deku(count = "n", ctx = "IndexContext { idx: 0 }")]
         items: Vec<B>,
     }
+
+    fn write_items<W: std::io::Write + std::io::Seek>(
+        writer: &mut Writer<W>,
+        items: &[B],
+    ) -> Result<(), DekuError> {
+        for (idx, item) in items.iter().enumerate() {
+            item.to_writer(writer, IndexContext { idx })?;
+        }
+        Ok(())
+    }
+
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
-    #[deku(ctx = "idx: IndexContext")]
+    #[deku(ctx = "ctx: IndexContext", ctx_default = "IndexContext{idx: 0}")] // this struct uses a context for serialization. For deserialization it also works with the default context.
     struct B {
         x: u8,
         y: u8,
-        #[deku(temp, temp_value = "ctx.idx")]
-        idx: u8,
+        #[deku(temp, temp_value = "ctx.idx as u8")]
+        idx_automatically_filled: u8,
     }
 
     let test_data = A {
-        items: vec![B { x: 8, y: 9 }, B { x: 4, y: 3 }],
+        items: vec![B { x: 8, y: 9 }, B { x: 7, y: 9 }, B { x: 6, y: 9 }],
     };
 
     let ret_write: Vec<u8> = test_data.try_into().unwrap();
-    assert_eq!(vec![2, 8, 9, 0, 4, 3, 0], ret_write);
+    assert_eq!(vec![3, 8, 9, 0, 7, 9, 1, 6, 9, 2], ret_write);
+    //                       ^        ^        ^
+    //                      idx=0    idx=1    idx=2
 }

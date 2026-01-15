@@ -4,11 +4,11 @@
 
 ## [0.20.3](https://github.com/sharksforarms/deku/compare/deku-v0.20.2...deku-v0.20.3) - 2026-01-15
 
-### Other
+### Fixed
 
-- Add padding size calculation to DekuSize ([#640](https://github.com/sharksforarms/deku/pull/640))
-- Add magic enum/struct field/top-level ([#639](https://github.com/sharksforarms/deku/pull/639))
-- Disallow seek attributes for DekuSize struct/enums and fields ([#638](https://github.com/sharksforarms/deku/pull/638))
+- DekuSize: Add padding size calculation ([#640](https://github.com/sharksforarms/deku/pull/640))
+- DekuSize: Add magic enum/struct field/top-level ([#639](https://github.com/sharksforarms/deku/pull/639))
+- DekuSize: Disallow seek attributes for struct/enums and fields ([#638](https://github.com/sharksforarms/deku/pull/638))
 
 ## [0.20.2](https://github.com/sharksforarms/deku/compare/deku-v0.20.1...deku-v0.20.2) - 2025-11-25
 

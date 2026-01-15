@@ -1,0 +1,18 @@
+error: DekuSize cannot be derived for types with seek attributes on field 'field'. Seek operations make size unpredictable.
+ --> tests/test_compile/cases/deku_size_seek_field.rs:7:12
+  |
+7 |     field: u8,
+  |            ^^
+
+error[E0599]: no associated item named `SIZE_BITS` found for struct `SeekFieldStruct` in the current scope
+  --> tests/test_compile/cases/deku_size_seek_field.rs:11:30
+   |
+ 4 | struct SeekFieldStruct {
+   | ---------------------- associated item `SIZE_BITS` not found for this struct
+...
+11 |     let _ = SeekFieldStruct::SIZE_BITS;
+   |                              ^^^^^^^^^ associated item not found in `SeekFieldStruct`
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `SIZE_BITS`, perhaps you need to implement it:
+           candidate #1: `deku::DekuSize`

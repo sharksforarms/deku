@@ -4,7 +4,7 @@
 
 ### Added
 
-- Change the requirement that the context (`Ctx`) must be `Copy` in some call.
+- Changed the requirement that the context (`Ctx`) must be `Copy` in some call.
   It is changed to `Clone`, this allows to add interior mutability in the context
   (like `Rc<Cell<bool>>`). This is no breaking change, since `Copy` implies `Clone`.
 - Added an attribute `until_with_ctx`: like `until`, but it also gets the context.

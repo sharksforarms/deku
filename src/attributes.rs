@@ -48,6 +48,7 @@ enum DekuEnum {
 | [bytes_read](#bytes_read) | field | Set the field representing the number of bytes to read into a container
 | [until](#until) | field | Set a predicate returning when to stop reading elements into a container
 | [read_all](#read_all) | field | Read until [reader.end()] returns `true`
+| [read_post_processing](#read_post_processing) | field | Code to postprocess read data (including temp values; can be used to modify the context via interior mutability)
 | [update](#update) | field | Apply code over the field when `.update()` is called
 | [temp](#temp) | field | Read the field but exclude it from the struct/enum
 | [temp_value](#temp_value) | field | Write the field but exclude it from the struct/enum

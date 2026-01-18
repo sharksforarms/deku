@@ -301,7 +301,8 @@ fn test_use_implicit_index_of_array() {
         n: u8,
         #[deku(
             count = "n",
-            ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 3 }"
+            ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0 }",
+            writer_ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: (*n).into() }"
         )]
         items567: Vec<B>,
     }

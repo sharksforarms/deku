@@ -595,6 +595,9 @@ struct FieldData {
     /// context passed to the field
     ctx: Option<Punctuated<syn::Expr, syn::token::Comma>>,
 
+    /// writer_context passed to the field
+    writer_ctx: Option<Punctuated<syn::Expr, syn::token::Comma>>,
+
     /// map field when updating struct
     update: Option<TokenStream>,
 
@@ -680,6 +683,7 @@ impl FieldData {
             || self.until.is_some()
             || self.map.is_some()
             || self.ctx.is_some()
+            || self.writer_ctx.is_some()
             || self.update.is_some()
             || self.reader.is_some()
             || self.writer.is_some();
@@ -720,6 +724,11 @@ impl FieldData {
             .map(|s| s.parse_with(Punctuated::parse_terminated))
             .transpose()
             .map_err(|e| e.to_compile_error())?;
+        let writer_ctx = receiver
+            .writer_ctx?
+            .map(|s| s.parse_with(Punctuated::parse_terminated))
+            .transpose()
+            .map_err(|e| e.to_compile_error())?;
 
         let data = Self {
             ident: receiver.ident,
@@ -736,6 +745,7 @@ impl FieldData {
             read_all: receiver.read_all,
             map: receiver.map?,
             ctx,
+            writer_ctx,
             update: receiver.update?,
             reader: receiver.reader?,
             writer: receiver.writer?,
@@ -1121,6 +1131,13 @@ struct DekuFieldReceiver {
     //       https://github.com/TedDriggs/darling/pull/98
     #[darling(default = "default_res_opt", map = "map_option_litstr")]
     ctx: Result<Option<syn::LitStr>, ReplacementError>,
+
+    /// writer_context passed to the field.
+    /// A comma separated argument list.
+    // TODO: The type of it should be `Punctuated<Expr, Comma>`
+    //       https://github.com/TedDriggs/darling/pull/98
+    #[darling(default = "default_res_opt", map = "map_option_litstr")]
+    writer_ctx: Result<Option<syn::LitStr>, ReplacementError>,
 
     /// map field when updating struct
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]

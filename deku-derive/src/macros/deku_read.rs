@@ -676,6 +676,7 @@ fn emit_field_read(
         &f.map,
         &f.reader,
         &f.ctx.as_ref().map(|v| quote!(#v)),
+        &f.writer_ctx.as_ref().map(|v| quote!(#v)),
         &f.assert,
         &f.assert_eq,
     ];

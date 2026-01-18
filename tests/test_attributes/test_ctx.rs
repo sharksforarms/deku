@@ -329,7 +329,8 @@ fn test_use_implicit_index_of_array() {
     };
 
     let ret_write: Vec<u8> = test_data.try_into().unwrap();
-    assert_eq!(vec![3, 8, 9, 0, 7, 9, 1, 6, 9, 2], ret_write);
-    //                       ^        ^        ^
-    //                      idx=0    idx=1    idx=2
+    assert_eq!(vec![3, 8, 9, 0, 1, 7, 9, 1, 1, 6, 9, 2, 0], ret_write);
+    //                       ^  ^        ^  ^        ^  ^
+    //                       |  fx=1     |  fx=1     |  fx=0 (last)
+    //                      idx=0      idx=1       idx=2
 }

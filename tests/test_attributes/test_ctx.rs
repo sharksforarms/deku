@@ -338,6 +338,7 @@ fn test_use_implicit_index_of_array() {
     //                    |  fx=1     |  fx=1     |  fx=0 (last)
     //                   idx=0      idx=1       idx=2
 
+    // read the data back
     let check_data = A::from_bytes((&ret_write, 0)).unwrap().1;
     assert_eq!(check_data, test_data);
 

@@ -4,15 +4,16 @@
 
 ### Added
 
-- Changed the requirement that the context (`Ctx`) must be `Copy` in some call.
-  It is changed to `Clone`, this allows to add interior mutability in the context
+- Changed the requirement that the context (`Ctx`) must be `Copy` in some calls.
+  It is changed to `Clone`, this **allows to add interior mutability** in the context
   (like `Rc<Cell<bool>>`). This is no breaking change, since `Copy` implies `Clone`.
-- Added an attribute `until_with_ctx`: like `until`, but it also gets the context.
+- Added an attribute `until_with_ctx`: **like `until`, but it also gets the context**.
 - Added `writer_ctx` for fields: overrides `ctx` for the writer case - this allows
-  a different context value for reader and writer (the reader gets the original
+  a **different context value for reader and writer** (the reader gets the original
   `ctx`).
 - Added an attribute `read_post_processing`: code which is inserted after a field is
-  read (including a temp field). You have full context access.
+  read (including a temp field). You have full context access (**and you can modify
+  the context there**).
 
 ## [0.20.2](https://github.com/sharksforarms/deku/compare/deku-v0.20.1...deku-v0.20.2) - 2025-11-25
 

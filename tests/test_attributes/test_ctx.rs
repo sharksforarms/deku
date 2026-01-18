@@ -292,40 +292,25 @@ fn test_use_implicit_index_of_array() {
     #[derive(Debug, Clone)]
     struct IndexContext {
         idx: std::rc::Rc<std::cell::Cell<usize>>,
+        n: usize,
     }
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
     struct A {
         #[deku(temp, temp_value = "items567.len().try_into().unwrap()")]
         n: u8,
-        //#[deku(count = "n", writer = "write_items(deku::writer, &self.items)")]
         #[deku(
             count = "n",
-            ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)) }"
+            ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 3 }"
         )]
         items567: Vec<B>,
-    }
-
-    fn write_items<W: std::io::Write + std::io::Seek>(
-        writer: &mut Writer<W>,
-        items: &[B],
-    ) -> Result<(), DekuError> {
-        for (idx, item) in items.iter().enumerate() {
-            item.to_writer(
-                writer,
-                IndexContext {
-                    idx: std::rc::Rc::new(std::cell::Cell::new(idx)),
-                },
-            )?;
-        }
-        Ok(())
     }
 
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
     #[deku(
         ctx = "ctx: IndexContext",
-        ctx_default = "IndexContext{idx: std::rc::Rc::new(std::cell::Cell::new(0))}"
+        ctx_default = "IndexContext{idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0}"
     )] // this struct uses a context for serialization. For deserialization it also works with the default context.
     struct B {
         x: u8,
@@ -335,6 +320,8 @@ fn test_use_implicit_index_of_array() {
             temp_value = "{let ret = ctx.idx.get() as u8; ctx.idx.set(ctx.idx.get()+1); ret}"
         )]
         idx_automatically_filled: u8,
+        #[deku(temp, temp_value = "if ctx.idx.get() < ctx.n {1} else {0}")]
+        idx_auto_fx: u8,
     }
 
     let test_data = A {

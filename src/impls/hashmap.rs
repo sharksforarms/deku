@@ -66,14 +66,15 @@ where
     Ok(res)
 }
 
-impl<'a, K, V, S, Ctx, Predicate> DekuReader<'a, (Limit<(K, V), Predicate>, Ctx)>
-    for HashMap<K, V, S>
+impl<'a, K, V, S, Ctx, Predicate, PredicateWithContext>
+    DekuReader<'a, (Limit<(K, V), Predicate, Ctx, PredicateWithContext>, Ctx)> for HashMap<K, V, S>
 where
     K: DekuReader<'a, Ctx> + Eq + Hash,
     V: DekuReader<'a, Ctx>,
     S: BuildHasher + Default,
     Ctx: Clone,
     Predicate: FnMut(&(K, V)) -> bool,
+    PredicateWithContext: FnMut(&(K, V), Ctx) -> bool,
 {
     /// Read `T`s until the given limit
     /// * `limit` - the limiting factor on the amount of `T`s to read
@@ -103,7 +104,7 @@ where
     /// ```
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
-        (limit, inner_ctx): (Limit<(K, V), Predicate>, Ctx),
+        (limit, inner_ctx): (Limit<(K, V), Predicate, Ctx, PredicateWithContext>, Ctx),
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
@@ -135,6 +136,16 @@ where
                 inner_ctx.clone(),
                 move |_, kv| predicate(kv),
             ),
+
+            // Read until a given predicate returns true
+            Limit::UntilWithCtx(mut predicate, _, _) => {
+                from_reader_with_ctx_hashmap_with_predicate(
+                    reader,
+                    None,
+                    inner_ctx.clone(),
+                    move |_, kv| predicate(kv, inner_ctx.clone()),
+                )
+            }
 
             // Read until a given quantity of bits have been read
             Limit::BitSize(size) => {
@@ -176,17 +187,19 @@ where
     }
 }
 
-impl<'a, K, V, S, Predicate> DekuReader<'a, Limit<(K, V), Predicate>> for HashMap<K, V, S>
+impl<'a, K, V, S, Predicate, PredicateWithContext>
+    DekuReader<'a, Limit<(K, V), Predicate, (), PredicateWithContext>> for HashMap<K, V, S>
 where
     K: DekuReader<'a> + Eq + Hash,
     V: DekuReader<'a>,
     S: BuildHasher + Default,
     Predicate: FnMut(&(K, V)) -> bool,
+    PredicateWithContext: FnMut(&(K, V), ()) -> bool,
 {
     /// Read `K, V`s until the given limit from input for types which don't require context.
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
-        limit: Limit<(K, V), Predicate>,
+        limit: Limit<(K, V), Predicate, (), PredicateWithContext>,
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
@@ -299,7 +312,12 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<(u8, u8), Predicate>,
+        limit: Limit<
+            (u8, u8),
+            Predicate,
+            (Endian, BitSize),
+            fn(&(u8, u8), (Endian, BitSize)) -> bool,
+        >,
         expected: FxHashMap<u8, u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],
@@ -312,6 +330,42 @@ mod tests {
                 (limit, (endian, BitSize(bit_size))),
             )
             .unwrap(),
+            None => {
+                panic!("unexpected")
+            }
+        };
+        assert_eq!(expected, res_read);
+        assert_eq!(
+            reader.rest(),
+            expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
+        );
+        let mut buf = vec![];
+        cursor.read_to_end(&mut buf).unwrap();
+        assert_eq!(expected_rest_bytes, buf);
+    }
+
+    #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
+        case::until_null([0x01, 0xAA, 0, 0, 0xBB].as_ref(), Endian::Little, None, (|kv: &(u8, u8)| kv.0 == 0u8 && kv.1 == 0u8).into(), fxhashmap!{0x01 => 0xAA, 0 => 0}, bits![u8, Msb0;], &[0xbb]),
+        case::until_empty_bits([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(0).into(), FxHashMap::default(), bits![u8, Msb0;], &[0x01, 0xaa, 0xbb]),
+        case::until_empty_bytes([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(0).into(), FxHashMap::default(), bits![u8, Msb0;], &[0x01, 0xaa, 0xbb]),
+        case::until_bits([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(16).into(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0xbb]),
+        case::read_all([0x01, 0xAA].as_ref(), Endian::Little, None, Limit::end(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[]),
+        case::until_bytes([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(2).into(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0xbb]),
+        case::until_count([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::from(1), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0xbb]),
+    )]
+    fn test_hashmap_read_no_bitsize<Predicate: FnMut(&(u8, u8)) -> bool + Copy>(
+        input: &[u8],
+        endian: Endian,
+        bit_size: Option<usize>,
+        limit: Limit<(u8, u8), Predicate, Endian, fn(&(u8, u8), Endian) -> bool>,
+        expected: FxHashMap<u8, u8>,
+        expected_rest_bits: &BitSlice<u8, Msb0>,
+        expected_rest_bytes: &[u8],
+    ) {
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = match bit_size {
+            Some(_) => panic!("unexpected"),
             None => {
                 FxHashMap::<u8, u8>::from_reader_with_ctx(&mut reader, (limit, (endian))).unwrap()
             }

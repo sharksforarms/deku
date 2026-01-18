@@ -293,25 +293,24 @@ fn test_use_implicit_index_of_array() {
     struct IndexContext {
         idx: std::rc::Rc<std::cell::Cell<usize>>,
         n: usize,
+        fx: std::rc::Rc<std::cell::Cell<bool>>,
     }
     #[deku_derive(DekuRead, DekuWrite)]
-    #[derive(PartialEq, Debug)]
+    #[derive(PartialEq, Debug, Clone)]
     struct A {
-        #[deku(temp, temp_value = "items567.len().try_into().unwrap()")]
-        n: u8,
         #[deku(
-            count = "n",
-            ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0 }",
-            writer_ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: (*n).into() }"
+            until_with_ctx = "|_:&B,ctx:IndexContext| !ctx.fx.get()",
+            ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0, fx: std::rc::Rc::new(std::cell::Cell::new(false))}",
+            writer_ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: items.len(), fx: std::rc::Rc::new(std::cell::Cell::new(false)) }"
         )]
-        items567: Vec<B>,
+        items: Vec<B>,
     }
 
     #[deku_derive(DekuRead, DekuWrite)]
-    #[derive(PartialEq, Debug)]
+    #[derive(PartialEq, Debug, Clone)]
     #[deku(
         ctx = "ctx: IndexContext",
-        ctx_default = "IndexContext{idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0}"
+        ctx_default = "IndexContext{idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0, fx: std::rc::Rc::new(std::cell::Cell::new(false))}"
     )] // this struct uses a context for serialization. For deserialization it also works with the default context.
     struct B {
         x: u8,
@@ -321,17 +320,28 @@ fn test_use_implicit_index_of_array() {
             temp_value = "{let ret = ctx.idx.get() as u8; ctx.idx.set(ctx.idx.get()+1); ret}"
         )]
         idx_automatically_filled: u8,
-        #[deku(temp, temp_value = "if ctx.idx.get() < ctx.n {1} else {0}")]
-        idx_auto_fx: u8,
+        #[deku(
+            read_post_processing = "ctx.fx.set(*auto_fx!=0);",
+            temp,
+            temp_value = "if ctx.idx.get() < ctx.n {1} else {0}"
+        )]
+        auto_fx: u8,
     }
 
     let test_data = A {
-        items567: vec![B { x: 8, y: 9 }, B { x: 7, y: 9 }, B { x: 6, y: 9 }],
+        items: vec![B { x: 8, y: 9 }, B { x: 7, y: 9 }, B { x: 6, y: 9 }],
     };
 
-    let ret_write: Vec<u8> = test_data.try_into().unwrap();
-    assert_eq!(vec![3, 8, 9, 0, 1, 7, 9, 1, 1, 6, 9, 2, 0], ret_write);
-    //                       ^  ^        ^  ^        ^  ^
-    //                       |  fx=1     |  fx=1     |  fx=0 (last)
-    //                      idx=0      idx=1       idx=2
+    let ret_write: Vec<u8> = test_data.clone().try_into().unwrap();
+    assert_eq!(vec![8, 9, 0, 1, 7, 9, 1, 1, 6, 9, 2, 0], ret_write);
+    //                    ^  ^        ^  ^        ^  ^
+    //                    |  fx=1     |  fx=1     |  fx=0 (last)
+    //                   idx=0      idx=1       idx=2
+
+    let check_data = A::from_bytes((&ret_write, 0)).unwrap().1;
+    assert_eq!(check_data, test_data);
+
+    // check with fx=0 after the second element:
+    let check_data = A::from_bytes((&[8, 9, 0, 1, 7, 9, 1, 0], 0)).unwrap().1;
+    assert_eq!(check_data.items.len(), 2);
 }

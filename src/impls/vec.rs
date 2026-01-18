@@ -64,6 +64,44 @@ where
     Ok(res)
 }
 
+fn reader_vec_with_predicate_with_context<'a, T, Ctx, PredicateWithContext, R: Read + Seek>(
+    reader: &mut Reader<R>,
+    capacity: Option<usize>,
+    ctx: Ctx,
+    mut predicate: PredicateWithContext,
+) -> Result<Vec<T>, DekuError>
+where
+    T: DekuReader<'a, Ctx>,
+    Ctx: Clone,
+    PredicateWithContext: FnMut(usize, &T, Ctx) -> bool,
+{
+    // ZST detected, return empty vec
+    if mem::size_of::<T>() == 0 {
+        return Ok(Vec::new());
+    }
+
+    let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
+
+    let start_read = reader.bits_read;
+
+    loop {
+        let val = <T>::from_reader_with_ctx(reader, ctx.clone())?;
+        res.push(val);
+
+        // This unwrap is safe as we are pushing to the vec immediately before it,
+        // so there will always be a last element
+        if predicate(
+            reader.bits_read - start_read,
+            res.last().unwrap(),
+            ctx.clone(),
+        ) {
+            break;
+        }
+    }
+
+    Ok(res)
+}
+
 fn reader_vec_to_end<'a, T, Ctx, R: Read + Seek>(
     reader: &mut crate::reader::Reader<R>,
     capacity: Option<usize>,
@@ -90,15 +128,17 @@ where
     Ok(res)
 }
 
-impl<'a, T, Ctx, Predicate> DekuReader<'a, (Limit<T, Predicate>, Ctx)> for Vec<T>
+impl<'a, T, Ctx, Predicate, PredicateWithContext>
+    DekuReader<'a, (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx)> for Vec<T>
 where
     T: DekuReader<'a, Ctx>,
     Ctx: Clone,
     Predicate: FnMut(&T) -> bool,
+    PredicateWithContext: FnMut(&T, Ctx) -> bool,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
-        (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
+        (limit, inner_ctx): (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx),
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
@@ -124,6 +164,14 @@ where
                     predicate(value)
                 })
             }
+
+            // Read until a given predicate returns true
+            Limit::UntilWithCtx(mut predicate, _, _) => reader_vec_with_predicate_with_context(
+                reader,
+                None,
+                inner_ctx.clone(),
+                move |_, value, ctx| predicate(value, ctx),
+            ),
 
             // Read until a given quantity of bits have been read
             Limit::BitSize(size) => {
@@ -158,13 +206,17 @@ where
     }
 }
 
-impl<'a, T: DekuReader<'a>, Predicate: FnMut(&T) -> bool> DekuReader<'a, Limit<T, Predicate>>
-    for Vec<T>
+impl<
+        'a,
+        T: DekuReader<'a>,
+        Predicate: FnMut(&T) -> bool,
+        PredicateWithContext: FnMut(&T, ()) -> bool,
+    > DekuReader<'a, Limit<T, Predicate, (), PredicateWithContext>> for Vec<T>
 {
     /// Read `T`s until the given limit from input for types which don't require context.
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
-        limit: Limit<T, Predicate>,
+        limit: Limit<T, Predicate, (), PredicateWithContext>,
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
@@ -234,7 +286,7 @@ mod tests {
     )]
     fn test_vec_reader_no_ctx<Predicate: FnMut(&u8) -> bool>(
         mut input: &[u8],
-        limit: Limit<u8, Predicate>,
+        limit: Limit<u8, Predicate, (), fn(&u8, ()) -> bool>,
         expected: Vec<u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],
@@ -257,9 +309,6 @@ mod tests {
         case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), vec![], bits![u8, Msb0;], &[0xaa]),
         case::count_1([0xAA, 0xBB].as_ref(), Endian::Little, Some(8), 1.into(), vec![0xAA], bits![u8, Msb0;], &[0xbb]),
         case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Endian::Little, Some(8), 2.into(), vec![0xAA, 0xBB], bits![u8, Msb0;], &[0xcc]),
-        case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, None, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0], bits![u8, Msb0;], &[0xbb]),
-        case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(8).into(), vec![0xAA], bits![u8, Msb0;], &[0xbb]),
-        case::end([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::end(), vec![0xaa, 0xbb], bits![u8, Msb0;], &[]),
         case::end_bitsize([0xf0, 0xf0].as_ref(), Endian::Little, Some(4), Limit::end(), vec![0xf, 0x0, 0x0f, 0x0], bits![u8, Msb0;], &[]),
         case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), Endian::Little, Some(6), 2.into(), vec![0b00_011010, 0b00_011110], bits![u8, Msb0; 1, 0, 0, 1], &[]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
@@ -279,7 +328,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<u8, Predicate>,
+        limit: Limit<u8, Predicate, (Endian, BitSize), fn(&u8, (Endian, BitSize)) -> bool>,
         expected: Vec<u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],
@@ -291,6 +340,37 @@ mod tests {
                 Vec::<u8>::from_reader_with_ctx(&mut reader, (limit, (endian, BitSize(bit_size))))
                     .unwrap()
             }
+            None => panic!("unexpected"),
+        };
+        assert_eq!(expected, res_read);
+        assert_eq!(
+            reader.rest(),
+            expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
+        );
+        let mut buf = vec![];
+        cursor.read_to_end(&mut buf).unwrap();
+        assert_eq!(expected_rest_bytes, buf);
+    }
+
+    #[cfg(all(feature = "bits", feature = "descriptive-errors"))]
+    #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
+        case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, None, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0], bits![u8, Msb0;], &[0xbb]),
+        case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(8).into(), vec![0xAA], bits![u8, Msb0;], &[0xbb]),
+        case::end([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::end(), vec![0xaa, 0xbb], bits![u8, Msb0;], &[]),
+    )]
+    fn test_vec_reader_no_bitsize<Predicate: FnMut(&u8) -> bool>(
+        input: &[u8],
+        endian: Endian,
+        bit_size: Option<usize>,
+        limit: Limit<u8, Predicate, Endian, fn(&u8, Endian) -> bool>,
+        expected: Vec<u8>,
+        expected_rest_bits: &BitSlice<u8, Msb0>,
+        expected_rest_bytes: &[u8],
+    ) {
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = match bit_size {
+            Some(bit_size) => panic!("unexpected"),
             None => Vec::<u8>::from_reader_with_ctx(&mut reader, (limit, (endian))).unwrap(),
         };
         assert_eq!(expected, res_read);
@@ -327,7 +407,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<u16, Predicate>,
+        limit: Limit<u16, Predicate, (Endian, BitSize), fn(&u16, (Endian, BitSize)) -> bool>,
         expected: Vec<u16>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],

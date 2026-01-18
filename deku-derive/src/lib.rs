@@ -633,6 +633,9 @@ struct FieldData {
     /// write given value of temp field
     temp_value: Option<TokenStream>,
 
+    /// post_process
+    read_post_processing: Option<TokenStream>,
+
     /// default value code when used with skip or cond
     default: Option<TokenStream>,
 
@@ -708,6 +711,7 @@ impl FieldData {
         any_option_set = any_option_set
             || self.pad_bytes_after.is_some()
             || self.temp_value.is_some()
+            || self.read_post_processing.is_some()
             || self.cond.is_some()
             || self.assert.is_some()
             || self.assert_eq.is_some()
@@ -763,6 +767,7 @@ impl FieldData {
             pad_bytes_after: receiver.pad_bytes_after?,
             temp: receiver.temp,
             temp_value: receiver.temp_value?,
+            read_post_processing: receiver.read_post_processing?,
             default: receiver.default?,
             cond: receiver.cond?,
             assert: receiver.assert?,
@@ -1190,6 +1195,10 @@ struct DekuFieldReceiver {
     /// write given value of temp field
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     temp_value: Result<Option<TokenStream>, ReplacementError>,
+
+    /// post process read values
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    read_post_processing: Result<Option<TokenStream>, ReplacementError>,
 
     /// default value code when used with skip
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]

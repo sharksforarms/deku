@@ -64,12 +64,14 @@ where
     Ok(res)
 }
 
-impl<'a, T, S, Ctx, Predicate> DekuReader<'a, (Limit<T, Predicate>, Ctx)> for HashSet<T, S>
+impl<'a, T, S, Ctx, Predicate, PredicateWithContext>
+    DekuReader<'a, (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx)> for HashSet<T, S>
 where
     T: DekuReader<'a, Ctx> + Eq + Hash,
     S: BuildHasher + Default,
     Ctx: Clone,
     Predicate: FnMut(&T) -> bool,
+    PredicateWithContext: FnMut(&T, Ctx) -> bool,
 {
     /// Read `T`s until the given limit
     /// * `limit` - the limiting factor on the amount of `T`s to read
@@ -88,7 +90,7 @@ where
     /// ```
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
-        (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
+        (limit, inner_ctx): (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx),
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
@@ -120,6 +122,16 @@ where
                 inner_ctx.clone(),
                 move |_, value| predicate(value),
             ),
+
+            // Read until a given predicate returns true
+            Limit::UntilWithCtx(mut predicate, _, _) => {
+                from_reader_with_ctx_hashset_with_predicate(
+                    reader,
+                    None,
+                    inner_ctx.clone(),
+                    move |_, value| predicate(value, inner_ctx.clone()),
+                )
+            }
 
             // Read until a given quantity of bits have been read
             Limit::BitSize(size) => {
@@ -161,13 +173,18 @@ where
     }
 }
 
-impl<'a, T: DekuReader<'a> + Eq + Hash, S: BuildHasher + Default, Predicate: FnMut(&T) -> bool>
-    DekuReader<'a, Limit<T, Predicate>> for HashSet<T, S>
+impl<
+        'a,
+        T: DekuReader<'a> + Eq + Hash,
+        S: BuildHasher + Default,
+        Predicate: FnMut(&T) -> bool,
+        PredicateWithContext: FnMut(&T, ()) -> bool,
+    > DekuReader<'a, Limit<T, Predicate, (), PredicateWithContext>> for HashSet<T, S>
 {
     /// Read `T`s until the given limit from input for types which don't require context.
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
-        limit: Limit<T, Predicate>,
+        limit: Limit<T, Predicate, (), PredicateWithContext>,
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
@@ -230,13 +247,6 @@ mod tests {
         case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), FxHashSet::default(), bits![u8, Msb0;], &[0xaa]),
         case::count_1([0xAA, 0xBB].as_ref(), Endian::Little, Some(8), 1.into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
         case::count_2([0xAA, 0xBB, 0xCC].as_ref(), Endian::Little, Some(8), 2.into(), vec![0xAA, 0xBB].into_iter().collect(), bits![u8, Msb0;], &[0xcc]),
-        case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, None, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
-        case::until_empty_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(0).into(), HashSet::default(), bits![u8, Msb0;], &[0xaa, 0xbb]),
-        case::until_empty_bytes([0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(0).into(), HashSet::default(), bits![u8, Msb0;], &[0xaa, 0xbb]),
-        case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(8).into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
-        case::read_all([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::end(), vec![0xAA, 0xBB].into_iter().collect(), bits![u8, Msb0;], &[]),
-        case::until_bytes([0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(1).into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
-        case::until_count([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::from(1), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
         case::bits_6([0b0110_1001, 0b1110_1001].as_ref(), Endian::Little, Some(6), 2.into(), vec![0b00_011010, 0b00_011110].into_iter().collect(), bits![u8, Msb0; 1, 0, 0, 1], &[]),
         #[should_panic(expected = "Parse(\"too much data: container of 8 bits cannot hold 9 bits\")")]
         case::not_enough_data([].as_ref(), Endian::Little, Some(9), 1.into(), FxHashSet::default(), bits![u8, Msb0;], &[]),
@@ -255,7 +265,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<u8, Predicate>,
+        limit: Limit<u8, Predicate, (Endian, BitSize), fn(&u8, (Endian, BitSize)) -> bool>,
         expected: FxHashSet<u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],
@@ -268,6 +278,41 @@ mod tests {
                 (limit, (endian, BitSize(bit_size))),
             )
             .unwrap(),
+            None => panic!("unexpected"),
+        };
+        assert_eq!(expected, res_read);
+        assert_eq!(
+            reader.rest(),
+            expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
+        );
+        let mut buf = vec![];
+        cursor.read_to_end(&mut buf).unwrap();
+        assert_eq!(expected_rest_bytes, buf);
+    }
+
+    #[cfg(all(feature = "bits", feature = "descriptive-errors"))]
+    #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
+        case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, None, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
+        case::until_empty_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(0).into(), HashSet::default(), bits![u8, Msb0;], &[0xaa, 0xbb]),
+        case::until_empty_bytes([0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(0).into(), HashSet::default(), bits![u8, Msb0;], &[0xaa, 0xbb]),
+        case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(8).into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
+        case::read_all([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::end(), vec![0xAA, 0xBB].into_iter().collect(), bits![u8, Msb0;], &[]),
+        case::until_bytes([0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(1).into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
+        case::until_count([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::from(1), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
+    )]
+    fn test_hashset_read_no_bitsize<Predicate: FnMut(&u8) -> bool + Copy>(
+        input: &[u8],
+        endian: Endian,
+        bit_size: Option<usize>,
+        limit: Limit<u8, Predicate, Endian, fn(&u8, Endian) -> bool>,
+        expected: FxHashSet<u8>,
+        expected_rest_bits: &BitSlice<u8, Msb0>,
+        expected_rest_bytes: &[u8],
+    ) {
+        let mut cursor = Cursor::new(input);
+        let mut reader = Reader::new(&mut cursor);
+        let res_read = match bit_size {
+            Some(_) => panic!("unexpected"),
             None => FxHashSet::<u8>::from_reader_with_ctx(&mut reader, (limit, (endian))).unwrap(),
         };
         assert_eq!(expected, res_read);
@@ -297,6 +342,8 @@ mod tests {
                 .any(|u| v == u)));
     }
 
+    // Limit<u16, fn(&u16), (Endian, BitSize), fn(&u16, (Endian, BitSize))>
+    //::from(2)
     // Note: These tests also exist in boxed.rs
     #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes, expected_write,
@@ -311,7 +358,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<u16, Predicate>,
+        limit: Limit<u16, Predicate, (Endian, BitSize), fn(&u16, (Endian, BitSize)) -> bool>,
         expected: FxHashSet<u16>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],

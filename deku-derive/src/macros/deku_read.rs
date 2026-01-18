@@ -675,6 +675,7 @@ fn emit_field_read(
         &f.cond,
         &f.default,
         &f.map,
+        &f.read_post_processing,
         &f.reader,
         &f.ctx.as_ref().map(|v| quote!(#v)),
         &f.writer_ctx.as_ref().map(|v| quote!(#v)),
@@ -764,6 +765,13 @@ fn emit_field_read(
         quote! {
             log::trace!("Reading: {}.{}", #ident, #field_ident_str);
         }
+    } else {
+        quote! {}
+    };
+
+    let read_post_processing = if f.read_post_processing.is_some() {
+        let code = &f.read_post_processing.clone().unwrap();
+        code.clone()
     } else {
         quote! {}
     };
@@ -869,7 +877,6 @@ fn emit_field_read(
                 }
             }
         } else if let Some(field_until) = &f.until {
-            // TODO until_with_ctx
             // We wrap the input into another closure here to enforce that it is actually a callable
             // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
             quote! {
@@ -877,6 +884,16 @@ fn emit_field_read(
                 (
                     __deku_reader,
                     (::#crate_::ctx::Limit::new_until(#field_until), (#read_args))
+                )?
+            }
+        } else if let Some(field_until_with_ctx) = &f.until_with_ctx {
+            // We wrap the input into another closure here to enforce that it is actually a callable
+            // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
+            quote! {
+                #type_as_deku_read::from_reader_with_ctx
+                (
+                    __deku_reader,
+                    (::#crate_::ctx::Limit::new_until_with_ctx(#field_until_with_ctx), (#read_args))
                 )?
             }
         } else if f.read_all {
@@ -997,6 +1014,7 @@ fn emit_field_read(
         };
         let #field_ident = &#internal_field_ident;
 
+        #read_post_processing
         #field_assert
         #field_assert_eq
 

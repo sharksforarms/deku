@@ -22,15 +22,17 @@ where
     }
 }
 
-impl<'a, T, Ctx, Predicate> DekuReader<'a, (Limit<T, Predicate>, Ctx)> for Box<[T]>
+impl<'a, T, Ctx, Predicate, PredicateWithContext>
+    DekuReader<'a, (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx)> for Box<[T]>
 where
     T: DekuReader<'a, Ctx>,
     Ctx: Clone,
     Predicate: FnMut(&T) -> bool,
+    PredicateWithContext: FnMut(&T, Ctx) -> bool,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
-        (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
+        (limit, inner_ctx): (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx),
     ) -> Result<Self, DekuError> {
         // use Vec<T>'s implementation and convert to Box<[T]>
         let val = <Vec<T>>::from_reader_with_ctx(reader, (limit, inner_ctx.clone()))?;
@@ -116,7 +118,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<u16, Predicate>,
+        limit: Limit<u16, Predicate, (Endian, BitSize), fn(&u16, (Endian, BitSize)) -> bool>,
         expected: Box<[u16]>,
         expected_rest_bits: &bitvec::slice::BitSlice<u8, bitvec::prelude::Msb0>,
         expected_rest_bytes: &[u8],

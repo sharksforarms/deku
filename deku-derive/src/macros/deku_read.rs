@@ -671,6 +671,7 @@ fn emit_field_read(
         &f.bits_read,
         &f.bytes_read,
         &f.until,
+        &f.until_with_ctx,
         &f.cond,
         &f.default,
         &f.map,
@@ -868,6 +869,7 @@ fn emit_field_read(
                 }
             }
         } else if let Some(field_until) = &f.until {
+            // TODO until_with_ctx
             // We wrap the input into another closure here to enforce that it is actually a callable
             // Otherwise, an incorrectly passed-in integer could unexpectedly convert into a `Count` limit
             quote! {

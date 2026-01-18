@@ -583,8 +583,11 @@ struct FieldData {
     /// tokens providing the number of bytes for the length of the container
     bytes_read: Option<TokenStream>,
 
-    /// a predicate to decide when to stop reading elements into the container
+    /// a predicate to decide when to stop reading elements into the container (receives the current container element)
     until: Option<TokenStream>,
+
+    /// a predicate to decide when to stop reading elements into the container (receives the current container element and a clone of the context)
+    until_with_ctx: Option<TokenStream>,
 
     /// read until `reader.end()`
     read_all: bool,
@@ -681,6 +684,7 @@ impl FieldData {
         any_option_set = any_option_set
             || self.bytes_read.is_some()
             || self.until.is_some()
+            || self.until_with_ctx.is_some()
             || self.map.is_some()
             || self.ctx.is_some()
             || self.writer_ctx.is_some()
@@ -742,6 +746,7 @@ impl FieldData {
             bits_read: receiver.bits_read?,
             bytes_read: receiver.bytes_read?,
             until: receiver.until?,
+            until_with_ctx: receiver.until_with_ctx?,
             read_all: receiver.read_all,
             map: receiver.map?,
             ctx,
@@ -834,12 +839,13 @@ impl FieldData {
         #[cfg(feature = "bits")]
         if data.read_all
             && (data.until.is_some()
+                || data.until_with_ctx.is_some()
                 || data.count.is_some()
                 || (data.bits_read.is_some() || data.bytes_read.is_some()))
         {
             return Err(cerror(
                 data.read_all.span(),
-                "conflicting: `read_all` cannot be used with `until`, `count`, `bits_read`, or `bytes_read`",
+                "conflicting: `read_all` cannot be used with `until`, `until_with_ctx`, `count`, `bits_read`, or `bytes_read`",
             ));
         }
 
@@ -1116,6 +1122,10 @@ struct DekuFieldReceiver {
     /// a predicate to decide when to stop reading elements into the container
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     until: Result<Option<TokenStream>, ReplacementError>,
+
+    /// a predicate to decide when to stop reading elements into the container
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    until_with_ctx: Result<Option<TokenStream>, ReplacementError>,
 
     /// read until `reader.end()`
     #[darling(default)]

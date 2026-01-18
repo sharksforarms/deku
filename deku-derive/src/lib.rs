@@ -592,10 +592,10 @@ struct FieldData {
     /// apply a function to the field after it's read
     map: Option<TokenStream>,
 
-    /// context passed to the field
+    /// context passed to the field (reader/writer; see writer_ctx)
     ctx: Option<Punctuated<syn::Expr, syn::token::Comma>>,
 
-    /// writer_context passed to the field
+    /// writer_context passed to the field (overrides ctx)
     writer_ctx: Option<Punctuated<syn::Expr, syn::token::Comma>>,
 
     /// map field when updating struct
@@ -1125,14 +1125,14 @@ struct DekuFieldReceiver {
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     map: Result<Option<TokenStream>, ReplacementError>,
 
-    /// context passed to the field.
+    /// context passed to the field (reader/writer). See writer_ctx.
     /// A comma separated argument list.
     // TODO: The type of it should be `Punctuated<Expr, Comma>`
     //       https://github.com/TedDriggs/darling/pull/98
     #[darling(default = "default_res_opt", map = "map_option_litstr")]
     ctx: Result<Option<syn::LitStr>, ReplacementError>,
 
-    /// writer_context passed to the field.
+    /// writer_context passed to the field. Overrides ctx.
     /// A comma separated argument list.
     // TODO: The type of it should be `Punctuated<Expr, Comma>`
     //       https://github.com/TedDriggs/darling/pull/98

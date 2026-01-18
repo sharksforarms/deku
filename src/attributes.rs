@@ -61,7 +61,8 @@ enum DekuEnum {
 | [map](#map) | field | Specify a function or lambda to apply to the result of the read
 | [reader](#readerwriter) | variant, field | Custom reader code
 | [writer](#readerwriter) | variant, field | Custom writer code
-| [ctx](#ctx) | top-level, field| Context list for context sensitive parsing
+| [ctx](#ctx) | top-level, field| Context list for context sensitive parsing (reader/writer)
+| [writer_ctx](#ctx) | top-level, field| Context list for context sensitive parsing (overrides ctx for the writer part)
 | [ctx_default](#ctx_default) | top-level, field| Default context values
 | enum: [id](#id) | top-level, variant | enum or variant id value
 | enum: [id_endian](#id_endian) | top-level | Endianness of *just* the enum `id`

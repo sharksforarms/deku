@@ -24,7 +24,7 @@ fn from_reader_with_ctx_hashset_with_predicate<'a, T, S, Ctx, Predicate, R: Read
 where
     T: DekuReader<'a, Ctx> + Eq + Hash,
     S: BuildHasher + Default,
-    Ctx: Copy,
+    Ctx: Clone,
     Predicate: FnMut(usize, &T) -> bool,
 {
     let mut res = HashSet::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
@@ -33,7 +33,7 @@ where
     let orig_bits_read = reader.bits_read;
 
     while !found_predicate {
-        let val = <T>::from_reader_with_ctx(reader, ctx)?;
+        let val = <T>::from_reader_with_ctx(reader, ctx.clone())?;
         found_predicate = predicate(reader.bits_read - orig_bits_read, &val);
         res.insert(val);
     }
@@ -49,7 +49,7 @@ fn from_reader_with_ctx_hashset_to_end<'a, T, S, Ctx, R: Read + Seek>(
 where
     T: DekuReader<'a, Ctx> + Eq + Hash,
     S: BuildHasher + Default,
-    Ctx: Copy,
+    Ctx: Clone,
 {
     let mut res = HashSet::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
 
@@ -57,7 +57,7 @@ where
         if reader.end() {
             break;
         }
-        let val = <T>::from_reader_with_ctx(reader, ctx)?;
+        let val = <T>::from_reader_with_ctx(reader, ctx.clone())?;
         res.insert(val);
     }
 
@@ -68,7 +68,7 @@ impl<'a, T, S, Ctx, Predicate> DekuReader<'a, (Limit<T, Predicate>, Ctx)> for Ha
 where
     T: DekuReader<'a, Ctx> + Eq + Hash,
     S: BuildHasher + Default,
-    Ctx: Copy,
+    Ctx: Clone,
     Predicate: FnMut(&T) -> bool,
 {
     /// Read `T`s until the given limit
@@ -105,7 +105,7 @@ where
                 from_reader_with_ctx_hashset_with_predicate(
                     reader,
                     Some(count),
-                    inner_ctx,
+                    inner_ctx.clone(),
                     move |_, _| {
                         count -= 1;
                         count == 0
@@ -117,7 +117,7 @@ where
             Limit::Until(mut predicate, _) => from_reader_with_ctx_hashset_with_predicate(
                 reader,
                 None,
-                inner_ctx,
+                inner_ctx.clone(),
                 move |_, value| predicate(value),
             ),
 
@@ -133,7 +133,7 @@ where
                 from_reader_with_ctx_hashset_with_predicate(
                     reader,
                     None,
-                    inner_ctx,
+                    inner_ctx.clone(),
                     move |read_bits, _| read_bits == bit_size,
                 )
             }
@@ -150,13 +150,13 @@ where
                 from_reader_with_ctx_hashset_with_predicate(
                     reader,
                     None,
-                    inner_ctx,
+                    inner_ctx.clone(),
                     move |read_bits, _| read_bits == bit_size,
                 )
             }
 
             // Read until `reader.end()` is true
-            Limit::End => from_reader_with_ctx_hashset_to_end(reader, None, inner_ctx),
+            Limit::End => from_reader_with_ctx_hashset_to_end(reader, None, inner_ctx.clone()),
         }
     }
 }
@@ -176,7 +176,7 @@ impl<'a, T: DekuReader<'a> + Eq + Hash, S: BuildHasher + Default, Predicate: FnM
     }
 }
 
-impl<T: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for HashSet<T, S> {
+impl<T: DekuWriter<Ctx>, S, Ctx: Clone> DekuWriter<Ctx> for HashSet<T, S> {
     /// Write all `T`s in a `HashSet` to bits.
     /// * **inner_ctx** - The context required by `T`.
     ///
@@ -205,7 +205,7 @@ impl<T: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for HashSet<T, S> {
         inner_ctx: Ctx,
     ) -> Result<(), DekuError> {
         for v in self {
-            v.to_writer(writer, inner_ctx)?;
+            v.to_writer(writer, inner_ctx.clone())?;
         }
         Ok(())
     }

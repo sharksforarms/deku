@@ -289,18 +289,21 @@ fn test_enum_endian_ctx() {
 
 #[test]
 fn test_use_implicit_index_of_array() {
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone)]
     struct IndexContext {
-        idx: usize,
+        idx: std::rc::Rc<std::cell::Cell<usize>>,
     }
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
     struct A {
-        #[deku(temp, temp_value = "items.len().try_into().unwrap()")]
+        #[deku(temp, temp_value = "items567.len().try_into().unwrap()")]
         n: u8,
-        #[deku(count = "n", writer = "write_items(deku::writer, &self.items)")]
-        //#[deku(count = "n", ctx = "IndexContext { idx: 0 }")]
-        items: Vec<B>,
+        //#[deku(count = "n", writer = "write_items(deku::writer, &self.items)")]
+        #[deku(
+            count = "n",
+            ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)) }"
+        )]
+        items567: Vec<B>,
     }
 
     fn write_items<W: std::io::Write + std::io::Seek>(
@@ -308,23 +311,34 @@ fn test_use_implicit_index_of_array() {
         items: &[B],
     ) -> Result<(), DekuError> {
         for (idx, item) in items.iter().enumerate() {
-            item.to_writer(writer, IndexContext { idx })?;
+            item.to_writer(
+                writer,
+                IndexContext {
+                    idx: std::rc::Rc::new(std::cell::Cell::new(idx)),
+                },
+            )?;
         }
         Ok(())
     }
 
     #[deku_derive(DekuRead, DekuWrite)]
     #[derive(PartialEq, Debug)]
-    #[deku(ctx = "ctx: IndexContext", ctx_default = "IndexContext{idx: 0}")] // this struct uses a context for serialization. For deserialization it also works with the default context.
+    #[deku(
+        ctx = "ctx: IndexContext",
+        ctx_default = "IndexContext{idx: std::rc::Rc::new(std::cell::Cell::new(0))}"
+    )] // this struct uses a context for serialization. For deserialization it also works with the default context.
     struct B {
         x: u8,
         y: u8,
-        #[deku(temp, temp_value = "ctx.idx as u8")]
+        #[deku(
+            temp,
+            temp_value = "{let ret = ctx.idx.get() as u8; ctx.idx.set(ctx.idx.get()+1); ret}"
+        )]
         idx_automatically_filled: u8,
     }
 
     let test_data = A {
-        items: vec![B { x: 8, y: 9 }, B { x: 7, y: 9 }, B { x: 6, y: 9 }],
+        items567: vec![B { x: 8, y: 9 }, B { x: 7, y: 9 }, B { x: 6, y: 9 }],
     };
 
     let ret_write: Vec<u8> = test_data.try_into().unwrap();

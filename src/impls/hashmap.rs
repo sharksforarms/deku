@@ -25,7 +25,7 @@ where
     K: DekuReader<'a, Ctx> + Eq + Hash,
     V: DekuReader<'a, Ctx>,
     S: BuildHasher + Default,
-    Ctx: Copy,
+    Ctx: Clone,
     Predicate: FnMut(usize, &(K, V)) -> bool,
 {
     let mut res = HashMap::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
@@ -34,7 +34,7 @@ where
     let orig_bits_read = reader.bits_read;
 
     while !found_predicate {
-        let val = <(K, V)>::from_reader_with_ctx(reader, ctx)?;
+        let val = <(K, V)>::from_reader_with_ctx(reader, ctx.clone())?;
         found_predicate = predicate(reader.bits_read - orig_bits_read, &val);
         res.insert(val.0, val.1);
     }
@@ -51,7 +51,7 @@ where
     K: DekuReader<'a, Ctx> + Eq + Hash,
     V: DekuReader<'a, Ctx>,
     S: BuildHasher + Default,
-    Ctx: Copy,
+    Ctx: Clone,
 {
     let mut res = HashMap::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
 
@@ -59,7 +59,7 @@ where
         if reader.end() {
             break;
         }
-        let val = <(K, V)>::from_reader_with_ctx(reader, ctx)?;
+        let val = <(K, V)>::from_reader_with_ctx(reader, ctx.clone())?;
         res.insert(val.0, val.1);
     }
 
@@ -72,7 +72,7 @@ where
     K: DekuReader<'a, Ctx> + Eq + Hash,
     V: DekuReader<'a, Ctx>,
     S: BuildHasher + Default,
-    Ctx: Copy,
+    Ctx: Clone,
     Predicate: FnMut(&(K, V)) -> bool,
 {
     /// Read `T`s until the given limit
@@ -120,7 +120,7 @@ where
                 from_reader_with_ctx_hashmap_with_predicate(
                     reader,
                     Some(count),
-                    inner_ctx,
+                    inner_ctx.clone(),
                     move |_, _| {
                         count -= 1;
                         count == 0
@@ -132,7 +132,7 @@ where
             Limit::Until(mut predicate, _) => from_reader_with_ctx_hashmap_with_predicate(
                 reader,
                 None,
-                inner_ctx,
+                inner_ctx.clone(),
                 move |_, kv| predicate(kv),
             ),
 
@@ -148,7 +148,7 @@ where
                 from_reader_with_ctx_hashmap_with_predicate(
                     reader,
                     None,
-                    inner_ctx,
+                    inner_ctx.clone(),
                     move |read_bits, _| read_bits == bit_size,
                 )
             }
@@ -165,13 +165,13 @@ where
                 from_reader_with_ctx_hashmap_with_predicate(
                     reader,
                     None,
-                    inner_ctx,
+                    inner_ctx.clone(),
                     move |read_bits, _| read_bits == bit_size,
                 )
             }
 
             // Read until `reader.end()` is true
-            Limit::End => from_reader_with_ctx_hashmap_to_end(reader, None, inner_ctx),
+            Limit::End => from_reader_with_ctx_hashmap_to_end(reader, None, inner_ctx.clone()),
         }
     }
 }
@@ -195,7 +195,7 @@ where
     }
 }
 
-impl<K: DekuWriter<Ctx>, V: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for HashMap<K, V, S> {
+impl<K: DekuWriter<Ctx>, V: DekuWriter<Ctx>, S, Ctx: Clone> DekuWriter<Ctx> for HashMap<K, V, S> {
     /// Write all `K, V`s in a `HashMap` to bits.
     /// * **inner_ctx** - The context required by `K, V`.
     ///
@@ -235,7 +235,7 @@ impl<K: DekuWriter<Ctx>, V: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for H
         inner_ctx: Ctx,
     ) -> Result<(), DekuError> {
         for kv in self {
-            kv.to_writer(writer, inner_ctx)?;
+            kv.to_writer(writer, inner_ctx.clone())?;
         }
         Ok(())
     }

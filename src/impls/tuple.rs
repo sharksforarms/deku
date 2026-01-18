@@ -37,7 +37,7 @@ macro_rules! ImplDekuTupleTraits {
             }
         }
 
-        impl<'a, Ctx: Copy, $($T:DekuReader<'a, Ctx>+Sized),+> DekuReader<'a, Ctx> for ($($T,)+)
+        impl<'a, Ctx: Clone, $($T:DekuReader<'a, Ctx>+Sized),+> DekuReader<'a, Ctx> for ($($T,)+)
         {
             fn from_reader_with_ctx<R: Read + Seek>(
                 reader: &mut crate::reader::Reader<R>,
@@ -48,20 +48,20 @@ macro_rules! ImplDekuTupleTraits {
             {
                 let tuple = ();
                 $(
-                    let val = <$T>::from_reader_with_ctx(reader, ctx)?;
+                    let val = <$T>::from_reader_with_ctx(reader, ctx.clone())?;
                     let tuple = tuple.append(val);
                 )+
                 Ok(tuple)
             }
         }
 
-        impl<Ctx: Copy, $($T:DekuWriter<Ctx>),+> DekuWriter<Ctx> for ($($T,)+)
+        impl<Ctx: Clone, $($T:DekuWriter<Ctx>),+> DekuWriter<Ctx> for ($($T,)+)
         {
             #[allow(non_snake_case)]
             fn to_writer<W: Write + Seek>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
                 let ($(ref $T,)+) = *self;
                 $(
-                    $T.to_writer(writer, ctx)?;
+                    $T.to_writer(writer, ctx.clone())?;
                 )+
                 Ok(())
             }

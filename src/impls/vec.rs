@@ -38,7 +38,7 @@ fn reader_vec_with_predicate<'a, T, Ctx, Predicate, R: Read + Seek>(
 ) -> Result<Vec<T>, DekuError>
 where
     T: DekuReader<'a, Ctx>,
-    Ctx: Copy,
+    Ctx: Clone,
     Predicate: FnMut(usize, &T) -> bool,
 {
     // ZST detected, return empty vec
@@ -51,7 +51,7 @@ where
     let start_read = reader.bits_read;
 
     loop {
-        let val = <T>::from_reader_with_ctx(reader, ctx)?;
+        let val = <T>::from_reader_with_ctx(reader, ctx.clone())?;
         res.push(val);
 
         // This unwrap is safe as we are pushing to the vec immediately before it,
@@ -71,7 +71,7 @@ fn reader_vec_to_end<'a, T, Ctx, R: Read + Seek>(
 ) -> Result<Vec<T>, DekuError>
 where
     T: DekuReader<'a, Ctx>,
-    Ctx: Copy,
+    Ctx: Clone,
 {
     // ZST detected, return empty vec
     if mem::size_of::<T>() == 0 {
@@ -83,7 +83,7 @@ where
         if reader.end() {
             break;
         }
-        let val = <T>::from_reader_with_ctx(reader, ctx)?;
+        let val = <T>::from_reader_with_ctx(reader, ctx.clone())?;
         res.push(val);
     }
 
@@ -93,7 +93,7 @@ where
 impl<'a, T, Ctx, Predicate> DekuReader<'a, (Limit<T, Predicate>, Ctx)> for Vec<T>
 where
     T: DekuReader<'a, Ctx>,
-    Ctx: Copy,
+    Ctx: Clone,
     Predicate: FnMut(&T) -> bool,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
@@ -112,7 +112,7 @@ where
                 }
 
                 // Otherwise, read until we have read `count` elements
-                reader_vec_with_predicate(reader, Some(count), inner_ctx, move |_, _| {
+                reader_vec_with_predicate(reader, Some(count), inner_ctx.clone(), move |_, _| {
                     count -= 1;
                     count == 0
                 })
@@ -120,7 +120,9 @@ where
 
             // Read until a given predicate returns true
             Limit::Until(mut predicate, _) => {
-                reader_vec_with_predicate(reader, None, inner_ctx, move |_, value| predicate(value))
+                reader_vec_with_predicate(reader, None, inner_ctx.clone(), move |_, value| {
+                    predicate(value)
+                })
             }
 
             // Read until a given quantity of bits have been read
@@ -132,7 +134,7 @@ where
                     return Ok(Vec::new());
                 }
 
-                reader_vec_with_predicate(reader, None, inner_ctx, move |read_bits, _| {
+                reader_vec_with_predicate(reader, None, inner_ctx.clone(), move |read_bits, _| {
                     read_bits == bit_size
                 })
             }
@@ -146,12 +148,12 @@ where
                     return Ok(Vec::new());
                 }
 
-                reader_vec_with_predicate(reader, None, inner_ctx, move |read_bits, _| {
+                reader_vec_with_predicate(reader, None, inner_ctx.clone(), move |read_bits, _| {
                     read_bits == bit_size
                 })
             }
 
-            Limit::End => reader_vec_to_end(reader, None, inner_ctx),
+            Limit::End => reader_vec_to_end(reader, None, inner_ctx.clone()),
         }
     }
 }
@@ -171,7 +173,7 @@ impl<'a, T: DekuReader<'a>, Predicate: FnMut(&T) -> bool> DekuReader<'a, Limit<T
     }
 }
 
-impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Vec<T> {
+impl<T: DekuWriter<Ctx>, Ctx: Clone> DekuWriter<Ctx> for Vec<T> {
     /// Write all `T`s in a `Vec` to bits.
     /// * **inner_ctx** - The context required by `T`.
     /// # Examples
@@ -202,7 +204,7 @@ impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Vec<T> {
         inner_ctx: Ctx,
     ) -> Result<(), DekuError> {
         for v in self {
-            v.to_writer(writer, inner_ctx)?;
+            v.to_writer(writer, inner_ctx.clone())?;
         }
         Ok(())
     }

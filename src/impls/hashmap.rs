@@ -66,15 +66,15 @@ where
     Ok(res)
 }
 
-impl<'a, K, V, S, Ctx, Predicate, PredicateWithContext>
-    DekuReader<'a, (Limit<(K, V), Predicate, Ctx, PredicateWithContext>, Ctx)> for HashMap<K, V, S>
+impl<'a, K, V, S, Ctx, Predicate, PredicateWithCtx>
+    DekuReader<'a, (Limit<(K, V), Predicate, Ctx, PredicateWithCtx>, Ctx)> for HashMap<K, V, S>
 where
     K: DekuReader<'a, Ctx> + Eq + Hash,
     V: DekuReader<'a, Ctx>,
     S: BuildHasher + Default,
     Ctx: Clone,
     Predicate: FnMut(&(K, V)) -> bool,
-    PredicateWithContext: FnMut(&(K, V), Ctx) -> bool,
+    PredicateWithCtx: FnMut(&(K, V), Ctx) -> bool,
 {
     /// Read `T`s until the given limit
     /// * `limit` - the limiting factor on the amount of `T`s to read
@@ -104,7 +104,7 @@ where
     /// ```
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
-        (limit, inner_ctx): (Limit<(K, V), Predicate, Ctx, PredicateWithContext>, Ctx),
+        (limit, inner_ctx): (Limit<(K, V), Predicate, Ctx, PredicateWithCtx>, Ctx),
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
@@ -187,19 +187,19 @@ where
     }
 }
 
-impl<'a, K, V, S, Predicate, PredicateWithContext>
-    DekuReader<'a, Limit<(K, V), Predicate, (), PredicateWithContext>> for HashMap<K, V, S>
+impl<'a, K, V, S, Predicate, PredicateWithCtx>
+    DekuReader<'a, Limit<(K, V), Predicate, (), PredicateWithCtx>> for HashMap<K, V, S>
 where
     K: DekuReader<'a> + Eq + Hash,
     V: DekuReader<'a>,
     S: BuildHasher + Default,
     Predicate: FnMut(&(K, V)) -> bool,
-    PredicateWithContext: FnMut(&(K, V), ()) -> bool,
+    PredicateWithCtx: FnMut(&(K, V), ()) -> bool,
 {
     /// Read `K, V`s until the given limit from input for types which don't require context.
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
-        limit: Limit<(K, V), Predicate, (), PredicateWithContext>,
+        limit: Limit<(K, V), Predicate, (), PredicateWithCtx>,
     ) -> Result<Self, DekuError>
     where
         Self: Sized,

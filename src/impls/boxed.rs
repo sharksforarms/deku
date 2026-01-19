@@ -22,17 +22,17 @@ where
     }
 }
 
-impl<'a, T, Ctx, Predicate, PredicateWithContext>
-    DekuReader<'a, (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx)> for Box<[T]>
+impl<'a, T, Ctx, Predicate, PredicateWithCtx>
+    DekuReader<'a, (Limit<T, Predicate, Ctx, PredicateWithCtx>, Ctx)> for Box<[T]>
 where
     T: DekuReader<'a, Ctx>,
     Ctx: Clone,
     Predicate: FnMut(&T) -> bool,
-    PredicateWithContext: FnMut(&T, Ctx) -> bool,
+    PredicateWithCtx: FnMut(&T, Ctx) -> bool,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
-        (limit, inner_ctx): (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx),
+        (limit, inner_ctx): (Limit<T, Predicate, Ctx, PredicateWithCtx>, Ctx),
     ) -> Result<Self, DekuError> {
         // use Vec<T>'s implementation and convert to Box<[T]>
         let val = <Vec<T>>::from_reader_with_ctx(reader, (limit, inner_ctx.clone()))?;

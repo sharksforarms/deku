@@ -64,14 +64,14 @@ where
     Ok(res)
 }
 
-impl<'a, T, S, Ctx, Predicate, PredicateWithContext>
-    DekuReader<'a, (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx)> for HashSet<T, S>
+impl<'a, T, S, Ctx, Predicate, PredicateWithCtx>
+    DekuReader<'a, (Limit<T, Predicate, Ctx, PredicateWithCtx>, Ctx)> for HashSet<T, S>
 where
     T: DekuReader<'a, Ctx> + Eq + Hash,
     S: BuildHasher + Default,
     Ctx: Clone,
     Predicate: FnMut(&T) -> bool,
-    PredicateWithContext: FnMut(&T, Ctx) -> bool,
+    PredicateWithCtx: FnMut(&T, Ctx) -> bool,
 {
     /// Read `T`s until the given limit
     /// * `limit` - the limiting factor on the amount of `T`s to read
@@ -90,7 +90,7 @@ where
     /// ```
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
-        (limit, inner_ctx): (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx),
+        (limit, inner_ctx): (Limit<T, Predicate, Ctx, PredicateWithCtx>, Ctx),
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
@@ -178,13 +178,13 @@ impl<
         T: DekuReader<'a> + Eq + Hash,
         S: BuildHasher + Default,
         Predicate: FnMut(&T) -> bool,
-        PredicateWithContext: FnMut(&T, ()) -> bool,
-    > DekuReader<'a, Limit<T, Predicate, (), PredicateWithContext>> for HashSet<T, S>
+        PredicateWithCtx: FnMut(&T, ()) -> bool,
+    > DekuReader<'a, Limit<T, Predicate, (), PredicateWithCtx>> for HashSet<T, S>
 {
     /// Read `T`s until the given limit from input for types which don't require context.
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
-        limit: Limit<T, Predicate, (), PredicateWithContext>,
+        limit: Limit<T, Predicate, (), PredicateWithCtx>,
     ) -> Result<Self, DekuError>
     where
         Self: Sized,

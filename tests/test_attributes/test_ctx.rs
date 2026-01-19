@@ -288,7 +288,7 @@ fn test_enum_endian_ctx() {
 }
 
 #[test]
-fn test_use_implicit_index_of_array() {
+fn test_interior_mutability_for_context_read_until_with_ctx() {
     #[derive(Debug, Clone)]
     struct IndexContext {
         idx: std::rc::Rc<std::cell::Cell<usize>>,

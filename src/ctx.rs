@@ -133,11 +133,11 @@ impl<
         T,
         Ctx,
         Predicate: for<'a> FnMut(&'a T) -> bool,
-        PredicateWithContext: for<'a> FnMut(&'a T, Ctx) -> bool,
-    > From<PredicateWithContext> for Limit<T, Predicate, Ctx, PredicateWithContext>
+        PredicateWithCtx: for<'a> FnMut(&'a T, Ctx) -> bool,
+    > From<PredicateWithCtx> for Limit<T, Predicate, Ctx, PredicateWithCtx>
 {
     #[inline]
-    fn from(predicate_with_ctx: PredicateWithContext) -> Self {
+    fn from(predicate_with_ctx: PredicateWithCtx) -> Self {
         Limit::UntilWithCtx(predicate_with_ctx, PhantomData, PhantomData)
     }
 }
@@ -168,14 +168,14 @@ impl<T, Ctx, Predicate: for<'a> FnMut(&'a T) -> bool>
     }
 }
 
-impl<T, Ctx, PredicateWithContext: for<'a> FnMut(&'a T, Ctx) -> bool>
-    Limit<T, fn(&T) -> bool, Ctx, PredicateWithContext>
+impl<T, Ctx, PredicateWithCtx: for<'a> FnMut(&'a T, Ctx) -> bool>
+    Limit<T, fn(&T) -> bool, Ctx, PredicateWithCtx>
 {
     /// Constructs a new Limit that reads until the given predicate returns true
     /// The predicate is given a reference to the latest read value and must return
     /// true to stop reading
     #[inline]
-    pub fn new_until_with_ctx(predicate: PredicateWithContext) -> Self {
+    pub fn new_until_with_ctx(predicate: PredicateWithCtx) -> Self {
         predicate.into()
     }
 }

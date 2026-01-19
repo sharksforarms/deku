@@ -64,16 +64,16 @@ where
     Ok(res)
 }
 
-fn reader_vec_with_predicate_with_context<'a, T, Ctx, PredicateWithContext, R: Read + Seek>(
+fn reader_vec_with_predicate_with_context<'a, T, Ctx, PredicateWithCtx, R: Read + Seek>(
     reader: &mut Reader<R>,
     capacity: Option<usize>,
     ctx: Ctx,
-    mut predicate: PredicateWithContext,
+    mut predicate: PredicateWithCtx,
 ) -> Result<Vec<T>, DekuError>
 where
     T: DekuReader<'a, Ctx>,
     Ctx: Clone,
-    PredicateWithContext: FnMut(usize, &T, Ctx) -> bool,
+    PredicateWithCtx: FnMut(usize, &T, Ctx) -> bool,
 {
     // ZST detected, return empty vec
     if mem::size_of::<T>() == 0 {
@@ -128,17 +128,17 @@ where
     Ok(res)
 }
 
-impl<'a, T, Ctx, Predicate, PredicateWithContext>
-    DekuReader<'a, (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx)> for Vec<T>
+impl<'a, T, Ctx, Predicate, PredicateWithCtx>
+    DekuReader<'a, (Limit<T, Predicate, Ctx, PredicateWithCtx>, Ctx)> for Vec<T>
 where
     T: DekuReader<'a, Ctx>,
     Ctx: Clone,
     Predicate: FnMut(&T) -> bool,
-    PredicateWithContext: FnMut(&T, Ctx) -> bool,
+    PredicateWithCtx: FnMut(&T, Ctx) -> bool,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
-        (limit, inner_ctx): (Limit<T, Predicate, Ctx, PredicateWithContext>, Ctx),
+        (limit, inner_ctx): (Limit<T, Predicate, Ctx, PredicateWithCtx>, Ctx),
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
@@ -210,13 +210,13 @@ impl<
         'a,
         T: DekuReader<'a>,
         Predicate: FnMut(&T) -> bool,
-        PredicateWithContext: FnMut(&T, ()) -> bool,
-    > DekuReader<'a, Limit<T, Predicate, (), PredicateWithContext>> for Vec<T>
+        PredicateWithCtx: FnMut(&T, ()) -> bool,
+    > DekuReader<'a, Limit<T, Predicate, (), PredicateWithCtx>> for Vec<T>
 {
     /// Read `T`s until the given limit from input for types which don't require context.
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
-        limit: Limit<T, Predicate, (), PredicateWithContext>,
+        limit: Limit<T, Predicate, (), PredicateWithCtx>,
     ) -> Result<Self, DekuError>
     where
         Self: Sized,

@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use darling::ast::Data;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::spanned::Spanned;
 
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData};
 
@@ -23,26 +24,118 @@ fn calculate_fields_size<'a>(
     fields: impl IntoIterator<Item = &'a FieldData>,
     crate_: &syn::Ident,
 ) -> TokenStream {
-    let field_sizes = fields.into_iter().filter_map(|f| {
-        if !f.temp {
-            let field_type = &f.ty;
+    let field_components = fields.into_iter().filter_map(|f| {
+        if f.temp {
+            return None;
+        }
 
-            #[cfg(feature = "bits")]
-            if let Some(bits) = &f.bits {
-                return Some(quote! { (#bits) });
+        let mut components = Vec::new();
+
+        if let Some(magic) = &f.magic {
+            let magic_size = calculate_magic_size(magic);
+            components.push(quote! { #magic_size });
+        }
+
+        #[cfg(feature = "bits")]
+        {
+            if let Some(pad_before) =
+                calculate_padding_size(f.pad_bits_before.as_ref(), f.pad_bytes_before.as_ref())
+            {
+                components.push(pad_before);
             }
-
-            if let Some(bytes) = &f.bytes {
-                return Some(quote! { (#bytes) * 8 });
+        }
+        #[cfg(not(feature = "bits"))]
+        {
+            if let Some(pad_before) = calculate_padding_size(f.pad_bytes_before.as_ref()) {
+                components.push(pad_before);
             }
+        }
 
-            Some(quote! { <#field_type as ::#crate_::DekuSize>::SIZE_BITS })
+        let field_type = &f.ty;
+        #[cfg(feature = "bits")]
+        if let Some(bits) = &f.bits {
+            components.push(quote! { (#bits) });
+        } else if let Some(bytes) = &f.bytes {
+            components.push(quote! { (#bytes) * 8 });
         } else {
+            components.push(quote! { <#field_type as ::#crate_::DekuSize>::SIZE_BITS });
+        }
+
+        #[cfg(not(feature = "bits"))]
+        if let Some(bytes) = &f.bytes {
+            components.push(quote! { (#bytes) * 8 });
+        } else {
+            components.push(quote! { <#field_type as ::#crate_::DekuSize>::SIZE_BITS });
+        }
+
+        #[cfg(feature = "bits")]
+        {
+            if let Some(pad_after) =
+                calculate_padding_size(f.pad_bits_after.as_ref(), f.pad_bytes_after.as_ref())
+            {
+                components.push(pad_after);
+            }
+        }
+        #[cfg(not(feature = "bits"))]
+        {
+            if let Some(pad_after) = calculate_padding_size(f.pad_bytes_after.as_ref()) {
+                components.push(pad_after);
+            }
+        }
+
+        if components.is_empty() {
             None
+        } else {
+            Some(quote! { #(#components)+* })
         }
     });
 
-    quote! { 0 #(+ #field_sizes)* }
+    quote! { 0 #(+ (#field_components))* }
+}
+
+/// Check if struct/enum has seek attributes
+fn has_seek_attributes(input: &DekuData) -> bool {
+    input.seek_rewind
+        || input.seek_from_current.is_some()
+        || input.seek_from_end.is_some()
+        || input.seek_from_start.is_some()
+}
+
+/// Check if field has seek attributes
+fn field_has_seek_attributes(field: &FieldData) -> bool {
+    field.seek_rewind
+        || field.seek_from_current.is_some()
+        || field.seek_from_end.is_some()
+        || field.seek_from_start.is_some()
+}
+
+/// Calculate the size in bits of a magic byte string
+fn calculate_magic_size(magic: &syn::LitByteStr) -> TokenStream {
+    let magic_len = magic.value().len();
+    quote! { #magic_len * 8 }
+}
+
+/// Calculate padding size (with bits feature)
+#[cfg(feature = "bits")]
+fn calculate_padding_size(
+    pad_bits: Option<&TokenStream>,
+    pad_bytes: Option<&TokenStream>,
+) -> Option<TokenStream> {
+    match (pad_bits, pad_bytes) {
+        (Some(bits), Some(bytes)) => Some(quote! { (#bits) + ((#bytes) * 8) }),
+        (Some(bits), None) => Some(quote! { (#bits) }),
+        (None, Some(bytes)) => Some(quote! { ((#bytes) * 8) }),
+        (None, None) => None,
+    }
+}
+
+/// Calculate padding size (without bits feature)
+#[cfg(not(feature = "bits"))]
+fn calculate_padding_size(pad_bytes: Option<&TokenStream>) -> Option<TokenStream> {
+    match pad_bytes {
+        Some(bytes) => Some(quote! { ((#bytes) * 8) }),
+        None => None,
+    }
 }
 
 /// Add DekuSize trait bounds to where clause for fields that need them
@@ -102,12 +195,39 @@ fn calculate_discriminant_size(
 fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
 
+    if has_seek_attributes(input) {
+        return Err(syn::Error::new(
+            input.ident.span(),
+            "DekuSize cannot be derived for types with seek attributes (seek_rewind, seek_from_current, seek_from_end, seek_from_start). Seek operations make size unpredictable.",
+        ));
+    }
+
     let DekuDataStruct {
         imp: _,
         wher: _,
         ident: _,
         fields,
     } = DekuDataStruct::try_from(input)?;
+
+    for field in fields.iter().copied() {
+        if field_has_seek_attributes(field) {
+            let field_name = field
+                .ident
+                .as_ref()
+                .map(|i| i.to_string())
+                .unwrap_or_else(|| "unnamed field".to_string());
+            return Err(syn::Error::new(
+                field.ty.span(),
+                format!("DekuSize cannot be derived for types with seek attributes on field '{}'. Seek operations make size unpredictable.", field_name),
+            ));
+        }
+    }
+
+    let magic_size = if let Some(magic) = &input.magic {
+        calculate_magic_size(magic)
+    } else {
+        quote! { 0 }
+    };
 
     let size_calculation = calculate_fields_size(fields.iter().copied(), &crate_);
 
@@ -120,7 +240,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let tokens = quote! {
         impl #imp_generics ::#crate_::DekuSize for #ident #ty_generics #where_clause {
-            const SIZE_BITS: usize = #size_calculation;
+            const SIZE_BITS: usize = #magic_size + #size_calculation;
         }
     };
 
@@ -129,6 +249,13 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
 fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
+
+    if has_seek_attributes(input) {
+        return Err(syn::Error::new(
+            input.ident.span(),
+            "DekuSize cannot be derived for types with seek attributes (seek_rewind, seek_from_current, seek_from_end, seek_from_start). Seek operations make size unpredictable.",
+        ));
+    }
 
     let DekuDataEnum {
         imp: _,
@@ -139,6 +266,28 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         id_type,
         id_args: _,
     } = DekuDataEnum::try_from(input)?;
+
+    for variant in variants.iter() {
+        for field in variant.fields.iter() {
+            if field_has_seek_attributes(field) {
+                let field_name = field
+                    .ident
+                    .as_ref()
+                    .map(|i| i.to_string())
+                    .unwrap_or_else(|| "unnamed field".to_string());
+                return Err(syn::Error::new(
+                    field.ty.span(),
+                    format!("DekuSize cannot be derived for types with seek attributes on field '{}'. Seek operations make size unpredictable.", field_name),
+                ));
+            }
+        }
+    }
+
+    let magic_size = if let Some(magic) = &input.magic {
+        calculate_magic_size(magic)
+    } else {
+        quote! { 0 }
+    };
 
     let discriminant_size = calculate_discriminant_size(input, id, id_type, &crate_);
 
@@ -171,7 +320,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let tokens = quote! {
         impl #imp_generics ::#crate_::DekuSize for #ident #ty_generics #where_clause {
-            const SIZE_BITS: usize = #discriminant_size + #max_variant_size;
+            const SIZE_BITS: usize = #magic_size + #discriminant_size + #max_variant_size;
         }
     };
 

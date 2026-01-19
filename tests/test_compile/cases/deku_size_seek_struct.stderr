@@ -1,0 +1,18 @@
+error: DekuSize cannot be derived for types with seek attributes (seek_rewind, seek_from_current, seek_from_end, seek_from_start). Seek operations make size unpredictable.
+ --> tests/test_compile/cases/deku_size_seek_struct.rs:5:8
+  |
+5 | struct SeekStruct {
+  |        ^^^^^^^^^^
+
+error[E0599]: no associated item named `SIZE_BITS` found for struct `SeekStruct` in the current scope
+  --> tests/test_compile/cases/deku_size_seek_struct.rs:10:25
+   |
+ 5 | struct SeekStruct {
+   | ----------------- associated item `SIZE_BITS` not found for this struct
+...
+10 |     let _ = SeekStruct::SIZE_BITS;
+   |                         ^^^^^^^^^ associated item not found in `SeekStruct`
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `SIZE_BITS`, perhaps you need to implement it:
+           candidate #1: `deku::DekuSize`

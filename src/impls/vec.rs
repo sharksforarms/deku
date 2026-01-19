@@ -353,15 +353,14 @@ mod tests {
     }
 
     #[cfg(all(feature = "bits", feature = "descriptive-errors"))]
-    #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
-        case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, None, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0], bits![u8, Msb0;], &[0xbb]),
-        case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(8).into(), vec![0xAA], bits![u8, Msb0;], &[0xbb]),
-        case::end([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::end(), vec![0xaa, 0xbb], bits![u8, Msb0;], &[]),
+    #[rstest(input, endian, limit, expected, expected_rest_bits, expected_rest_bytes,
+        case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0], bits![u8, Msb0;], &[0xbb]),
+        case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, BitSize(8).into(), vec![0xAA], bits![u8, Msb0;], &[0xbb]),
+        case::end([0xAA, 0xBB].as_ref(), Endian::Little, Limit::end(), vec![0xaa, 0xbb], bits![u8, Msb0;], &[]),
     )]
     fn test_vec_reader_no_bitsize<Predicate: FnMut(&u8) -> bool>(
         input: &[u8],
         endian: Endian,
-        bit_size: Option<usize>,
         limit: Limit<u8, Predicate, Endian, fn(&u8, Endian) -> bool>,
         expected: Vec<u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
@@ -369,10 +368,7 @@ mod tests {
     ) {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        let res_read = match bit_size {
-            Some(bit_size) => panic!("unexpected"),
-            None => Vec::<u8>::from_reader_with_ctx(&mut reader, (limit, (endian))).unwrap(),
-        };
+        let res_read = Vec::<u8>::from_reader_with_ctx(&mut reader, (limit, (endian))).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(
             reader.rest(),

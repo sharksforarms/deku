@@ -283,6 +283,9 @@ mod tests {
          };
     );
 
+    type MyLimit<Predicate> =
+        Limit<(u8, u8), Predicate, (Endian, BitSize), fn(&(u8, u8), (Endian, BitSize)) -> bool>;
+
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
         case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), FxHashMap::default(), bits![u8, Msb0;], &[0xaa]),
         case::count_1([0x01, 0xAA, 0x02, 0xBB].as_ref(), Endian::Little, Some(8), 1.into(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0x02, 0xbb]),
@@ -305,12 +308,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<
-            (u8, u8),
-            Predicate,
-            (Endian, BitSize),
-            fn(&(u8, u8), (Endian, BitSize)) -> bool,
-        >,
+        limit: MyLimit<Predicate>,
         expected: FxHashMap<u8, u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],
@@ -332,6 +330,8 @@ mod tests {
         assert_eq!(expected_rest_bytes, buf);
     }
 
+    type MyLimit2<Predicate> = Limit<(u8, u8), Predicate, Endian, fn(&(u8, u8), Endian) -> bool>;
+
     #[rstest(input, endian, limit, expected, expected_rest_bits, expected_rest_bytes,
         case::until_null([0x01, 0xAA, 0, 0, 0xBB].as_ref(), Endian::Little, (|kv: &(u8, u8)| kv.0 == 0u8 && kv.1 == 0u8).into(), fxhashmap!{0x01 => 0xAA, 0 => 0}, bits![u8, Msb0;], &[0xbb]),
         case::until_empty_bits([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, BitSize(0).into(), FxHashMap::default(), bits![u8, Msb0;], &[0x01, 0xaa, 0xbb]),
@@ -344,7 +344,7 @@ mod tests {
     fn test_hashmap_read_no_bitsize<Predicate: FnMut(&(u8, u8)) -> bool + Copy>(
         input: &[u8],
         endian: Endian,
-        limit: Limit<(u8, u8), Predicate, Endian, fn(&(u8, u8), Endian) -> bool>,
+        limit: MyLimit2<Predicate>,
         expected: FxHashMap<u8, u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],

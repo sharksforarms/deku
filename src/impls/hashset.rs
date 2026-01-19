@@ -242,6 +242,9 @@ mod tests {
 
     use super::*;
 
+    type MyLimit<Predicate> =
+        Limit<u8, Predicate, (Endian, BitSize), fn(&u8, (Endian, BitSize)) -> bool>;
+
     #[cfg(all(feature = "bits", feature = "descriptive-errors"))]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
         case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), FxHashSet::default(), bits![u8, Msb0;], &[0xaa]),
@@ -265,7 +268,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<u8, Predicate, (Endian, BitSize), fn(&u8, (Endian, BitSize)) -> bool>,
+        limit: MyLimit<Predicate>,
         expected: FxHashSet<u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],
@@ -287,6 +290,8 @@ mod tests {
         assert_eq!(expected_rest_bytes, buf);
     }
 
+    type MyLimit2<Predicate> = Limit<u8, Predicate, Endian, fn(&u8, Endian) -> bool>;
+
     #[cfg(all(feature = "bits", feature = "descriptive-errors"))]
     #[rstest(input, endian, limit, expected, expected_rest_bits, expected_rest_bytes,
         case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
@@ -300,7 +305,7 @@ mod tests {
     fn test_hashset_read_no_bitsize<Predicate: FnMut(&u8) -> bool + Copy>(
         input: &[u8],
         endian: Endian,
-        limit: Limit<u8, Predicate, Endian, fn(&u8, Endian) -> bool>,
+        limit: MyLimit2<Predicate>,
         expected: FxHashSet<u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],

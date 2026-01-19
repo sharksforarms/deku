@@ -352,6 +352,8 @@ mod tests {
         assert_eq!(expected_rest_bytes, buf);
     }
 
+    type MyLimit<Predicate> = Limit<u8, Predicate, Endian, fn(&u8, Endian) -> bool>;
+
     #[cfg(all(feature = "bits", feature = "descriptive-errors"))]
     #[rstest(input, endian, limit, expected, expected_rest_bits, expected_rest_bytes,
         case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0], bits![u8, Msb0;], &[0xbb]),
@@ -361,7 +363,7 @@ mod tests {
     fn test_vec_reader_no_bitsize<Predicate: FnMut(&u8) -> bool>(
         input: &[u8],
         endian: Endian,
-        limit: Limit<u8, Predicate, Endian, fn(&u8, Endian) -> bool>,
+        limit: MyLimit<Predicate>,
         expected: Vec<u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],
@@ -389,6 +391,9 @@ mod tests {
         assert_eq!(expected, writer.inner.into_inner());
     }
 
+    type MyLimit2<Predicate> =
+        Limit<u16, Predicate, (Endian, BitSize), fn(&u16, (Endian, BitSize)) -> bool>;
+
     // Note: These tests also exist in boxed.rs
     #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes, expected_write,
@@ -403,7 +408,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<u16, Predicate, (Endian, BitSize), fn(&u16, (Endian, BitSize)) -> bool>,
+        limit: MyLimit2<Predicate>,
         expected: Vec<u16>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],

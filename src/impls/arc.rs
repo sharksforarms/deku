@@ -106,6 +106,9 @@ mod tests {
         assert_eq!(input.to_vec(), writer.inner.into_inner());
     }
 
+    type MyLimit<Predicate> =
+        Limit<u16, Predicate, (Endian, BitSize), fn(&u16, (Endian, BitSize)) -> bool>;
+
     // Note: Copied tests from vec.rs impl
     #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes, expected_write,
@@ -120,7 +123,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<u16, Predicate, (Endian, BitSize), fn(&u16, (Endian, BitSize)) -> bool>,
+        limit: MyLimit<Predicate>,
         expected: Arc<[u16]>,
         expected_rest_bits: &bitvec::slice::BitSlice<u8, bitvec::prelude::Msb0>,
         expected_rest_bytes: &[u8],

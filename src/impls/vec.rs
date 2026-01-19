@@ -306,6 +306,9 @@ mod tests {
         assert_eq!(expected_rest_bytes, buf);
     }
 
+    type MyLimit4<Predicate> =
+        Limit<u8, Predicate, (Endian, BitSize), fn(&u8, (Endian, BitSize)) -> bool>;
+
     #[cfg(all(feature = "bits", feature = "descriptive-errors"))]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
         case::count_0([0xAA].as_ref(), Endian::Little, Some(8), 0.into(), vec![], bits![u8, Msb0;], &[0xaa]),
@@ -330,7 +333,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<u8, Predicate, (Endian, BitSize), fn(&u8, (Endian, BitSize)) -> bool>,
+        limit: MyLimit4<Predicate>,
         expected: Vec<u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],

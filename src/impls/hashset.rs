@@ -341,8 +341,9 @@ mod tests {
                 .any(|u| v == u)));
     }
 
-    // Limit<u16, fn(&u16), (Endian, BitSize), fn(&u16, (Endian, BitSize))>
-    //::from(2)
+    type MyLimit3<Predicate> =
+        Limit<u16, Predicate, (Endian, BitSize), fn(&u16, (Endian, BitSize)) -> bool>;
+
     // Note: These tests also exist in boxed.rs
     #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes, expected_write,
@@ -357,7 +358,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<u16, Predicate, (Endian, BitSize), fn(&u16, (Endian, BitSize)) -> bool>,
+        limit: MyLimit3<Predicate>,
         expected: FxHashSet<u16>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],

@@ -276,6 +276,8 @@ mod tests {
 
     use super::*;
 
+    type MyLimit3<Predicate> = Limit<u8, Predicate, (), fn(&u8, ()) -> bool>;
+
     #[cfg(feature = "bits")]
     #[rstest(input, limit, expected, expected_rest_bits, expected_rest_bytes,
         case::count_0([0xAA].as_ref(), 0.into(), vec![], bits![u8, Msb0;], &[0xaa]),
@@ -286,7 +288,7 @@ mod tests {
     )]
     fn test_vec_reader_no_ctx<Predicate: FnMut(&u8) -> bool>(
         mut input: &[u8],
-        limit: Limit<u8, Predicate, (), fn(&u8, ()) -> bool>,
+        limit: MyLimit3<Predicate>,
         expected: Vec<u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
         expected_rest_bytes: &[u8],

@@ -272,14 +272,11 @@ mod tests {
     ) {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        let res_read = match bit_size {
-            Some(bit_size) => FxHashSet::<u8>::from_reader_with_ctx(
-                &mut reader,
-                (limit, (endian, BitSize(bit_size))),
-            )
-            .unwrap(),
-            None => panic!("unexpected"),
-        };
+        let res_read = FxHashSet::<u8>::from_reader_with_ctx(
+            &mut reader,
+            (limit, (endian, BitSize(bit_size.unwrap()))),
+        )
+        .unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(
             reader.rest(),
@@ -291,19 +288,18 @@ mod tests {
     }
 
     #[cfg(all(feature = "bits", feature = "descriptive-errors"))]
-    #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
-        case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, None, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
-        case::until_empty_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(0).into(), HashSet::default(), bits![u8, Msb0;], &[0xaa, 0xbb]),
-        case::until_empty_bytes([0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(0).into(), HashSet::default(), bits![u8, Msb0;], &[0xaa, 0xbb]),
-        case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(8).into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
-        case::read_all([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::end(), vec![0xAA, 0xBB].into_iter().collect(), bits![u8, Msb0;], &[]),
-        case::until_bytes([0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(1).into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
-        case::until_count([0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::from(1), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
+    #[rstest(input, endian, limit, expected, expected_rest_bits, expected_rest_bytes,
+        case::until_null([0xAA, 0, 0xBB].as_ref(), Endian::Little, (|v: &u8| *v == 0u8).into(), vec![0xAA, 0].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
+        case::until_empty_bits([0xAA, 0xBB].as_ref(), Endian::Little, BitSize(0).into(), HashSet::default(), bits![u8, Msb0;], &[0xaa, 0xbb]),
+        case::until_empty_bytes([0xAA, 0xBB].as_ref(), Endian::Little, ByteSize(0).into(), HashSet::default(), bits![u8, Msb0;], &[0xaa, 0xbb]),
+        case::until_bits([0xAA, 0xBB].as_ref(), Endian::Little, BitSize(8).into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
+        case::read_all([0xAA, 0xBB].as_ref(), Endian::Little, Limit::end(), vec![0xAA, 0xBB].into_iter().collect(), bits![u8, Msb0;], &[]),
+        case::until_bytes([0xAA, 0xBB].as_ref(), Endian::Little, ByteSize(1).into(), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
+        case::until_count([0xAA, 0xBB].as_ref(), Endian::Little, Limit::from(1), vec![0xAA].into_iter().collect(), bits![u8, Msb0;], &[0xbb]),
     )]
     fn test_hashset_read_no_bitsize<Predicate: FnMut(&u8) -> bool + Copy>(
         input: &[u8],
         endian: Endian,
-        bit_size: Option<usize>,
         limit: Limit<u8, Predicate, Endian, fn(&u8, Endian) -> bool>,
         expected: FxHashSet<u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
@@ -311,10 +307,8 @@ mod tests {
     ) {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        let res_read = match bit_size {
-            Some(_) => panic!("unexpected"),
-            None => FxHashSet::<u8>::from_reader_with_ctx(&mut reader, (limit, (endian))).unwrap(),
-        };
+        let res_read =
+            FxHashSet::<u8>::from_reader_with_ctx(&mut reader, (limit, (endian))).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(
             reader.rest(),

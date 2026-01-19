@@ -317,16 +317,11 @@ mod tests {
     ) {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        let res_read = match bit_size {
-            Some(bit_size) => FxHashMap::<u8, u8>::from_reader_with_ctx(
-                &mut reader,
-                (limit, (endian, BitSize(bit_size))),
-            )
-            .unwrap(),
-            None => {
-                panic!("unexpected")
-            }
-        };
+        let res_read = FxHashMap::<u8, u8>::from_reader_with_ctx(
+            &mut reader,
+            (limit, (endian, BitSize(bit_size.unwrap()))),
+        )
+        .unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(
             reader.rest(),
@@ -337,19 +332,18 @@ mod tests {
         assert_eq!(expected_rest_bytes, buf);
     }
 
-    #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes,
-        case::until_null([0x01, 0xAA, 0, 0, 0xBB].as_ref(), Endian::Little, None, (|kv: &(u8, u8)| kv.0 == 0u8 && kv.1 == 0u8).into(), fxhashmap!{0x01 => 0xAA, 0 => 0}, bits![u8, Msb0;], &[0xbb]),
-        case::until_empty_bits([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(0).into(), FxHashMap::default(), bits![u8, Msb0;], &[0x01, 0xaa, 0xbb]),
-        case::until_empty_bytes([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(0).into(), FxHashMap::default(), bits![u8, Msb0;], &[0x01, 0xaa, 0xbb]),
-        case::until_bits([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, BitSize(16).into(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0xbb]),
-        case::read_all([0x01, 0xAA].as_ref(), Endian::Little, None, Limit::end(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[]),
-        case::until_bytes([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, ByteSize(2).into(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0xbb]),
-        case::until_count([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, None, Limit::from(1), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0xbb]),
+    #[rstest(input, endian, limit, expected, expected_rest_bits, expected_rest_bytes,
+        case::until_null([0x01, 0xAA, 0, 0, 0xBB].as_ref(), Endian::Little, (|kv: &(u8, u8)| kv.0 == 0u8 && kv.1 == 0u8).into(), fxhashmap!{0x01 => 0xAA, 0 => 0}, bits![u8, Msb0;], &[0xbb]),
+        case::until_empty_bits([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, BitSize(0).into(), FxHashMap::default(), bits![u8, Msb0;], &[0x01, 0xaa, 0xbb]),
+        case::until_empty_bytes([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, ByteSize(0).into(), FxHashMap::default(), bits![u8, Msb0;], &[0x01, 0xaa, 0xbb]),
+        case::until_bits([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, BitSize(16).into(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0xbb]),
+        case::read_all([0x01, 0xAA].as_ref(), Endian::Little, Limit::end(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[]),
+        case::until_bytes([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, ByteSize(2).into(), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0xbb]),
+        case::until_count([0x01, 0xAA, 0xBB].as_ref(), Endian::Little, Limit::from(1), fxhashmap!{0x01 => 0xAA}, bits![u8, Msb0;], &[0xbb]),
     )]
     fn test_hashmap_read_no_bitsize<Predicate: FnMut(&(u8, u8)) -> bool + Copy>(
         input: &[u8],
         endian: Endian,
-        bit_size: Option<usize>,
         limit: Limit<(u8, u8), Predicate, Endian, fn(&(u8, u8), Endian) -> bool>,
         expected: FxHashMap<u8, u8>,
         expected_rest_bits: &BitSlice<u8, Msb0>,
@@ -357,12 +351,8 @@ mod tests {
     ) {
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        let res_read = match bit_size {
-            Some(_) => panic!("unexpected"),
-            None => {
-                FxHashMap::<u8, u8>::from_reader_with_ctx(&mut reader, (limit, (endian))).unwrap()
-            }
-        };
+        let res_read =
+            FxHashMap::<u8, u8>::from_reader_with_ctx(&mut reader, (limit, (endian))).unwrap();
         assert_eq!(expected, res_read);
         assert_eq!(
             reader.rest(),

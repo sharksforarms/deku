@@ -419,11 +419,11 @@ fn test_interior_mutability_for_context_read_until_with_ctx_hashmap() {
     #[derive(PartialEq, Debug, Clone)]
     struct A {
         #[deku(
-            until_with_ctx = "|x:&(B,B),ctx:IndexContext| !ctx.fx.get()",
+            until_with_ctx = "|x:&(N,B),ctx:IndexContext| !ctx.fx.get()",
             ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0, fx: std::rc::Rc::new(std::cell::Cell::new(false))}",
             writer_ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: items.len(), fx: std::rc::Rc::new(std::cell::Cell::new(false)) }"
         )]
-        items: HashMap<B, B>,
+        items: HashMap<N, B>,
     }
 
     #[deku_derive(DekuRead, DekuWrite)]
@@ -448,11 +448,21 @@ fn test_interior_mutability_for_context_read_until_with_ctx_hashmap() {
         auto_fx: u8,
     }
 
+    #[deku_derive(DekuRead, DekuWrite)]
+    #[derive(PartialEq, Debug, Clone, Eq, Hash)]
+    #[deku(
+        ctx = "ctx: IndexContext",
+        ctx_default = "IndexContext{idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0, fx: std::rc::Rc::new(std::cell::Cell::new(false))}"
+    )] // this struct uses a context for serialization. For deserialization it also works with the default context.
+    struct N {
+        n: u8,
+    }
+
     let test_data = A {
         items: HashMap::from([
-            (B { x: 8, y: 9 }, B { x: 8, y: 9 }),
-            (B { x: 8, y: 9 }, B { x: 7, y: 9 }),
-            (B { x: 8, y: 9 }, B { x: 6, y: 9 }),
+            (N { n: 1 }, B { x: 8, y: 9 }),
+            (N { n: 2 }, B { x: 7, y: 9 }),
+            (N { n: 3 }, B { x: 6, y: 9 }),
         ]),
     };
 

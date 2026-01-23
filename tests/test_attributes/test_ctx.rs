@@ -473,3 +473,55 @@ fn test_interior_mutability_for_context_read_until_with_ctx_hashmap() {
     let check_data = A::from_bytes((&ret_write, 0)).unwrap().1;
     assert_eq!(check_data, test_data);
 }
+
+#[test]
+fn test_interior_mutability_for_context_read_until_with_ctx_slice_ref() {
+    #[derive(Debug, Clone)]
+    struct IndexContext {
+        idx: std::rc::Rc<std::cell::Cell<usize>>,
+        n: usize,
+        fx: std::rc::Rc<std::cell::Cell<bool>>,
+    }
+
+    #[deku_derive(DekuRead, DekuWrite)]
+    #[derive(PartialEq, Debug, Clone)]
+    #[deku(
+        ctx = "ctx: IndexContext",
+        ctx_default = "IndexContext{idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0, fx: std::rc::Rc::new(std::cell::Cell::new(false))}"
+    )] // this struct uses a context for serialization. For deserialization it also works with the default context.
+    struct B {
+        x: u8,
+        y: u8,
+        #[deku(
+            temp,
+            temp_value = "{let ret = ctx.idx.get() as u8; ctx.idx.set(ctx.idx.get()+1); ret}"
+        )]
+        idx_automatically_filled: u8,
+        #[deku(
+            read_post_processing = "ctx.fx.set(*auto_fx!=0);",
+            temp,
+            temp_value = "if ctx.idx.get() < ctx.n {1} else {0}"
+        )]
+        auto_fx: u8,
+    }
+
+    let data = [B { x: 8, y: 9 }, B { x: 7, y: 9 }, B { x: 6, y: 9 }];
+
+    let mut buf = vec![];
+    let mut cursor = Cursor::new(&mut buf);
+    let mut writer = Writer::new(&mut cursor);
+    data[..]
+        .to_writer(
+            &mut writer,
+            IndexContext {
+                idx: std::rc::Rc::new(std::cell::Cell::new(0)),
+                n: 3,
+                fx: std::rc::Rc::new(std::cell::Cell::new(false)),
+            },
+        )
+        .unwrap();
+    assert_eq!(vec![8, 9, 0, 1, 7, 9, 1, 1, 6, 9, 2, 0], buf);
+    //                    ^  ^        ^  ^        ^  ^
+    //                    |  fx=1     |  fx=1     |  fx=0 (last)
+    //                   idx=0      idx=1       idx=2
+}

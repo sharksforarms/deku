@@ -515,7 +515,7 @@ fn test_interior_mutability_for_context_read_until_with_ctx_slice_ref() {
             &mut writer,
             IndexContext {
                 idx: std::rc::Rc::new(std::cell::Cell::new(0)),
-                n: 3,
+                n: data.len(),
                 fx: std::rc::Rc::new(std::cell::Cell::new(false)),
             },
         )

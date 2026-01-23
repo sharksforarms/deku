@@ -510,7 +510,8 @@ fn test_interior_mutability_for_context_read_until_with_ctx_slice_ref() {
     let mut buf = vec![];
     let mut cursor = Cursor::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
-    data[..]
+    let myref = &data[..];
+    myref
         .to_writer(
             &mut writer,
             IndexContext {

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.20.4](https://github.com/sharksforarms/deku/compare/deku-v0.20.3...deku-v0.20.4) - 2026-01-23
+
+### Other
+
+- update stale feature flag documentation ([#637](https://github.com/sharksforarms/deku/pull/637))
+
 ## [0.20.3](https://github.com/sharksforarms/deku/compare/deku-v0.20.2...deku-v0.20.3) - 2026-01-15
 
 ### Fixed

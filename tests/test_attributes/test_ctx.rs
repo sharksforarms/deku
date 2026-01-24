@@ -511,7 +511,8 @@ fn test_interior_mutability_for_context_read_until_with_ctx_slice_ref() {
     let mut cursor = Cursor::new(&mut buf);
     let mut writer = Writer::new(&mut cursor);
     let myref = &data[..];
-    myref
+    // auto referencing rules: we want to call the method on `&[T]`:
+    (&myref)
         .to_writer(
             &mut writer,
             IndexContext {

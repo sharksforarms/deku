@@ -48,6 +48,7 @@ enum DekuEnum {
 | [bytes_read](#bytes_read) | field | Set the field representing the number of bytes to read into a container
 | [until](#until) | field | Set a predicate returning when to stop reading elements into a container
 | [read_all](#read_all) | field | Read until [reader.end()] returns `true`
+| [read_post_processing](#read_post_processing) | field | Code to postprocess read data (including temp values; can be used to modify the context via interior mutability)
 | [update](#update) | field | Apply code over the field when `.update()` is called
 | [temp](#temp) | field | Read the field but exclude it from the struct/enum
 | [temp_value](#temp_value) | field | Write the field but exclude it from the struct/enum
@@ -61,7 +62,8 @@ enum DekuEnum {
 | [map](#map) | field | Specify a function or lambda to apply to the result of the read
 | [reader](#readerwriter) | variant, field | Custom reader code
 | [writer](#readerwriter) | variant, field | Custom writer code
-| [ctx](#ctx) | top-level, field| Context list for context sensitive parsing
+| [ctx](#ctx) | top-level, field| Context list for context sensitive parsing (reader/writer)
+| [writer_ctx](#ctx) | top-level, field| Context list for context sensitive parsing (overrides ctx for the writer part)
 | [ctx_default](#ctx_default) | top-level, field| Default context values
 | enum: [id](#id) | top-level, variant | enum or variant id value
 | enum: [id_endian](#id_endian) | top-level | Endianness of *just* the enum `id`

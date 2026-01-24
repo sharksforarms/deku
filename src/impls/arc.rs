@@ -10,29 +10,31 @@ use crate::{DekuError, DekuReader, DekuWriter};
 impl<'a, T, Ctx> DekuReader<'a, Ctx> for Arc<T>
 where
     T: DekuReader<'a, Ctx>,
-    Ctx: Copy,
+    Ctx: Clone,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
-        let val = <T>::from_reader_with_ctx(reader, inner_ctx)?;
+        let val = <T>::from_reader_with_ctx(reader, inner_ctx.clone())?;
         Ok(Arc::new(val))
     }
 }
 
-impl<'a, T, Ctx, Predicate> DekuReader<'a, (Limit<T, Predicate>, Ctx)> for Arc<[T]>
+impl<'a, T, Ctx, Predicate, PredicateWithCtx>
+    DekuReader<'a, (Limit<T, Predicate, Ctx, PredicateWithCtx>, Ctx)> for Arc<[T]>
 where
     T: DekuReader<'a, Ctx>,
-    Ctx: Copy,
+    Ctx: Clone,
     Predicate: FnMut(&T) -> bool,
+    PredicateWithCtx: FnMut(&T, Ctx) -> bool,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
-        (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
+        (limit, inner_ctx): (Limit<T, Predicate, Ctx, PredicateWithCtx>, Ctx),
     ) -> Result<Self, DekuError> {
         // use Vec<T>'s implementation and convert to Arc<[T]>
-        let val = <Vec<T>>::from_reader_with_ctx(reader, (limit, inner_ctx))?;
+        let val = <Vec<T>>::from_reader_with_ctx(reader, (limit, inner_ctx.clone()))?;
         Ok(Arc::from(val.into_boxed_slice()))
     }
 }
@@ -40,7 +42,7 @@ where
 impl<T, Ctx> DekuWriter<Ctx> for Arc<[T]>
 where
     T: DekuWriter<Ctx>,
-    Ctx: Copy,
+    Ctx: Clone,
 {
     /// Write all `T`s to bits
     fn to_writer<W: Write + Seek>(
@@ -49,7 +51,7 @@ where
         ctx: Ctx,
     ) -> Result<(), DekuError> {
         for v in self.as_ref() {
-            v.to_writer(writer, ctx)?;
+            v.to_writer(writer, ctx.clone())?;
         }
         Ok(())
     }
@@ -58,7 +60,7 @@ where
 impl<T, Ctx> DekuWriter<Ctx> for Arc<T>
 where
     T: DekuWriter<Ctx>,
-    Ctx: Copy,
+    Ctx: Clone,
 {
     /// Write all `T`s to bits
     fn to_writer<W: Write + Seek>(
@@ -66,7 +68,7 @@ where
         writer: &mut Writer<W>,
         ctx: Ctx,
     ) -> Result<(), DekuError> {
-        self.as_ref().to_writer(writer, ctx)?;
+        self.as_ref().to_writer(writer, ctx.clone())?;
         Ok(())
     }
 }
@@ -80,7 +82,6 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    #[cfg(feature = "bits")]
     use crate::ctx::{BitSize, Endian};
     use crate::native_endian;
     use crate::reader::Reader;
@@ -104,6 +105,9 @@ mod tests {
         assert_eq!(input.to_vec(), writer.inner.into_inner());
     }
 
+    type MyLimit<Predicate> =
+        Limit<u16, Predicate, (Endian, BitSize), fn(&u16, (Endian, BitSize)) -> bool>;
+
     // Note: Copied tests from vec.rs impl
     #[cfg(feature = "bits")]
     #[rstest(input, endian, bit_size, limit, expected, expected_rest_bits, expected_rest_bytes, expected_write,
@@ -118,7 +122,7 @@ mod tests {
         input: &[u8],
         endian: Endian,
         bit_size: Option<usize>,
-        limit: Limit<u16, Predicate>,
+        limit: MyLimit<Predicate>,
         expected: Arc<[u16]>,
         expected_rest_bits: &bitvec::slice::BitSlice<u8, bitvec::prelude::Msb0>,
         expected_rest_bytes: &[u8],

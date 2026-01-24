@@ -6,7 +6,7 @@ use crate::{DekuError, DekuReader, DekuWriter};
 use core::mem::MaybeUninit;
 use no_std_io::io::{Read, Seek, Write};
 
-impl<'a, Ctx: Copy, T, const N: usize> DekuReader<'a, Ctx> for [T; N]
+impl<'a, Ctx: Clone, T, const N: usize> DekuReader<'a, Ctx> for [T; N]
 where
     T: DekuReader<'a, Ctx>,
 {
@@ -19,7 +19,7 @@ where
     {
         let mut array: [MaybeUninit<T>; N] = [const { MaybeUninit::uninit() }; N];
         for (n, item) in array.iter_mut().enumerate() {
-            match T::from_reader_with_ctx(reader, ctx) {
+            match T::from_reader_with_ctx(reader, ctx.clone()) {
                 Ok(value) => {
                     item.write(value);
                 }
@@ -46,7 +46,7 @@ where
     }
 }
 
-impl<Ctx: Copy, T, const N: usize> DekuWriter<Ctx> for [T; N]
+impl<Ctx: Clone, T, const N: usize> DekuWriter<Ctx> for [T; N]
 where
     T: DekuWriter<Ctx>,
 {
@@ -56,13 +56,13 @@ where
         ctx: Ctx,
     ) -> Result<(), DekuError> {
         for v in self {
-            v.to_writer(writer, ctx)?;
+            v.to_writer(writer, ctx.clone())?;
         }
         Ok(())
     }
 }
 
-impl<Ctx: Copy, T> DekuWriter<Ctx> for &[T]
+impl<Ctx: Clone, T> DekuWriter<Ctx> for &[T]
 where
     T: DekuWriter<Ctx>,
 {
@@ -72,13 +72,13 @@ where
         ctx: Ctx,
     ) -> Result<(), DekuError> {
         for v in *self {
-            v.to_writer(writer, ctx)?;
+            v.to_writer(writer, ctx.clone())?;
         }
         Ok(())
     }
 }
 
-impl<Ctx: Copy, T> DekuWriter<Ctx> for [T]
+impl<Ctx: Clone, T> DekuWriter<Ctx> for [T]
 where
     T: DekuWriter<Ctx>,
 {
@@ -88,7 +88,7 @@ where
         ctx: Ctx,
     ) -> Result<(), DekuError> {
         for v in self {
-            v.to_writer(writer, ctx)?;
+            v.to_writer(writer, ctx.clone())?;
         }
         Ok(())
     }

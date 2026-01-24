@@ -696,6 +696,7 @@ fn emit_field_write(
         &f.writer,
         &f.cond,
         &f.ctx.as_ref().map(|v| quote!(#v)),
+        &f.writer_ctx.as_ref().map(|v| quote!(#v)),
         &f.assert,
         &f.assert_eq,
     ];
@@ -747,7 +748,11 @@ fn emit_field_write(
             #[cfg(not(feature = "bits"))]
             None,
             f.bytes.as_ref(),
-            f.ctx.as_ref(),
+            if f.writer_ctx.is_some() {
+                f.writer_ctx.as_ref()
+            } else {
+                f.ctx.as_ref()
+            },
             field_bit_order,
         )?;
 

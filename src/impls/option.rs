@@ -2,24 +2,24 @@ use no_std_io::io::{Read, Seek, Write};
 
 use crate::{writer::Writer, DekuError, DekuReader, DekuWriter};
 
-impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
+impl<'a, T: DekuReader<'a, Ctx>, Ctx: Clone> DekuReader<'a, Ctx> for Option<T> {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut crate::reader::Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
-        let val = <T>::from_reader_with_ctx(reader, inner_ctx)?;
+        let val = <T>::from_reader_with_ctx(reader, inner_ctx.clone())?;
         Ok(Some(val))
     }
 }
 
-impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Option<T> {
+impl<T: DekuWriter<Ctx>, Ctx: Clone> DekuWriter<Ctx> for Option<T> {
     fn to_writer<W: Write + Seek>(
         &self,
         writer: &mut Writer<W>,
         inner_ctx: Ctx,
     ) -> Result<(), DekuError> {
         self.as_ref()
-            .map_or(Ok(()), |v| v.to_writer(writer, inner_ctx))
+            .map_or(Ok(()), |v| v.to_writer(writer, inner_ctx.clone()))
     }
 }
 

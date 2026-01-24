@@ -9,13 +9,13 @@ use crate::{DekuError, DekuReader, DekuWriter};
 impl<'a, T, Ctx> DekuReader<'a, Ctx> for Cow<'a, T>
 where
     T: DekuReader<'a, Ctx> + Clone,
-    Ctx: Copy,
+    Ctx: Clone,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
-        let val = <T>::from_reader_with_ctx(reader, inner_ctx)?;
+        let val = <T>::from_reader_with_ctx(reader, inner_ctx.clone())?;
         Ok(Cow::Owned(val))
     }
 }
@@ -23,7 +23,7 @@ where
 impl<T, Ctx> DekuWriter<Ctx> for Cow<'_, T>
 where
     T: DekuWriter<Ctx> + Clone,
-    Ctx: Copy,
+    Ctx: Clone,
 {
     /// Write T from Cow<T>
     fn to_writer<W: Write + Seek>(
@@ -31,7 +31,7 @@ where
         writer: &mut Writer<W>,
         inner_ctx: Ctx,
     ) -> Result<(), DekuError> {
-        (self.borrow() as &T).to_writer(writer, inner_ctx)
+        (self.borrow() as &T).to_writer(writer, inner_ctx.clone())
     }
 }
 

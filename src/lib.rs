@@ -821,7 +821,7 @@ pub trait DekuSize {
 impl<T, Ctx> DekuWriter<Ctx> for &T
 where
     T: DekuWriter<Ctx>,
-    Ctx: Copy,
+    Ctx: Clone,
 {
     #[inline(always)]
     fn to_writer<W: no_std_io::Write + no_std_io::Seek>(
@@ -829,7 +829,7 @@ where
         writer: &mut Writer<W>,
         ctx: Ctx,
     ) -> Result<(), DekuError> {
-        <T>::to_writer(self, writer, ctx)?;
+        <T>::to_writer(self, writer, ctx.clone())?;
         Ok(())
     }
 }

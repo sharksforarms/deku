@@ -93,12 +93,15 @@ impl FromStr for Endian {
 // For details: https://github.com/rust-lang/rust-clippy/issues/9413
 /// A limit placed on a container's elements
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd)]
-pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
+pub enum Limit<T, Predicate: FnMut(&T) -> bool, Ctx, PredicateWithCtx: FnMut(&T, Ctx) -> bool> {
     /// Read a specific count of elements
     Count(usize),
 
     /// Read until a given predicate holds true
     Until(Predicate, PhantomData<T>),
+
+    /// Read until a given predicate holds true
+    UntilWithCtx(PredicateWithCtx, PhantomData<T>, PhantomData<Ctx>),
 
     /// Read until a given quantity of bytes have been read
     ByteSize(ByteSize),
@@ -110,35 +113,52 @@ pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
     End,
 }
 
-impl<T> From<usize> for Limit<T, fn(&T) -> bool> {
+impl<T, Ctx> From<usize> for Limit<T, fn(&T) -> bool, Ctx, fn(&T, Ctx) -> bool> {
     #[inline]
     fn from(n: usize) -> Self {
         Limit::Count(n)
     }
 }
 
-impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> From<Predicate> for Limit<T, Predicate> {
+impl<T, Ctx, Predicate: for<'a> FnMut(&'a T) -> bool> From<Predicate>
+    for Limit<T, Predicate, Ctx, fn(&T, Ctx) -> bool>
+{
     #[inline]
     fn from(predicate: Predicate) -> Self {
         Limit::Until(predicate, PhantomData)
     }
 }
 
-impl<T> From<ByteSize> for Limit<T, fn(&T) -> bool> {
+impl<
+        T,
+        Ctx,
+        Predicate: for<'a> FnMut(&'a T) -> bool,
+        PredicateWithCtx: for<'a> FnMut(&'a T, Ctx) -> bool,
+    > From<PredicateWithCtx> for Limit<T, Predicate, Ctx, PredicateWithCtx>
+{
+    #[inline]
+    fn from(predicate_with_ctx: PredicateWithCtx) -> Self {
+        Limit::UntilWithCtx(predicate_with_ctx, PhantomData, PhantomData)
+    }
+}
+
+impl<T, Ctx> From<ByteSize> for Limit<T, fn(&T) -> bool, Ctx, fn(&T, Ctx) -> bool> {
     #[inline]
     fn from(size: ByteSize) -> Self {
         Limit::ByteSize(size)
     }
 }
 
-impl<T> From<BitSize> for Limit<T, fn(&T) -> bool> {
+impl<T, Ctx> From<BitSize> for Limit<T, fn(&T) -> bool, Ctx, fn(&T, Ctx) -> bool> {
     #[inline]
     fn from(size: BitSize) -> Self {
         Limit::BitSize(size)
     }
 }
 
-impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> Limit<T, Predicate> {
+impl<T, Ctx, Predicate: for<'a> FnMut(&'a T) -> bool>
+    Limit<T, Predicate, Ctx, fn(&T, Ctx) -> bool>
+{
     /// Constructs a new Limit that reads until the given predicate returns true
     /// The predicate is given a reference to the latest read value and must return
     /// true to stop reading
@@ -148,7 +168,19 @@ impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> Limit<T, Predicate> {
     }
 }
 
-impl<T> Limit<T, fn(&T) -> bool> {
+impl<T, Ctx, PredicateWithCtx: for<'a> FnMut(&'a T, Ctx) -> bool>
+    Limit<T, fn(&T) -> bool, Ctx, PredicateWithCtx>
+{
+    /// Constructs a new Limit that reads until the given predicate returns true
+    /// The predicate is given a reference to the latest read value and must return
+    /// true to stop reading
+    #[inline]
+    pub fn new_until_with_ctx(predicate: PredicateWithCtx) -> Self {
+        predicate.into()
+    }
+}
+
+impl<T, Ctx> Limit<T, fn(&T) -> bool, Ctx, fn(&T, Ctx) -> bool> {
     /// Read until `reader.end()` is true
     #[inline]
     pub fn end() -> Self {
@@ -156,7 +188,7 @@ impl<T> Limit<T, fn(&T) -> bool> {
     }
 }
 
-impl<T> Limit<T, fn(&T) -> bool> {
+impl<T, Ctx> Limit<T, fn(&T) -> bool, Ctx, fn(&T, Ctx) -> bool> {
     /// Constructs a new Limit that reads until the given number of elements are read
     #[inline]
     pub fn new_count(count: usize) -> Self {

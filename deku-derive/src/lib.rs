@@ -10,7 +10,7 @@ use std::convert::TryFrom;
 use std::fmt::Display;
 use syn::{Attribute, Meta, Type};
 
-use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};
+use darling::{ast, ast::NestedMeta, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};
 use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use syn::punctuated::Punctuated;
@@ -153,6 +153,57 @@ impl FromMeta for Num {
             _ => Err(darling::Error::unexpected_lit_type(value)),
         })
         .map_err(|e| e.with_span(value))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum SkipMode {
+    /// skip
+    All,
+    /// skip(read) - skip only reading
+    Read,
+    // skip(write) - skip only writing
+    Write,
+}
+
+impl FromMeta for SkipMode {
+    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
+        if items.len() != 1 {
+            return Err(darling::Error::custom(
+                "skip must have exactly one argument",
+            ));
+        }
+
+        match &items[0] {
+            NestedMeta::Meta(meta) => {
+                if let Meta::Path(path) = meta {
+                    if let Some(ident) = path.get_ident() {
+                        match ident.to_string().as_str() {
+                            "read" => Ok(SkipMode::Read),
+                            "write" => Ok(SkipMode::Write),
+                            _ => Err(darling::Error::custom(
+                                "skip argument must be 'read' or 'write'",
+                            )),
+                        }
+                    } else {
+                        Err(darling::Error::custom(
+                            "skip argument must be a simple identifier, not a path",
+                        ))
+                    }
+                } else {
+                    Err(darling::Error::custom(
+                        "skip argument must be 'read' or 'write', not a key-value pair",
+                    ))
+                }
+            }
+            _ => Err(darling::Error::custom(
+                "skip argument must be 'read' or 'write', not a literal",
+            )),
+        }
+    }
+
+    fn from_word() -> darling::Result<Self> {
+        Ok(SkipMode::All)
     }
 }
 
@@ -605,7 +656,7 @@ struct FieldData {
     writer: Option<TokenStream>,
 
     /// skip field reading/writing
-    skip: bool,
+    skip: Option<SkipMode>,
 
     /// pad a number of bits before
     #[cfg(feature = "bits")]
@@ -709,7 +760,7 @@ impl FieldData {
             || self.bit_order.is_some()
             || self.magic.is_some();
 
-        let any_bool_set = self.read_all || self.skip || self.temp || self.seek_rewind;
+        let any_bool_set = self.read_all || self.skip.is_some() || self.temp || self.seek_rewind;
 
         any_option_set || any_bool_set
     }
@@ -812,7 +863,7 @@ impl FieldData {
         }
 
         // Validate usage of `default` attribute
-        if data.default.is_some() && (!data.skip && data.cond.is_none()) {
+        if data.default.is_some() && (data.skip.is_none() && data.cond.is_none()) {
             // FIXME: Use `Span::join` once out of nightly
             return Err(cerror(
                 data.default.span(),
@@ -1136,7 +1187,7 @@ struct DekuFieldReceiver {
 
     /// skip field reading/writing
     #[darling(default)]
-    skip: bool,
+    skip: Option<SkipMode>,
 
     /// pad a number of bits before
     #[cfg(feature = "bits")]

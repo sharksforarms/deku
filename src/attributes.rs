@@ -1307,27 +1307,48 @@ Defaults value to [default](#default)
 
 **Note**: Can be paired with [cond](#cond) to have conditional skipping
 
+Skip modes:
+- `skip` - Skip both reading and writing
+- `skip(read)` - Skip only reading, field is written normally
+- `skip(write)` - Skip only writing, field is read normally
+
 Example:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::vec::Vec;
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "alloc")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     field_a: u8,
-    #[deku(skip)]
+    #[deku(skip)]  // Skip both read and write (Must be Option or have `default`)
     field_b: Option<u8>,
+    #[deku(skip(read))]  // Skip read, write normally
     field_c: u8,
+    #[deku(skip(write))]  // Skip write, read normally
+    field_d: u8,
+    field_e: u8,
 }
 
-let data: &[u8] = &[0x01, 0x02];
+# #[cfg(feature = "alloc")]
+# {
+let data: &[u8] = &[0x01, 0x02, 0x03];
 
 let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
-    DekuTest { field_a: 0x01, field_b: None, field_c: 0x02 },
+    DekuTest { field_a: 0x01, field_b: None, field_c: 0, field_d: 0x02, field_e: 0x03 },
     value
 );
+
+// When writing back, field_c is included but field_d is skipped
+let bytes = value.to_bytes().unwrap();
+assert_eq!(bytes, &[0x01, 0x00, 0x03]); // field_a, field_c, field_e
+# }
 ```
 
 # pad_bytes_before

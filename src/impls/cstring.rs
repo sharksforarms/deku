@@ -8,7 +8,7 @@ use crate::writer::Writer;
 use crate::{ctx::*, DekuReader};
 use crate::{DekuError, DekuWriter};
 
-impl<Ctx: Copy> DekuWriter<Ctx> for CString
+impl<Ctx: Clone> DekuWriter<Ctx> for CString
 where
     u8: DekuWriter<Ctx>,
 {
@@ -18,7 +18,7 @@ where
         ctx: Ctx,
     ) -> Result<(), DekuError> {
         let bytes = self.as_bytes_with_nul();
-        bytes.to_writer(writer, ctx)
+        bytes.to_writer(writer, ctx.clone())
     }
 }
 

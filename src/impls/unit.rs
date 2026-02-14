@@ -2,7 +2,7 @@ use no_std_io::io::{Read, Seek, Write};
 
 use crate::{reader::Reader, writer::Writer, DekuError, DekuReader, DekuWriter};
 
-impl<Ctx: Copy> DekuReader<'_, Ctx> for () {
+impl<Ctx: Clone> DekuReader<'_, Ctx> for () {
     fn from_reader_with_ctx<R: Read + Seek>(
         _reader: &mut Reader<R>,
         _inner_ctx: Ctx,
@@ -11,7 +11,7 @@ impl<Ctx: Copy> DekuReader<'_, Ctx> for () {
     }
 }
 
-impl<Ctx: Copy> DekuWriter<Ctx> for () {
+impl<Ctx: Clone> DekuWriter<Ctx> for () {
     /// NOP on write
     fn to_writer<W: Write + Seek>(
         &self,

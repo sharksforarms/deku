@@ -47,7 +47,9 @@ enum DekuEnum {
 | [bits_read](#bits_read) | field | Set the field representing the number of bits to read into a container
 | [bytes_read](#bytes_read) | field | Set the field representing the number of bytes to read into a container
 | [until](#until) | field | Set a predicate returning when to stop reading elements into a container
+| [until_with_ctx](#context_with_interior_mutability) | field | like `until`, but the predicate also receives the context as second argument
 | [read_all](#read_all) | field | Read until [reader.end()] returns `true`
+| [read_post_processing](#context_with_interior_mutability) | field | Code to postprocess read data (including temp values; can be used to modify the context via interior mutability)
 | [update](#update) | field | Apply code over the field when `.update()` is called
 | [temp](#temp) | field | Read the field but exclude it from the struct/enum
 | [temp_value](#temp_value) | field | Write the field but exclude it from the struct/enum
@@ -61,7 +63,8 @@ enum DekuEnum {
 | [map](#map) | field | Specify a function or lambda to apply to the result of the read
 | [reader](#readerwriter) | variant, field | Custom reader code
 | [writer](#readerwriter) | variant, field | Custom writer code
-| [ctx](#ctx) | top-level, field| Context list for context sensitive parsing
+| [ctx](#ctx) | top-level, field| Context list for context sensitive parsing (reader/writer)
+| [writer_ctx](#context_with_interior_mutability) | top-level, field| Context list for context sensitive parsing (overrides ctx for the writer part)
 | [ctx_default](#ctx_default) | top-level, field| Default context values
 | enum: [id](#id) | top-level, variant | enum or variant id value
 | enum: [id_endian](#id_endian) | top-level | Endianness of *just* the enum `id`
@@ -1150,6 +1153,123 @@ let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(&*data, value);
 # }
 #
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
+```
+
+# <div id="context_with_interior_mutability">Context with Interior Mutability (using `until_with_ctx`, `writer_ctx`, `read_post_processing`)</div>
+
+The following example demonstrates how to read and write an array of data, where a flag in each data item (`auto_fx`) indicates whether that item is the last in a containing array.
+**Importantly, this flag is not part of the actual data structure** presented to the user and is only a temporary construct used during reading and writing.
+This ensures the flag is always set correctly and cannot be misused (e.g. be forgotten to be set correctly).
+
+The central idea is to use a **context with interior mutability** (specifically, the `fx` field) to make the temporary value available to the outer structure while traversing the array. This context can also be used to increment a counter representing the current index of the traversed array.
+
+**Key Steps Illustrated in This Example:**
+
+1. **Define a context with interior mutability**:
+   1. A mutable `idx` field representing the **current index of the array** (mutable through a `Cell`, shared through an `Rc`).
+   2. A mutable flag `fx` indicating the **end of the array** (mutable through a `Cell`, shared through an `Rc`).
+   3. A (non-mutable) value `n` representing the **length of the array** (while writing) or zero (while reading).
+
+2. **Set up the context separately for reading (`ctx`) and writing (`writer_ctx`)**. This is
+   important, since the final array length is unknown while reading.
+
+3. **During reading**:
+   1. The temporary information stored in the `auto_fx` field must be passed back to the caller via the context.
+   2. `read_post_processing` stores the temporary value in the context.
+   3. `until_with_ctx` in the surrounding array uses this context to control how much data to read (until the `fx` flag is zero).
+
+4. **During writing**:
+   - The index is updated in each step and the `auto_fx` field is set accordingly (last entry is set to `false`).
+
+Example:
+
+* Here, the user fills an array with x/y data
+  ```rust,ignore
+  A { items: vec![
+     B { x: 8, y: 9 },
+     B { x: 7, y: 9 },
+     B { x: 6, y: 9 },
+  ] };
+  ```
+* This data is stored on disk as x/y/"index-in-array"/"fx=0 for the last element, else fx=1"
+  ```rust,ignore
+             vec![8, 9, 0, 1, 7, 9, 1, 1, 6, 9, 2, 0]
+  //                    ^  ^        ^  ^        ^  ^
+  //                    |  fx=1     |  fx=1     |  fx=0 (last)
+  //                   idx=0      idx=1       idx=2
+  ```
+* The user (providing the x/y data) is not aware of the index and the `fx` field
+  stored on disk (and cannot break the binary data format by providing some wrong data).
+
+* Note: this enables to implement "Extended Length Data Items" from the
+  [ASTERIX EUROCONTOL](https://www.eurocontrol.int/publication/eurocontrol-specification-surveillance-data-exchange-part-i)
+  standard, without making control flags (`fx`) visible in the user data.
+
+```rust
+# #[cfg(feature = "alloc")]
+# use deku::prelude::*;
+# #[cfg(feature = "alloc")]
+# fn main() {
+#[derive(Debug, Clone)]
+struct IndexContext {
+    idx: std::rc::Rc<std::cell::Cell<usize>>, // see text, 1.1
+    n: usize,                                 // see text, 1.2
+    fx: std::rc::Rc<std::cell::Cell<bool>>,   // see text, 1.3
+}
+#[deku_derive(DekuRead, DekuWrite)]
+#[derive(PartialEq, Debug, Clone)]
+struct A {
+    #[deku(
+        until_with_ctx = "|_:&B,ctx:IndexContext| !ctx.fx.get()", // see text, 3.1 + 3.3
+
+        // see text, 2
+        ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0, fx: std::rc::Rc::new(std::cell::Cell::new(false))}",
+        writer_ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: items.len(), fx: std::rc::Rc::new(std::cell::Cell::new(false)) }"
+    )]
+    items: Vec<B>,
+}
+#[deku_derive(DekuRead, DekuWrite)]
+#[derive(PartialEq, Debug, Clone)]
+#[deku(
+    ctx = "ctx: IndexContext",
+    ctx_default = "IndexContext{idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0, fx: std::rc::Rc::new(std::cell::Cell::new(false))}"
+)] // this struct uses a context for serialization. For deserialization it also works with the default context.
+struct B {
+    x: u8,
+    y: u8,
+    #[deku(
+        temp,
+        temp_value = "{let ret = ctx.idx.get() as u8; ctx.idx.set(ctx.idx.get()+1); ret}"
+    )]
+    idx_automatically_filled: u8,
+    #[deku(
+        read_post_processing = "ctx.fx.set(*auto_fx!=0);", // see text, 3.2 + 3.3
+        temp,
+        temp_value = "if ctx.idx.get() < ctx.n {1} else {0}" // see text, 4
+    )]
+    auto_fx: u8,
+}
+#
+#     let test_data = A {
+#         items: vec![B { x: 8, y: 9 }, B { x: 7, y: 9 }, B { x: 6, y: 9 }],
+#     };
+#
+#     let ret_write: Vec<u8> = test_data.clone().try_into().unwrap();
+#     assert_eq!(vec![8, 9, 0, 1, 7, 9, 1, 1, 6, 9, 2, 0], ret_write);
+#     //                    ^  ^        ^  ^        ^  ^
+#     //                    |  fx=1     |  fx=1     |  fx=0 (last)
+#     //                   idx=0      idx=1       idx=2
+#
+#     // read the data back
+#     let check_data = A::from_bytes((&ret_write, 0)).unwrap().1;
+#     assert_eq!(check_data, test_data);
+#
+#     // check with fx=0 after the second element:
+#     let check_data = A::from_bytes((&[8, 9, 0, 1, 7, 9, 1, 0], 0)).unwrap().1;
+#     assert_eq!(check_data.items.len(), 2);
+# }
 # #[cfg(not(feature = "alloc"))]
 # fn main() {}
 ```

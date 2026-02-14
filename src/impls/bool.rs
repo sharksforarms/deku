@@ -6,14 +6,14 @@ use crate::{deku_error, DekuError, DekuReader, DekuWriter};
 
 impl<'a, Ctx> DekuReader<'a, Ctx> for bool
 where
-    Ctx: Copy,
+    Ctx: Clone,
     u8: DekuReader<'a, Ctx>,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
         reader: &mut Reader<R>,
         inner_ctx: Ctx,
     ) -> Result<bool, DekuError> {
-        let val = u8::from_reader_with_ctx(reader, inner_ctx)?;
+        let val = u8::from_reader_with_ctx(reader, inner_ctx.clone())?;
 
         let ret = match val {
             0x01 => Ok(true),

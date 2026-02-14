@@ -23,7 +23,7 @@ fn main() {
 
     let mut binding = Cursor::new(custom.clone());
     let mut reader = Reader::new(&mut binding);
-    let ret = <Vec<Test> as DekuReader<Limit<_, _>>>::from_reader_with_ctx(
+    let ret = <Vec<Test> as DekuReader<Limit<_, _, _, _>>>::from_reader_with_ctx(
         &mut reader,
         Limit::new_count(10_0000),
     );

@@ -634,8 +634,11 @@ struct FieldData {
     /// tokens providing the number of bytes for the length of the container
     bytes_read: Option<TokenStream>,
 
-    /// a predicate to decide when to stop reading elements into the container
+    /// a predicate to decide when to stop reading elements into the container (receives the current container element)
     until: Option<TokenStream>,
+
+    /// a predicate to decide when to stop reading elements into the container (receives the current container element and a clone of the context)
+    until_with_ctx: Option<TokenStream>,
 
     /// read until `reader.end()`
     read_all: bool,
@@ -643,8 +646,11 @@ struct FieldData {
     /// apply a function to the field after it's read
     map: Option<TokenStream>,
 
-    /// context passed to the field
+    /// context passed to the field (reader/writer; see writer_ctx)
     ctx: Option<Punctuated<syn::Expr, syn::token::Comma>>,
+
+    /// writer_context passed to the field (overrides ctx)
+    writer_ctx: Option<Punctuated<syn::Expr, syn::token::Comma>>,
 
     /// map field when updating struct
     update: Option<TokenStream>,
@@ -677,6 +683,9 @@ struct FieldData {
 
     /// write given value of temp field
     temp_value: Option<TokenStream>,
+
+    /// post_process
+    read_post_processing: Option<TokenStream>,
 
     /// default value code when used with skip or cond
     default: Option<TokenStream>,
@@ -729,8 +738,10 @@ impl FieldData {
         any_option_set = any_option_set
             || self.bytes_read.is_some()
             || self.until.is_some()
+            || self.until_with_ctx.is_some()
             || self.map.is_some()
             || self.ctx.is_some()
+            || self.writer_ctx.is_some()
             || self.update.is_some()
             || self.reader.is_some()
             || self.writer.is_some();
@@ -751,6 +762,7 @@ impl FieldData {
         any_option_set = any_option_set
             || self.pad_bytes_after.is_some()
             || self.temp_value.is_some()
+            || self.read_post_processing.is_some()
             || self.cond.is_some()
             || self.assert.is_some()
             || self.assert_eq.is_some()
@@ -771,6 +783,11 @@ impl FieldData {
             .map(|s| s.parse_with(Punctuated::parse_terminated))
             .transpose()
             .map_err(|e| e.to_compile_error())?;
+        let writer_ctx = receiver
+            .writer_ctx?
+            .map(|s| s.parse_with(Punctuated::parse_terminated))
+            .transpose()
+            .map_err(|e| e.to_compile_error())?;
 
         let data = Self {
             ident: receiver.ident,
@@ -784,9 +801,11 @@ impl FieldData {
             bits_read: receiver.bits_read?,
             bytes_read: receiver.bytes_read?,
             until: receiver.until?,
+            until_with_ctx: receiver.until_with_ctx?,
             read_all: receiver.read_all,
             map: receiver.map?,
             ctx,
+            writer_ctx,
             update: receiver.update?,
             reader: receiver.reader?,
             writer: receiver.writer?,
@@ -799,6 +818,7 @@ impl FieldData {
             pad_bytes_after: receiver.pad_bytes_after?,
             temp: receiver.temp,
             temp_value: receiver.temp_value?,
+            read_post_processing: receiver.read_post_processing?,
             default: receiver.default?,
             cond: receiver.cond?,
             assert: receiver.assert?,
@@ -875,12 +895,13 @@ impl FieldData {
         #[cfg(feature = "bits")]
         if data.read_all
             && (data.until.is_some()
+                || data.until_with_ctx.is_some()
                 || data.count.is_some()
                 || (data.bits_read.is_some() || data.bytes_read.is_some()))
         {
             return Err(cerror(
                 data.read_all.span(),
-                "conflicting: `read_all` cannot be used with `until`, `count`, `bits_read`, or `bytes_read`",
+                "conflicting: `read_all` cannot be used with `until`, `until_with_ctx`, `count`, `bits_read`, or `bytes_read`",
             ));
         }
 
@@ -1158,6 +1179,10 @@ struct DekuFieldReceiver {
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     until: Result<Option<TokenStream>, ReplacementError>,
 
+    /// a predicate to decide when to stop reading elements into the container
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    until_with_ctx: Result<Option<TokenStream>, ReplacementError>,
+
     /// read until `reader.end()`
     #[darling(default)]
     read_all: bool,
@@ -1166,12 +1191,19 @@ struct DekuFieldReceiver {
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     map: Result<Option<TokenStream>, ReplacementError>,
 
-    /// context passed to the field.
+    /// context passed to the field (reader/writer). See writer_ctx.
     /// A comma separated argument list.
     // TODO: The type of it should be `Punctuated<Expr, Comma>`
     //       https://github.com/TedDriggs/darling/pull/98
     #[darling(default = "default_res_opt", map = "map_option_litstr")]
     ctx: Result<Option<syn::LitStr>, ReplacementError>,
+
+    /// writer_context passed to the field. Overrides ctx.
+    /// A comma separated argument list.
+    // TODO: The type of it should be `Punctuated<Expr, Comma>`
+    //       https://github.com/TedDriggs/darling/pull/98
+    #[darling(default = "default_res_opt", map = "map_option_litstr")]
+    writer_ctx: Result<Option<syn::LitStr>, ReplacementError>,
 
     /// map field when updating struct
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
@@ -1214,6 +1246,10 @@ struct DekuFieldReceiver {
     /// write given value of temp field
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     temp_value: Result<Option<TokenStream>, ReplacementError>,
+
+    /// post process read values
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    read_post_processing: Result<Option<TokenStream>, ReplacementError>,
 
     /// default value code when used with skip
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]

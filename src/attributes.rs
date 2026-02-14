@@ -1161,24 +1161,24 @@ assert_eq!(&*data, value);
 
 The following example demonstrates how to read and write an array of data, where a flag in each data item (`auto_fx`) indicates whether that item is the last in a containing array.
 **Importantly, this flag is not part of the actual data structure** presented to the user and is only a temporary construct used during reading and writing.
-With this this flag is always set correctly and cannot be misused (e.g. be forgotten to be set correctly).
+This ensures the flag is always set correctly and cannot be misused (e.g. be forgotten to be set correctly).
 
 The central idea is to use a **context with interior mutability** (specifically, the `fx` field) to make the temporary value available to the outer structure while traversing the array. This context can also be used to increment a counter representing the current index of the traversed array.
 
 **Key Steps Illustrated in This Example:**
 
 1. **Define a context with interior mutability**:
-   - An `idx` field representing the **current index of the array**.
-   - A flag `fx` indicating the **end of the array**.
-   - A (non-mutable) value `n` representing the **length of the array** (while writing) or zero (while reading).
+   1. A mutable `idx` field representing the **current index of the array** (mutable through a `Cell`, shared through an `Rc`).
+   2. A mutable flag `fx` indicating the **end of the array** (mutable through a `Cell`, shared through an `Rc`).
+   3. A (non-mutable) value `n` representing the **length of the array** (while writing) or zero (while reading).
 
 2. **Set up the context separately for reading (`ctx`) and writing (`writer_ctx`)**. This is
    important, since the final array length is unknown while reading.
 
 3. **During reading**:
-   - The temporary information stored in the `auto_fx` field must be passed back to the caller via the context.
-   - `read_post_processing` stores the temporary value in the context.
-   - `until_with_ctx` in the surrounding array uses this context to control how much data to read (until the `fx` flag is zero).
+   1. The temporary information stored in the `auto_fx` field must be passed back to the caller via the context.
+   2. `read_post_processing` stores the temporary value in the context.
+   3. `until_with_ctx` in the surrounding array uses this context to control how much data to read (until the `fx` flag is zero).
 
 4. **During writing**:
    - The index is updated in each step and the `auto_fx` field is set accordingly (last entry is set to `false`).
@@ -1203,7 +1203,7 @@ Example:
 * The user (providing the x/y data) is not aware of the index and the `fx` field
   stored on disk (and cannot break the binary data format by providing some wrong data).
 
-* Note: this enables to transparently implement "Extended Length Data Items" from the
+* Note: this enables to implement "Extended Length Data Items" from the
   [ASTERIX EUROCONTOL](https://www.eurocontrol.int/publication/eurocontrol-specification-surveillance-data-exchange-part-i)
   standard, without making control flags (`fx`) visible in the user data.
 
@@ -1214,15 +1214,17 @@ Example:
 # fn main() {
 #[derive(Debug, Clone)]
 struct IndexContext {
-    idx: std::rc::Rc<std::cell::Cell<usize>>,
-    n: usize,
-    fx: std::rc::Rc<std::cell::Cell<bool>>,
+    idx: std::rc::Rc<std::cell::Cell<usize>>, // see text, 1.1
+    n: usize,                                 // see text, 1.2
+    fx: std::rc::Rc<std::cell::Cell<bool>>,   // see text, 1.3
 }
 #[deku_derive(DekuRead, DekuWrite)]
 #[derive(PartialEq, Debug, Clone)]
 struct A {
     #[deku(
-        until_with_ctx = "|_:&B,ctx:IndexContext| !ctx.fx.get()",
+        until_with_ctx = "|_:&B,ctx:IndexContext| !ctx.fx.get()", // see text, 3.1 + 3.3
+
+        // see text, 2
         ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: 0, fx: std::rc::Rc::new(std::cell::Cell::new(false))}",
         writer_ctx = "IndexContext { idx: std::rc::Rc::new(std::cell::Cell::new(0)), n: items.len(), fx: std::rc::Rc::new(std::cell::Cell::new(false)) }"
     )]
@@ -1243,9 +1245,9 @@ struct B {
     )]
     idx_automatically_filled: u8,
     #[deku(
-        read_post_processing = "ctx.fx.set(*auto_fx!=0);",
+        read_post_processing = "ctx.fx.set(*auto_fx!=0);", // see text, 3.2 + 3.3
         temp,
-        temp_value = "if ctx.idx.get() < ctx.n {1} else {0}"
+        temp_value = "if ctx.idx.get() < ctx.n {1} else {0}" // see text, 4
     )]
     auto_fx: u8,
 }

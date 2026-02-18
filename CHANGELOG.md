@@ -15,6 +15,7 @@
 ### Other
 
 - Fix recursive DekuSize impl ([#628](https://github.com/sharksforarms/deku/pull/628))
+- Added a note concerning `skip`/`cond` attributes and padding (doc)
 
 ## [0.20.1](https://github.com/sharksforarms/deku/compare/deku-v0.20.0...deku-v0.20.1) - 2025-11-24
 

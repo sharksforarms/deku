@@ -49,6 +49,9 @@ enum DekuEnum {
 | [until](#until) | field | Set a predicate returning when to stop reading elements into a container
 | [read_all](#read_all) | field | Read until [reader.end()] returns `true`
 | [update](#update) | field | Apply code over the field when `.update()` is called
+| [update_ctx](#update_ctx) | top-level, field | Context to pass when calling update on nested fields
+| [update_also](#update_also) | field | Call `.update()` on a nested struct/enum field
+| [update_with](#update_with) | field | Specify a custom function to call when updating a field
 | [temp](#temp) | field | Read the field but exclude it from the struct/enum
 | [temp_value](#temp_value) | field | Write the field but exclude it from the struct/enum
 | [skip](#skip) | field | Skip the reading/writing of a field
@@ -1191,7 +1194,7 @@ assert_eq!(
 value.items.push(0xFF);
 
 // update it, this will update the `count` field
-value.update().unwrap();
+value.update(()).unwrap();
 
 assert_eq!(
     DekuTest { count: 0x03, items: vec![0xAB, 0xCD, 0xFF] },
@@ -1200,6 +1203,159 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(vec![0x03, 0xAB, 0xCD, 0xFF], value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
+```
+
+# update_ctx
+
+Specify context to pass when calling `.update()` on nested struct/enum fields.
+
+At the **top-level**, this defines the context parameters that the struct's `update()` method
+accepts (similar to how [ctx](#ctx) works for reading/writing).
+
+At the **field-level**, this specifies the context values to pass when calling `update()` on
+the field (used with [update_also](#update_also) or [update_with](#update_with)).
+
+Example:
+```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
+use deku::prelude::*;
+
+# #[cfg(feature = "alloc")]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct Container {
+    // Pass the length of `data` to the nested Header's update
+    #[deku(update_also, update_ctx = "self.data.len() as u16")]
+    header: Header,
+
+    #[deku(count = "header.length")]
+    data: Vec<u8>,
+}
+
+# #[cfg(feature = "alloc")]
+// Header receives update context: the data length
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(update_ctx = "data_len: u16")]
+struct Header {
+    #[deku(update = "data_len")]
+    length: u16,
+}
+
+# #[cfg(feature = "alloc")]
+# fn main() {
+let mut container = Container {
+    header: Header { length: 2 },
+    data: vec![0xAB, 0xCD],
+};
+
+// Add more data
+container.data.push(0xEF);
+
+// Update propagates to Header with context
+container.update(()).unwrap();
+assert_eq!(3, container.header.length);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
+```
+
+# update_also
+
+Call `.update()` on a nested struct/enum field when the parent's `.update()` is called.
+
+By default, calling `.update()` on a struct does not propagate to nested struct fields.
+Use `update_also` to explicitly propagate the update call to a field.
+
+Can be combined with [update_ctx](#update_ctx) to pass context values to the nested
+struct's update method.
+
+Example:
+```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
+use deku::prelude::*;
+
+# #[cfg(feature = "alloc")]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct Outer {
+    #[deku(update_also)]
+    inner: Inner,
+}
+
+# #[cfg(feature = "alloc")]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct Inner {
+    #[deku(update = "0xFF")]
+    value: u8,
+}
+
+# #[cfg(feature = "alloc")]
+# fn main() {
+let mut outer = Outer {
+    inner: Inner { value: 0x00 },
+};
+
+// This will propagate to inner.update()
+outer.update(()).unwrap();
+assert_eq!(0xFF, outer.inner.value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
+```
+
+# update_with
+
+Specify a custom function to call when updating a field.
+
+The function receives a mutable reference to the field and the update context,
+and should return `Result<(), DekuError>`.
+
+Can be combined with [update_ctx](#update_ctx) to pass context values to the function.
+
+Example:
+```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
+use deku::prelude::*;
+
+# #[cfg(feature = "alloc")]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(update_with = "Self::update_checksum", update_ctx = "self.data.iter().sum::<u8>(),")]
+    checksum: u8,
+    #[deku(count = "3")]
+    data: Vec<u8>,
+}
+
+# #[cfg(feature = "alloc")]
+impl DekuTest {
+    fn update_checksum(checksum: &mut u8, ctx: (u8,)) -> Result<(), DekuError> {
+        *checksum = ctx.0;
+        Ok(())
+    }
+}
+
+# #[cfg(feature = "alloc")]
+# fn main() {
+let mut value = DekuTest {
+    checksum: 0,
+    data: vec![0x01, 0x02, 0x03],
+};
+
+value.update(()).unwrap();
+assert_eq!(0x06, value.checksum); // 1 + 2 + 3 = 6
 # }
 #
 # #[cfg(not(feature = "alloc"))]

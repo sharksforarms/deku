@@ -229,6 +229,9 @@ struct DekuData {
     /// default context passed to the field
     ctx_default: Option<Punctuated<syn::Expr, syn::token::Comma>>,
 
+    /// context passed to the update function
+    update_ctx: Option<syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>>,
+
     /// A magic value that must appear at the start of this struct/enum's data
     magic: Option<syn::LitByteStr>,
 
@@ -392,6 +395,7 @@ impl DekuData {
             endian: receiver.endian,
             ctx: receiver.ctx,
             ctx_default: receiver.ctx_default,
+            update_ctx: receiver.update_ctx,
             magic: receiver.magic,
             id: receiver.id,
             id_type: receiver.id_type?,
@@ -649,6 +653,15 @@ struct FieldData {
     /// map field when updating struct
     update: Option<TokenStream>,
 
+    /// custom function to call when updating struct field
+    update_with: Option<TokenStream>,
+
+    // context passed to the update function
+    update_ctx: Option<Punctuated<syn::Expr, syn::token::Comma>>,
+
+    // propagate update to nested struct
+    update_also: bool,
+
     /// custom field reader code
     reader: Option<TokenStream>,
 
@@ -772,6 +785,12 @@ impl FieldData {
             .transpose()
             .map_err(|e| e.to_compile_error())?;
 
+        let update_ctx = receiver
+            .update_ctx?
+            .map(|s| s.parse_with(Punctuated::parse_terminated))
+            .transpose()
+            .map_err(|e| e.to_compile_error())?;
+
         let data = Self {
             ident: receiver.ident,
             ty: receiver.ty,
@@ -788,6 +807,9 @@ impl FieldData {
             map: receiver.map?,
             ctx,
             update: receiver.update?,
+            update_with: receiver.update_with?,
+            update_ctx,
+            update_also: receiver.update_also,
             reader: receiver.reader?,
             writer: receiver.writer?,
             skip: receiver.skip,
@@ -1002,6 +1024,9 @@ struct DekuReceiver {
     #[darling(default)]
     ctx_default: Option<syn::punctuated::Punctuated<syn::Expr, syn::token::Comma>>,
 
+    #[darling(default)]
+    update_ctx: Option<syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>>,
+
     /// A magic value that must appear at the start of this struct/enum's data
     #[darling(default)]
     magic: Option<syn::LitByteStr>,
@@ -1176,6 +1201,19 @@ struct DekuFieldReceiver {
     /// map field when updating struct
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     update: Result<Option<TokenStream>, ReplacementError>,
+
+    /// custom function to call when updating struct field
+    #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
+    update_with: Result<Option<TokenStream>, ReplacementError>,
+
+    /// Call update function when parent calls their update function (propagate)
+    #[darling(default)]
+    update_also: bool,
+
+    // TODO: The type of it should be `Punctuated<Expr, Comma>`
+    //       https://github.com/TedDriggs/darling/pull/98
+    #[darling(default = "default_res_opt", map = "map_option_litstr")]
+    update_ctx: Result<Option<syn::LitStr>, ReplacementError>,
 
     /// custom field reader code
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]

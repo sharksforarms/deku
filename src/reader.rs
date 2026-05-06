@@ -452,15 +452,15 @@ impl<R: Read + Seek> Reader<R> {
         &mut self,
         amt: usize,
         buf: &mut [u8],
-        _order: Order,
+        order: Order,
     ) -> Result<ReaderRet, DekuError> {
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_leftover(buf, byte, amt),
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
                 let slice = BitSlice::from_slice_mut(&mut buf[..amt]);
-                self.read_bits_into(slice, _order)?;
-                if _order == Order::Lsb0 {
+                self.read_bits_into(slice, order)?;
+                if order == Order::Lsb0 {
                     buf[..amt].reverse();
                 }
                 Ok(ReaderRet::Bytes)
@@ -548,7 +548,7 @@ impl<R: Read + Seek> Reader<R> {
     fn read_bytes_const_other<const N: usize>(
         &mut self,
         buf: &mut [u8; N],
-        _order: Order,
+        order: Order,
     ) -> Result<ReaderRet, DekuError> {
         match self.leftover {
             Some(Leftover::Byte(byte)) => {
@@ -558,8 +558,8 @@ impl<R: Read + Seek> Reader<R> {
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
                 let slice = BitSlice::from_slice_mut(buf);
-                self.read_bits_into(slice, _order)?;
-                if _order == Order::Lsb0 {
+                self.read_bits_into(slice, order)?;
+                if order == Order::Lsb0 {
                     buf.reverse();
                 }
                 Ok(ReaderRet::Bytes)
@@ -579,7 +579,7 @@ impl<R: Read + Seek> Reader<R> {
     pub fn read_bytes_const_into<const N: usize>(
         &mut self,
         buf: &mut [u8; N],
-        _order: Order,
+        order: Order,
     ) -> Result<(), DekuError> {
         if self.leftover.is_none() {
             if let Err(e) = self.inner.read_exact(buf) {
@@ -598,8 +598,8 @@ impl<R: Read + Seek> Reader<R> {
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
                 let slice = BitSlice::from_slice_mut(buf);
-                self.read_bits_into(slice, _order)?;
-                if _order == Order::Lsb0 {
+                self.read_bits_into(slice, order)?;
+                if order == Order::Lsb0 {
                     buf.reverse();
                 }
                 Ok(())

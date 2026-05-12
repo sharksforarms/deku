@@ -219,6 +219,40 @@ mod tests {
         assert_eq_hex!(bytes, data);
     }
 
+    // Regression for #602: an `Order`-typed `ctx` parameter on a nested
+    // enum/struct should be used as that type's `bit_order` even when no
+    // explicit `bit_order = "<param>"` attribute is given.
+    #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+    #[deku(bit_order = "lsb")]
+    pub struct EnumsAutoOrder {
+        right: ChoiceAuto,
+        left: ChoiceAuto,
+    }
+
+    #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
+    #[repr(u8)]
+    #[deku(bits = "4", id_type = "u8", ctx = "_bit_order: deku::ctx::Order")]
+    pub enum ChoiceAuto {
+        Empty = 0x0,
+        Full = 0xf,
+    }
+
+    #[test]
+    fn test_bit_order_enums_auto_from_ctx() {
+        let data = vec![0xf0];
+        let parsed = EnumsAutoOrder::try_from(data.as_ref()).unwrap();
+        assert_eq!(
+            parsed,
+            EnumsAutoOrder {
+                right: ChoiceAuto::Empty,
+                left: ChoiceAuto::Full
+            }
+        );
+
+        let bytes = parsed.to_bytes().unwrap();
+        assert_eq_hex!(bytes, data);
+    }
+
     #[derive(Debug, DekuRead, DekuWrite, PartialEq)]
     #[deku(bit_order = "lsb")]
     pub struct MoreFirst {

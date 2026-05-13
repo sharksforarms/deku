@@ -154,3 +154,25 @@ fn test_seek_ctx_no_seek(input: &[u8], expected: SeekCtxNoSeek) {
     ret_read.to_writer(&mut writer, ()).unwrap();
     assert_eq!(buf, input);
 }
+
+#[derive(DekuRead, DekuWrite, Debug, PartialEq, Eq)]
+pub struct SeekStartZero {
+    #[deku(seek_from_current = "1")]
+    tail: u8,
+
+    #[deku(seek_from_start = "0")]
+    head: u8,
+}
+
+#[test]
+#[cfg(feature = "std")]
+fn test_seek_from_start_zero_rewind() {
+    let input = hex!("aabb");
+    let expected = SeekStartZero {
+        tail: 0xbb,
+        head: 0xaa,
+    };
+
+    let (_, ret_read) = SeekStartZero::from_bytes((&input, 0)).unwrap();
+    assert_eq!(ret_read, expected);
+}

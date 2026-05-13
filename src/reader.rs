@@ -50,24 +50,10 @@ impl<R: Read + Seek> Seek for Reader<R> {
 
         // clear leftover
         self.leftover = None;
-        // set bits read
-        match pos {
-            // When reading from the start, reset the bits_read so from_bytes
-            // return can still be reasonable
-            SeekFrom::Start(n) => {
-                if n > 0 {
-                    self.bits_read = (n * 8) as usize;
-                }
-            }
-            SeekFrom::End(_) => (),
-            // If seeking from current, act as if we just read those bytes
-            SeekFrom::Current(n) => {
-                if n > 0 {
-                    self.bits_read += (n * 8) as usize;
-                }
-            }
-        }
-        self.inner.seek(pos)
+
+        let new_pos = self.inner.seek(pos)?;
+        self.bits_read = (new_pos as usize) * 8;
+        Ok(new_pos)
     }
 }
 

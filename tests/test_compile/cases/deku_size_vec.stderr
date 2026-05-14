@@ -16,6 +16,10 @@ error[E0277]: the trait bound `Vec<u8>: deku::DekuSize` is not satisfied
           and $N others
   = help: see issue #48214
   = note: this error originates in the derive macro `DekuSize` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: add `#![feature(trivial_bounds)]` to the crate attributes to enable
+  |
+1 + #![feature(trivial_bounds)]
+  |
 
 error[E0599]: the associated item `SIZE_BITS` exists for struct `Test`, but its trait bounds were not satisfied
  --> tests/test_compile/cases/deku_size_vec.rs:9:23
@@ -25,6 +29,11 @@ error[E0599]: the associated item `SIZE_BITS` exists for struct `Test`, but its 
 ...
 9 |     let _size = Test::SIZE_BITS;
   |                       ^^^^^^^^^ associated item cannot be called on `Test` due to unsatisfied trait bounds
+  |
+ ::: $RUST/alloc/src/vec/mod.rs
+  |
+  | pub struct Vec<T, #[unstable(feature = "allocator_api", issue = "32838")] A: Allocator = Global> {
+  | ------------------------------------------------------------------------------------------------ doesn't satisfy `Vec<u8>: deku::DekuSize`
   |
   = note: trait bound `Vec<u8>: deku::DekuSize` was not satisfied
   = help: items from traits can only be used if the trait is implemented and in scope

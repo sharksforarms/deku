@@ -138,6 +138,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
+    let (update_ctx_types, update_ctx_arg) = gen_ctx_types_and_arg(input.update_ctx.as_ref())?;
 
     let write_body = quote! {
         match *self {
@@ -156,9 +157,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         #[automatically_derived]
-        impl #imp ::#crate_::DekuUpdate for #ident #wher {
+        impl #imp ::#crate_::DekuUpdate<#update_ctx_types> for #ident #wher {
             #[inline]
-            fn update(&mut self) -> core::result::Result<(), ::#crate_::DekuError> {
+            fn update(&mut self, #update_ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
                 #update_use
                 #(#field_updates)*
 
@@ -394,6 +395,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     }
 
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
+    let (update_ctx_types, update_ctx_arg) = gen_ctx_types_and_arg(input.update_ctx.as_ref())?;
 
     let write_body = quote! {
         #magic_write
@@ -410,9 +412,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         #[automatically_derived]
-        impl #imp ::#crate_::DekuUpdate for #ident #wher {
+        impl #imp ::#crate_::DekuUpdate<#update_ctx_types> for #ident #wher {
             #[inline]
-            fn update(&mut self) -> core::result::Result<(), ::#crate_::DekuError> {
+            fn update(&mut self, #update_ctx_arg) -> core::result::Result<(), ::#crate_::DekuError> {
                 #update_use
 
                 match self {
@@ -498,17 +500,36 @@ fn emit_field_update(
         return None;
     }
     let field_ident = f.get_ident(i, object_prefix.is_none());
-    let deref = if object_prefix.is_none() {
-        Some(quote! { * })
-    } else {
-        None
+    let deref = match object_prefix.is_none() {
+        true => Some(quote! { * }),
+        false => None,
     };
 
-    f.update.as_ref().map(|field_update| {
-        quote! {
-            #deref #object_prefix #field_ident = (#field_update).try_into()?;
-        }
-    })
+    if f.update_also {
+        let ctx = match f.update_ctx.as_ref() {
+            Some(ctx) => quote! {(#ctx)},
+            None => quote! {()},
+        };
+        let a = quote! {
+            #deref #object_prefix #field_ident.update(#ctx)?;
+        };
+
+        Some(a)
+    } else if let Some(custom) = &f.update_with {
+        let ctx = match f.update_ctx.as_ref() {
+            Some(ctx) => quote! {(#ctx)},
+            None => quote! {()},
+        };
+        Some(quote! {
+            #custom(&mut #object_prefix #field_ident, #ctx)?;
+        })
+    } else {
+        f.update.as_ref().map(|field_update| {
+            quote! {
+                #deref #object_prefix #field_ident = (#field_update).try_into()?;
+            }
+        })
+    }
 }
 
 fn emit_bit_byte_offsets(

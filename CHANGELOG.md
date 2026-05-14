@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.20.4](https://github.com/sharksforarms/deku/compare/deku-v0.20.3...deku-v0.20.4) - 2026-05-14
+
+### Other
+
+- use &raw const instead of core::ptr::addr_of ([#654](https://github.com/sharksforarms/deku/pull/654))
+- 1.85 ([#662](https://github.com/sharksforarms/deku/pull/662))
+- skip/cond + padding ([#651](https://github.com/sharksforarms/deku/pull/651))
+- Add skip(read) and skip(write) ([#648](https://github.com/sharksforarms/deku/pull/648))
+- update stale feature flag documentation ([#637](https://github.com/sharksforarms/deku/pull/637))
+
 ### Other
 
 - Added a note concerning `skip`/`cond` attributes and padding (doc)

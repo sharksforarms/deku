@@ -346,6 +346,28 @@ fn repr(attrs: &[Attribute]) -> Option<ReprType> {
     None
 }
 
+/// If `ctx` contains a parameter typed as `Order` (or `deku::ctx::Order`, `ctx::Order`),
+/// return the parameter name so it can be used as a runtime `bit_order` variable.
+#[cfg(feature = "bits")]
+fn find_order_param_in_ctx(
+    ctx: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
+) -> Option<String> {
+    for arg in ctx {
+        if let syn::FnArg::Typed(pat_type) = arg {
+            if let syn::Type::Path(type_path) = pat_type.ty.as_ref() {
+                if let Some(last_segment) = type_path.path.segments.last() {
+                    if last_segment.ident == "Order" {
+                        if let syn::Pat::Ident(pat_ident) = pat_type.pat.as_ref() {
+                            return Some(pat_ident.ident.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 impl DekuData {
     fn from_input(input: TokenStream) -> Result<Self, TokenStream> {
         let input = match syn::parse2(input) {
@@ -384,6 +406,21 @@ impl DekuData {
 
         let repr = repr(&attrs);
 
+        // If no explicit `bit_order` attribute is set but `ctx` contains an
+        // `Order`-typed parameter, automatically forward that parameter as the
+        // runtime bit_order. This ensures nested types receiving Order via ctx
+        // propagate it to their own discriminant/field writes.
+        #[cfg(feature = "bits")]
+        let bit_order = receiver.bit_order.or_else(|| {
+            receiver.ctx.as_ref().and_then(|ctx| {
+                find_order_param_in_ctx(ctx).map(|name| {
+                    syn::LitStr::new(&name, proc_macro2::Span::call_site())
+                })
+            })
+        });
+        #[cfg(not(feature = "bits"))]
+        let bit_order = receiver.bit_order;
+
         let data = Self {
             ident: receiver.ident,
             generics: receiver.generics,
@@ -403,7 +440,7 @@ impl DekuData {
             seek_from_current: receiver.seek_from_current?,
             seek_from_end: receiver.seek_from_end?,
             seek_from_start: receiver.seek_from_start?,
-            bit_order: receiver.bit_order,
+            bit_order,
         };
 
         DekuData::validate(&data)?;

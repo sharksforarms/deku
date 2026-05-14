@@ -318,31 +318,17 @@ impl<R: Read + Seek> Reader<R> {
                 // read in new bytes
                 // TODO: Profile and optimise
                 let remainder = if order == Order::Lsb0 {
-                    if dst.len() % 8 != 0 {
-                        let mut iter = dst[..end].rchunks_exact_mut(8);
-                        for slot in iter.by_ref() {
-                            let mut buf: [u8; 1] = [0u8];
-                            if let Err(e) = self.inner.read_exact(&mut buf) {
-                                if e.kind() == ErrorKind::UnexpectedEof {
-                                    return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                                }
+                    let mut iter = dst[..end].rchunks_exact_mut(8);
+                    for slot in iter.by_ref() {
+                        let mut buf: [u8; 1] = [0u8];
+                        if let Err(e) = self.inner.read_exact(&mut buf) {
+                            if e.kind() == ErrorKind::UnexpectedEof {
+                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
                             }
-                            slot.store_be(buf[0]);
                         }
-                        iter.into_remainder()
-                    } else {
-                        let mut iter = dst[..end].chunks_exact_mut(8);
-                        for slot in iter.by_ref() {
-                            let mut buf: [u8; 1] = [0u8];
-                            if let Err(e) = self.inner.read_exact(&mut buf) {
-                                if e.kind() == ErrorKind::UnexpectedEof {
-                                    return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                                }
-                            }
-                            slot.store_be(buf[0]);
-                        }
-                        iter.into_remainder()
+                        slot.store_be(buf[0]);
                     }
+                    iter.into_remainder()
                 } else {
                     debug_assert_eq!(order, Order::Msb0);
                     let mut iter = dst[start..end].chunks_exact_mut(8);
@@ -466,14 +452,17 @@ impl<R: Read + Seek> Reader<R> {
         &mut self,
         amt: usize,
         buf: &mut [u8],
-        _order: Order,
+        order: Order,
     ) -> Result<ReaderRet, DekuError> {
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_leftover(buf, byte, amt),
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
                 let slice = BitSlice::from_slice_mut(&mut buf[..amt]);
-                self.read_bits_into(slice, _order)?;
+                self.read_bits_into(slice, order)?;
+                if order == Order::Lsb0 {
+                    buf[..amt].reverse();
+                }
                 Ok(ReaderRet::Bytes)
             }
             _ => unreachable!(),
@@ -559,7 +548,7 @@ impl<R: Read + Seek> Reader<R> {
     fn read_bytes_const_other<const N: usize>(
         &mut self,
         buf: &mut [u8; N],
-        _order: Order,
+        order: Order,
     ) -> Result<ReaderRet, DekuError> {
         match self.leftover {
             Some(Leftover::Byte(byte)) => {
@@ -569,7 +558,10 @@ impl<R: Read + Seek> Reader<R> {
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
                 let slice = BitSlice::from_slice_mut(buf);
-                self.read_bits_into(slice, _order)?;
+                self.read_bits_into(slice, order)?;
+                if order == Order::Lsb0 {
+                    buf.reverse();
+                }
                 Ok(ReaderRet::Bytes)
             }
             _ => unreachable!(),
@@ -587,7 +579,7 @@ impl<R: Read + Seek> Reader<R> {
     pub fn read_bytes_const_into<const N: usize>(
         &mut self,
         buf: &mut [u8; N],
-        _order: Order,
+        order: Order,
     ) -> Result<(), DekuError> {
         if self.leftover.is_none() {
             if let Err(e) = self.inner.read_exact(buf) {
@@ -606,7 +598,10 @@ impl<R: Read + Seek> Reader<R> {
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
                 let slice = BitSlice::from_slice_mut(buf);
-                self.read_bits_into(slice, _order)?;
+                self.read_bits_into(slice, order)?;
+                if order == Order::Lsb0 {
+                    buf.reverse();
+                }
                 Ok(())
             }
             None => unreachable!(),

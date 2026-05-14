@@ -167,7 +167,7 @@ macro_rules! ImplDekuReadBits {
                 debug_assert!(MAX_TYPE_BITS >= bit_slice.len() + pad);
 
                 // if everything is aligned, just read the value
-                if pad == 0 && bit_slice.len() == MAX_TYPE_BITS {
+                if pad == 0 && bit_slice.len() == MAX_TYPE_BITS && order != Order::Lsb0 {
                     let bytes = bit_slice.domain().region().unwrap().1;
 
                     if bytes.len() * 8 == MAX_TYPE_BITS {
@@ -189,7 +189,7 @@ macro_rules! ImplDekuReadBits {
                 // Turning this into [0x23, 0x01] (then appending till type size)
                 debug_assert_eq!(bit_size, bit_slice.len());
                 const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
-                if order == Order::Lsb0 && bit_slice.len() > 8 && pad != 0 {
+                if order == Order::Lsb0 {
                     let mut bits = crate::BoundedBitVec::<[u8; MAX_TYPE_BYTES], Msb0>::new();
 
                     bits.extend_from_bitslice(&bit_slice);
@@ -199,7 +199,17 @@ macro_rules! ImplDekuReadBits {
                     }
 
                     let mut buf = [0u8; MAX_TYPE_BYTES];
-                    for (slice, slot) in bits.as_bitslice().rchunks_exact(8).zip(buf.iter_mut()) {
+                    let skip = if input_is_le {
+                        0
+                    } else {
+                        MAX_TYPE_BYTES - bit_slice.len().div_ceil(8)
+                    };
+
+                    for (slice, slot) in bits
+                        .as_bitslice()
+                        .rchunks_exact(8)
+                        .zip(buf.iter_mut().skip(skip))
+                    {
                         *slot = slice.load_be();
                     }
 

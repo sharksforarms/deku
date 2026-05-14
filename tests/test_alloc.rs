@@ -86,6 +86,26 @@ mod tests {
         );
     }
 
+    /// Verify that ReadExact with insufficient data returns an error
+    /// without allocating. Without the seek-based bounds check, this
+    /// would allocate a large buffer, zero it, then fail.
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_read_exact_no_alloc_on_insufficient_data() {
+        use deku::ctx::ReadExact;
+        use deku::reader::Reader;
+
+        let data = vec![0x01, 0x02, 0x03];
+        let mut cursor = Cursor::new(data);
+        let mut reader = Reader::new(&mut cursor);
+
+        let (counts, result) = count_alloc(|| {
+            Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(1_000_000))
+        });
+        assert!(result.is_err());
+        assert_eq!(counts, (0, 0, 0));
+    }
+
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_to_slice() {

@@ -1,9 +1,10 @@
 use core::mem;
 
-use no_std_io::io::{Read, Seek, Write};
+use no_std_io::io::{Read, Seek, SeekFrom, Write};
 
 use alloc::vec::Vec;
 
+use crate::error::NeedSize;
 use crate::reader::Reader;
 use crate::writer::Writer;
 use crate::{ctx::*, DekuReader};
@@ -17,6 +18,20 @@ impl DekuReader<'_, ReadExact> for Vec<u8> {
     where
         Self: Sized,
     {
+        // Check remaining bytes via the inner reader before allocating,
+        // so a bogus count from untrusted input doesn't cause a huge
+        // allocation that will immediately fail on read.
+        let inner = reader.as_mut();
+        let pos = inner.stream_position().map_err(|e| DekuError::Io(e.kind()))?;
+        let end = inner.seek(SeekFrom::End(0)).map_err(|e| DekuError::Io(e.kind()))?;
+        inner
+            .seek(SeekFrom::Start(pos))
+            .map_err(|e| DekuError::Io(e.kind()))?;
+
+        if (end - pos) < exact.0 as u64 {
+            return Err(DekuError::Incomplete(NeedSize::new(exact.0 * 8)));
+        }
+
         let mut bytes = alloc::vec![0x00; exact.0];
         let _ = reader.read_bytes(exact.0, &mut bytes, Order::Lsb0)?;
         Ok(bytes)
@@ -356,5 +371,85 @@ mod tests {
         assert_eq!(expected_write, writer.inner.into_inner());
 
         assert_eq!(input_clone[..expected_write.len()].to_vec(), expected_write);
+    }
+
+    mod read_exact_tests {
+        use super::*;
+        use crate::ctx::ReadExact;
+        use crate::error::NeedSize;
+        use crate::reader::Reader;
+        use crate::DekuError;
+        use std::io::Cursor;
+
+        #[test]
+        fn read_exact_success() {
+            let data = vec![0xAA, 0xBB, 0xCC, 0xDD];
+            let mut cursor = Cursor::new(data);
+            let mut reader = Reader::new(&mut cursor);
+            let result = Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(4)).unwrap();
+            assert_eq!(result, vec![0xAA, 0xBB, 0xCC, 0xDD]);
+        }
+
+        #[test]
+        fn read_exact_partial() {
+            let data = vec![0xAA, 0xBB, 0xCC, 0xDD];
+            let mut cursor = Cursor::new(data);
+            let mut reader = Reader::new(&mut cursor);
+            let result = Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(2)).unwrap();
+            assert_eq!(result, vec![0xAA, 0xBB]);
+            // remaining bytes still available
+            let mut rest = vec![];
+            cursor.read_to_end(&mut rest).unwrap();
+            assert_eq!(rest, vec![0xCC, 0xDD]);
+        }
+
+        #[test]
+        fn read_exact_not_enough_data() {
+            let data = vec![0xAA, 0xBB];
+            let mut cursor = Cursor::new(data);
+            let mut reader = Reader::new(&mut cursor);
+            let result = Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(10));
+            assert_eq!(
+                result.unwrap_err(),
+                DekuError::Incomplete(NeedSize::new(10 * 8))
+            );
+        }
+
+        #[test]
+        fn read_exact_empty_input() {
+            let data: Vec<u8> = vec![];
+            let mut cursor = Cursor::new(data);
+            let mut reader = Reader::new(&mut cursor);
+            let result = Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(1));
+            assert_eq!(
+                result.unwrap_err(),
+                DekuError::Incomplete(NeedSize::new(1 * 8))
+            );
+        }
+
+        #[test]
+        fn read_exact_zero_bytes() {
+            let data = vec![0xAA];
+            let mut cursor = Cursor::new(data);
+            let mut reader = Reader::new(&mut cursor);
+            let result = Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(0)).unwrap();
+            assert_eq!(result, vec![]);
+        }
+
+        /// This test verifies the seek-based bounds check prevents
+        /// a huge allocation when the requested count far exceeds
+        /// available data. Without the fix, this would attempt to
+        /// allocate ~1GB and zero-fill it before failing.
+        #[test]
+        fn read_exact_large_count_small_buffer_no_alloc() {
+            let data = vec![0x01, 0x02, 0x03];
+            let mut cursor = Cursor::new(data);
+            let mut reader = Reader::new(&mut cursor);
+            let result = Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(1_073_741_824));
+            assert_eq!(
+                result.unwrap_err(),
+                DekuError::Incomplete(NeedSize::new(1_073_741_824 * 8))
+            );
+        }
     }
 }

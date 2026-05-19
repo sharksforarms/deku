@@ -159,7 +159,6 @@ fn test_seek_ctx_no_seek(input: &[u8], expected: SeekCtxNoSeek) {
 pub struct SeekStartZero {
     #[deku(seek_from_current = "1")]
     tail: u8,
-
     #[deku(seek_from_start = "0")]
     head: u8,
 }
@@ -175,4 +174,63 @@ fn test_seek_from_start_zero_rewind() {
 
     let (_, ret_read) = SeekStartZero::from_bytes((&input, 0)).unwrap();
     assert_eq!(ret_read, expected);
+}
+
+#[derive(DekuRead, DekuWrite, Debug, PartialEq, Eq)]
+pub struct SeekEndThenRewind {
+    #[deku(seek_from_end = "-1")]
+    tail: u8,
+    #[deku(seek_from_start = "0")]
+    head: u8,
+}
+
+#[test]
+#[cfg(feature = "std")]
+fn test_seek_from_end_rewind() {
+    let input = hex!("aabb");
+    let expected = SeekEndThenRewind {
+        tail: 0xbb,
+        head: 0xaa,
+    };
+
+    let (_, ret_read) = SeekEndThenRewind::from_bytes((&input, 0)).unwrap();
+    assert_eq!(ret_read, expected);
+}
+
+#[derive(DekuRead, DekuWrite, Debug, PartialEq, Eq)]
+pub struct SeekCurrentNegativeRewind {
+    first: u8,
+    second: u8,
+    #[deku(seek_from_current = "-2")]
+    first_again: u8,
+}
+
+#[test]
+#[cfg(feature = "std")]
+fn test_seek_from_current_negative_rewind() {
+    let input = hex!("aabb");
+    let expected = SeekCurrentNegativeRewind {
+        first: 0xaa,
+        second: 0xbb,
+        first_again: 0xaa,
+    };
+
+    let (_, ret_read) = SeekCurrentNegativeRewind::from_bytes((&input, 0)).unwrap();
+    assert_eq!(ret_read, expected);
+}
+
+#[test]
+#[cfg(feature = "std")]
+fn test_seek_error_preserves_bits_read() {
+    use std::io::{Cursor, Seek, SeekFrom};
+    let input = hex!("aabb").to_vec();
+    let mut cursor = Cursor::new(input);
+    let mut reader = Reader::new(&mut cursor);
+
+    reader.seek(SeekFrom::Start(1)).unwrap();
+    let bits_before = reader.bits_read;
+
+    let result = reader.seek(SeekFrom::Current(-100));
+    assert!(result.is_err());
+    assert_eq!(reader.bits_read, bits_before);
 }

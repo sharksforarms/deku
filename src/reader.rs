@@ -52,7 +52,9 @@ impl<R: Read + Seek> Seek for Reader<R> {
         self.leftover = None;
 
         let new_pos = self.inner.seek(pos)?;
-        self.bits_read = (new_pos as usize) * 8;
+        self.bits_read = usize::try_from(new_pos)
+            .unwrap_or(usize::MAX)
+            .saturating_mul(8);
         Ok(new_pos)
     }
 }

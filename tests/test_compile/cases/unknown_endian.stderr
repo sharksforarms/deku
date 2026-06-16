@@ -29,15 +29,3 @@ error[E0425]: cannot find value `variable` in this scope
    |          ^^^^^^^^ not found in this scope
    |
    = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-warning: unreachable expression
-  --> tests/test_compile/cases/unknown_endian.rs:15:10
-   |
-15 | #[derive(DekuRead)]
-   |          ^^^^^^^^
-   |          |
-   |          unreachable expression
-   |          any code following this `match` expression is unreachable, as all arms diverge
-   |
-   = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
-   = note: this warning originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)

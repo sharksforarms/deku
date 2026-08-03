@@ -471,11 +471,80 @@ fn emit_field_writes(
     ident: &TokenStream,
 ) -> Result<Vec<TokenStream>, syn::Error> {
     let mut is_id_pat = is_id_pat;
-    fields
-        .iter()
-        .enumerate()
-        .map(|(i, f)| emit_field_write(input, i, f, &object_prefix, ident, &mut is_id_pat))
-        .collect()
+
+    #[cfg(feature = "bits")]
+    let runs = super::deku_read::plan_bit_runs(input, fields, is_id_pat);
+
+    let mut writes = Vec::with_capacity(fields.len());
+    let mut i = 0;
+    while i < fields.len() {
+        #[cfg(feature = "bits")]
+        if let Some(run) = runs.get(&i) {
+            writes.push(emit_bit_run_write(fields, i, run, &object_prefix));
+            i += run.len();
+            is_id_pat = false;
+            continue;
+        }
+
+        let f = fields.fields[i];
+        writes.push(emit_field_write(
+            input,
+            i,
+            f,
+            &object_prefix,
+            ident,
+            &mut is_id_pat,
+        )?);
+        i += 1;
+    }
+
+    Ok(writes)
+}
+
+/// Composes a run of adjacent fields into one integer and writes it once, the
+/// mirror of the read side. Each field keeps its own "does the value fit" check,
+/// which is the only per-field work the individual writes did.
+#[cfg(feature = "bits")]
+fn emit_bit_run_write(
+    fields: &Fields<&FieldData>,
+    start: usize,
+    run: &super::deku_read::BitRun,
+    object_prefix: &Option<TokenStream>,
+) -> TokenStream {
+    let crate_ = super::get_crate_name();
+    let total: usize = run.iter().map(|f| f.bits).sum();
+
+    let mut checks = TokenStream::new();
+    let mut terms = Vec::with_capacity(run.len());
+    let mut consumed = 0usize;
+    for (offset, field) in run.iter().enumerate() {
+        let f = fields.fields[start + offset];
+        let field_ident = f.get_ident(start + offset, object_prefix.is_none());
+        let bits = field.bits;
+        let shift = total - consumed - bits;
+        let mask: u64 = if bits == 64 {
+            u64::MAX
+        } else {
+            (1u64 << bits) - 1
+        };
+
+        let value = quote! { (*(#object_prefix #field_ident) as u64) };
+        // A field that fills its container cannot overflow it, so a check is only
+        // emitted where the individual write could have rejected something.
+        if bits < 64 {
+            checks.extend(quote! {
+                ::#crate_::writer::check_bit_size(#value, #bits)?;
+            });
+        }
+        terms.push(quote! { ((#value & #mask) << #shift) });
+        consumed += bits;
+    }
+
+    quote! {
+        #checks
+        let __deku_bit_run: u64 = #(#terms)|*;
+        __deku_writer.write_bits_uint_msb0(__deku_bit_run, #total)?;
+    }
 }
 
 fn emit_field_updates(

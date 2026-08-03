@@ -381,6 +381,12 @@ macro_rules! ImplDekuReadBits {
                         size.0
                     ));
                 }
+                // Fast path: big-endian, and `Order::default()` is Msb0. Reads the
+                // field straight into an integer, with no `BitSlice` in between.
+                if !endian.is_le() && size.0 > 0 && size.0 <= 64 {
+                    let value = reader.read_bits_uint_msb0(size.0)? as $inner;
+                    return Ok(<$typ>::from_be_bytes(value.to_be_bytes()));
+                }
                 let mut bits = ::bitvec::array::BitArray::<[u8; { MAX_TYPE_BITS / 8 }], Msb0>::new(
                     [0; { MAX_TYPE_BITS / 8 }],
                 );
@@ -406,6 +412,11 @@ macro_rules! ImplDekuReadBits {
                         MAX_TYPE_BITS,
                         size.0
                     ));
+                }
+                // Fast path: big-endian, Msb0. See the `(Endian, BitSize)` impl above.
+                if !endian.is_le() && order == Order::Msb0 && size.0 > 0 && size.0 <= 64 {
+                    let value = reader.read_bits_uint_msb0(size.0)? as $inner;
+                    return Ok(<$typ>::from_be_bytes(value.to_be_bytes()));
                 }
                 let mut bits = ::bitvec::array::BitArray::<[u8; { MAX_TYPE_BITS / 8 }], Msb0>::new(
                     [0; { MAX_TYPE_BITS / 8 }],

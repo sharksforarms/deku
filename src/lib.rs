@@ -1000,6 +1000,29 @@ where
     }
 }
 
+/// Integer view of a single-byte `Msb0` leftover, for the reader's fast path.
+///
+/// A leftover of `size` bits always occupies the *high* `size` bits of the byte,
+/// because it is built by copying a bit-slice into a zeroed array at index 0. So
+/// it is a byte and a length, and shifting it is enough: no `BitSlice` needed.
+#[cfg(feature = "bits")]
+impl BoundedBitVec<[u8; 1], crate::bitvec::Msb0> {
+    #[inline]
+    fn from_msb0_byte(byte: u8, size: usize) -> Self {
+        debug_assert!(size <= 8);
+        Self {
+            bits: BitArray::new([byte]),
+            size,
+        }
+    }
+
+    /// The leftover as `(high-aligned byte, bit count)`.
+    #[inline]
+    fn as_msb0_byte(&self) -> (u8, usize) {
+        (self.bits.as_raw_slice()[0], self.size)
+    }
+}
+
 #[cfg(test)]
 #[path = "../tests/test_common/mod.rs"]
 pub mod test_common;

@@ -379,6 +379,9 @@ impl<R: Read + Seek> Reader<R> {
     /// Reads `amt` bits (`1..=64`) most-significant-bit first, returning them
     /// right-aligned in a `u64`.
     ///
+    /// Public because the derive calls it to read a run of contiguous
+    /// big-endian `Msb0` bit-fields in one go.
+    ///
     /// This is the integer fast path for the common big-endian / `Msb0` case. It
     /// is equivalent to `read_bits_into` followed by `load_be`, but the value
     /// never touches a `BitSlice`: the leftover is a byte and a length, so
@@ -390,7 +393,7 @@ impl<R: Read + Seek> Reader<R> {
     /// `amt`, exactly as `read_bits_into` does, so it consumes no more input.
     #[inline]
     #[cfg(feature = "bits")]
-    pub(crate) fn read_bits_uint_msb0(&mut self, amt: usize) -> Result<u64, DekuError> {
+    pub fn read_bits_uint_msb0(&mut self, amt: usize) -> Result<u64, DekuError> {
         debug_assert!((1..=64).contains(&amt));
 
         // Up to 7 leftover bits plus 64 requested does not fit a u64.
@@ -412,10 +415,11 @@ impl<R: Read + Seek> Reader<R> {
         }
 
         // One byte at a time, which reads exactly as much as the field needs and
-        // no more. Batching the whole field into a single variable-length
-        // `read_exact` wins on a microbenchmark over wide fields, but loses on a
-        // realistic multi-protocol pipeline, where fields are mostly narrow and
-        // the extra branch costs more than it saves.
+        // no more. Batching the whole field into one variable-length `read_exact`
+        // wins on a microbenchmark but loses on a realistic multi-protocol
+        // pipeline. Tried three times: with narrow fields, with a `need == 1`
+        // fast path, and again after the derive started batching runs so the
+        // reads are wide. Slower every time.
         while have < amt {
             let mut buf = [0u8; 1];
             if let Err(e) = self.inner.read_exact(&mut buf) {

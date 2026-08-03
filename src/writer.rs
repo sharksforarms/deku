@@ -62,6 +62,52 @@ impl<W: Write + Seek> Writer<W> {
         self.leftover.0.as_bitslice().iter().by_vals().collect()
     }
 
+    /// Writes the low `amt` bits (`1..=64`) of `value`, most-significant-bit
+    /// first. The integer mirror of `Reader::read_bits_uint_msb0`.
+    ///
+    /// Only valid when the pending leftover is `Msb0`; the caller checks that.
+    /// Equivalent to `write_bits_order(.., Order::Msb0)` over the same bits, but
+    /// the value never becomes a `BitSlice`: whole bytes leave in one `write_all`
+    /// instead of one call per byte, and the leftover is a byte and a length
+    /// rather than a `BoundedBitVec` rebuilt bit by bit.
+    #[inline]
+    #[cfg(feature = "bits")]
+    pub(crate) fn write_bits_uint_msb0(&mut self, value: u64, amt: usize) -> Result<(), DekuError> {
+        debug_assert!((1..=64).contains(&amt));
+        debug_assert_eq!(self.leftover.1, Order::Msb0);
+
+        let (lead, lead_len) = self.leftover.0.as_msb0_byte();
+        // Leftover bits first, then the value's low `amt` bits: at most 7 + 64.
+        let mut acc: u128 = if lead_len == 0 {
+            0
+        } else {
+            u128::from(lead >> (8 - lead_len))
+        };
+        acc = (acc << amt) | u128::from(value & (u64::MAX >> (64 - amt)));
+        let have = lead_len + amt;
+
+        let whole = have / 8;
+        let rest = have % 8;
+        if whole != 0 {
+            let mut buf = [0u8; 9];
+            let aligned = acc >> rest;
+            for (i, slot) in buf[..whole].iter_mut().enumerate() {
+                *slot = (aligned >> ((whole - 1 - i) * 8)) as u8;
+            }
+            self.inner.write_all(&buf[..whole])?;
+            self.bits_written += whole * 8;
+        }
+
+        if rest == 0 {
+            self.leftover.0.clear();
+        } else {
+            let tail = (acc & ((1u128 << rest) - 1)) as u8;
+            self.leftover.0 = BoundedBitVec::from_msb0_byte(tail << (8 - rest), rest);
+        }
+        self.leftover.1 = Order::Msb0;
+        Ok(())
+    }
+
     #[cfg(feature = "bits")]
     fn write_bits_order_msb_msb(
         &mut self,

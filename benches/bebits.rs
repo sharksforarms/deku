@@ -70,6 +70,35 @@ fn bench(c: &mut Criterion) {
             OneBitU64::from_reader_with_ctx(&mut r, ()).unwrap()
         })
     });
+
+    // Write side of the same shapes. Into a reused stack buffer, so the
+    // measurement is the field writes rather than an allocation.
+    let mut r = Reader::new(Cursor::new(&buf));
+    let header = TmPrimaryHeader::from_reader_with_ctx(&mut r, ()).unwrap();
+    let six = SixBytes {
+        a: 1,
+        b: 2,
+        c: 3,
+        d: 4,
+        e: 5,
+        f: 6,
+    };
+    c.bench_function("be_write_tm_primary_header_11_fields", |b| {
+        let mut out = [0u8; 16];
+        b.iter(|| {
+            let mut w = Writer::new(Cursor::new(out.as_mut_slice()));
+            header.to_writer(&mut w, ()).unwrap();
+            w.finalize().unwrap();
+        })
+    });
+    c.bench_function("be_write_six_bytes_aligned", |b| {
+        let mut out = [0u8; 16];
+        b.iter(|| {
+            let mut w = Writer::new(Cursor::new(out.as_mut_slice()));
+            six.to_writer(&mut w, ()).unwrap();
+            w.finalize().unwrap();
+        })
+    });
 }
 criterion_group!(bebits, bench);
 criterion_main!(bebits);

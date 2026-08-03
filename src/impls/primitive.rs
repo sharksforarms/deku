@@ -83,9 +83,26 @@ impl DekuWriter<(Endian, BitSize, Order)> for u8 {
         writer: &mut Writer<W>,
         (_, size, order): (Endian, BitSize, Order),
     ) -> Result<(), DekuError> {
-        let input = self.to_le_bytes();
-
         let bit_size: usize = size.0;
+        const MAX_TYPE_BITS: usize = BitSize::of::<u8>().0;
+
+        // Fast path, ahead of the bit-slice view: for a `u8` the checks below are
+        // "does it fit" and "are there bits above `bit_size`", both of which are
+        // integer comparisons. `first_one` over a bit-slice is not.
+        if order == Order::Msb0 && writer.leftover.1 == Order::Msb0 && bit_size <= MAX_TYPE_BITS {
+            if bit_size < MAX_TYPE_BITS && (*self >> bit_size) != 0 {
+                return Err(deku_error!(
+                    DekuError::InvalidParam,
+                    "bit size of input is larger than bit requested size",
+                    "{} exceeds {}",
+                    MAX_TYPE_BITS - (self.leading_zeros() as usize),
+                    bit_size
+                ));
+            }
+            return writer.write_bits_uint_msb0(u64::from(*self), bit_size);
+        }
+
+        let input = self.to_le_bytes();
 
         let input_bits = input.view_bits::<Msb0>();
 
@@ -100,7 +117,6 @@ impl DekuWriter<(Endian, BitSize, Order)> for u8 {
         }
 
         // Check for extra bits before sending into writer
-        const MAX_TYPE_BITS: usize = BitSize::of::<u8>().0;
         if let Some(first) = input_bits.first_one() {
             let max = MAX_TYPE_BITS - bit_size;
             if max > first {
@@ -876,6 +892,39 @@ macro_rules! ImplDekuWrite {
                     }
                     (Endian::Big, Order::Msb0) => {
                         const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
+
+                        // Fast path, ahead of the bit-slice scan. Significant-bit
+                        // count from the big-endian bytes is the same test as
+                        // `first_one`: that check errors when
+                        // `MAX_TYPE_BITS - bit_size > first`, i.e. when
+                        // `MAX_TYPE_BITS - first` (the significant bits) exceeds
+                        // `bit_size`.
+                        if bit_size <= 64 && writer.leftover.1 == Order::Msb0 {
+                            let significant = match input.iter().position(|b| *b != 0) {
+                                Some(i) => {
+                                    (input.len() - i) * 8 - (input[i].leading_zeros() as usize)
+                                }
+                                None => 0,
+                            };
+                            if significant > bit_size {
+                                return Err(deku_error!(
+                                    DekuError::InvalidParam,
+                                    "bit size of input is larger than requested size",
+                                    "{} exceeds {}",
+                                    significant,
+                                    bit_size
+                                ));
+                            }
+                            // The value fits in `bit_size <= 64` bits, so the low
+                            // eight bytes carry all of it even for a 128-bit
+                            // container.
+                            let mut value: u64 = 0;
+                            for &byte in &input[input.len().saturating_sub(8)..] {
+                                value = (value << 8) | u64::from(byte);
+                            }
+                            return writer.write_bits_uint_msb0(value, bit_size);
+                        }
+
                         if let Some(first) = input_bits.first_one() {
                             let max = MAX_TYPE_BITS - bit_size;
                             if max > first {

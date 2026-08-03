@@ -557,7 +557,27 @@ fn emit_field_reads(
 
     let mut use_id = use_id;
 
-    for (i, f) in fields.iter().enumerate() {
+    #[cfg(feature = "bits")]
+    let runs = plan_bit_runs(input, fields, use_id);
+
+    let mut i = 0;
+    while i < fields.len() {
+        #[cfg(feature = "bits")]
+        if let Some(run) = runs.get(&i) {
+            let (idents, read) = emit_bit_run_read(fields, i, run);
+            for field_ident in idents {
+                field_idents.push(FieldIdent {
+                    field_ident,
+                    is_temp: false,
+                });
+            }
+            field_reads.push(read);
+            i += run.len();
+            use_id = false;
+            continue;
+        }
+
+        let f = fields.fields[i];
         let (field_ident, field_read) = emit_field_read(input, i, f, ident, use_id)?;
         use_id = false;
         field_idents.push(FieldIdent {
@@ -565,9 +585,187 @@ fn emit_field_reads(
             is_temp: f.temp,
         });
         field_reads.push(field_read);
+        i += 1;
     }
 
     Ok((field_idents, field_reads))
+}
+
+/// One field of a contiguous big-endian `Msb0` bit-field run.
+#[cfg(feature = "bits")]
+struct BitRunField {
+    bits: usize,
+    ty: syn::Type,
+}
+
+/// Widths of a run of adjacent fields that one read can serve.
+#[cfg(feature = "bits")]
+type BitRun = Vec<BitRunField>;
+
+/// A field that a run read can serve: `bits = N` with a literal `N`, on a plain
+/// unsigned primitive, explicitly big-endian, `Msb0`, and carrying no other deku
+/// attribute. Anything else keeps its own read.
+#[cfg(feature = "bits")]
+fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> {
+    // Every other attribute must be unset: each one either moves the cursor,
+    // makes the read conditional, or depends on a value read before it, and any
+    // of those breaks the "one contiguous read" assumption.
+    if f.bytes.is_some()
+        || f.count.is_some()
+        || f.bits_read.is_some()
+        || f.bytes_read.is_some()
+        || f.until.is_some()
+        || f.read_all
+        || f.map.is_some()
+        || f.ctx.is_some()
+        || f.update.is_some()
+        || f.reader.is_some()
+        || f.writer.is_some()
+        || f.skip.is_some()
+        || f.pad_bits_before.is_some()
+        || f.pad_bytes_before.is_some()
+        || f.pad_bits_after.is_some()
+        || f.pad_bytes_after.is_some()
+        || f.temp
+        || f.temp_value.is_some()
+        || f.cond.is_some()
+        || f.assert.is_some()
+        || f.assert_eq.is_some()
+        || f.seek_rewind
+        || f.seek_from_current.is_some()
+        || f.seek_from_end.is_some()
+        || f.seek_from_start.is_some()
+        || f.magic.is_some()
+    {
+        return None;
+    }
+
+    // Big-endian must be explicit: with no attribute the context endian is the
+    // target's, which is little on x86.
+    let endian = f.endian.as_ref().or(input.endian.as_ref())?;
+    if endian.value() != "big" {
+        return None;
+    }
+
+    // `Msb0` is the default, so absent is fine; "lsb" is not.
+    if let Some(order) = f.bit_order.as_ref().or(input.bit_order.as_ref()) {
+        if order.value() != "msb" {
+            return None;
+        }
+    }
+
+    let width = match &f.ty {
+        syn::Type::Path(p) if p.qself.is_none() => match p.path.get_ident()?.to_string().as_str() {
+            "u8" => 8,
+            "u16" => 16,
+            "u32" => 32,
+            "u64" => 64,
+            _ => return None,
+        },
+        _ => return None,
+    };
+
+    let bits = match f.bits.as_ref() {
+        Some(crate::Num::LitInt(lit)) => lit.base10_parse::<usize>().ok()?,
+        Some(crate::Num::TokenStream(_)) => return None,
+        // A plain big-endian integer field is exactly `bits = width`: when the
+        // cursor is byte-aligned it is a big-endian byte read, and when it is not,
+        // deku already routes it through `read_bits_into` for the same `width`
+        // bits, most-significant first.
+        None => width,
+    };
+    if bits == 0 || bits > width {
+        return None;
+    }
+
+    Some(BitRunField {
+        bits,
+        ty: f.ty.clone(),
+    })
+}
+
+/// Groups adjacent run-eligible fields, keyed by the index the run starts at.
+///
+/// A run is capped at 64 bits, the width the reader returns, and must hold at
+/// least two fields to be worth a batch.
+#[cfg(feature = "bits")]
+fn plan_bit_runs(
+    input: &DekuData,
+    fields: &Fields<&FieldData>,
+    use_id: bool,
+) -> std::collections::HashMap<usize, BitRun> {
+    let mut runs = std::collections::HashMap::new();
+    let mut i = 0;
+    while i < fields.len() {
+        // The first field can be the enum id storage, which is not a read at all.
+        if i == 0 && use_id {
+            i = 1;
+            continue;
+        }
+        let mut run: BitRun = Vec::new();
+        let mut total = 0usize;
+        let mut j = i;
+        while j < fields.len() {
+            let Some(field) = run_field(input, fields.fields[j]) else {
+                break;
+            };
+            if total + field.bits > 64 {
+                break;
+            }
+            total += field.bits;
+            run.push(field);
+            j += 1;
+        }
+        if run.len() >= 2 {
+            let len = run.len();
+            runs.insert(i, run);
+            i += len;
+        } else {
+            i += 1;
+        }
+    }
+    runs
+}
+
+/// One read for the whole run, then shift and mask each field out of it. This is
+/// what a hand-written parser does, and it replaces one `DekuReader` call plus one
+/// bit-cursor update per field with one of each per run.
+#[cfg(feature = "bits")]
+fn emit_bit_run_read(
+    fields: &Fields<&FieldData>,
+    start: usize,
+    run: &BitRun,
+) -> (Vec<TokenStream>, TokenStream) {
+    let total: usize = run.iter().map(|f| f.bits).sum();
+    let run_ident = quote::format_ident!("__deku_bit_run_{}", start);
+
+    let mut idents = Vec::with_capacity(run.len());
+    let mut extracts = TokenStream::new();
+    let mut consumed = 0usize;
+    for (offset, field) in run.iter().enumerate() {
+        let f = fields.fields[start + offset];
+        let field_ident = f.get_ident(start + offset, true);
+        let internal = gen_internal_field_ident(&field_ident);
+        let shift = total - consumed - field.bits;
+        let mask: u64 = if field.bits == 64 {
+            u64::MAX
+        } else {
+            (1u64 << field.bits) - 1
+        };
+        let ty = &field.ty;
+        extracts.extend(quote! {
+            let #internal = ((#run_ident >> #shift) & #mask) as #ty;
+            let #field_ident = &#internal;
+        });
+        idents.push(field_ident);
+        consumed += field.bits;
+    }
+
+    let read = quote! {
+        let #run_ident: u64 = __deku_reader.read_bits_uint_msb0(#total)?;
+        #extracts
+    };
+    (idents, read)
 }
 
 fn emit_bit_byte_offsets(

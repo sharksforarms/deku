@@ -593,20 +593,20 @@ fn emit_field_reads(
 
 /// One field of a contiguous big-endian `Msb0` bit-field run.
 #[cfg(feature = "bits")]
-struct BitRunField {
-    bits: usize,
-    ty: syn::Type,
+pub(crate) struct BitRunField {
+    pub(crate) bits: usize,
+    pub(crate) ty: syn::Type,
 }
 
 /// Widths of a run of adjacent fields that one read can serve.
 #[cfg(feature = "bits")]
-type BitRun = Vec<BitRunField>;
+pub(crate) type BitRun = Vec<BitRunField>;
 
 /// A field that a run read can serve: `bits = N` with a literal `N`, on a plain
 /// unsigned primitive, explicitly big-endian, `Msb0`, and carrying no other deku
 /// attribute. Anything else keeps its own read.
 #[cfg(feature = "bits")]
-fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> {
+pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> {
     // Every other attribute must be unset: each one either moves the cursor,
     // makes the read conditional, or depends on a value read before it, and any
     // of those breaks the "one contiguous read" assumption.
@@ -689,7 +689,7 @@ fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> {
 /// A run is capped at 64 bits, the width the reader returns, and must hold at
 /// least two fields to be worth a batch.
 #[cfg(feature = "bits")]
-fn plan_bit_runs(
+pub(crate) fn plan_bit_runs(
     input: &DekuData,
     fields: &Fields<&FieldData>,
     use_id: bool,

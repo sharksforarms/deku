@@ -37,7 +37,7 @@ jobs:
       matrix:
         toolchain:
             # msrv
-          - 1.85
+          - 1.88
 
     steps:
       - uses: actions/checkout@v6

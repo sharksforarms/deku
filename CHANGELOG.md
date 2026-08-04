@@ -4,6 +4,7 @@
 
 ### Other
 
+- Bump MSRV to 1.88
 - Update syn to 3.0 and darling to 0.24
 - Added a note concerning `skip`/`cond` attributes and padding (doc)
 

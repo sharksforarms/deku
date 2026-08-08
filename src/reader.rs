@@ -564,6 +564,7 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// # Params
     /// `buf` - result bytes
+    #[inline]
     pub fn read_bytes_const_into<const N: usize>(
         &mut self,
         buf: &mut [u8; N],
@@ -581,6 +582,15 @@ impl<R: Read + Seek> Reader<R> {
             return Ok(());
         }
 
+        // Trying to keep this not in the hot path
+        self.read_bytes_const_into_other::<N>(buf, order)
+    }
+
+    fn read_bytes_const_into_other<const N: usize>(
+        &mut self,
+        buf: &mut [u8; N],
+        order: Order,
+    ) -> Result<(), DekuError> {
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_const_leftover(buf, byte),
             #[cfg(feature = "bits")]

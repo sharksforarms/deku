@@ -677,3 +677,27 @@ fn test_multiple_fields_with_padding() {
     assert_eq!(MultiplePadding::SIZE_BYTES, Some(8));
     assert_eq!(MultiplePadding::SIZE_BITS, 64);
 }
+
+// https://github.com/sharksforarms/deku/issues/669
+#[cfg(feature = "bits")]
+#[test]
+fn test_enum_id_pat_storage_is_not_counted() {
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, DekuRead, DekuWrite, DekuSize)]
+    #[repr(u8)]
+    #[deku(bits = 4, endian = "big", id_type = "u8")]
+    enum HeaderType {
+        #[deku(id = "1")]
+        Variant1 = 1,
+        #[deku(id = "2")]
+        Variant2,
+        #[deku(id = "3")]
+        Variant3,
+        #[deku(id = "15")]
+        Variant15 = 15,
+        #[deku(id_pat = "0 | 4..15")]
+        Undefined(u8),
+    }
+
+    assert_eq!(HeaderType::SIZE_BITS, 4);
+    assert_eq!(HeaderType::SIZE_BYTES, None);
+}

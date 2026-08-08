@@ -181,6 +181,22 @@ macro_rules! ImplDekuReadBits {
                     }
                 }
 
+                // Fast path: big-endian, Msb0 bit order.
+                //
+                // The generic paths below zero-extend the value to the container
+                // width by calling `BoundedBitVec::insert(0, false)` once per
+                // padding bit, and each `insert` shifts the entire backing array
+                // right by one bit. That is O(MAX_TYPE_BITS) bit operations per
+                // padding bit, i.e. O(MAX_TYPE_BITS * (MAX_TYPE_BITS - bit_size))
+                // per field -- for a 1-bit field in a u64 that is 63 whole-array
+                // shifts. `load_be` performs the identical zero-extension in one
+                // step. Only Msb0 + big-endian is handled here; the Lsb0 and
+                // little-endian paths keep their existing behaviour.
+                if !input_is_le && order == Order::Msb0 && bit_size > 0 {
+                    let value = bit_slice.load_be::<$inner>();
+                    return Ok((bit_size, <$typ>::from_be_bytes(value.to_be_bytes())));
+                }
+
                 // if read from Lsb order and it's especially cursed since its not just within one byte...
                 // read_bits returned: [0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1]
                 //                     | second     |    first            |
@@ -284,6 +300,15 @@ macro_rules! ImplDekuReadBits {
                         };
                         return Ok((bit_size, value));
                     }
+                }
+
+                // Fast path: big-endian. This impl has no `Order` parameter and
+                // so is always Msb0. See the comment on the same fast path in
+                // the `(Endian, BitSize, Order)` impl above for why the generic
+                // path below is quadratic in the container width.
+                if !input_is_le && bit_size > 0 {
+                    let value = bit_slice.load_be::<$inner>();
+                    return Ok((bit_size, <$typ>::from_be_bytes(value.to_be_bytes())));
                 }
 
                 // Create a new BoundedBitVec from the slice and pad un-aligned chunks

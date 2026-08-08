@@ -50,6 +50,11 @@ name = "deku"
 harness = false
 required-features = ["alloc"]
 
+[[bench]]
+name = "bebits"
+harness = false
+required-features = ["alloc", "bits"]
+
 [lints]
 workspace = true
 

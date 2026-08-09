@@ -12,12 +12,9 @@ error[E0277]: the trait bound `Vec<u8>: deku::DekuSize` is not satisfied
             (A, B, C, D, E, F)
             (A, B, C, D, E, F, G)
             (A, B, C, D, E, F, G, H)
+            (A, B, C, D, E, F, G, H, I)
           and $N others
   = note: this error originates in the derive macro `DekuSize` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: add `#![feature(trivial_bounds)]` to the crate attributes to enable
-  |
-1 + #![feature(trivial_bounds)]
-  |
 
 error[E0599]: the associated function or constant `SIZE_BITS` exists for struct `Test`, but its trait bounds were not satisfied
  --> tests/test_compile/cases/deku_size_vec.rs:9:23

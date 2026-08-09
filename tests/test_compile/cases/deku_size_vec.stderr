@@ -12,7 +12,6 @@ error[E0277]: the trait bound `Vec<u8>: deku::DekuSize` is not satisfied
             (A, B, C, D, E, F)
             (A, B, C, D, E, F, G)
             (A, B, C, D, E, F, G, H)
-            (A, B, C, D, E, F, G, H, I)
           and $N others
   = note: this error originates in the derive macro `DekuSize` (in Nightly builds, run with -Z macro-backtrace for more info)
 help: add `#![feature(trivial_bounds)]` to the crate attributes to enable

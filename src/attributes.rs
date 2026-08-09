@@ -1307,27 +1307,48 @@ Defaults value to [default](#default)
 
 **Note**: Can be paired with [cond](#cond) to have conditional skipping
 
+Skip modes:
+- `skip` - Skip both reading and writing
+- `skip(read)` - Skip only reading, field is written normally
+- `skip(write)` - Skip only writing, field is read normally
+
 Example:
 
 ```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::vec::Vec;
 # use core::convert::{TryInto, TryFrom};
 # use deku::prelude::*;
+# #[cfg(feature = "alloc")]
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
 struct DekuTest {
     field_a: u8,
-    #[deku(skip)]
+    #[deku(skip)]  // Skip both read and write (Must be Option or have `default`)
     field_b: Option<u8>,
+    #[deku(skip(read))]  // Skip read, write normally
     field_c: u8,
+    #[deku(skip(write))]  // Skip write, read normally
+    field_d: u8,
+    field_e: u8,
 }
 
-let data: &[u8] = &[0x01, 0x02];
+# #[cfg(feature = "alloc")]
+# {
+let data: &[u8] = &[0x01, 0x02, 0x03];
 
 let value = DekuTest::try_from(data).unwrap();
 
 assert_eq!(
-    DekuTest { field_a: 0x01, field_b: None, field_c: 0x02 },
+    DekuTest { field_a: 0x01, field_b: None, field_c: 0, field_d: 0x02, field_e: 0x03 },
     value
 );
+
+// When writing back, field_c is included but field_d is skipped
+let bytes = value.to_bytes().unwrap();
+assert_eq!(bytes, &[0x01, 0x00, 0x03]); // field_a, field_c, field_e
+# }
 ```
 
 # pad_bytes_before
@@ -1416,6 +1437,70 @@ assert_eq!(vec![0b10_00_1001], value);
 # #[cfg(not(all(feature = "alloc", feature = "bits")))]
 # fn main() {}
 ```
+
+**Note**: Padding is not affected by the `skip` or `cond` attributes.
+If a field is skipped (for reading or writing), the padding is still
+applied and is not skipped:
+
+
+```rust
+# #[cfg(feature = "alloc")]
+# extern crate alloc;
+# #[cfg(feature = "alloc")]
+# use alloc::{vec, vec::Vec};
+# use core::convert::{TryInto, TryFrom};
+# use deku::prelude::*;
+# #[cfg(feature = "bits")]
+#[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+struct DekuTest {
+    #[deku(bits = 8)]
+    field_a: u8,
+    #[deku(skip, cond="*field_a==2", pad_bits_before = "8", bits = 8, default="0xAB")]
+    field_b: u8,
+    #[deku(bits = 8)]
+    field_c: u8,
+}
+
+# #[cfg(all(feature = "alloc", feature = "bits"))]
+# fn main() {
+let data: &[u8] = &[0x01, 0x00, 0x03, 0x4];
+let value = DekuTest::try_from(data).unwrap();
+
+assert_eq!(
+    DekuTest {
+        field_a: 0x1,
+        field_b: 0x3,
+        field_c: 0x4,
+    },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(vec![0x01, 0x00, 0x03, 0x4], value);
+
+
+let data: &[u8] = &[0x02, 0x00, 0x04]; // 0x00 --> padding not skipped
+//                  ^^^^ condition for skip
+let value = DekuTest::try_from(data).unwrap();
+
+assert_eq!(
+    DekuTest {
+        field_a: 0x2,
+        field_b: 0xAB, // <-- default value of skipped value
+        field_c: 0x4,
+    },
+    value
+);
+
+let value: Vec<u8> = value.try_into().unwrap();
+assert_eq!(vec![0x02, 0x00, 0x4], value);
+
+# }
+#
+# #[cfg(not(all(feature = "alloc", feature = "bits")))]
+# fn main() {}
+```
+
 
 # pad_bytes_after
 

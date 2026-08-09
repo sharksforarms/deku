@@ -40,7 +40,7 @@ where
         // SAFETY: `array` is certain to be initialized
         let array = unsafe {
             // TODO: array_assume_init: https://github.com/rust-lang/rust/issues/96097
-            (core::ptr::addr_of!(array).cast::<[T; N]>()).read()
+            (&raw const array).cast::<[T; N]>().read()
         };
         Ok(array)
     }

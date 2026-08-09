@@ -299,3 +299,33 @@ fn test_misaligned_pad_bits_aaelf32_flags() {
         flags
     );
 }
+
+#[test]
+fn test_lsb_le_misaligned_3() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(endian = "little", bit_order = "lsb")]
+    struct TestStruct {
+        #[deku(bits = 1)]
+        optional: bool,
+        #[deku(bits = 24)]
+        value: u32,
+    }
+    let bits = deku::bitvec::bits![
+        u8, deku::bitvec::Lsb0;
+        1, // Optional
+
+        // Value - 24 bits
+        1,1,1,1, 1,1,1,1,
+        0,0,0,0, 0,0,0,0,
+        0,0,0,0, 0,0,0,0,
+
+        // Padding to make it byte aligned
+        0,0,0,0, 0,0,0
+    ]
+    .to_bitvec();
+    let bitvec = bits.into_vec();
+    let (_rem, s) = TestStruct::from_bytes((&bitvec, 0)).unwrap();
+
+    assert!(s.optional, "Boolean value for field `optional` != `true`");
+    assert_eq!(s.value, u8::MAX as u32)
+}

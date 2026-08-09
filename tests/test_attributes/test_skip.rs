@@ -98,3 +98,188 @@ fn test_skip_cond() {
     let ret_write: Vec<u8> = ret_read.try_into().unwrap();
     assert_eq!(test_data, ret_write);
 }
+
+#[test]
+fn test_skip_read() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct TestStruct {
+        field_a: u8,
+        #[deku(skip(read), default = "42")]
+        field_b: u8,
+        field_c: u8,
+    }
+
+    let test_data: Vec<u8> = vec![0x01, 0x02];
+
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
+    assert_eq!(
+        TestStruct {
+            field_a: 0x01,
+            field_b: 42,
+            field_c: 0x02,
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(vec![0x01, 42, 0x02], ret_write);
+}
+
+#[test]
+fn test_skip_read_with_conditional() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct TestStruct {
+        field_a: u8,
+        #[deku(skip(read), cond = "*field_a == 0x01", default = "42")]
+        field_b: u8,
+        field_c: u8,
+    }
+
+    let test_data: Vec<u8> = vec![0x01, 0x02];
+
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
+    assert_eq!(
+        TestStruct {
+            field_a: 0x01,
+            field_b: 42,
+            field_c: 0x02,
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(vec![0x01, 42, 0x02], ret_write);
+}
+
+#[test]
+fn test_skip_read_with_conditional_not_firing() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct TestStruct {
+        field_a: u8,
+        #[deku(skip(read), cond = "*field_a == 0xff", default = "42")]
+        field_b: u8,
+        field_c: u8,
+    }
+
+    let test_data: Vec<u8> = vec![0x01, 0x0a, 0x02];
+
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
+    assert_eq!(
+        TestStruct {
+            field_a: 0x01,
+            field_b: 0x0a,
+            field_c: 0x02,
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(vec![0x01, 0x0a, 0x02], ret_write);
+}
+
+#[test]
+fn test_skip_write() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct TestStruct {
+        field_a: u8,
+        #[deku(skip(write))]
+        field_b: u8,
+        field_c: u8,
+    }
+
+    let test_data: Vec<u8> = vec![0x01, 0x02, 0x03];
+
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
+    assert_eq!(
+        TestStruct {
+            field_a: 0x01,
+            field_b: 0x02,
+            field_c: 0x03,
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(vec![0x01, 0x03], ret_write);
+}
+
+#[test]
+fn test_skip_write_with_conditional() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct TestStruct {
+        field_a: u8,
+        #[deku(skip(write), cond = "*field_a == 0x01")]
+        field_b: u8,
+    }
+
+    // field is always read
+    let test_data: Vec<u8> = vec![0x01, 0x02];
+
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
+    assert_eq!(
+        TestStruct {
+            field_a: 0x01,
+            field_b: 0x02,
+        },
+        ret_read
+    );
+
+    // When cond is true, field_b is not written
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(vec![0x01], ret_write);
+}
+
+#[test]
+fn test_skip_write_with_conditional_not_firing() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct TestStruct {
+        field_a: u8,
+        #[deku(skip(write), cond = "*field_a == 0x01")]
+        field_b: u8,
+    }
+
+    // field is always read
+    let test_data: Vec<u8> = vec![0x0a, 0x02];
+
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
+    assert_eq!(
+        TestStruct {
+            field_a: 0x0a,
+            field_b: 0x02,
+        },
+        ret_read
+    );
+
+    // When cond is false, field_b is written
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(vec![0x0a, 0x02], ret_write);
+}
+
+#[test]
+fn test_both_skip_modes() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct TestStruct {
+        field_a: u8,
+        #[deku(skip(read), default = "100")]
+        field_b: u8,
+        #[deku(skip(write))]
+        field_c: u8,
+        field_d: u8,
+    }
+
+    let test_data: Vec<u8> = vec![0x01, 0x02, 0x03];
+
+    let ret_read = TestStruct::try_from(test_data.as_slice()).unwrap();
+    assert_eq!(
+        TestStruct {
+            field_a: 0x01,
+            field_b: 100,
+            field_c: 0x02,
+            field_d: 0x03,
+        },
+        ret_read
+    );
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(vec![0x01, 100, 0x03], ret_write);
+}

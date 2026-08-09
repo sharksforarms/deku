@@ -9,7 +9,7 @@ keywords = ["deku", "bits", "serialization", "deserialization", "struct"]
 categories = ["encoding", "parsing", "no-std"]
 description = "bit level serialization/deserialization proc-macro for structs"
 readme = "README.md"
-rust-version = "1.82"
+rust-version = "1.88"
 
 [lib]
 bench = false
@@ -49,6 +49,11 @@ log = { version = "0.4.28" }
 name = "deku"
 harness = false
 required-features = ["alloc"]
+
+[[bench]]
+name = "bebits"
+harness = false
+required-features = ["alloc", "bits"]
 
 [lints]
 workspace = true

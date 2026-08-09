@@ -946,9 +946,10 @@ fn emit_field_read(
 
     let field_default = &f.default;
 
-    let field_read_tokens = match (f.skip, &f.cond) {
-        (true, Some(field_cond)) => {
-            // #[deku(skip, cond = "...")] ==> `skip` if `cond`
+    let field_read_tokens = match (&f.skip, &f.cond) {
+        (Some(crate::SkipMode::All), Some(field_cond))
+        | (Some(crate::SkipMode::Read), Some(field_cond)) => {
+            // #[deku(skip, cond = "...")] or #[deku(skip(read), cond = "...")] ==> `skip` if `cond`
             quote! {
                 if (#field_cond) {
                     #field_default
@@ -957,13 +958,19 @@ fn emit_field_read(
                 }
             }
         }
-        (true, None) => {
-            // #[deku(skip)] ==> `skip`
+        (Some(crate::SkipMode::All), None) | (Some(crate::SkipMode::Read), None) => {
+            // #[deku(skip)] or #[deku(skip(read))] ==> `skip` reading
             quote! {
                 #field_default
             }
         }
-        (false, Some(field_cond)) => {
+        (Some(crate::SkipMode::Write), _) => {
+            // #[deku(skip(write))] ==> read normally
+            quote! {
+                #field_read_normal
+            }
+        }
+        (None, Some(field_cond)) => {
             // #[deku(cond = "...")] ==> read if `cond`
             quote! {
                 if (#field_cond) {
@@ -973,7 +980,7 @@ fn emit_field_read(
                 }
             }
         }
-        (false, None) => {
+        (None, None) => {
             quote! {
                 #field_read_normal
             }

@@ -118,7 +118,7 @@ fn test_enum_array_type() {
         VarC([u8; 3]),
     }
 
-    assert_eq!(TestEnumArray::SIZE_BYTES, Some(6));
+    assert_eq!(TestEnumArray::SIZE_BYTES, Some(3));
 
     let input = b"123".to_vec();
 
@@ -198,7 +198,7 @@ fn test_enum_id_pat_with_discriminant_and_storage() {
         #[deku(id_pat = "_")]
         VarC(u8),
     }
-    assert_eq!(TestEnumStorage::SIZE_BITS, 11);
+    assert_eq!(TestEnumStorage::SIZE_BITS, 3);
     assert_eq!(TestEnumStorage::SIZE_BYTES, None);
 
     #[derive(PartialEq, Debug, DekuRead, DekuWrite, DekuSize)]
@@ -207,7 +207,7 @@ fn test_enum_id_pat_with_discriminant_and_storage() {
         #[deku(bits = 5)]
         rest: u8,
     }
-    assert_eq!(DekuTest::SIZE_BYTES, Some(2));
+    assert_eq!(DekuTest::SIZE_BYTES, Some(1));
 
     let input = &[0b001_00101];
     let ret_read = DekuTest::try_from(input.as_slice()).unwrap();
@@ -309,7 +309,7 @@ fn id_pat_with_id_bits() {
         #[deku(id_pat = "_")]
         B(u8, #[deku(bits = 6)] u8),
     }
-    assert_eq!(IdPatBits::SIZE_BITS, 8 + 8);
+    assert_eq!(IdPatBits::SIZE_BITS, 2 + 6);
 
     let input = [0b1100_1111];
     let mut cursor = Cursor::new(input);

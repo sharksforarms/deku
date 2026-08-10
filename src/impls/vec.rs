@@ -22,8 +22,12 @@ impl DekuReader<'_, ReadExact> for Vec<u8> {
         // so a bogus count from untrusted input doesn't cause a huge
         // allocation that will immediately fail on read.
         let inner = reader.as_mut();
-        let pos = inner.stream_position().map_err(|e| DekuError::Io(e.kind()))?;
-        let end = inner.seek(SeekFrom::End(0)).map_err(|e| DekuError::Io(e.kind()))?;
+        let pos = inner
+            .stream_position()
+            .map_err(|e| DekuError::Io(e.kind()))?;
+        let end = inner
+            .seek(SeekFrom::End(0))
+            .map_err(|e| DekuError::Io(e.kind()))?;
         inner
             .seek(SeekFrom::Start(pos))
             .map_err(|e| DekuError::Io(e.kind()))?;
@@ -421,10 +425,7 @@ mod tests {
             let mut cursor = Cursor::new(data);
             let mut reader = Reader::new(&mut cursor);
             let result = Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(1));
-            assert_eq!(
-                result.unwrap_err(),
-                DekuError::Incomplete(NeedSize::new(8))
-            );
+            assert_eq!(result.unwrap_err(), DekuError::Incomplete(NeedSize::new(8)));
         }
 
         #[test]

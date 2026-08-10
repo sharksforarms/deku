@@ -301,6 +301,7 @@ fn test_misaligned_pad_bits_aaelf32_flags() {
 }
 
 #[test]
+#[cfg(feature = "alloc")]
 fn test_lsb_le_misaligned_3() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
     #[deku(endian = "little", bit_order = "lsb")]

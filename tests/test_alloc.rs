@@ -99,9 +99,8 @@ mod tests {
         let mut cursor = Cursor::new(data);
         let mut reader = Reader::new(&mut cursor);
 
-        let (counts, result) = count_alloc(|| {
-            Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(1_000_000))
-        });
+        let (counts, result) =
+            count_alloc(|| Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(1_000_000)));
         assert!(result.is_err());
         assert_eq!(counts, (0, 0, 0));
     }

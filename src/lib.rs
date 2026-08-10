@@ -980,7 +980,7 @@ where
         assert!(self.size < self.bits.len());
         assert!(index < self.size);
         let (_left, right) = self.bits.split_at_mut(index);
-        right.shift_right(1);
+        right.shift_end(1);
         right.set(0, value);
         self.size += 1;
     }

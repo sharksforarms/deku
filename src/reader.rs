@@ -165,7 +165,7 @@ impl<R: Read + Seek> Reader<R> {
             }
 
             #[cfg(feature = "logging")]
-            log::trace!("not end: read {:02x?}", &buf);
+            log::trace!("not end: read {:02x?}", buf);
 
             self.leftover = Some(Leftover::Byte(buf[0]));
             false
@@ -466,13 +466,13 @@ impl<R: Read + Seek> Reader<R> {
         buf[0] = byte;
 
         #[cfg(feature = "logging")]
-        log::trace!("read_bytes_leftover: using previous read {:02x?}", &buf[0]);
+        log::trace!("read_bytes_leftover: using previous read {:02x?}", buf[0]);
 
         self.leftover = None;
         let remaining = amt - 1;
         if remaining == 0 {
             #[cfg(feature = "logging")]
-            log::trace!("read_bytes_const_leftover: returning {:02x?}", &buf);
+            log::trace!("read_bytes_const_leftover: returning {:02x?}", buf);
 
             self.bits_read += amt * 8;
             return Ok(ReaderRet::Bytes);
@@ -493,7 +493,7 @@ impl<R: Read + Seek> Reader<R> {
         self.bits_read += amt * 8;
 
         #[cfg(feature = "logging")]
-        log::trace!("read_bytes_leftover: returning {:02x?}", &buf);
+        log::trace!("read_bytes_leftover: returning {:02x?}", buf);
 
         Ok(ReaderRet::Bytes)
     }
@@ -524,7 +524,7 @@ impl<R: Read + Seek> Reader<R> {
             self.bits_read += N * 8;
 
             #[cfg(feature = "logging")]
-            log::trace!("read_bytes_const: returning {:02x?}", &buf);
+            log::trace!("read_bytes_const: returning {:02x?}", buf);
 
             return Ok(ReaderRet::Bytes);
         }
@@ -606,14 +606,14 @@ impl<R: Read + Seek> Reader<R> {
         #[cfg(feature = "logging")]
         log::trace!(
             "read_bytes_const_leftover: using previous read {:02x?}",
-            &buf[0]
+            buf[0]
         );
 
         self.leftover = None;
         let remaining = N - 1;
         if remaining == 0 {
             #[cfg(feature = "logging")]
-            log::trace!("read_bytes_const_leftover: returning {:02x?}", &buf);
+            log::trace!("read_bytes_const_leftover: returning {:02x?}", buf);
             self.bits_read += N * 8;
 
             return Ok(());
@@ -634,7 +634,7 @@ impl<R: Read + Seek> Reader<R> {
         self.bits_read += N * 8;
 
         #[cfg(feature = "logging")]
-        log::trace!("read_bytes_const_leftover: returning {:02x?}", &buf);
+        log::trace!("read_bytes_const_leftover: returning {:02x?}", buf);
 
         Ok(())
     }

@@ -679,6 +679,51 @@ fn is_bool(ty: &syn::Type) -> bool {
     matches!(ty, syn::Type::Path(p) if p.qself.is_none() && p.path.is_ident("bool"))
 }
 
+/// `N` for a field that is a plain `[u8; N]`, which one `read_exact` can serve,
+/// or `None` for anything else.
+///
+/// The generic `[T; N]` impl reads element by element, with the `MaybeUninit`
+/// and drop-on-error bookkeeping the general case needs. A byte array needs
+/// none of it: the bytes are the value.
+pub(crate) fn byte_array_len(input: &DekuData, f: &FieldData) -> Option<usize> {
+    // Anything else moves the cursor, makes the read conditional, or changes
+    // what the field means. Vetted on `FieldData`, so a new attribute cannot
+    // silently qualify.
+    if f.any_field_set_incompatible_with_byte_array() {
+        return None;
+    }
+
+    // `Msb0` only: on an unaligned cursor `read_bytes_const_into` reverses the
+    // buffer for `Lsb0`. A byte has no byte order, so endianness needs no check.
+    #[cfg(feature = "bits")]
+    if let Some(order) = f.bit_order.as_ref().or(input.bit_order.as_ref()) {
+        if order.value() != "msb" {
+            return None;
+        }
+    }
+    #[cfg(not(feature = "bits"))]
+    let _ = input;
+
+    let syn::Type::Array(array) = &f.ty else {
+        return None;
+    };
+    let syn::Type::Path(elem) = &*array.elem else {
+        return None;
+    };
+    if !elem.path.is_ident("u8") {
+        return None;
+    }
+    let syn::Expr::Lit(syn::ExprLit {
+        lit: syn::Lit::Int(len),
+        ..
+    }) = &array.len
+    else {
+        return None;
+    };
+    let len = len.base10_parse::<usize>().ok()?;
+    (len != 0).then_some(len)
+}
+
 /// Groups adjacent run-eligible fields, keyed by the index the run starts at.
 ///
 /// A run is capped at 64 bits, the width the reader returns, and must hold at
@@ -1127,6 +1172,23 @@ fn emit_field_read(
                     }
                 })
             }
+            // One `read_exact` for a plain byte array, in place of one read per
+            // element through the generic `[T; N]` impl.
+            if ret.is_empty() {
+                if let Some(n) = byte_array_len(input, f) {
+                    ret.extend(quote! {
+                        {
+                            let mut __deku_bytes = [0u8; #n];
+                            __deku_reader.read_bytes_const_into::<#n>(
+                                &mut __deku_bytes,
+                                ::#crate_::ctx::Order::Msb0,
+                            )?;
+                            __deku_bytes
+                        }
+                    })
+                }
+            }
+
             if ret.is_empty() {
                 ret.extend(quote! {
                     #type_as_deku_read::from_reader_with_ctx

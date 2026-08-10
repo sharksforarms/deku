@@ -842,6 +842,21 @@ impl FieldData {
         .any_field_set()
     }
 
+    /// True if the field carries an attribute the one-call byte-array path
+    /// cannot reproduce.
+    ///
+    /// Excuses the three a bit run excuses, none of which change the bytes, but
+    /// not `bits`: a width on a byte array is a different read.
+    pub fn any_field_set_incompatible_with_byte_array(&self) -> bool {
+        Self {
+            endian: None,
+            bit_order: None,
+            update: None,
+            ..self.clone()
+        }
+        .any_field_set()
+    }
+
     fn from_receiver(receiver: DekuFieldReceiver) -> Result<Self, TokenStream> {
         let ctx = receiver
             .ctx?

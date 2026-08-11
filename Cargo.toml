@@ -40,7 +40,7 @@ hexlit = "0.5.5"
 criterion = "0.7.0"
 alloc_counter = "0.0.4"
 trybuild = "1.0.112"
-rustc-hash = "=2.1.1"
+rustc-hash = "=2.1.3"
 env_logger = "0.11.8"
 assert_hex = "0.4.1"
 log = { version = "0.4.28" }

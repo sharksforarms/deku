@@ -4,6 +4,8 @@
 
 ### Other
 
+- Bump MSRV to 1.88
+- Update syn to 3.0 and darling to 0.24
 - Added a note concerning `skip`/`cond` attributes and padding (doc)
 
 ## [0.20.3](https://github.com/sharksforarms/deku/compare/deku-v0.20.2...deku-v0.20.3) - 2026-01-15

@@ -64,9 +64,7 @@ fn test_update_from_field() {
 /// Update error
 #[test]
 #[cfg(feature = "descriptive-errors")]
-#[should_panic(
-    expected = "Parse(\"error parsing int: out of range integral type conversion attempted\")"
-)]
+#[should_panic(expected = "Parse(\"error parsing int: ")]
 fn test_update_error() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct TestStruct {

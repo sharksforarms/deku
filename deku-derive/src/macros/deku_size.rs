@@ -23,8 +23,15 @@ pub(crate) fn emit_deku_size(input: &DekuData) -> Result<TokenStream, syn::Error
 fn calculate_fields_size<'a>(
     fields: impl IntoIterator<Item = &'a FieldData>,
     crate_: &syn::Ident,
+    skip_first: bool,
 ) -> TokenStream {
-    let field_components = fields.into_iter().filter_map(|f| {
+    let mut skip_first = skip_first;
+    let field_components = fields.into_iter().filter_map(move |f| {
+        if skip_first {
+            skip_first = false;
+            return None;
+        }
+
         if f.temp {
             return None;
         }
@@ -143,8 +150,15 @@ fn add_field_bounds<'a>(
     where_clause: &mut Option<syn::WhereClause>,
     fields: impl IntoIterator<Item = &'a FieldData>,
     crate_: &syn::Ident,
+    skip_first: bool,
 ) {
+    let mut skip_first = skip_first;
     for field in fields {
+        if skip_first {
+            skip_first = false;
+            continue;
+        }
+
         if !field.temp {
             let field_type = &field.ty;
             #[cfg(feature = "bits")]
@@ -229,12 +243,12 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         quote! { 0 }
     };
 
-    let size_calculation = calculate_fields_size(fields.iter().copied(), &crate_);
+    let size_calculation = calculate_fields_size(fields.iter().copied(), &crate_, false);
 
     let (imp_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     let mut where_clause = where_clause.cloned();
-    add_field_bounds(&mut where_clause, fields.iter().copied(), &crate_);
+    add_field_bounds(&mut where_clause, fields.iter().copied(), &crate_, false);
 
     let ident = &input.ident;
 
@@ -291,9 +305,14 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let discriminant_size = calculate_discriminant_size(input, id, id_type, &crate_);
 
+    // If this stores the id, we need to skip the first entry
+    let stores_id = |variant: &&crate::VariantData| {
+        id.is_none() && variant.id_pat.is_some() && !variant.fields.is_empty()
+    };
+
     let variant_sizes = variants
         .iter()
-        .map(|variant| calculate_fields_size(variant.fields.iter(), &crate_));
+        .map(|variant| calculate_fields_size(variant.fields.iter(), &crate_, stores_id(variant)));
 
     let max_variant_size = quote! {
         {
@@ -313,7 +332,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let mut where_clause = where_clause.cloned();
     for variant in variants.iter() {
-        add_field_bounds(&mut where_clause, variant.fields.iter(), &crate_);
+        add_field_bounds(
+            &mut where_clause,
+            variant.fields.iter(),
+            &crate_,
+            stores_id(variant),
+        );
     }
 
     let ident = &input.ident;

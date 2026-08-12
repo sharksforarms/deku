@@ -413,9 +413,8 @@ impl DekuData {
         #[cfg(feature = "bits")]
         let bit_order = receiver.bit_order.or_else(|| {
             receiver.ctx.as_ref().and_then(|ctx| {
-                find_order_param_in_ctx(ctx).map(|name| {
-                    syn::LitStr::new(&name, proc_macro2::Span::call_site())
-                })
+                find_order_param_in_ctx(ctx)
+                    .map(|name| syn::LitStr::new(&name, proc_macro2::Span::call_site()))
             })
         });
         #[cfg(not(feature = "bits"))]

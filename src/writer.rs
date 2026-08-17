@@ -20,16 +20,17 @@ const fn bits_of<T>() -> usize {
 /// Errors unless `value` fits in `bits` bits.
 ///
 /// The derive calls this before composing a run of bit-fields into one write, so
-/// each field keeps the per-field "bit size of input is larger than requested
-/// size" check that the individual writes performed.
+/// each field keeps the check the individual writes performed. The message and the
+/// two widths it names match the sub-width path in `impls::primitive` verbatim, so
+/// batching a field does not change the error a caller sees.
 #[cfg(feature = "bits")]
 #[inline]
 pub fn check_bit_size(value: u64, bits: usize) -> Result<(), DekuError> {
-    if bits < 64 && (value >> bits) != 0 {
-        let significant = 64 - value.leading_zeros() as usize;
+    if bits < u64::BITS as usize && (value >> bits) != 0 {
+        let significant = (u64::BITS - value.leading_zeros()) as usize;
         return Err(crate::deku_error!(
             DekuError::InvalidParam,
-            "bit size of input is larger than requested size",
+            "bit size of input is larger than bit requested size",
             "{} exceeds {}",
             significant,
             bits

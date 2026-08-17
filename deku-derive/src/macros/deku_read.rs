@@ -603,40 +603,11 @@ pub(crate) struct BitRunField {
 pub(crate) type BitRun = Vec<BitRunField>;
 
 /// A field that a run read can serve: `bits = N` with a literal `N`, on a plain
-/// unsigned primitive, explicitly big-endian, `Msb0`, and carrying no other deku
-/// attribute. Anything else keeps its own read.
+/// unsigned primitive, explicitly big-endian, `Msb0`, and carrying no attribute
+/// a batched read cannot reproduce. Anything else keeps its own read.
 #[cfg(feature = "bits")]
 pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> {
-    // Every other attribute must be unset: each one either moves the cursor,
-    // makes the read conditional, or depends on a value read before it, and any
-    // of those breaks the "one contiguous read" assumption.
-    if f.bytes.is_some()
-        || f.count.is_some()
-        || f.bits_read.is_some()
-        || f.bytes_read.is_some()
-        || f.until.is_some()
-        || f.read_all
-        || f.map.is_some()
-        || f.ctx.is_some()
-        || f.update.is_some()
-        || f.reader.is_some()
-        || f.writer.is_some()
-        || f.skip.is_some()
-        || f.pad_bits_before.is_some()
-        || f.pad_bytes_before.is_some()
-        || f.pad_bits_after.is_some()
-        || f.pad_bytes_after.is_some()
-        || f.temp
-        || f.temp_value.is_some()
-        || f.cond.is_some()
-        || f.assert.is_some()
-        || f.assert_eq.is_some()
-        || f.seek_rewind
-        || f.seek_from_current.is_some()
-        || f.seek_from_end.is_some()
-        || f.seek_from_start.is_some()
-        || f.magic.is_some()
-    {
+    if f.any_field_set_incompatible_with_bit_run() {
         return None;
     }
 
@@ -656,10 +627,10 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
 
     let width = match &f.ty {
         syn::Type::Path(p) if p.qself.is_none() => match p.path.get_ident()?.to_string().as_str() {
-            "u8" => 8,
-            "u16" => 16,
-            "u32" => 32,
-            "u64" => 64,
+            "u8" => u8::BITS as usize,
+            "u16" => u16::BITS as usize,
+            "u32" => u32::BITS as usize,
+            "u64" => u64::BITS as usize,
             _ => return None,
         },
         _ => return None,
@@ -709,7 +680,7 @@ pub(crate) fn plan_bit_runs(
             let Some(field) = run_field(input, fields.fields[j]) else {
                 break;
             };
-            if total + field.bits > 64 {
+            if total + field.bits > u64::BITS as usize {
                 break;
             }
             total += field.bits;
@@ -747,11 +718,10 @@ fn emit_bit_run_read(
         let field_ident = f.get_ident(start + offset, true);
         let internal = gen_internal_field_ident(&field_ident);
         let shift = total - consumed - field.bits;
-        let mask: u64 = if field.bits == 64 {
-            u64::MAX
-        } else {
-            (1u64 << field.bits) - 1
-        };
+        // A run holds at least two fields totalling at most 64 bits, so no single
+        // field in one is 64 bits wide and the shift below cannot overflow.
+        debug_assert!(field.bits < u64::BITS as usize);
+        let mask: u64 = (1u64 << field.bits) - 1;
         let ty = &field.ty;
         extracts.extend(quote! {
             let #internal = ((#run_ident >> #shift) & #mask) as #ty;
@@ -1265,5 +1235,259 @@ pub fn emit_try_from(
                 Ok(res)
             }
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "bits")]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    /// Sorts a planner result into `(index of the first field, widths)` pairs.
+    fn sorted(runs: std::collections::HashMap<usize, BitRun>) -> Vec<(usize, Vec<usize>)> {
+        let mut runs: Vec<_> = runs
+            .into_iter()
+            .map(|(start, run)| (start, run.iter().map(|f| f.bits).collect::<Vec<_>>()))
+            .collect();
+        runs.sort_by_key(|(start, _)| *start);
+        runs
+    }
+
+    /// Every run the planner forms over a struct.
+    fn plan(src: &str) -> Vec<(usize, Vec<usize>)> {
+        plan_with_id(src, false)
+    }
+
+    /// As `plan`, with control over `use_id`, which tells the planner the first
+    /// field is an enum's id storage rather than something to read.
+    fn plan_with_id(src: &str, use_id: bool) -> Vec<(usize, Vec<usize>)> {
+        let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
+        let fields = data
+            .data
+            .as_ref()
+            .take_struct()
+            .expect("test input should be a struct");
+
+        sorted(plan_bit_runs(&data, &fields, use_id))
+    }
+
+    /// Every run the planner forms over one variant of an enum.
+    fn plan_variant(src: &str, variant: usize, use_id: bool) -> Vec<(usize, Vec<usize>)> {
+        let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
+        let variants = data
+            .data
+            .as_ref()
+            .take_enum()
+            .expect("test input should be an enum");
+        let fields = variants[variant].fields.as_ref();
+
+        sorted(plan_bit_runs(&data, &fields, use_id))
+    }
+
+    /// A struct of big-endian `u8` fields, one per `bits` width given.
+    fn be_struct(widths: &[usize]) -> String {
+        let fields: String = widths
+            .iter()
+            .enumerate()
+            .map(|(i, w)| format!("#[deku(bits = {w})] f{i}: u8,"))
+            .collect();
+        format!(r#"#[deku(endian = "big")] struct Test {{ {fields} }}"#)
+    }
+
+    #[test]
+    fn adjacent_fields_share_one_read() {
+        assert_eq!(plan(&be_struct(&[2, 3, 3])), vec![(0, vec![2, 3, 3])]);
+    }
+
+    #[test]
+    fn a_lone_field_is_not_a_run() {
+        // One field would cost the same read either way, so batching buys nothing.
+        assert_eq!(plan(&be_struct(&[5])), vec![]);
+    }
+
+    #[test]
+    fn plain_fields_without_bits_are_their_full_width() {
+        let src = r#"#[deku(endian = "big")] struct Test { a: u8, b: u16, c: u32 }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 16, 32])]);
+    }
+
+    #[test]
+    fn a_run_is_capped_at_64_bits_and_the_next_one_starts_there() {
+        // 32 + 32 fills a run exactly; the third field opens a second run, which
+        // then needs a partner of its own to be worth forming.
+        let src = r#"#[deku(endian = "big")] struct Test { a: u32, b: u32, c: u32, d: u32 }"#;
+        assert_eq!(plan(src), vec![(0, vec![32, 32]), (2, vec![32, 32])]);
+
+        // A field that does not fit closes the run rather than overflowing it.
+        let src = r#"#[deku(endian = "big")] struct Test { a: u32, b: u16, c: u32 }"#;
+        assert_eq!(plan(src), vec![(0, vec![32, 16])]);
+    }
+
+    #[test]
+    fn an_ineligible_field_splits_a_run_in_two() {
+        let src = r#"
+        #[deku(endian = "big")]
+        struct Test {
+            #[deku(bits = 2)] a: u8,
+            #[deku(bits = 2)] b: u8,
+            #[deku(endian = "little")] c: u16,
+            #[deku(bits = 2)] d: u8,
+            #[deku(bits = 2)] e: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![2, 2]), (3, vec![2, 2])]);
+    }
+
+    #[test]
+    fn endianness_must_be_explicitly_big() {
+        // Absent means the target's endianness, which is little on x86, so the
+        // planner must not assume it.
+        assert_eq!(plan(r#"struct Test { a: u8, b: u8 }"#), vec![]);
+        assert_eq!(
+            plan(r#"#[deku(endian = "little")] struct Test { a: u8, b: u8 }"#),
+            vec![]
+        );
+        // A field-level attribute qualifies a field inside a little-endian struct.
+        let src = r#"#[deku(endian = "little")] struct Test {
+            #[deku(endian = "big")] a: u8,
+            #[deku(endian = "big")] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+    }
+
+    #[test]
+    fn bit_order_must_be_msb() {
+        let src = r#"#[deku(endian = "big", bit_order = "lsb")] struct Test { a: u8, b: u8 }"#;
+        assert_eq!(plan(src), vec![]);
+        // Msb0 is the default, so absent qualifies.
+        let src = r#"#[deku(endian = "big", bit_order = "msb")] struct Test { a: u8, b: u8 }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+    }
+
+    #[test]
+    fn only_unsigned_primitives_qualify() {
+        for ty in ["i8", "i16", "f32", "bool", "MyEnum", "Vec<u8>", "[u8; 2]"] {
+            let src = format!(r#"#[deku(endian = "big")] struct Test {{ a: {ty}, b: {ty} }}"#);
+            assert_eq!(plan(&src), vec![], "{ty} must not form a run");
+        }
+    }
+
+    #[test]
+    fn bits_must_be_a_literal_and_fit_the_type() {
+        // A non-literal width is not known at expansion time.
+        let src = r#"#[deku(endian = "big", ctx = "n: usize")] struct Test {
+            #[deku(bits = "n")] a: u8,
+            #[deku(bits = "n")] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![]);
+
+        // Wider than its container.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 9)] a: u8,
+            #[deku(bits = 2)] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![]);
+    }
+
+    /// The deny list in `run_field` is the part most likely to rot, so pin every
+    /// attribute that has to keep a field out of a run. Each case is two fields
+    /// that would otherwise batch, with the attribute on the first.
+    #[rstest]
+    #[case::bytes("bytes = 1")]
+    #[case::pad_bits_before("pad_bits_before = \"1\"")]
+    #[case::pad_bytes_before("pad_bytes_before = \"1\"")]
+    #[case::pad_bits_after("pad_bits_after = \"1\"")]
+    #[case::pad_bytes_after("pad_bytes_after = \"1\"")]
+    #[case::cond("cond = \"true\"")]
+    #[case::assert("assert = \"true\"")]
+    #[case::assert_eq("assert_eq = \"0\"")]
+    #[case::map("map = \"|v: u8| -> Result<_, DekuError> { Ok(v) }\"")]
+    #[case::reader("reader = \"read_it()\"")]
+    #[case::writer("writer = \"write_it()\"")]
+    #[case::skip_with_default("skip, default = \"0\"")]
+    #[case::temp("temp")]
+    #[case::seek_rewind("seek_rewind")]
+    #[case::seek_from_current("seek_from_current = \"1\"")]
+    #[case::seek_from_end("seek_from_end = \"0\"")]
+    #[case::seek_from_start("seek_from_start = \"0\"")]
+    #[case::magic("magic = b\"\\x01\"")]
+    fn a_disqualifying_attribute_keeps_a_field_out_of_a_run(#[case] attr: &str) {
+        let src =
+            format!(r#"#[deku(endian = "big")] struct Test {{ #[deku({attr})] a: u8, b: u8 }}"#);
+        assert_eq!(
+            plan(&src),
+            vec![],
+            "`{attr}` must keep the field out of a run"
+        );
+    }
+
+    #[test]
+    fn the_id_storage_field_is_never_part_of_a_run() {
+        // With `use_id`, the first field holds the enum id that has already been
+        // read, so it is not a read at all and cannot join the run behind it.
+        let src = &be_struct(&[2, 3, 3]);
+        assert_eq!(plan_with_id(src, false), vec![(0, vec![2, 3, 3])]);
+        assert_eq!(plan_with_id(src, true), vec![(1, vec![3, 3])]);
+
+        // And with only one field left behind the id, there is no run at all.
+        let src = &be_struct(&[2, 6]);
+        assert_eq!(plan_with_id(src, true), vec![]);
+    }
+
+    #[test]
+    fn a_run_forms_inside_an_enum_variant() {
+        let src = r#"
+        #[deku(id_type = "u8", endian = "big")]
+        enum Test {
+            #[deku(id = 1)]
+            Named {
+                #[deku(bits = 2)] a: u8,
+                #[deku(bits = 6)] b: u8,
+            },
+            #[deku(id = 2)]
+            Unnamed(#[deku(bits = 4)] u8, #[deku(bits = 4)] u8),
+        }"#;
+        assert_eq!(plan_variant(src, 0, false), vec![(0, vec![2, 6])]);
+        // Unnamed fields take a different ident path but plan the same.
+        assert_eq!(plan_variant(src, 1, false), vec![(0, vec![4, 4])]);
+    }
+
+    #[test]
+    fn a_run_forms_in_a_tuple_struct() {
+        let src = r#"#[deku(endian = "big")] struct Test(
+            #[deku(bits = 3)] u8,
+            #[deku(bits = 5)] u8,
+        );"#;
+        assert_eq!(plan(src), vec![(0, vec![3, 5])]);
+    }
+
+    #[test]
+    fn update_does_not_keep_a_field_out_of_a_run() {
+        // `update` is consumed only by the `DekuUpdate` impl, so it cannot change
+        // how the field is read or written and must not split a run.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 4, update = "0")] a: u8,
+            #[deku(bits = 4)] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![4, 4])]);
+    }
+
+    #[test]
+    fn the_emitted_read_makes_one_call_for_the_whole_run() {
+        // The assertion the round-trip tests cannot make: three fields, one call.
+        let data = DekuData::from_input(be_struct(&[2, 3, 3]).parse().unwrap()).unwrap();
+        let emitted = emit_deku_read(&data).unwrap().to_string();
+        assert_eq!(emitted.matches("read_bits_uint_msb0").count(), 1);
+
+        // And without a run, one call per field.
+        let src = r#"#[deku(endian = "little")] struct Test {
+            #[deku(bits = 2)] a: u8,
+            #[deku(bits = 3)] b: u8,
+            #[deku(bits = 3)] c: u8,
+        }"#;
+        let data = DekuData::from_input(src.parse().unwrap()).unwrap();
+        let emitted = emit_deku_read(&data).unwrap().to_string();
+        assert_eq!(emitted.matches("read_bits_uint_msb0").count(), 0);
     }
 }

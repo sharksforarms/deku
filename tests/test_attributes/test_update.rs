@@ -76,3 +76,36 @@ fn test_update_error() {
 
     val.update().unwrap();
 }
+
+/// `update` on a field inside a batched big-endian bit-field run: the run reads
+/// and writes the field, and `update` still rewrites it, because `update` feeds
+/// only the `DekuUpdate` impl.
+#[test]
+#[cfg(feature = "bits")]
+fn test_update_in_bit_run() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(endian = "big")]
+    struct TestStruct {
+        #[deku(bits = 4)]
+        field_a: u8,
+        #[deku(bits = 4, update = "9")]
+        field_b: u8,
+        field_c: u8,
+    }
+
+    let mut ret_read = TestStruct::try_from([0x12u8, 0x34].as_slice()).unwrap();
+    assert_eq!(
+        TestStruct {
+            field_a: 0x1,
+            field_b: 0x2,
+            field_c: 0x34
+        },
+        ret_read
+    );
+
+    ret_read.update().unwrap();
+    assert_eq!(0x9, ret_read.field_b);
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(vec![0x19, 0x34], ret_write);
+}

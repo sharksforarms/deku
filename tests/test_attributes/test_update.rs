@@ -77,9 +77,8 @@ fn test_update_error() {
     val.update().unwrap();
 }
 
-/// `update` on a field inside a batched big-endian bit-field run: the run reads
-/// and writes the field, and `update` still rewrites it, because `update` feeds
-/// only the `DekuUpdate` impl.
+/// `update` on a field inside a batched bit-field run still rewrites it, because
+/// it feeds only the `DekuUpdate` impl.
 #[test]
 #[cfg(feature = "bits")]
 fn test_update_in_bit_run() {

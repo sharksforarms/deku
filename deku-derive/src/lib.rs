@@ -711,15 +711,13 @@ struct FieldData {
 
 impl FieldData {
     pub fn any_field_set(&self) -> bool {
-        // Destructured exhaustively on purpose: no `..`. Adding an attribute to
-        // `FieldData` then fails to compile here until it is classified.
+        // Exhaustive on purpose: a new `FieldData` attribute fails to compile
+        // here until it is classified.
         let Self {
-            // Not attributes: the identifier and type say nothing about what the
-            // user wrote in a `deku` attribute.
+            // Not attributes.
             ident: _,
             ty: _,
-            // Ignored: `from_receiver` fills `default` in for every field, so it
-            // is `Some` even where the user wrote nothing.
+            // Always `Some`: `from_receiver` fills it in for every field.
             default: _,
 
             endian,
@@ -793,12 +791,9 @@ impl FieldData {
         any_option_set || any_bool_set
     }
 
-    /// True if the field carries any attribute that one batched read cannot
-    /// reproduce.
-    ///
-    /// Every incompatible attribute either moves the cursor, makes the read
-    /// conditional, or depends on a value read earlier, and any of those breaks
-    /// the "one contiguous read" premise.
+    /// True if the field carries an attribute a batched read cannot reproduce:
+    /// anything that moves the cursor, makes the read conditional, or depends on a
+    /// value read earlier.
     #[cfg(feature = "bits")]
     pub fn any_field_set_incompatible_with_bit_run(&self) -> bool {
         Self {

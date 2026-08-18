@@ -979,8 +979,7 @@ mod tests {
 
     #[test]
     fn a_field_that_cannot_overflow_gets_no_check() {
-        // Whole bytes fill their type and bools are 0 or 1, so neither can exceed
-        // its width and the check would always pass.
+        // Whole bytes fill their type and bools are 0 or 1: neither can overflow.
         let src = r#"#[deku(endian = "big")] struct Test { a: u8, b: u16 }"#;
         assert_eq!(emitted(src).matches("check_bit_size").count(), 0);
 
@@ -994,8 +993,7 @@ mod tests {
 
     #[test]
     fn every_field_in_a_run_keeps_its_overflow_check() {
-        // Folding three fields into one integer must not lose the per-field
-        // "bit size of input is larger than requested size" rejection.
+        // Folding three fields into one integer must not lose the per-field check.
         assert_eq!(emitted(RUN).matches("check_bit_size").count(), 3);
     }
 

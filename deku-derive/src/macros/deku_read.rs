@@ -596,13 +596,10 @@ fn emit_field_reads(
 pub(crate) struct BitRunField {
     pub(crate) bits: usize,
     pub(crate) ty: syn::Type,
-    /// Whether the field's own write would have gone through the `Order`-carrying
-    /// impl, which words its overflow error differently. Selects the wording the
-    /// batched write reports.
+    /// Field takes the `Order`-carrying write impl, which words overflow
+    /// differently.
     pub(crate) ordered: bool,
-    /// Whether a written value can actually exceed `bits`. False where the field
-    /// fills its own type, or is a `bool`, since neither can overflow: the check
-    /// would always pass, so the run does not emit one.
+    /// Whether a value can exceed `bits` at all. If not, no check is emitted.
     pub(crate) can_overflow: bool,
 }
 
@@ -610,9 +607,9 @@ pub(crate) struct BitRunField {
 #[cfg(feature = "bits")]
 pub(crate) type BitRun = Vec<BitRunField>;
 
-/// A field that a run read can serve: `bits = N` with a literal `N`, on a plain
-/// unsigned primitive, explicitly big-endian, `Msb0`, and carrying no attribute
-/// a batched read cannot reproduce. Anything else keeps its own read.
+/// A field a run can serve: a literal `bits` on an unsigned primitive or `bool`,
+/// explicitly big-endian, `Msb0`, carrying nothing else. Anything else keeps its
+/// own read.
 #[cfg(feature = "bits")]
 pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> {
     if f.any_field_set_incompatible_with_bit_run() {
@@ -633,9 +630,7 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
             return None;
         }
     }
-    // Same check, two spellings: `DekuWriter<(Endian, BitSize, Order)>` drops the
-    // second "bit" that `DekuWriter<(Endian, BitSize)>` includes. Record which one
-    // this field would have produced so batching does not change the message.
+    // Which overflow wording this field's own write would have used.
     let ordered = explicit_order.is_some();
 
     let width = match &f.ty {
@@ -644,9 +639,8 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
             "u16" => u16::BITS as usize,
             "u32" => u32::BITS as usize,
             "u64" => u64::BITS as usize,
-            // `impls::bool` reads a bool by delegating to `u8` with the same ctx,
-            // so it occupies a byte unless `bits` narrows it. Flags in a packed
-            // header are usually `bits = 1`.
+            // `impls::bool` delegates to `u8`, so a bool is a byte unless
+            // `bits` narrows it. Flags in a packed header are usually `bits = 1`.
             "bool" => u8::BITS as usize,
             _ => return None,
         },
@@ -666,8 +660,7 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
         return None;
     }
 
-    // A value cast from a type `bits` wide cannot need more than `bits` bits, and a
-    // bool is 0 or 1, so in both cases the per-field check could never have fired.
+    // Neither a value filling its type nor a bool can exceed its width.
     let can_overflow = bits < width && !is_bool(&f.ty);
 
     Some(BitRunField {
@@ -678,7 +671,7 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
     })
 }
 
-/// Whether the field is a plain `bool`, which a run must compare rather than cast.
+/// A plain `bool`, which a run compares rather than casts.
 #[cfg(feature = "bits")]
 fn is_bool(ty: &syn::Type) -> bool {
     matches!(ty, syn::Type::Path(p) if p.qself.is_none() && p.path.is_ident("bool"))
@@ -748,19 +741,17 @@ fn emit_bit_run_read(
         let field_ident = f.get_ident(start + offset, true);
         let internal = gen_internal_field_ident(&field_ident);
         let shift = total - consumed - field.bits;
-        // A run holds at least two fields totalling at most 64 bits, so no single
-        // field in one is 64 bits wide and the shift below cannot overflow.
+        // A run is two or more fields in 64 bits, so none is 64 wide.
         debug_assert!(field.bits < u64::BITS as usize);
         let mask: u64 = (1u64 << field.bits) - 1;
         let ty = &field.ty;
         // `as` cannot produce a bool, so a bool field is compared rather than cast.
         let extract = if is_bool(ty) {
             if field.bits == 1 {
-                // One bit is either 0 or 1, so there is no invalid value to reject.
+                // One bit is 0 or 1: nothing to reject.
                 quote! { ((#run_ident >> #shift) & 1) != 0 }
             } else {
-                // A wider bool rejects anything but 0 and 1, with the same error
-                // `impls::bool` returns.
+                // Wider bools reject anything but 0 and 1, as `impls::bool` does.
                 quote! {
                     match (#run_ident >> #shift) & #mask {
                         0 => false,
@@ -1314,8 +1305,7 @@ mod tests {
         plan_with_id(src, false)
     }
 
-    /// As `plan`, with control over `use_id`, which tells the planner the first
-    /// field is an enum's id storage rather than something to read.
+    /// As `plan`, with `use_id`: the first field is an enum's id storage, not a read.
     fn plan_with_id(src: &str, use_id: bool) -> Vec<(usize, Vec<usize>)> {
         let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
         let fields = data
@@ -1357,7 +1347,7 @@ mod tests {
 
     #[test]
     fn a_lone_field_is_not_a_run() {
-        // One field would cost the same read either way, so batching buys nothing.
+        // One field costs the same read either way.
         assert_eq!(plan(&be_struct(&[5])), vec![]);
     }
 
@@ -1369,8 +1359,7 @@ mod tests {
 
     #[test]
     fn a_run_is_capped_at_64_bits_and_the_next_one_starts_there() {
-        // 32 + 32 fills a run exactly; the third field opens a second run, which
-        // then needs a partner of its own to be worth forming.
+        // 32 + 32 fills a run exactly, so the third field opens a second.
         let src = r#"#[deku(endian = "big")] struct Test { a: u32, b: u32, c: u32, d: u32 }"#;
         assert_eq!(plan(src), vec![(0, vec![32, 32]), (2, vec![32, 32])]);
 
@@ -1395,8 +1384,7 @@ mod tests {
 
     #[test]
     fn endianness_must_be_explicitly_big() {
-        // Absent means the target's endianness, which is little on x86, so the
-        // planner must not assume it.
+        // Absent means the target's endianness, little on x86.
         assert_eq!(plan(r#"struct Test { a: u8, b: u8 }"#), vec![]);
         assert_eq!(
             plan(r#"#[deku(endian = "little")] struct Test { a: u8, b: u8 }"#),
@@ -1438,8 +1426,7 @@ mod tests {
 
     #[test]
     fn an_explicit_bit_order_selects_the_other_overflow_wording() {
-        // Both fields batch, but they reach different write impls, which word the
-        // overflow error differently, so each must call the matching check.
+        // Both batch, but reach different write impls, so each needs its own wording.
         let src = r#"#[deku(endian = "big")] struct Test {
             #[deku(bits = 4, bit_order = "msb")] ordered: u8,
             #[deku(bits = 4)] plain: u8,
@@ -1459,8 +1446,7 @@ mod tests {
 
     #[test]
     fn a_bool_joins_a_run() {
-        // Flags in a packed header are `bits = 1` bools, and excluding them splits
-        // a run wherever a flag sits.
+        // Excluding bools would split a run wherever a flag sits.
         let src = r#"#[deku(endian = "big")] struct Test {
             #[deku(bits = 2)] a: u8,
             #[deku(bits = 1)] flag: bool,
@@ -1475,8 +1461,7 @@ mod tests {
 
     #[test]
     fn the_rtp_header_batches_into_one_read() {
-        // RFC 3550 fixed header: 9 fields, three of them flags. With bools excluded
-        // this planned as a single run of three, leaving six standalone reads.
+        // RFC 3550 fixed header: 9 fields, three of them flags.
         let src = r#"#[deku(endian = "big")] struct Rtp {
             #[deku(bits = 2)] version: u8,
             #[deku(bits = 1)] padding: bool,
@@ -1488,8 +1473,7 @@ mod tests {
             timestamp: u32,
             ssrc: u32,
         }"#;
-        // The first eight fields sum to exactly 64 bits; `ssrc` cannot fit and is
-        // left alone, so the header costs two reads instead of seven.
+        // The first eight sum to 64 bits; `ssrc` cannot fit. Two reads, not seven.
         assert_eq!(plan(src), vec![(0, vec![2, 1, 1, 4, 1, 7, 16, 32])]);
     }
 
@@ -1518,9 +1502,8 @@ mod tests {
         assert_eq!(plan(src), vec![]);
     }
 
-    /// The deny list in `run_field` is the part most likely to rot, so pin every
-    /// attribute that has to keep a field out of a run. Each case is two fields
-    /// that would otherwise batch, with the attribute on the first.
+    /// Every attribute that must keep a field out of a run. Two fields that would
+    /// otherwise batch, with the attribute on the first.
     #[rstest]
     #[case::bytes("bytes = 1")]
     #[case::pad_bits_before("pad_bits_before = \"1\"")]
@@ -1552,13 +1535,12 @@ mod tests {
 
     #[test]
     fn the_id_storage_field_is_never_part_of_a_run() {
-        // With `use_id`, the first field holds the enum id that has already been
-        // read, so it is not a read at all and cannot join the run behind it.
+        // The id has already been read, so it cannot join the run behind it.
         let src = &be_struct(&[2, 3, 3]);
         assert_eq!(plan_with_id(src, false), vec![(0, vec![2, 3, 3])]);
         assert_eq!(plan_with_id(src, true), vec![(1, vec![3, 3])]);
 
-        // And with only one field left behind the id, there is no run at all.
+        // One field left behind the id is no run.
         let src = &be_struct(&[2, 6]);
         assert_eq!(plan_with_id(src, true), vec![]);
     }
@@ -1592,8 +1574,7 @@ mod tests {
 
     #[test]
     fn update_does_not_keep_a_field_out_of_a_run() {
-        // `update` is consumed only by the `DekuUpdate` impl, so it cannot change
-        // how the field is read or written and must not split a run.
+        // `update` feeds only `DekuUpdate`, so it cannot change the read or write.
         let src = r#"#[deku(endian = "big")] struct Test {
             #[deku(bits = 4, update = "0")] a: u8,
             #[deku(bits = 4)] b: u8,
@@ -1603,7 +1584,7 @@ mod tests {
 
     #[test]
     fn the_emitted_read_makes_one_call_for_the_whole_run() {
-        // The assertion the round-trip tests cannot make: three fields, one call.
+        // What round-trip tests cannot show: three fields, one call.
         let data = DekuData::from_input(be_struct(&[2, 3, 3]).parse().unwrap()).unwrap();
         let emitted = emit_deku_read(&data).unwrap().to_string();
         assert_eq!(emitted.matches("read_bits_uint_msb0").count(), 1);

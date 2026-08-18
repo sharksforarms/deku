@@ -531,9 +531,12 @@ fn emit_bit_run_write(
         // Every field keeps the rejection its own write performed. Where the field
         // fills its type this folds away at compile time, because a value cast from
         // that type cannot exceed the width.
-        checks.extend(quote! {
-            ::#crate_::writer::check_bit_size(#value, #bits)?;
-        });
+        if field.can_overflow {
+            let ordered = field.ordered;
+            checks.extend(quote! {
+                ::#crate_::writer::check_bit_size::<#ordered>(#value, #bits)?;
+            });
+        }
         terms.push(quote! { ((#value & #mask) << #shift) });
         consumed += bits;
     }
@@ -974,6 +977,21 @@ mod tests {
     #[test]
     fn without_a_run_no_batched_write_is_emitted() {
         assert_eq!(emitted(NO_RUN).matches("write_bits_uint_msb0").count(), 0);
+    }
+
+    #[test]
+    fn a_field_that_cannot_overflow_gets_no_check() {
+        // Whole bytes fill their type and bools are 0 or 1, so neither can exceed
+        // its width and the check would always pass.
+        let src = r#"#[deku(endian = "big")] struct Test { a: u8, b: u16 }"#;
+        assert_eq!(emitted(src).matches("check_bit_size").count(), 0);
+
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 1)] flag: bool,
+            #[deku(bits = 7)] rest: u8,
+        }"#;
+        // Only `rest` is narrower than its type.
+        assert_eq!(emitted(src).matches("check_bit_size").count(), 1);
     }
 
     #[test]

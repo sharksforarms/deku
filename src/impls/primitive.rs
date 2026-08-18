@@ -665,9 +665,15 @@ macro_rules! ImplDekuReadSignExtend {
                         };
                         // Sign-extend: a sub-width signed read zero-pads above, so the
                         // sign bit of the N-byte value must be propagated to the full type.
+                        // A zero-byte read has no sign bit to propagate, and shifting by
+                        // the full type width would overflow, so it is left as-is.
                         const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
-                        let shift = MAX_TYPE_BITS - (size.0 * 8);
-                        (value << shift) >> shift
+                        if size.0 == 0 {
+                            value
+                        } else {
+                            let shift = MAX_TYPE_BITS - (size.0 * 8);
+                            (value << shift) >> shift
+                        }
                     }
                     #[cfg(all(feature = "bits", feature = "alloc"))]
                     ReaderRet::Bits(Some(bits)) => {
@@ -1725,12 +1731,18 @@ mod tests {
         // 3-byte LE encoding of -100
         let mut cursor = std::io::Cursor::new([0x9C_u8, 0xFF, 0xFF]);
         let mut reader = Reader::new(&mut cursor);
-        assert_eq!(-100_i32, i32::from_reader_with_ctx(&mut reader, (Endian::Little, ByteSize(3))).unwrap());
+        assert_eq!(
+            -100_i32,
+            i32::from_reader_with_ctx(&mut reader, (Endian::Little, ByteSize(3))).unwrap()
+        );
 
         // 3-byte BE encoding of -100
         let mut cursor = std::io::Cursor::new([0xFF_u8, 0xFF, 0x9C]);
         let mut reader = Reader::new(&mut cursor);
-        assert_eq!(-100_i32, i32::from_reader_with_ctx(&mut reader, (Endian::Big, ByteSize(3))).unwrap());
+        assert_eq!(
+            -100_i32,
+            i32::from_reader_with_ctx(&mut reader, (Endian::Big, ByteSize(3))).unwrap()
+        );
     }
 
     #[cfg(feature = "bits")]
@@ -1739,11 +1751,54 @@ mod tests {
         // 3-byte LE encoding of -8388608 (0x800000 sign-extended)
         let mut cursor = std::io::Cursor::new([0x00_u8, 0x00, 0x80]);
         let mut reader = Reader::new(&mut cursor);
-        assert_eq!(-8388608_i32, i32::from_reader_with_ctx(&mut reader, (Endian::Little, ByteSize(3))).unwrap());
+        assert_eq!(
+            -8388608_i32,
+            i32::from_reader_with_ctx(&mut reader, (Endian::Little, ByteSize(3))).unwrap()
+        );
 
         // 3-byte BE encoding of -8388608
         let mut cursor = std::io::Cursor::new([0x80_u8, 0x00, 0x00]);
         let mut reader = Reader::new(&mut cursor);
-        assert_eq!(-8388608_i32, i32::from_reader_with_ctx(&mut reader, (Endian::Big, ByteSize(3))).unwrap());
+        assert_eq!(
+            -8388608_i32,
+            i32::from_reader_with_ctx(&mut reader, (Endian::Big, ByteSize(3))).unwrap()
+        );
+    }
+
+    // A runtime-computed `bytes` of 0 must keep reading nothing and yield 0,
+    // not overflow the sign-extension shift.
+    #[test]
+    fn test_sign_extend_bytesize_zero() {
+        let mut cursor = std::io::Cursor::new([0x01_u8, 0x02]);
+        let mut reader = Reader::new(&mut cursor);
+        assert_eq!(
+            0_i32,
+            i32::from_reader_with_ctx(&mut reader, (Endian::Little, ByteSize(0))).unwrap()
+        );
+
+        let mut cursor = std::io::Cursor::new([0x01_u8, 0x02]);
+        let mut reader = Reader::new(&mut cursor);
+        assert_eq!(
+            0_i32,
+            i32::from_reader_with_ctx(&mut reader, (Endian::Big, ByteSize(0))).unwrap()
+        );
+    }
+
+    // Full-width reads take shift == 0 and must round-trip unchanged.
+    #[test]
+    fn test_sign_extend_bytesize_full_width() {
+        let mut cursor = std::io::Cursor::new([0x9C_u8, 0xFF, 0xFF, 0xFF]);
+        let mut reader = Reader::new(&mut cursor);
+        assert_eq!(
+            -100_i32,
+            i32::from_reader_with_ctx(&mut reader, (Endian::Little, ByteSize(4))).unwrap()
+        );
+
+        let mut cursor = std::io::Cursor::new([0xFF_u8, 0xFF, 0xFF, 0x9C]);
+        let mut reader = Reader::new(&mut cursor);
+        assert_eq!(
+            -100_i32,
+            i32::from_reader_with_ctx(&mut reader, (Endian::Big, ByteSize(4))).unwrap()
+        );
     }
 }

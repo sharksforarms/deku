@@ -19,18 +19,12 @@ const fn bits_of<T>() -> usize {
 
 /// Errors unless `value` fits in `bits` bits.
 ///
-/// The derive calls this before composing a run of bit-fields into one write, so
-/// each field keeps the check its own write performed. Kept to two comparisons so
-/// it inlines: where a field fills its type the check is provably dead and folds
-/// away entirely, which is the common case for a run of whole bytes.
+/// The derive calls this per field before composing a run into one write. Two
+/// comparisons, so it inlines and folds away where a field fills its type.
 ///
-/// `ORDERED` picks the wording, because deku's two write impls word this error
-/// differently: `DekuWriter<(Endian, BitSize)>` says "bit size of input is larger
-/// than bit requested size", while `DekuWriter<(Endian, BitSize, Order)>`, which a
-/// field carrying an explicit `bit_order` uses, drops that second "bit". The derive
-/// passes whichever the field would otherwise have produced, so batching cannot
-/// change the message. Bring those two impls into line and this parameter goes
-/// away.
+/// `ORDERED` picks the wording: `DekuWriter<(Endian, BitSize, Order)>` omits the
+/// second "bit" that `DekuWriter<(Endian, BitSize)>` includes. Unify those two and
+/// this parameter goes away.
 #[cfg(feature = "bits")]
 #[inline]
 pub fn check_bit_size<const ORDERED: bool>(value: u64, bits: usize) -> Result<(), DekuError> {
@@ -40,13 +34,12 @@ pub fn check_bit_size<const ORDERED: bool>(value: u64, bits: usize) -> Result<()
     Err(bit_size_error::<ORDERED>(value, bits))
 }
 
-/// Builds the error for [`check_bit_size`]. Out of line so the check itself stays
-/// small enough to inline and fold.
+/// Cold path of [`check_bit_size`], out of line so the check inlines.
 #[cfg(feature = "bits")]
 #[cold]
 #[inline(never)]
 fn bit_size_error<const ORDERED: bool>(value: u64, bits: usize) -> DekuError {
-    // The width the per-field writes report: how many bits `value` occupies.
+    // Bits `value` occupies, which is what the per-field writes report.
     let significant = (u64::BITS - value.leading_zeros()) as usize;
     if ORDERED {
         crate::deku_error!(

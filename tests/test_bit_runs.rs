@@ -1,19 +1,14 @@
 //! Adjacent big-endian `Msb0` bit fields served by one read and one write.
 //!
-//! The derive batches such a run and cuts each field out with a shift and a mask.
-//! The contract is that this is invisible: a batched struct must read the same
-//! values, reject the same writes, and produce the same bytes as an unbatched one.
-//!
-//! `assert = "true"` is the lever these tests pull to get an unbatched control.
-//! It disqualifies a field from a run while being semantically a no-op, so the two
-//! structs below differ only in whether the derive batches them.
+//! Batching must be invisible: same values, same rejections, same bytes as an
+//! unbatched struct. `assert = "true"` is the control, since it disqualifies a
+//! field from a run while being a no-op.
 #![cfg(all(feature = "alloc", feature = "bits"))]
 
 use deku::prelude::*;
 
-/// A realistic bit-packed header: 5 fields, 48 bits, byte-aligned overall so the
-/// write side round-trips exactly. Declared twice from one definition so the two
-/// cannot drift apart.
+/// A bit-packed header: 5 fields, 48 bits. Declared twice from one definition so
+/// the two cannot drift apart.
 macro_rules! header {
     ($name:ident, $($extra:tt)*) => {
         #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -49,8 +44,7 @@ fn wire(len: usize, seed: u32) -> Vec<u8> {
         .collect()
 }
 
-/// The core claim: batching changes nothing observable. Every field, and the bytes
-/// written back, must agree with the unbatched path over a large sample.
+/// The core claim: every field and the bytes written back agree with unbatched.
 #[test]
 fn batched_matches_unbatched() {
     for seed in 1..20_000u32 {
@@ -71,8 +65,7 @@ fn batched_matches_unbatched() {
     }
 }
 
-/// One wire against values computed independently of deku, so the differential
-/// test above cannot pass by both paths being wrong in the same way.
+/// One wire against independently computed values, in case both paths are wrong.
 #[test]
 fn known_wire_yields_hand_computed_fields() {
     let data = [0xABu8, 0xCD, 0xEF, 0x12, 0x34, 0x56];
@@ -90,9 +83,8 @@ fn known_wire_yields_hand_computed_fields() {
     assert_eq!(h.to_bytes().unwrap(), data);
 }
 
-/// A run must keep the per-field overflow rejection that the individual writes
-/// performed: composing five fields into one integer must not let a too-wide value
-/// silently collide with its neighbour.
+/// Composing fields into one integer must not let a too-wide value collide with
+/// its neighbour.
 #[test]
 fn an_oversized_field_is_still_rejected() {
     let bad = Batched {
@@ -121,8 +113,7 @@ fn an_oversized_field_is_still_rejected() {
     assert_eq!(format!("{plain_err}"), msg);
 }
 
-/// Widest value each field accepts, to pin the boundary rather than just the
-/// overflow.
+/// The boundary, not just the overflow.
 #[test]
 fn each_field_accepts_its_widest_value() {
     let full = Batched {
@@ -138,8 +129,7 @@ fn each_field_accepts_its_widest_value() {
     assert_eq!(back, full);
 }
 
-/// A run inside an enum variant, both named and unnamed, since those take a
-/// different field-ident path in the derive.
+/// Enum variants, named and unnamed: a different field-ident path.
 #[test]
 fn runs_inside_enum_variants() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -186,8 +176,7 @@ fn run_in_a_tuple_struct() {
     assert_eq!(p.to_bytes().unwrap(), data);
 }
 
-/// A run starting part way through a struct, after a field that disqualifies
-/// itself, and a second run after another.
+/// Runs either side of an ineligible field.
 #[test]
 fn runs_around_ineligible_fields() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -220,8 +209,7 @@ fn runs_around_ineligible_fields() {
     assert_eq!(m.to_bytes().unwrap(), data);
 }
 
-/// A truncated wire must still be `Incomplete`, not a partial value: one read for
-/// 48 bits must not succeed on fewer.
+/// One read for 48 bits must not succeed on fewer.
 #[test]
 fn a_short_wire_still_errors() {
     for len in 0..6 {
@@ -234,8 +222,7 @@ fn a_short_wire_still_errors() {
     assert!(Batched::from_bytes((&wire(6, 5), 0)).is_ok());
 }
 
-/// `check_bit_size` is what preserves the per-field rejection, and the derive calls
-/// it directly, so pin its boundaries and that it reports the message it is given.
+/// `check_bit_size` preserves the per-field rejection, so pin its boundaries.
 #[test]
 fn check_bit_size_boundaries() {
     use deku::writer::check_bit_size;
@@ -259,8 +246,7 @@ fn check_bit_size_boundaries() {
     let err = check_bit_size::<false>(0x100, 8).expect_err("9 bits do not fit in 8");
     assert!(format!("{err}").contains('9'));
 
-    // The verdict is independent of the wording; only the wording differs, which is
-    // how a batched write reproduces either impl's error.
+    // Same verdict either way; only the wording differs.
     for (value, bits) in [(0b11u64, 2), (0xFF, 8), (0, 1), (u64::MAX, 64), (0b100, 2)] {
         assert_eq!(
             check_bit_size::<false>(value, bits).is_ok(),
@@ -276,8 +262,7 @@ fn check_bit_size_boundaries() {
     );
 }
 
-/// A header whose flags are bools, which is how a packed header is normally
-/// modelled. Shaped like the RFC 3550 fixed header: 64 bits, three bools.
+/// Flags as bools, shaped like the RFC 3550 fixed header: 64 bits, three bools.
 macro_rules! flags_header {
     ($name:ident, $($extra:tt)*) => {
         #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -306,8 +291,7 @@ macro_rules! flags_header {
 flags_header!(FlagsBatched,);
 flags_header!(FlagsUnbatched, , assert = "true");
 
-/// Bools carry no invalid value at one bit wide, so a batched header with flags
-/// must agree with an unbatched one on every wire.
+/// A one-bit bool has no invalid value, so every wire must agree with unbatched.
 #[test]
 fn a_header_of_flags_matches_unbatched() {
     for seed in 1..20_000u32 {
@@ -347,8 +331,7 @@ fn flags_round_trip_in_both_states() {
     assert_eq!(b.to_bytes().unwrap(), none_set);
 }
 
-/// A bool without `bits` is a byte, so it has values that are neither 0 nor 1.
-/// A batched read must reject those exactly as `impls::bool` does.
+/// A bool without `bits` is a byte, so it has invalid values to reject.
 #[test]
 fn a_byte_wide_bool_in_a_run_rejects_a_non_boolean_value() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -393,9 +376,8 @@ fn a_byte_wide_bool_in_a_run_rejects_a_non_boolean_value() {
     }
 }
 
-/// `bit_order = "msb"` is the default spelled out, so it must batch. deku routes
-/// it to the `Order`-carrying impl, which is the same operation but words its
-/// overflow error differently, so a batched write has to follow that wording.
+/// `bit_order = "msb"` is the default spelled out, so it must batch. It takes the
+/// `Order`-carrying impl, whose overflow wording the batched write must follow.
 #[test]
 fn an_explicit_msb_bit_order_batches() {
     macro_rules! ordered_header {
@@ -441,8 +423,7 @@ fn an_explicit_msb_bit_order_batches() {
     );
 }
 
-/// A run may mix a field that spelled `bit_order` out with one that did not, and
-/// each keeps the wording of the impl it would otherwise have used.
+/// A run may mix the two, and each field keeps its own wording.
 #[test]
 fn a_mixed_run_keeps_each_fields_wording() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]

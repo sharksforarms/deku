@@ -596,6 +596,14 @@ fn emit_field_reads(
 pub(crate) struct BitRunField {
     pub(crate) bits: usize,
     pub(crate) ty: syn::Type,
+    /// Whether the field's own write would have gone through the `Order`-carrying
+    /// impl, which words its overflow error differently. Selects the wording the
+    /// batched write reports.
+    pub(crate) ordered: bool,
+    /// Whether a written value can actually exceed `bits`. False where the field
+    /// fills its own type, or is a `bool`, since neither can overflow: the check
+    /// would always pass, so the run does not emit one.
+    pub(crate) can_overflow: bool,
 }
 
 /// Widths of a run of adjacent fields that one read can serve.
@@ -618,12 +626,17 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
         return None;
     }
 
-    // `Msb0` is the default, so absent is fine; "lsb" is not.
-    if let Some(order) = f.bit_order.as_ref().or(input.bit_order.as_ref()) {
+    // Only `Msb0` batches, and it is the default, so absent is fine and "lsb" is not.
+    let explicit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());
+    if let Some(order) = explicit_order {
         if order.value() != "msb" {
             return None;
         }
     }
+    // Same check, two spellings: `DekuWriter<(Endian, BitSize, Order)>` drops the
+    // second "bit" that `DekuWriter<(Endian, BitSize)>` includes. Record which one
+    // this field would have produced so batching does not change the message.
+    let ordered = explicit_order.is_some();
 
     let width = match &f.ty {
         syn::Type::Path(p) if p.qself.is_none() => match p.path.get_ident()?.to_string().as_str() {
@@ -631,6 +644,10 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
             "u16" => u16::BITS as usize,
             "u32" => u32::BITS as usize,
             "u64" => u64::BITS as usize,
+            // `impls::bool` reads a bool by delegating to `u8` with the same ctx,
+            // so it occupies a byte unless `bits` narrows it. Flags in a packed
+            // header are usually `bits = 1`.
+            "bool" => u8::BITS as usize,
             _ => return None,
         },
         _ => return None,
@@ -649,10 +666,22 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
         return None;
     }
 
+    // A value cast from a type `bits` wide cannot need more than `bits` bits, and a
+    // bool is 0 or 1, so in both cases the per-field check could never have fired.
+    let can_overflow = bits < width && !is_bool(&f.ty);
+
     Some(BitRunField {
         bits,
         ty: f.ty.clone(),
+        ordered,
+        can_overflow,
     })
+}
+
+/// Whether the field is a plain `bool`, which a run must compare rather than cast.
+#[cfg(feature = "bits")]
+fn is_bool(ty: &syn::Type) -> bool {
+    matches!(ty, syn::Type::Path(p) if p.qself.is_none() && p.path.is_ident("bool"))
 }
 
 /// Groups adjacent run-eligible fields, keyed by the index the run starts at.
@@ -707,6 +736,7 @@ fn emit_bit_run_read(
     start: usize,
     run: &BitRun,
 ) -> (Vec<TokenStream>, TokenStream) {
+    let crate_ = super::get_crate_name();
     let total: usize = run.iter().map(|f| f.bits).sum();
     let run_ident = quote::format_ident!("__deku_bit_run_{}", start);
 
@@ -723,8 +753,32 @@ fn emit_bit_run_read(
         debug_assert!(field.bits < u64::BITS as usize);
         let mask: u64 = (1u64 << field.bits) - 1;
         let ty = &field.ty;
+        // `as` cannot produce a bool, so a bool field is compared rather than cast.
+        let extract = if is_bool(ty) {
+            if field.bits == 1 {
+                // One bit is either 0 or 1, so there is no invalid value to reject.
+                quote! { ((#run_ident >> #shift) & 1) != 0 }
+            } else {
+                // A wider bool rejects anything but 0 and 1, with the same error
+                // `impls::bool` returns.
+                quote! {
+                    match (#run_ident >> #shift) & #mask {
+                        0 => false,
+                        1 => true,
+                        __deku_bool => return Err(::#crate_::deku_error!(
+                            ::#crate_::DekuError::Parse,
+                            "cannot parse bool value",
+                            "{}",
+                            __deku_bool as u8
+                        )),
+                    }
+                }
+            }
+        } else {
+            quote! { ((#run_ident >> #shift) & #mask) as #ty }
+        };
         extracts.extend(quote! {
-            let #internal = ((#run_ident >> #shift) & #mask) as #ty;
+            let #internal = #extract;
             let #field_ident = &#internal;
         });
         idents.push(field_ident);
@@ -1358,16 +1412,90 @@ mod tests {
 
     #[test]
     fn bit_order_must_be_msb() {
+        // `Msb0` is the default, so absent qualifies, and so does spelling it out.
+        let src = r#"#[deku(endian = "big")] struct Test { a: u8, b: u8 }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+
+        let src = r#"#[deku(endian = "big", bit_order = "msb")] struct Test { a: u8, b: u8 }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bit_order = "msb")] a: u8,
+            b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+
+        // "lsb" does not.
         let src = r#"#[deku(endian = "big", bit_order = "lsb")] struct Test { a: u8, b: u8 }"#;
         assert_eq!(plan(src), vec![]);
-        // Msb0 is the default, so absent qualifies.
-        let src = r#"#[deku(endian = "big", bit_order = "msb")] struct Test { a: u8, b: u8 }"#;
+
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bit_order = "lsb")] a: u8,
+            b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![]);
+    }
+
+    #[test]
+    fn an_explicit_bit_order_selects_the_other_overflow_wording() {
+        // Both fields batch, but they reach different write impls, which word the
+        // overflow error differently, so each must call the matching check.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 4, bit_order = "msb")] ordered: u8,
+            #[deku(bits = 4)] plain: u8,
+        }"#;
+        let data = DekuData::from_input(src.parse().unwrap()).unwrap();
+        let fields = data.data.as_ref().take_struct().unwrap();
+        let runs = plan_bit_runs(&data, &fields, false);
+        let run = runs.get(&0).expect("both fields should batch");
+        assert_eq!(
+            run.iter().map(|f| f.ordered).collect::<Vec<_>>(),
+            vec![true, false]
+        );
+
+        let emitted = emit_deku_read(&data).unwrap().to_string();
+        assert_eq!(emitted.matches("read_bits_uint_msb0").count(), 1);
+    }
+
+    #[test]
+    fn a_bool_joins_a_run() {
+        // Flags in a packed header are `bits = 1` bools, and excluding them splits
+        // a run wherever a flag sits.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 2)] a: u8,
+            #[deku(bits = 1)] flag: bool,
+            #[deku(bits = 5)] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![2, 1, 5])]);
+
+        // Without `bits` a bool is a byte, as `impls::bool` reads it.
+        let src = r#"#[deku(endian = "big")] struct Test { flag: bool, b: u8 }"#;
         assert_eq!(plan(src), vec![(0, vec![8, 8])]);
     }
 
     #[test]
-    fn only_unsigned_primitives_qualify() {
-        for ty in ["i8", "i16", "f32", "bool", "MyEnum", "Vec<u8>", "[u8; 2]"] {
+    fn the_rtp_header_batches_into_one_read() {
+        // RFC 3550 fixed header: 9 fields, three of them flags. With bools excluded
+        // this planned as a single run of three, leaving six standalone reads.
+        let src = r#"#[deku(endian = "big")] struct Rtp {
+            #[deku(bits = 2)] version: u8,
+            #[deku(bits = 1)] padding: bool,
+            #[deku(bits = 1)] extension: bool,
+            #[deku(bits = 4)] csrc_count: u8,
+            #[deku(bits = 1)] marker: bool,
+            #[deku(bits = 7)] payload_type: u8,
+            sequence_number: u16,
+            timestamp: u32,
+            ssrc: u32,
+        }"#;
+        // The first eight fields sum to exactly 64 bits; `ssrc` cannot fit and is
+        // left alone, so the header costs two reads instead of seven.
+        assert_eq!(plan(src), vec![(0, vec![2, 1, 1, 4, 1, 7, 16, 32])]);
+    }
+
+    #[test]
+    fn only_unsigned_primitives_and_bool_qualify() {
+        for ty in ["i8", "i16", "f32", "MyEnum", "Vec<u8>", "[u8; 2]"] {
             let src = format!(r#"#[deku(endian = "big")] struct Test {{ a: {ty}, b: {ty} }}"#);
             assert_eq!(plan(&src), vec![], "{ty} must not form a run");
         }

@@ -20,23 +20,51 @@ const fn bits_of<T>() -> usize {
 /// Errors unless `value` fits in `bits` bits.
 ///
 /// The derive calls this before composing a run of bit-fields into one write, so
-/// each field keeps the check the individual writes performed. The message and the
-/// two widths it names match the sub-width path in `impls::primitive` verbatim, so
-/// batching a field does not change the error a caller sees.
+/// each field keeps the check its own write performed. Kept to two comparisons so
+/// it inlines: where a field fills its type the check is provably dead and folds
+/// away entirely, which is the common case for a run of whole bytes.
+///
+/// `ORDERED` picks the wording, because deku's two write impls word this error
+/// differently: `DekuWriter<(Endian, BitSize)>` says "bit size of input is larger
+/// than bit requested size", while `DekuWriter<(Endian, BitSize, Order)>`, which a
+/// field carrying an explicit `bit_order` uses, drops that second "bit". The derive
+/// passes whichever the field would otherwise have produced, so batching cannot
+/// change the message. Bring those two impls into line and this parameter goes
+/// away.
 #[cfg(feature = "bits")]
 #[inline]
-pub fn check_bit_size(value: u64, bits: usize) -> Result<(), DekuError> {
-    if bits < u64::BITS as usize && (value >> bits) != 0 {
-        let significant = (u64::BITS - value.leading_zeros()) as usize;
-        return Err(crate::deku_error!(
+pub fn check_bit_size<const ORDERED: bool>(value: u64, bits: usize) -> Result<(), DekuError> {
+    if bits >= u64::BITS as usize || (value >> bits) == 0 {
+        return Ok(());
+    }
+    Err(bit_size_error::<ORDERED>(value, bits))
+}
+
+/// Builds the error for [`check_bit_size`]. Out of line so the check itself stays
+/// small enough to inline and fold.
+#[cfg(feature = "bits")]
+#[cold]
+#[inline(never)]
+fn bit_size_error<const ORDERED: bool>(value: u64, bits: usize) -> DekuError {
+    // The width the per-field writes report: how many bits `value` occupies.
+    let significant = (u64::BITS - value.leading_zeros()) as usize;
+    if ORDERED {
+        crate::deku_error!(
+            DekuError::InvalidParam,
+            "bit size of input is larger than requested size",
+            "{} exceeds {}",
+            significant,
+            bits
+        )
+    } else {
+        crate::deku_error!(
             DekuError::InvalidParam,
             "bit size of input is larger than bit requested size",
             "{} exceeds {}",
             significant,
             bits
-        ));
+        )
     }
-    Ok(())
 }
 
 /// Container to use with `from_reader`

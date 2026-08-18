@@ -235,18 +235,20 @@ fn a_short_wire_still_errors() {
 }
 
 /// `check_bit_size` is what preserves the per-field rejection, and the derive calls
-/// it directly, so pin its boundaries.
+/// it directly, so pin its boundaries and that it reports the message it is given.
 #[test]
 fn check_bit_size_boundaries() {
     use deku::writer::check_bit_size;
 
     // Widest value that fits.
-    assert!(check_bit_size(0b11, 2).is_ok());
-    assert!(check_bit_size(0xFF, 8).is_ok());
-    assert!(check_bit_size(0, 1).is_ok());
+    assert!(check_bit_size::<false>(0b11, 2).is_ok());
+    assert!(check_bit_size::<false>(0xFF, 8).is_ok());
+    assert!(check_bit_size::<false>(0, 1).is_ok());
+    // A full-width request cannot overflow, so it never errors.
+    assert!(check_bit_size::<false>(u64::MAX, 64).is_ok());
 
     // One bit too wide, and the message names both widths.
-    let err = check_bit_size(0b100, 2).expect_err("3 bits do not fit in 2");
+    let err = check_bit_size::<false>(0b100, 2).expect_err("3 bits do not fit in 2");
     let msg = format!("{err}");
     assert!(
         msg.contains("bit size of input is larger than bit requested size"),
@@ -254,9 +256,242 @@ fn check_bit_size_boundaries() {
     );
     assert!(msg.contains('3') && msg.contains('2'), "message: {msg}");
 
-    let err = check_bit_size(0x100, 8).expect_err("9 bits do not fit in 8");
+    let err = check_bit_size::<false>(0x100, 8).expect_err("9 bits do not fit in 8");
     assert!(format!("{err}").contains('9'));
 
-    // A full-width request cannot overflow, so it never errors.
-    assert!(check_bit_size(u64::MAX, 64).is_ok());
+    // The verdict is independent of the wording; only the wording differs, which is
+    // how a batched write reproduces either impl's error.
+    for (value, bits) in [(0b11u64, 2), (0xFF, 8), (0, 1), (u64::MAX, 64), (0b100, 2)] {
+        assert_eq!(
+            check_bit_size::<false>(value, bits).is_ok(),
+            check_bit_size::<true>(value, bits).is_ok(),
+            "{value:#x} in {bits} bits"
+        );
+    }
+    let ordered = format!("{}", check_bit_size::<true>(0b100, 2).unwrap_err());
+    assert!(
+        ordered.contains("bit size of input is larger than requested size")
+            && !ordered.contains("bit requested size"),
+        "unexpected message: {ordered}"
+    );
+}
+
+/// A header whose flags are bools, which is how a packed header is normally
+/// modelled. Shaped like the RFC 3550 fixed header: 64 bits, three bools.
+macro_rules! flags_header {
+    ($name:ident, $($extra:tt)*) => {
+        #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+        #[deku(endian = "big")]
+        struct $name {
+            #[deku(bits = 2 $($extra)*)]
+            version: u8,
+            #[deku(bits = 1 $($extra)*)]
+            padding: bool,
+            #[deku(bits = 1 $($extra)*)]
+            extension: bool,
+            #[deku(bits = 4 $($extra)*)]
+            csrc_count: u8,
+            #[deku(bits = 1 $($extra)*)]
+            marker: bool,
+            #[deku(bits = 7 $($extra)*)]
+            payload_type: u8,
+            #[deku(bits = 16 $($extra)*)]
+            sequence_number: u16,
+            #[deku(bits = 32 $($extra)*)]
+            timestamp: u32,
+        }
+    };
+}
+
+flags_header!(FlagsBatched,);
+flags_header!(FlagsUnbatched, , assert = "true");
+
+/// Bools carry no invalid value at one bit wide, so a batched header with flags
+/// must agree with an unbatched one on every wire.
+#[test]
+fn a_header_of_flags_matches_unbatched() {
+    for seed in 1..20_000u32 {
+        let data = wire(8, seed);
+
+        let (_, b) = FlagsBatched::from_bytes((&data, 0)).unwrap();
+        let (_, p) = FlagsUnbatched::from_bytes((&data, 0)).unwrap();
+
+        assert_eq!(b.version, p.version, "version, seed {seed}");
+        assert_eq!(b.padding, p.padding, "padding, seed {seed}");
+        assert_eq!(b.extension, p.extension, "extension, seed {seed}");
+        assert_eq!(b.csrc_count, p.csrc_count, "csrc_count, seed {seed}");
+        assert_eq!(b.marker, p.marker, "marker, seed {seed}");
+        assert_eq!(b.payload_type, p.payload_type, "payload_type, seed {seed}");
+        assert_eq!(
+            b.sequence_number, p.sequence_number,
+            "sequence_number, seed {seed}"
+        );
+        assert_eq!(b.timestamp, p.timestamp, "timestamp, seed {seed}");
+
+        assert_eq!(b.to_bytes().unwrap(), data, "seed {seed}");
+        assert_eq!(p.to_bytes().unwrap(), data, "seed {seed}");
+    }
+}
+
+/// Both flag states, written back exactly.
+#[test]
+fn flags_round_trip_in_both_states() {
+    let all_set = [0xFFu8; 8];
+    let (_, b) = FlagsBatched::from_bytes((&all_set, 0)).unwrap();
+    assert!(b.padding && b.extension && b.marker);
+    assert_eq!(b.to_bytes().unwrap(), all_set);
+
+    let none_set = [0x00u8; 8];
+    let (_, b) = FlagsBatched::from_bytes((&none_set, 0)).unwrap();
+    assert!(!b.padding && !b.extension && !b.marker);
+    assert_eq!(b.to_bytes().unwrap(), none_set);
+}
+
+/// A bool without `bits` is a byte, so it has values that are neither 0 nor 1.
+/// A batched read must reject those exactly as `impls::bool` does.
+#[test]
+fn a_byte_wide_bool_in_a_run_rejects_a_non_boolean_value() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(endian = "big")]
+    struct Batched {
+        flag: bool,
+        other: u8,
+    }
+
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(endian = "big")]
+    struct Unbatched {
+        #[deku(assert = "true")]
+        flag: bool,
+        other: u8,
+    }
+
+    // 0 and 1 are the only accepted encodings, and round-trip.
+    for (byte, expected) in [(0x00u8, false), (0x01, true)] {
+        let data = [byte, 0x42];
+        let (_, b) = Batched::from_bytes((&data, 0)).unwrap();
+        assert_eq!(
+            b,
+            Batched {
+                flag: expected,
+                other: 0x42
+            }
+        );
+        assert_eq!(b.to_bytes().unwrap(), data);
+    }
+
+    // Anything else fails, with the same error the unbatched path gives.
+    for byte in [0x02u8, 0x7F, 0xFF] {
+        let data = [byte, 0x42];
+        let b = Batched::from_bytes((&data, 0)).expect_err("not a bool");
+        let p = Unbatched::from_bytes((&data, 0)).expect_err("not a bool");
+        assert_eq!(format!("{b}"), format!("{p}"), "byte {byte:#04x}");
+        assert!(
+            format!("{b}").contains("cannot parse bool value"),
+            "unexpected message: {b}"
+        );
+    }
+}
+
+/// `bit_order = "msb"` is the default spelled out, so it must batch. deku routes
+/// it to the `Order`-carrying impl, which is the same operation but words its
+/// overflow error differently, so a batched write has to follow that wording.
+#[test]
+fn an_explicit_msb_bit_order_batches() {
+    macro_rules! ordered_header {
+        ($name:ident, $($extra:tt)*) => {
+            #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+            #[deku(endian = "big")]
+            struct $name {
+                #[deku(bits = 3, bit_order = "msb" $($extra)*)]
+                a: u8,
+                #[deku(bits = 13, bit_order = "msb" $($extra)*)]
+                b: u16,
+            }
+        };
+    }
+
+    ordered_header!(OrderedBatched,);
+    ordered_header!(OrderedUnbatched, , assert = "true");
+
+    for seed in 1..2_000u32 {
+        let data = wire(2, seed);
+        let (_, x) = OrderedBatched::from_bytes((&data, 0)).unwrap();
+        let (_, y) = OrderedUnbatched::from_bytes((&data, 0)).unwrap();
+        assert_eq!((x.a, x.b), (y.a, y.b), "seed {seed}");
+        assert_eq!(x.to_bytes().unwrap(), data, "seed {seed}");
+    }
+
+    let batched = format!(
+        "{}",
+        OrderedBatched { a: 0, b: 0xFFFF }.to_bytes().unwrap_err()
+    );
+    let unbatched = format!(
+        "{}",
+        OrderedUnbatched { a: 0, b: 0xFFFF }.to_bytes().unwrap_err()
+    );
+    assert_eq!(batched, unbatched);
+    assert!(
+        batched.contains("bit size of input is larger than requested size"),
+        "unexpected message: {batched}"
+    );
+    assert!(
+        !batched.contains("bit requested size"),
+        "used the default impl's wording: {batched}"
+    );
+}
+
+/// A run may mix a field that spelled `bit_order` out with one that did not, and
+/// each keeps the wording of the impl it would otherwise have used.
+#[test]
+fn a_mixed_run_keeps_each_fields_wording() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(endian = "big")]
+    struct Mixed {
+        #[deku(bits = 4, bit_order = "msb")]
+        ordered: u8,
+        #[deku(bits = 4)]
+        plain: u8,
+    }
+
+    // Both fields still share one read and one write.
+    let data = [0x12u8];
+    let (_, m) = Mixed::from_bytes((&data, 0)).unwrap();
+    assert_eq!(
+        m,
+        Mixed {
+            ordered: 0x1,
+            plain: 0x2
+        }
+    );
+    assert_eq!(m.to_bytes().unwrap(), data);
+
+    let ordered_err = format!(
+        "{}",
+        Mixed {
+            ordered: 0xFF,
+            plain: 0
+        }
+        .to_bytes()
+        .unwrap_err()
+    );
+    assert!(
+        ordered_err.contains("bit size of input is larger than requested size")
+            && !ordered_err.contains("bit requested size"),
+        "unexpected message: {ordered_err}"
+    );
+
+    let plain_err = format!(
+        "{}",
+        Mixed {
+            ordered: 0,
+            plain: 0xFF
+        }
+        .to_bytes()
+        .unwrap_err()
+    );
+    assert!(
+        plain_err.contains("bit size of input is larger than bit requested size"),
+        "unexpected message: {plain_err}"
+    );
 }

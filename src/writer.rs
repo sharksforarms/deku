@@ -17,6 +17,49 @@ const fn bits_of<T>() -> usize {
     core::mem::size_of::<T>().saturating_mul(<u8>::BITS as usize)
 }
 
+/// Errors unless `value` fits in `bits` bits.
+///
+/// The derive calls this per field before composing a run into one write. Two
+/// comparisons, so it inlines and folds away where a field fills its type.
+///
+/// `ORDERED` picks the wording: `DekuWriter<(Endian, BitSize, Order)>` omits the
+/// second "bit" that `DekuWriter<(Endian, BitSize)>` includes. Unify those two and
+/// this parameter goes away.
+#[cfg(feature = "bits")]
+#[inline]
+pub fn check_bit_size<const ORDERED: bool>(value: u64, bits: usize) -> Result<(), DekuError> {
+    if bits >= u64::BITS as usize || (value >> bits) == 0 {
+        return Ok(());
+    }
+    Err(bit_size_error::<ORDERED>(value, bits))
+}
+
+/// Cold path of [`check_bit_size`], out of line so the check inlines.
+#[cfg(feature = "bits")]
+#[cold]
+#[inline(never)]
+fn bit_size_error<const ORDERED: bool>(value: u64, bits: usize) -> DekuError {
+    // Bits `value` occupies, which is what the per-field writes report.
+    let significant = (u64::BITS - value.leading_zeros()) as usize;
+    if ORDERED {
+        crate::deku_error!(
+            DekuError::InvalidParam,
+            "bit size of input is larger than requested size",
+            "{} exceeds {}",
+            significant,
+            bits
+        )
+    } else {
+        crate::deku_error!(
+            DekuError::InvalidParam,
+            "bit size of input is larger than bit requested size",
+            "{} exceeds {}",
+            significant,
+            bits
+        )
+    }
+}
+
 /// Container to use with `from_reader`
 pub struct Writer<W: Write + Seek> {
     pub(crate) inner: W,
@@ -66,13 +109,15 @@ impl<W: Write + Seek> Writer<W> {
     /// first. The integer mirror of `Reader::read_bits_uint_msb0`.
     ///
     /// Only valid when the pending leftover is `Msb0`; the caller checks that.
+    /// Public because the derive calls it to write a run of contiguous
+    /// big-endian `Msb0` bit-fields in one go.
     /// Equivalent to `write_bits_order(.., Order::Msb0)` over the same bits, but
     /// the value never becomes a `BitSlice`: whole bytes leave in one `write_all`
     /// instead of one call per byte, and the leftover is a byte and a length
     /// rather than a `BoundedBitVec` rebuilt bit by bit.
     #[inline]
     #[cfg(feature = "bits")]
-    pub(crate) fn write_bits_uint_msb0(&mut self, value: u64, amt: usize) -> Result<(), DekuError> {
+    pub fn write_bits_uint_msb0(&mut self, value: u64, amt: usize) -> Result<(), DekuError> {
         debug_assert!((1..=64).contains(&amt));
         debug_assert_eq!(self.leftover.1, Order::Msb0);
 

@@ -99,7 +99,7 @@ impl FromMeta for Id {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Num {
     LitInt(syn::LitInt),
     TokenStream(TokenStream),
@@ -609,7 +609,7 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataStruct<'a> {
 }
 
 /// A post-processed version of `FieldReceiver`
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FieldData {
     ident: Option<syn::Ident>,
     ty: Type,
@@ -711,58 +711,99 @@ struct FieldData {
 
 impl FieldData {
     pub fn any_field_set(&self) -> bool {
-        // NOTE: Ignore ident
-        let mut any_option_set = self.endian.is_some();
+        // Exhaustive on purpose: a new `FieldData` attribute fails to compile
+        // here until it is classified.
+        let Self {
+            // Not attributes.
+            ident: _,
+            ty: _,
+            // Always `Some`: `from_receiver` fills it in for every field.
+            default: _,
+
+            endian,
+            #[cfg(feature = "bits")]
+            bits,
+            bytes,
+            count,
+            #[cfg(feature = "bits")]
+            bits_read,
+            bytes_read,
+            until,
+            read_all,
+            map,
+            ctx,
+            update,
+            reader,
+            writer,
+            skip,
+            #[cfg(feature = "bits")]
+            pad_bits_before,
+            pad_bytes_before,
+            #[cfg(feature = "bits")]
+            pad_bits_after,
+            pad_bytes_after,
+            temp,
+            temp_value,
+            cond,
+            assert,
+            assert_eq,
+            seek_rewind,
+            seek_from_current,
+            seek_from_end,
+            seek_from_start,
+            bit_order,
+            magic,
+        } = self;
 
         #[cfg(feature = "bits")]
-        {
-            any_option_set = any_option_set || self.bits.is_some();
-        }
+        let bits_attr_set = bits.is_some()
+            || bits_read.is_some()
+            || pad_bits_before.is_some()
+            || pad_bits_after.is_some();
+        #[cfg(not(feature = "bits"))]
+        let bits_attr_set = false;
 
-        any_option_set = any_option_set || self.bytes.is_some() || self.count.is_some();
+        let any_option_set = bits_attr_set
+            || endian.is_some()
+            || bytes.is_some()
+            || count.is_some()
+            || bytes_read.is_some()
+            || until.is_some()
+            || map.is_some()
+            || ctx.is_some()
+            || update.is_some()
+            || reader.is_some()
+            || writer.is_some()
+            || pad_bytes_before.is_some()
+            || pad_bytes_after.is_some()
+            || temp_value.is_some()
+            || cond.is_some()
+            || assert.is_some()
+            || assert_eq.is_some()
+            || seek_from_current.is_some()
+            || seek_from_end.is_some()
+            || seek_from_start.is_some()
+            || bit_order.is_some()
+            || magic.is_some();
 
-        #[cfg(feature = "bits")]
-        {
-            any_option_set = any_option_set || self.bits_read.is_some();
-        }
-
-        any_option_set = any_option_set
-            || self.bytes_read.is_some()
-            || self.until.is_some()
-            || self.map.is_some()
-            || self.ctx.is_some()
-            || self.update.is_some()
-            || self.reader.is_some()
-            || self.writer.is_some();
-
-        #[cfg(feature = "bits")]
-        {
-            any_option_set = any_option_set || self.pad_bits_before.is_some();
-        }
-
-        any_option_set = any_option_set || self.pad_bytes_before.is_some();
-
-        #[cfg(feature = "bits")]
-        {
-            any_option_set = any_option_set || self.pad_bits_after.is_some();
-        }
-
-        // NOTE: Ignore default
-        any_option_set = any_option_set
-            || self.pad_bytes_after.is_some()
-            || self.temp_value.is_some()
-            || self.cond.is_some()
-            || self.assert.is_some()
-            || self.assert_eq.is_some()
-            || self.seek_from_current.is_some()
-            || self.seek_from_end.is_some()
-            || self.seek_from_start.is_some()
-            || self.bit_order.is_some()
-            || self.magic.is_some();
-
-        let any_bool_set = self.read_all || self.skip.is_some() || self.temp || self.seek_rewind;
+        let any_bool_set = *read_all || skip.is_some() || *temp || *seek_rewind;
 
         any_option_set || any_bool_set
+    }
+
+    /// True if the field carries an attribute a batched read cannot reproduce:
+    /// anything that moves the cursor, makes the read conditional, or depends on a
+    /// value read earlier.
+    #[cfg(feature = "bits")]
+    pub fn any_field_set_incompatible_with_bit_run(&self) -> bool {
+        Self {
+            endian: None,
+            bits: None,
+            bit_order: None,
+            update: None,
+            ..self.clone()
+        }
+        .any_field_set()
     }
 
     fn from_receiver(receiver: DekuFieldReceiver) -> Result<Self, TokenStream> {

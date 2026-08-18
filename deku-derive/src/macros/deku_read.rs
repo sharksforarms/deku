@@ -557,7 +557,27 @@ fn emit_field_reads(
 
     let mut use_id = use_id;
 
-    for (i, f) in fields.iter().enumerate() {
+    #[cfg(feature = "bits")]
+    let runs = plan_bit_runs(input, fields, use_id);
+
+    let mut i = 0;
+    while i < fields.len() {
+        #[cfg(feature = "bits")]
+        if let Some(run) = runs.get(&i) {
+            let (idents, read) = emit_bit_run_read(fields, i, run);
+            for field_ident in idents {
+                field_idents.push(FieldIdent {
+                    field_ident,
+                    is_temp: false,
+                });
+            }
+            field_reads.push(read);
+            i += run.len();
+            use_id = false;
+            continue;
+        }
+
+        let f = fields.fields[i];
         let (field_ident, field_read) = emit_field_read(input, i, f, ident, use_id)?;
         use_id = false;
         field_idents.push(FieldIdent {
@@ -565,9 +585,202 @@ fn emit_field_reads(
             is_temp: f.temp,
         });
         field_reads.push(field_read);
+        i += 1;
     }
 
     Ok((field_idents, field_reads))
+}
+
+/// One field of a contiguous big-endian `Msb0` bit-field run.
+#[cfg(feature = "bits")]
+pub(crate) struct BitRunField {
+    pub(crate) bits: usize,
+    pub(crate) ty: syn::Type,
+    /// Field takes the `Order`-carrying write impl, which words overflow
+    /// differently.
+    pub(crate) ordered: bool,
+    /// Whether a value can exceed `bits` at all. If not, no check is emitted.
+    pub(crate) can_overflow: bool,
+}
+
+/// Widths of a run of adjacent fields that one read can serve.
+#[cfg(feature = "bits")]
+pub(crate) type BitRun = Vec<BitRunField>;
+
+/// A field a run can serve: a literal `bits` on an unsigned primitive or `bool`,
+/// explicitly big-endian, `Msb0`, carrying nothing else. Anything else keeps its
+/// own read.
+#[cfg(feature = "bits")]
+pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> {
+    if f.any_field_set_incompatible_with_bit_run() {
+        return None;
+    }
+
+    // Big-endian must be explicit: with no attribute the context endian is the
+    // target's, which is little on x86.
+    let endian = f.endian.as_ref().or(input.endian.as_ref())?;
+    if endian.value() != "big" {
+        return None;
+    }
+
+    // Only `Msb0` batches, and it is the default, so absent is fine and "lsb" is not.
+    let explicit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());
+    if let Some(order) = explicit_order {
+        if order.value() != "msb" {
+            return None;
+        }
+    }
+    // Which overflow wording this field's own write would have used.
+    let ordered = explicit_order.is_some();
+
+    let width = match &f.ty {
+        syn::Type::Path(p) if p.qself.is_none() => match p.path.get_ident()?.to_string().as_str() {
+            "u8" => u8::BITS as usize,
+            "u16" => u16::BITS as usize,
+            "u32" => u32::BITS as usize,
+            "u64" => u64::BITS as usize,
+            // `impls::bool` delegates to `u8`, so a bool is a byte unless
+            // `bits` narrows it. Flags in a packed header are usually `bits = 1`.
+            "bool" => u8::BITS as usize,
+            _ => return None,
+        },
+        _ => return None,
+    };
+
+    let bits = match f.bits.as_ref() {
+        Some(crate::Num::LitInt(lit)) => lit.base10_parse::<usize>().ok()?,
+        Some(crate::Num::TokenStream(_)) => return None,
+        // A plain big-endian integer field is exactly `bits = width`: when the
+        // cursor is byte-aligned it is a big-endian byte read, and when it is not,
+        // deku already routes it through `read_bits_into` for the same `width`
+        // bits, most-significant first.
+        None => width,
+    };
+    if bits == 0 || bits > width {
+        return None;
+    }
+
+    // Neither a value filling its type nor a bool can exceed its width.
+    let can_overflow = bits < width && !is_bool(&f.ty);
+
+    Some(BitRunField {
+        bits,
+        ty: f.ty.clone(),
+        ordered,
+        can_overflow,
+    })
+}
+
+/// A plain `bool`, which a run compares rather than casts.
+#[cfg(feature = "bits")]
+fn is_bool(ty: &syn::Type) -> bool {
+    matches!(ty, syn::Type::Path(p) if p.qself.is_none() && p.path.is_ident("bool"))
+}
+
+/// Groups adjacent run-eligible fields, keyed by the index the run starts at.
+///
+/// A run is capped at 64 bits, the width the reader returns, and must hold at
+/// least two fields to be worth a batch.
+#[cfg(feature = "bits")]
+pub(crate) fn plan_bit_runs(
+    input: &DekuData,
+    fields: &Fields<&FieldData>,
+    use_id: bool,
+) -> std::collections::HashMap<usize, BitRun> {
+    let mut runs = std::collections::HashMap::new();
+    let mut i = 0;
+    while i < fields.len() {
+        // The first field can be the enum id storage, which is not a read at all.
+        if i == 0 && use_id {
+            i = 1;
+            continue;
+        }
+        let mut run: BitRun = Vec::new();
+        let mut total = 0usize;
+        let mut j = i;
+        while j < fields.len() {
+            let Some(field) = run_field(input, fields.fields[j]) else {
+                break;
+            };
+            if total + field.bits > u64::BITS as usize {
+                break;
+            }
+            total += field.bits;
+            run.push(field);
+            j += 1;
+        }
+        if run.len() >= 2 {
+            let len = run.len();
+            runs.insert(i, run);
+            i += len;
+        } else {
+            i += 1;
+        }
+    }
+    runs
+}
+
+/// One read for the whole run, then shift and mask each field out of it. This is
+/// what a hand-written parser does, and it replaces one `DekuReader` call plus one
+/// bit-cursor update per field with one of each per run.
+#[cfg(feature = "bits")]
+fn emit_bit_run_read(
+    fields: &Fields<&FieldData>,
+    start: usize,
+    run: &BitRun,
+) -> (Vec<TokenStream>, TokenStream) {
+    let crate_ = super::get_crate_name();
+    let total: usize = run.iter().map(|f| f.bits).sum();
+    let run_ident = quote::format_ident!("__deku_bit_run_{}", start);
+
+    let mut idents = Vec::with_capacity(run.len());
+    let mut extracts = TokenStream::new();
+    let mut consumed = 0usize;
+    for (offset, field) in run.iter().enumerate() {
+        let f = fields.fields[start + offset];
+        let field_ident = f.get_ident(start + offset, true);
+        let internal = gen_internal_field_ident(&field_ident);
+        let shift = total - consumed - field.bits;
+        // A run is two or more fields in 64 bits, so none is 64 wide.
+        debug_assert!(field.bits < u64::BITS as usize);
+        let mask: u64 = (1u64 << field.bits) - 1;
+        let ty = &field.ty;
+        // `as` cannot produce a bool, so a bool field is compared rather than cast.
+        let extract = if is_bool(ty) {
+            if field.bits == 1 {
+                // One bit is 0 or 1: nothing to reject.
+                quote! { ((#run_ident >> #shift) & 1) != 0 }
+            } else {
+                // Wider bools reject anything but 0 and 1, as `impls::bool` does.
+                quote! {
+                    match (#run_ident >> #shift) & #mask {
+                        0 => false,
+                        1 => true,
+                        __deku_bool => return Err(::#crate_::deku_error!(
+                            ::#crate_::DekuError::Parse,
+                            "cannot parse bool value",
+                            "{}",
+                            __deku_bool as u8
+                        )),
+                    }
+                }
+            }
+        } else {
+            quote! { ((#run_ident >> #shift) & #mask) as #ty }
+        };
+        extracts.extend(quote! {
+            let #internal = #extract;
+            let #field_ident = &#internal;
+        });
+        idents.push(field_ident);
+        consumed += field.bits;
+    }
+
+    let read = quote! {
+        let #run_ident: u64 = __deku_reader.read_bits_uint_msb0(#total)?;
+        #extracts
+    };
+    (idents, read)
 }
 
 fn emit_bit_byte_offsets(
@@ -1067,5 +1280,323 @@ pub fn emit_try_from(
                 Ok(res)
             }
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "bits")]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    /// Sorts a planner result into `(index of the first field, widths)` pairs.
+    fn sorted(runs: std::collections::HashMap<usize, BitRun>) -> Vec<(usize, Vec<usize>)> {
+        let mut runs: Vec<_> = runs
+            .into_iter()
+            .map(|(start, run)| (start, run.iter().map(|f| f.bits).collect::<Vec<_>>()))
+            .collect();
+        runs.sort_by_key(|(start, _)| *start);
+        runs
+    }
+
+    /// Every run the planner forms over a struct.
+    fn plan(src: &str) -> Vec<(usize, Vec<usize>)> {
+        plan_with_id(src, false)
+    }
+
+    /// As `plan`, with `use_id`: the first field is an enum's id storage, not a read.
+    fn plan_with_id(src: &str, use_id: bool) -> Vec<(usize, Vec<usize>)> {
+        let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
+        let fields = data
+            .data
+            .as_ref()
+            .take_struct()
+            .expect("test input should be a struct");
+
+        sorted(plan_bit_runs(&data, &fields, use_id))
+    }
+
+    /// Every run the planner forms over one variant of an enum.
+    fn plan_variant(src: &str, variant: usize, use_id: bool) -> Vec<(usize, Vec<usize>)> {
+        let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
+        let variants = data
+            .data
+            .as_ref()
+            .take_enum()
+            .expect("test input should be an enum");
+        let fields = variants[variant].fields.as_ref();
+
+        sorted(plan_bit_runs(&data, &fields, use_id))
+    }
+
+    /// A struct of big-endian `u8` fields, one per `bits` width given.
+    fn be_struct(widths: &[usize]) -> String {
+        let fields: String = widths
+            .iter()
+            .enumerate()
+            .map(|(i, w)| format!("#[deku(bits = {w})] f{i}: u8,"))
+            .collect();
+        format!(r#"#[deku(endian = "big")] struct Test {{ {fields} }}"#)
+    }
+
+    #[test]
+    fn adjacent_fields_share_one_read() {
+        assert_eq!(plan(&be_struct(&[2, 3, 3])), vec![(0, vec![2, 3, 3])]);
+    }
+
+    #[test]
+    fn a_lone_field_is_not_a_run() {
+        // One field costs the same read either way.
+        assert_eq!(plan(&be_struct(&[5])), vec![]);
+    }
+
+    #[test]
+    fn plain_fields_without_bits_are_their_full_width() {
+        let src = r#"#[deku(endian = "big")] struct Test { a: u8, b: u16, c: u32 }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 16, 32])]);
+    }
+
+    #[test]
+    fn a_run_is_capped_at_64_bits_and_the_next_one_starts_there() {
+        // 32 + 32 fills a run exactly, so the third field opens a second.
+        let src = r#"#[deku(endian = "big")] struct Test { a: u32, b: u32, c: u32, d: u32 }"#;
+        assert_eq!(plan(src), vec![(0, vec![32, 32]), (2, vec![32, 32])]);
+
+        // A field that does not fit closes the run rather than overflowing it.
+        let src = r#"#[deku(endian = "big")] struct Test { a: u32, b: u16, c: u32 }"#;
+        assert_eq!(plan(src), vec![(0, vec![32, 16])]);
+    }
+
+    #[test]
+    fn an_ineligible_field_splits_a_run_in_two() {
+        let src = r#"
+        #[deku(endian = "big")]
+        struct Test {
+            #[deku(bits = 2)] a: u8,
+            #[deku(bits = 2)] b: u8,
+            #[deku(endian = "little")] c: u16,
+            #[deku(bits = 2)] d: u8,
+            #[deku(bits = 2)] e: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![2, 2]), (3, vec![2, 2])]);
+    }
+
+    #[test]
+    fn endianness_must_be_explicitly_big() {
+        // Absent means the target's endianness, little on x86.
+        assert_eq!(plan(r#"struct Test { a: u8, b: u8 }"#), vec![]);
+        assert_eq!(
+            plan(r#"#[deku(endian = "little")] struct Test { a: u8, b: u8 }"#),
+            vec![]
+        );
+        // A field-level attribute qualifies a field inside a little-endian struct.
+        let src = r#"#[deku(endian = "little")] struct Test {
+            #[deku(endian = "big")] a: u8,
+            #[deku(endian = "big")] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+    }
+
+    #[test]
+    fn bit_order_must_be_msb() {
+        // `Msb0` is the default, so absent qualifies, and so does spelling it out.
+        let src = r#"#[deku(endian = "big")] struct Test { a: u8, b: u8 }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+
+        let src = r#"#[deku(endian = "big", bit_order = "msb")] struct Test { a: u8, b: u8 }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bit_order = "msb")] a: u8,
+            b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+
+        // "lsb" does not.
+        let src = r#"#[deku(endian = "big", bit_order = "lsb")] struct Test { a: u8, b: u8 }"#;
+        assert_eq!(plan(src), vec![]);
+
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bit_order = "lsb")] a: u8,
+            b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![]);
+    }
+
+    #[test]
+    fn an_explicit_bit_order_selects_the_other_overflow_wording() {
+        // Both batch, but reach different write impls, so each needs its own wording.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 4, bit_order = "msb")] ordered: u8,
+            #[deku(bits = 4)] plain: u8,
+        }"#;
+        let data = DekuData::from_input(src.parse().unwrap()).unwrap();
+        let fields = data.data.as_ref().take_struct().unwrap();
+        let runs = plan_bit_runs(&data, &fields, false);
+        let run = runs.get(&0).expect("both fields should batch");
+        assert_eq!(
+            run.iter().map(|f| f.ordered).collect::<Vec<_>>(),
+            vec![true, false]
+        );
+
+        let emitted = emit_deku_read(&data).unwrap().to_string();
+        assert_eq!(emitted.matches("read_bits_uint_msb0").count(), 1);
+    }
+
+    #[test]
+    fn a_bool_joins_a_run() {
+        // Excluding bools would split a run wherever a flag sits.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 2)] a: u8,
+            #[deku(bits = 1)] flag: bool,
+            #[deku(bits = 5)] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![2, 1, 5])]);
+
+        // Without `bits` a bool is a byte, as `impls::bool` reads it.
+        let src = r#"#[deku(endian = "big")] struct Test { flag: bool, b: u8 }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+    }
+
+    #[test]
+    fn the_rtp_header_batches_into_one_read() {
+        // RFC 3550 fixed header: 9 fields, three of them flags.
+        let src = r#"#[deku(endian = "big")] struct Rtp {
+            #[deku(bits = 2)] version: u8,
+            #[deku(bits = 1)] padding: bool,
+            #[deku(bits = 1)] extension: bool,
+            #[deku(bits = 4)] csrc_count: u8,
+            #[deku(bits = 1)] marker: bool,
+            #[deku(bits = 7)] payload_type: u8,
+            sequence_number: u16,
+            timestamp: u32,
+            ssrc: u32,
+        }"#;
+        // The first eight sum to 64 bits; `ssrc` cannot fit. Two reads, not seven.
+        assert_eq!(plan(src), vec![(0, vec![2, 1, 1, 4, 1, 7, 16, 32])]);
+    }
+
+    #[test]
+    fn only_unsigned_primitives_and_bool_qualify() {
+        for ty in ["i8", "i16", "f32", "MyEnum", "Vec<u8>", "[u8; 2]"] {
+            let src = format!(r#"#[deku(endian = "big")] struct Test {{ a: {ty}, b: {ty} }}"#);
+            assert_eq!(plan(&src), vec![], "{ty} must not form a run");
+        }
+    }
+
+    #[test]
+    fn bits_must_be_a_literal_and_fit_the_type() {
+        // A non-literal width is not known at expansion time.
+        let src = r#"#[deku(endian = "big", ctx = "n: usize")] struct Test {
+            #[deku(bits = "n")] a: u8,
+            #[deku(bits = "n")] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![]);
+
+        // Wider than its container.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 9)] a: u8,
+            #[deku(bits = 2)] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![]);
+    }
+
+    /// Every attribute that must keep a field out of a run. Two fields that would
+    /// otherwise batch, with the attribute on the first.
+    #[rstest]
+    #[case::bytes("bytes = 1")]
+    #[case::pad_bits_before("pad_bits_before = \"1\"")]
+    #[case::pad_bytes_before("pad_bytes_before = \"1\"")]
+    #[case::pad_bits_after("pad_bits_after = \"1\"")]
+    #[case::pad_bytes_after("pad_bytes_after = \"1\"")]
+    #[case::cond("cond = \"true\"")]
+    #[case::assert("assert = \"true\"")]
+    #[case::assert_eq("assert_eq = \"0\"")]
+    #[case::map("map = \"|v: u8| -> Result<_, DekuError> { Ok(v) }\"")]
+    #[case::reader("reader = \"read_it()\"")]
+    #[case::writer("writer = \"write_it()\"")]
+    #[case::skip_with_default("skip, default = \"0\"")]
+    #[case::temp("temp")]
+    #[case::seek_rewind("seek_rewind")]
+    #[case::seek_from_current("seek_from_current = \"1\"")]
+    #[case::seek_from_end("seek_from_end = \"0\"")]
+    #[case::seek_from_start("seek_from_start = \"0\"")]
+    #[case::magic("magic = b\"\\x01\"")]
+    fn a_disqualifying_attribute_keeps_a_field_out_of_a_run(#[case] attr: &str) {
+        let src =
+            format!(r#"#[deku(endian = "big")] struct Test {{ #[deku({attr})] a: u8, b: u8 }}"#);
+        assert_eq!(
+            plan(&src),
+            vec![],
+            "`{attr}` must keep the field out of a run"
+        );
+    }
+
+    #[test]
+    fn the_id_storage_field_is_never_part_of_a_run() {
+        // The id has already been read, so it cannot join the run behind it.
+        let src = &be_struct(&[2, 3, 3]);
+        assert_eq!(plan_with_id(src, false), vec![(0, vec![2, 3, 3])]);
+        assert_eq!(plan_with_id(src, true), vec![(1, vec![3, 3])]);
+
+        // One field left behind the id is no run.
+        let src = &be_struct(&[2, 6]);
+        assert_eq!(plan_with_id(src, true), vec![]);
+    }
+
+    #[test]
+    fn a_run_forms_inside_an_enum_variant() {
+        let src = r#"
+        #[deku(id_type = "u8", endian = "big")]
+        enum Test {
+            #[deku(id = 1)]
+            Named {
+                #[deku(bits = 2)] a: u8,
+                #[deku(bits = 6)] b: u8,
+            },
+            #[deku(id = 2)]
+            Unnamed(#[deku(bits = 4)] u8, #[deku(bits = 4)] u8),
+        }"#;
+        assert_eq!(plan_variant(src, 0, false), vec![(0, vec![2, 6])]);
+        // Unnamed fields take a different ident path but plan the same.
+        assert_eq!(plan_variant(src, 1, false), vec![(0, vec![4, 4])]);
+    }
+
+    #[test]
+    fn a_run_forms_in_a_tuple_struct() {
+        let src = r#"#[deku(endian = "big")] struct Test(
+            #[deku(bits = 3)] u8,
+            #[deku(bits = 5)] u8,
+        );"#;
+        assert_eq!(plan(src), vec![(0, vec![3, 5])]);
+    }
+
+    #[test]
+    fn update_does_not_keep_a_field_out_of_a_run() {
+        // `update` feeds only `DekuUpdate`, so it cannot change the read or write.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 4, update = "0")] a: u8,
+            #[deku(bits = 4)] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![4, 4])]);
+    }
+
+    #[test]
+    fn the_emitted_read_makes_one_call_for_the_whole_run() {
+        // What round-trip tests cannot show: three fields, one call.
+        let data = DekuData::from_input(be_struct(&[2, 3, 3]).parse().unwrap()).unwrap();
+        let emitted = emit_deku_read(&data).unwrap().to_string();
+        assert_eq!(emitted.matches("read_bits_uint_msb0").count(), 1);
+
+        // And without a run, one call per field.
+        let src = r#"#[deku(endian = "little")] struct Test {
+            #[deku(bits = 2)] a: u8,
+            #[deku(bits = 3)] b: u8,
+            #[deku(bits = 3)] c: u8,
+        }"#;
+        let data = DekuData::from_input(src.parse().unwrap()).unwrap();
+        let emitted = emit_deku_read(&data).unwrap().to_string();
+        assert_eq!(emitted.matches("read_bits_uint_msb0").count(), 0);
     }
 }

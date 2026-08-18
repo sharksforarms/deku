@@ -471,11 +471,81 @@ fn emit_field_writes(
     ident: &TokenStream,
 ) -> Result<Vec<TokenStream>, syn::Error> {
     let mut is_id_pat = is_id_pat;
-    fields
-        .iter()
-        .enumerate()
-        .map(|(i, f)| emit_field_write(input, i, f, &object_prefix, ident, &mut is_id_pat))
-        .collect()
+
+    #[cfg(feature = "bits")]
+    let runs = super::deku_read::plan_bit_runs(input, fields, is_id_pat);
+
+    let mut writes = Vec::with_capacity(fields.len());
+    let mut i = 0;
+    while i < fields.len() {
+        #[cfg(feature = "bits")]
+        if let Some(run) = runs.get(&i) {
+            writes.push(emit_bit_run_write(fields, i, run, &object_prefix));
+            i += run.len();
+            is_id_pat = false;
+            continue;
+        }
+
+        let f = fields.fields[i];
+        writes.push(emit_field_write(
+            input,
+            i,
+            f,
+            &object_prefix,
+            ident,
+            &mut is_id_pat,
+        )?);
+        i += 1;
+    }
+
+    Ok(writes)
+}
+
+/// Composes a run of adjacent fields into one integer and writes it once, the
+/// mirror of the read side. Each field keeps its own "does the value fit" check,
+/// which is the only per-field work the individual writes did.
+#[cfg(feature = "bits")]
+fn emit_bit_run_write(
+    fields: &Fields<&FieldData>,
+    start: usize,
+    run: &super::deku_read::BitRun,
+    object_prefix: &Option<TokenStream>,
+) -> TokenStream {
+    let crate_ = super::get_crate_name();
+    let total: usize = run.iter().map(|f| f.bits).sum();
+
+    let mut checks = TokenStream::new();
+    let mut terms = Vec::with_capacity(run.len());
+    let mut consumed = 0usize;
+    for (offset, field) in run.iter().enumerate() {
+        let f = fields.fields[start + offset];
+        let field_ident = f.get_ident(start + offset, object_prefix.is_none());
+        let bits = field.bits;
+        let shift = total - consumed - bits;
+        // A run holds at least two fields totalling at most 64 bits, so no single
+        // field in one is 64 bits wide and the shift below cannot overflow.
+        debug_assert!(bits < u64::BITS as usize);
+        let mask: u64 = (1u64 << bits) - 1;
+
+        let value = quote! { (*(#object_prefix #field_ident) as u64) };
+        // Every field keeps the rejection its own write performed. Where the field
+        // fills its type this folds away at compile time, because a value cast from
+        // that type cannot exceed the width.
+        if field.can_overflow {
+            let ordered = field.ordered;
+            checks.extend(quote! {
+                ::#crate_::writer::check_bit_size::<#ordered>(#value, #bits)?;
+            });
+        }
+        terms.push(quote! { ((#value & #mask) << #shift) });
+        consumed += bits;
+    }
+
+    quote! {
+        #checks
+        let __deku_bit_run: u64 = #(#terms)|*;
+        __deku_writer.write_bits_uint_msb0(__deku_bit_run, #total)?;
+    }
 }
 
 fn emit_field_updates(
@@ -867,5 +937,77 @@ fn check_update_use<T>(vec: &[T]) -> TokenStream {
         quote! {use core::convert::TryInto;}
     } else {
         quote! {}
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "bits")]
+mod tests {
+    use super::*;
+
+    /// The `DekuWrite` impl the derive emits for `src`, as a token string.
+    fn emitted(src: &str) -> String {
+        let data = crate::DekuData::from_input(src.parse().unwrap()).expect("input should parse");
+        emit_deku_write(&data)
+            .expect("input should emit")
+            .to_string()
+    }
+
+    /// Three adjacent big-endian bit fields, which form one run.
+    const RUN: &str = r#"#[deku(endian = "big")] struct Test {
+        #[deku(bits = 2)] a: u8,
+        #[deku(bits = 3)] b: u8,
+        #[deku(bits = 3)] c: u8,
+    }"#;
+
+    /// The same widths, little-endian, so no run forms.
+    const NO_RUN: &str = r#"#[deku(endian = "little")] struct Test {
+        #[deku(bits = 2)] a: u8,
+        #[deku(bits = 3)] b: u8,
+        #[deku(bits = 3)] c: u8,
+    }"#;
+
+    #[test]
+    fn the_emitted_write_makes_one_call_for_the_whole_run() {
+        assert_eq!(emitted(RUN).matches("write_bits_uint_msb0").count(), 1);
+    }
+
+    #[test]
+    fn without_a_run_no_batched_write_is_emitted() {
+        assert_eq!(emitted(NO_RUN).matches("write_bits_uint_msb0").count(), 0);
+    }
+
+    #[test]
+    fn a_field_that_cannot_overflow_gets_no_check() {
+        // Whole bytes fill their type and bools are 0 or 1: neither can overflow.
+        let src = r#"#[deku(endian = "big")] struct Test { a: u8, b: u16 }"#;
+        assert_eq!(emitted(src).matches("check_bit_size").count(), 0);
+
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 1)] flag: bool,
+            #[deku(bits = 7)] rest: u8,
+        }"#;
+        // Only `rest` is narrower than its type.
+        assert_eq!(emitted(src).matches("check_bit_size").count(), 1);
+    }
+
+    #[test]
+    fn every_field_in_a_run_keeps_its_overflow_check() {
+        // Folding three fields into one integer must not lose the per-field check.
+        assert_eq!(emitted(RUN).matches("check_bit_size").count(), 3);
+    }
+
+    #[test]
+    fn a_run_inside_an_enum_variant_is_written_in_one_call() {
+        let src = r#"
+        #[deku(id_type = "u8", endian = "big")]
+        enum Test {
+            #[deku(id = 1)]
+            A {
+                #[deku(bits = 4)] a: u8,
+                #[deku(bits = 4)] b: u8,
+            },
+        }"#;
+        assert_eq!(emitted(src).matches("write_bits_uint_msb0").count(), 1);
     }
 }

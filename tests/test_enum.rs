@@ -440,3 +440,83 @@ fn test_repr_assignment_with_id_via_ctx() {
         Message::from_reader((&mut cursor, 0)).unwrap().1
     );
 }
+
+/// Regression: the id stored in an id_pat variant must be written with the enum's declared
+/// endian. Before the fix it was always written little-endian regardless of endian="big".
+#[test]
+fn test_id_pat_big_endian_write() {
+    // The id_pat variant is what triggers the previously-buggy write path.
+    // A fixed-id variant (like Known) uses a different path that was already correct.
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(id_type = "u16", endian = "big")]
+    enum E {
+        #[deku(id = "65535")]
+        Known,
+        #[deku(id_pat = "0..=65534")]
+        Other(u16),
+    }
+
+    // id_pat variant: 0x0102 big-endian → [0x01, 0x02]; was [0x02, 0x01] before the fix
+    assert_eq!(E::Other(0x0102).to_bytes().unwrap(), [0x01, 0x02]);
+
+    // round-trip
+    let mut cursor = Cursor::new([0x01_u8, 0x02]);
+    let (_, decoded) = E::from_reader((&mut cursor, 0)).unwrap();
+    assert_eq!(decoded, E::Other(0x0102));
+}
+
+/// Regression: signed 24-bit id_pat enum must round-trip negative values on little-endian.
+/// A fixed negative id (-8388608) and a negative range value (-100) must both
+/// encode and decode correctly.
+#[test]
+#[cfg(feature = "bits")]
+fn test_id_pat_signed_i24_negative_roundtrip_le() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(id_type = "i32", bits = "24", endian = "little")]
+    enum Signed24LE {
+        #[deku(id = "-8388608")]
+        Fixed,
+        #[deku(id_pat = "-8388607..=8388607")]
+        Other(i32),
+    }
+
+    let cases = [
+        Signed24LE::Fixed,
+        Signed24LE::Other(-100),
+        Signed24LE::Other(100),
+    ];
+    for val in &cases {
+        let bytes = val.to_bytes().unwrap();
+        assert_eq!(bytes.len(), 3, "24-bit enum should encode to 3 bytes");
+        let mut cursor = Cursor::new(&bytes[..]);
+        let (_, decoded) = Signed24LE::from_reader((&mut cursor, 0)).unwrap();
+        assert_eq!(val, &decoded, "LE round-trip failed for {val:?}");
+    }
+}
+
+/// Same as above but big-endian — exercises both endian threading and sign-extension.
+#[test]
+#[cfg(feature = "bits")]
+fn test_id_pat_signed_i24_negative_roundtrip_be() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(id_type = "i32", bits = "24", endian = "big")]
+    enum Signed24BE {
+        #[deku(id = "-8388608")]
+        Fixed,
+        #[deku(id_pat = "-8388607..=8388607")]
+        Other(i32),
+    }
+
+    let cases = [
+        Signed24BE::Fixed,
+        Signed24BE::Other(-100),
+        Signed24BE::Other(100),
+    ];
+    for val in &cases {
+        let bytes = val.to_bytes().unwrap();
+        assert_eq!(bytes.len(), 3, "24-bit enum should encode to 3 bytes");
+        let mut cursor = Cursor::new(&bytes[..]);
+        let (_, decoded) = Signed24BE::from_reader((&mut cursor, 0)).unwrap();
+        assert_eq!(val, &decoded, "BE round-trip failed for {val:?}");
+    }
+}

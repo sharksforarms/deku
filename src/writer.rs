@@ -559,12 +559,16 @@ mod tests {
         let mut target = vec![];
         let mut writer = Writer::new(Cursor::new(&mut target));
 
-        writer.write_bits_order(&bitvec![u8, Msb0; 1, 1, 1, 1], Order::Msb0).unwrap();
+        writer
+            .write_bits_order(&bitvec![u8, Msb0; 1, 1, 1, 1], Order::Msb0)
+            .unwrap();
 
         let pos = writer.stream_position().unwrap();
         assert_eq!(pos, 0);
 
-        writer.write_bits_order(&bitvec![u8, Msb0; 1, 1, 1, 1], Order::Msb0).unwrap();
+        writer
+            .write_bits_order(&bitvec![u8, Msb0; 1, 1, 1, 1], Order::Msb0)
+            .unwrap();
 
         writer.finalize().unwrap();
         assert_eq!(target, [0xFF]);

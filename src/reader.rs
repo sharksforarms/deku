@@ -944,6 +944,8 @@ mod tests {
     #[test]
     // Issue #678
     fn test_regression_stream_position() {
+        use alloc::vec;
+
         let input = vec![0x0F, 0xFF, 0xF0];
         let mut reader = Reader::new(Cursor::new(&input));
 

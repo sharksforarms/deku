@@ -48,14 +48,18 @@ impl<R: Read + Seek> Seek for Reader<R> {
         #[cfg(feature = "logging")]
         log::trace!("seek: {pos:?}");
 
-        // clear leftover
-        self.leftover = None;
+        if pos == SeekFrom::Current(0) {
+            self.inner.seek(pos)
+        } else {
+            // clear leftover
+            self.leftover = None;
 
-        let new_pos = self.inner.seek(pos)?;
-        self.bits_read = usize::try_from(new_pos)
-            .unwrap_or(usize::MAX)
-            .saturating_mul(8);
-        Ok(new_pos)
+            let new_pos = self.inner.seek(pos)?;
+            self.bits_read = usize::try_from(new_pos)
+                .unwrap_or(usize::MAX)
+                .saturating_mul(8);
+            Ok(new_pos)
+        }
     }
 }
 
@@ -933,6 +937,28 @@ mod tests {
             bits,
             //                     |first               |last                   |left|
             Some(bitvec![u8, Msb0; 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0])
+        );
+    }
+
+    #[cfg(all(feature = "alloc", feature = "bits"))]
+    #[test]
+    // Issue #678
+    fn test_regression_stream_position() {
+        use alloc::vec;
+
+        let input = vec![0x0F, 0xFF, 0xF0];
+        let mut reader = Reader::new(Cursor::new(&input));
+
+        let first_bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(first_bits, Some(bitvec!(u8, Msb0; 0, 0, 0, 0)));
+
+        let pos = reader.stream_position().unwrap();
+        assert_eq!(pos, 1);
+
+        let second_bits = reader.read_bits(16, Order::Msb0).unwrap();
+        assert_eq!(
+            second_bits,
+            Some(bitvec![u8, Msb0; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
         );
     }
 }

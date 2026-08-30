@@ -32,9 +32,9 @@ impl<W: Write + Seek> Seek for Writer<W> {
         #[cfg(feature = "logging")]
         log::trace!("seek: {pos:?}");
 
-        // clear leftover
+        // clear leftover if the position changes
         #[cfg(feature = "bits")]
-        {
+        if pos != SeekFrom::Current(0) {
             self.leftover.0.clear();
             self.leftover.1 = Order::Msb0;
         }
@@ -550,5 +550,27 @@ mod tests {
             .unwrap();
         writer.finalize().unwrap();
         assert_eq!(out_buf.into_inner(), [0b1001_0101, 0b0000_1010]);
+    }
+
+    #[cfg(all(feature = "alloc", feature = "bits"))]
+    #[test]
+    // Issue #678
+    fn test_regression_stream_position() {
+        let mut target = vec![];
+        let mut writer = Writer::new(Cursor::new(&mut target));
+
+        writer
+            .write_bits_order(&bitvec![u8, Msb0; 1, 1, 1, 1], Order::Msb0)
+            .unwrap();
+
+        let pos = writer.stream_position().unwrap();
+        assert_eq!(pos, 0);
+
+        writer
+            .write_bits_order(&bitvec![u8, Msb0; 1, 1, 1, 1], Order::Msb0)
+            .unwrap();
+
+        writer.finalize().unwrap();
+        assert_eq!(target, [0xFF]);
     }
 }

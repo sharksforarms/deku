@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [0.20.4](https://github.com/sharksforarms/deku/compare/deku-v0.20.3...deku-v0.20.4) - 2026-09-01
+
+### Fixed
+
+- `Order::Lsb0` + `Endian::Little` bit alignment inconsistencies ([#657](https://github.com/sharksforarms/deku/pull/657))
+
+### Other
+
+- Fix id write endianness and sub-width signed sign-extension ([#664](https://github.com/sharksforarms/deku/pull/664))
+- Restore inlining of read_bytes_const_into hot path ([#672](https://github.com/sharksforarms/deku/pull/672))
+- Fix to Reader and Writer Seek impls. ([#679](https://github.com/sharksforarms/deku/pull/679))
+- Auto-forward Order-typed ctx parameter as bit_order ([#660](https://github.com/sharksforarms/deku/pull/660))
+- Update criterion requirement from 0.7.0 to 0.8.2 ([#649](https://github.com/sharksforarms/deku/pull/649))
+- read and write bit fields as integers ([#673](https://github.com/sharksforarms/deku/pull/673))
+- Bump actions/checkout from 6 to 7 ([#675](https://github.com/sharksforarms/deku/pull/675))
+- Update rustc-hash requirement from =2.1.1 to =2.1.3 ([#674](https://github.com/sharksforarms/deku/pull/674))
+- Bump codecov/codecov-action from 4 to 7 ([#676](https://github.com/sharksforarms/deku/pull/676))
+- Update for CI ([#671](https://github.com/sharksforarms/deku/pull/671))
+- Avoid allocating in ReadExact when insufficient data ([#659](https://github.com/sharksforarms/deku/pull/659))
+- Fix bits_read sync on all seek variants ([#661](https://github.com/sharksforarms/deku/pull/661))
+- Fix incorrect DekuSize size calculation ([#670](https://github.com/sharksforarms/deku/pull/670))
+- Upgrade syn to v3, darling to v0.24 / MSRV 1.88 ([#667](https://github.com/sharksforarms/deku/pull/667))
+- zero-extend big-endian bit fields with load_be ([#666](https://github.com/sharksforarms/deku/pull/666))
+- use &raw const instead of core::ptr::addr_of ([#654](https://github.com/sharksforarms/deku/pull/654))
+- 1.85 ([#662](https://github.com/sharksforarms/deku/pull/662))
+- skip/cond + padding ([#651](https://github.com/sharksforarms/deku/pull/651))
+- Add skip(read) and skip(write) ([#648](https://github.com/sharksforarms/deku/pull/648))
+- update stale feature flag documentation ([#637](https://github.com/sharksforarms/deku/pull/637))
+
 ### Other
 
 - Bump MSRV to 1.88

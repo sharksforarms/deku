@@ -451,3 +451,29 @@ fn issue_525() {
     assert_eq!(test.0, (ret, 0));
     assert_eq!(test.1, TestSeek { a: 0, b: 2, c: 3 });
 }
+
+// A `bytes` expression evaluating to 0 at runtime must read nothing and yield 0,
+// rather than overflowing the sign-extension shift.
+//
+// https://github.com/sharksforarms/deku/pull/664#issuecomment-5162310570
+#[test]
+fn pr_664_runtime_zero_bytes() {
+    #[derive(Debug, PartialEq, DekuRead)]
+    struct Dynamic {
+        n: u8,
+        #[deku(bytes = "*n as usize")]
+        a: i32,
+    }
+
+    // n = 0: no bytes are read for `a`, the trailing bytes are left untouched
+    let mut cursor = std::io::Cursor::new([0x00_u8, 0x01, 0x02]);
+    let (amt_read, val) = Dynamic::from_reader((&mut cursor, 0)).unwrap();
+    assert_eq!(8, amt_read);
+    assert_eq!(Dynamic { n: 0, a: 0 }, val);
+
+    // n = 1: the single byte read is still sign-extended
+    let mut cursor = std::io::Cursor::new([0x01_u8, 0x9C]);
+    let (amt_read, val) = Dynamic::from_reader((&mut cursor, 0)).unwrap();
+    assert_eq!(16, amt_read);
+    assert_eq!(Dynamic { n: 1, a: -100 }, val);
+}

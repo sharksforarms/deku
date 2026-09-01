@@ -616,7 +616,9 @@ fn emit_field_write(
         // TODO: This should error on some attributes that don't make sense aren't used?
         // Such as magic, seek*
         let crate_ = super::get_crate_name();
-        let field_endian = input.id_endian.as_ref();
+        // Mirror gen_id_args' read-side precedence (id_endian -> enum endian) so a
+        // hardcoded `endian="big"` or a bound `endian="endian"` reaches the write.
+        let field_endian = input.id_endian.as_ref().or(input.endian.as_ref());
         #[cfg(feature = "bits")]
         let field_bits = input.bits.as_ref();
         #[cfg(not(feature = "bits"))]

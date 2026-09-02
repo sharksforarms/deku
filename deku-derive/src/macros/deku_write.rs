@@ -480,7 +480,7 @@ fn emit_field_writes(
     while i < fields.len() {
         #[cfg(feature = "bits")]
         if let Some(run) = runs.get(&i) {
-            writes.push(emit_bit_run_write(fields, i, run, &object_prefix));
+            writes.push(emit_bit_run_write(fields, i, run, &object_prefix, ident));
             i += run.len();
             is_id_pat = false;
             continue;
@@ -510,10 +510,13 @@ fn emit_bit_run_write(
     start: usize,
     run: &super::deku_read::BitRun,
     object_prefix: &Option<TokenStream>,
+    ident: &TokenStream,
 ) -> TokenStream {
     let crate_ = super::get_crate_name();
     let total: usize = run.iter().map(|f| f.bits).sum();
+    let ident = ident.to_string();
 
+    let mut traces = TokenStream::new();
     let mut checks = TokenStream::new();
     let mut terms = Vec::with_capacity(run.len());
     let mut widths = Vec::with_capacity(run.len());
@@ -527,6 +530,11 @@ fn emit_bit_run_write(
         // field in one is 64 bits wide and the shift below cannot overflow.
         debug_assert!(bits < u64::BITS as usize);
         let mask: u64 = (1u64 << bits) - 1;
+
+        if cfg!(feature = "logging") {
+            let field_ident_str = field_ident.to_string();
+            traces.extend(quote! { log::trace!("Writing: {}.{}", #ident, #field_ident_str); });
+        }
 
         let value = quote! { (*(#object_prefix #field_ident) as u64) };
         // Every field keeps the rejection its own write performed. Where the field
@@ -544,6 +552,7 @@ fn emit_bit_run_write(
     }
 
     quote! {
+        #traces
         #checks
         let __deku_bit_run: u64 = #(#terms)|*;
         // A partial `Lsb0` leftover cannot be spliced onto in one go: the general

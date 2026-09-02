@@ -564,7 +564,7 @@ fn emit_field_reads(
     while i < fields.len() {
         #[cfg(feature = "bits")]
         if let Some(run) = runs.get(&i) {
-            let (idents, read) = emit_bit_run_read(fields, i, run);
+            let (idents, read) = emit_bit_run_read(fields, i, run, ident);
             for field_ident in idents {
                 field_idents.push(FieldIdent {
                     field_ident,
@@ -728,10 +728,12 @@ fn emit_bit_run_read(
     fields: &Fields<&FieldData>,
     start: usize,
     run: &BitRun,
+    ident: &TokenStream,
 ) -> (Vec<TokenStream>, TokenStream) {
     let crate_ = super::get_crate_name();
     let total: usize = run.iter().map(|f| f.bits).sum();
     let run_ident = quote::format_ident!("__deku_bit_run_{}", start);
+    let ident = ident.to_string();
 
     let mut idents = Vec::with_capacity(run.len());
     let mut extracts = TokenStream::new();
@@ -768,7 +770,14 @@ fn emit_bit_run_read(
         } else {
             quote! { ((#run_ident >> #shift) & #mask) as #ty }
         };
+        let trace_field_log = if cfg!(feature = "logging") {
+            let field_ident_str = field_ident.to_string();
+            quote! { log::trace!("Reading: {}.{}", #ident, #field_ident_str); }
+        } else {
+            quote! {}
+        };
         extracts.extend(quote! {
+            #trace_field_log
             let #internal = #extract;
             let #field_ident = &#internal;
         });

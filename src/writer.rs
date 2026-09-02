@@ -108,9 +108,12 @@ impl<W: Write + Seek> Writer<W> {
     /// Writes the low `amt` bits (`1..=64`) of `value`, most-significant-bit
     /// first. The integer mirror of `Reader::read_bits_uint_msb0`.
     ///
-    /// Only valid when the pending leftover is `Msb0`; the caller checks that.
     /// Public because the derive calls it to write a run of contiguous
     /// big-endian `Msb0` bit-fields in one go.
+    ///
+    /// A pending `Lsb0` leftover cannot be spliced onto by the integer path, so
+    /// that case falls back to `write_bits_order`. It happens when a struct
+    /// written `Lsb0` is followed by one written `Msb0`.
     /// Equivalent to `write_bits_order(.., Order::Msb0)` over the same bits, but
     /// the value never becomes a `BitSlice`: whole bytes leave in one `write_all`
     /// instead of one call per byte, and the leftover is a byte and a length
@@ -119,7 +122,20 @@ impl<W: Write + Seek> Writer<W> {
     #[cfg(feature = "bits")]
     pub fn write_bits_uint_msb0(&mut self, value: u64, amt: usize) -> Result<(), DekuError> {
         debug_assert!((1..=64).contains(&amt));
-        debug_assert_eq!(self.leftover.1, Order::Msb0);
+
+        if self.leftover.1 != Order::Msb0 {
+            if !self.leftover.0.is_empty() {
+                // Partial `Lsb0` byte pending: one batched write is not equivalent
+                // to the per-field writes it replaces, so refuse rather than
+                // silently reorder.
+                return Err(DekuError::InvalidParam(
+                    "cannot batch an Msb0 write onto a partial Lsb0 leftover".into(),
+                ));
+            }
+            // Byte-aligned, so the order flag is merely stale from a previous
+            // `Lsb0` write and carries no pending bits.
+            self.leftover.1 = Order::Msb0;
+        }
 
         let (lead, lead_len) = self.leftover.0.as_msb0_byte();
         // Leftover bits first, then the value's low `amt` bits: at most 7 + 64.

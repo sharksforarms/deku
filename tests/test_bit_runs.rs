@@ -479,3 +479,36 @@ fn a_mixed_run_keeps_each_fields_wording() {
         "unexpected message: {plain_err}"
     );
 }
+
+/// A struct written `Msb0` nested after one written `Lsb0`. The parent leaves the
+/// writer's order flag stale, and a batched write must not reorder the child's
+/// bytes because of it. Mirrors the `bit_order` example in `attributes.rs`.
+#[test]
+fn a_run_after_an_lsb0_parent() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(endian = "big", bit_order = "lsb")]
+    struct Parent {
+        #[deku(bits = 13)]
+        offset: u16,
+        #[deku(bits = 3)]
+        t: u8,
+        child: Child,
+    }
+
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(endian = "big", ctx = "_: deku::ctx::Endian, _: deku::ctx::Order")]
+    struct Child {
+        field_a: u8,
+        #[deku(bits = 1)]
+        flag: bool,
+        #[deku(bits = 7)]
+        field_b: u8,
+    }
+
+    let data = [0x10u8, 0x81, 0xAB, 0b1001_0110];
+    let (_, p) = Parent::from_bytes((&data, 0)).unwrap();
+    assert_eq!(p.child.field_a, 0xAB);
+    assert!(p.child.flag);
+    assert_eq!(p.child.field_b, 0b001_0110);
+    assert_eq!(p.to_bytes().unwrap(), data);
+}

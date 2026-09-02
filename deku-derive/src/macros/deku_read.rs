@@ -623,7 +623,9 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
         return None;
     }
 
-    // Only `Msb0` batches, and it is the default, so absent is fine and "lsb" is not.
+    // Only `Msb0` batches: absent is the default and fine, "lsb" is not, and
+    // anything else is a ctx parameter name forwarded as a runtime order, which
+    // could be either at run time.
     let explicit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());
     if let Some(order) = explicit_order {
         if order.value() != "msb" {
@@ -1431,6 +1433,24 @@ mod tests {
             b: u8,
         }"#;
         assert_eq!(plan(src), vec![]);
+    }
+
+    #[test]
+    fn a_runtime_bit_order_does_not_batch() {
+        // An `Order`-typed `ctx` parameter is forwarded as `bit_order`, so the
+        // order is only known at run time and could be `Lsb0`.
+        let src = r#"#[deku(endian = "big", ctx = "order: deku::ctx::Order")] struct Test {
+            #[deku(bits = 4)] a: u8,
+            #[deku(bits = 4)] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![]);
+
+        // A wildcard binds nothing, so there is no runtime order to honour.
+        let src = r#"#[deku(endian = "big", ctx = "_: deku::ctx::Order")] struct Test {
+            #[deku(bits = 4)] a: u8,
+            #[deku(bits = 4)] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![4, 4])]);
     }
 
     #[test]

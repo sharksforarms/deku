@@ -17,6 +17,49 @@ const fn bits_of<T>() -> usize {
     core::mem::size_of::<T>().saturating_mul(<u8>::BITS as usize)
 }
 
+/// Errors unless `value` fits in `bits` bits.
+///
+/// The derive calls this per field before composing a run into one write. Two
+/// comparisons, so it inlines and folds away where a field fills its type.
+///
+/// `ORDERED` picks the wording: `DekuWriter<(Endian, BitSize, Order)>` omits the
+/// second "bit" that `DekuWriter<(Endian, BitSize)>` includes. Unify those two and
+/// this parameter goes away.
+#[cfg(feature = "bits")]
+#[inline]
+pub fn check_bit_size<const ORDERED: bool>(value: u64, bits: usize) -> Result<(), DekuError> {
+    if bits >= u64::BITS as usize || (value >> bits) == 0 {
+        return Ok(());
+    }
+    Err(bit_size_error::<ORDERED>(value, bits))
+}
+
+/// Cold path of [`check_bit_size`], out of line so the check inlines.
+#[cfg(feature = "bits")]
+#[cold]
+#[inline(never)]
+fn bit_size_error<const ORDERED: bool>(value: u64, bits: usize) -> DekuError {
+    // Bits `value` occupies, which is what the per-field writes report.
+    let significant = (u64::BITS - value.leading_zeros()) as usize;
+    if ORDERED {
+        crate::deku_error!(
+            DekuError::InvalidParam,
+            "bit size of input is larger than requested size",
+            "{} exceeds {}",
+            significant,
+            bits
+        )
+    } else {
+        crate::deku_error!(
+            DekuError::InvalidParam,
+            "bit size of input is larger than bit requested size",
+            "{} exceeds {}",
+            significant,
+            bits
+        )
+    }
+}
+
 /// Container to use with `from_reader`
 pub struct Writer<W: Write + Seek> {
     pub(crate) inner: W,
@@ -65,16 +108,26 @@ impl<W: Write + Seek> Writer<W> {
     /// Writes the low `amt` bits (`1..=64`) of `value`, most-significant-bit
     /// first. The integer mirror of `Reader::read_bits_uint_msb0`.
     ///
-    /// Only valid when the pending leftover is `Msb0`; the caller checks that.
+    /// Public because the derive calls it to write a run of contiguous
+    /// big-endian `Msb0` bit-fields in one go.
+    ///
+    /// A pending `Lsb0` leftover cannot be spliced onto by the integer path, so
+    /// that case falls back to [`Writer::write_bits_uint_fields`]. It happens when
+    /// a struct written `Lsb0` is followed by one written `Msb0`.
+    ///
     /// Equivalent to `write_bits_order(.., Order::Msb0)` over the same bits, but
     /// the value never becomes a `BitSlice`: whole bytes leave in one `write_all`
     /// instead of one call per byte, and the leftover is a byte and a length
     /// rather than a `BoundedBitVec` rebuilt bit by bit.
     #[inline]
     #[cfg(feature = "bits")]
-    pub(crate) fn write_bits_uint_msb0(&mut self, value: u64, amt: usize) -> Result<(), DekuError> {
+    pub fn write_bits_uint_msb0(&mut self, value: u64, amt: usize) -> Result<(), DekuError> {
         debug_assert!((1..=64).contains(&amt));
-        debug_assert_eq!(self.leftover.1, Order::Msb0);
+
+        // A partial `Lsb0` byte cannot be spliced onto here: callers must check
+        // `can_write_bits_uint_msb0` and use `write_bits_uint_fields` instead. An
+        // empty leftover is already `Msb0`, so there is no flag to reset.
+        debug_assert!(self.can_write_bits_uint_msb0());
 
         let (lead, lead_len) = self.leftover.0.as_msb0_byte();
         // Leftover bits first, then the value's low `amt` bits: at most 7 + 64.
@@ -105,6 +158,47 @@ impl<W: Write + Seek> Writer<W> {
             self.leftover.0 = BoundedBitVec::from_msb0_byte(tail << (8 - rest), rest);
         }
         self.leftover.1 = Order::Msb0;
+        Ok(())
+    }
+
+    /// Whether [`Writer::write_bits_uint_msb0`] can serve the next write.
+    ///
+    /// False only with a partial `Lsb0` byte pending, where one batched write is
+    /// not equivalent to the per-field writes it would replace.
+    #[inline]
+    #[cfg(feature = "bits")]
+    pub fn can_write_bits_uint_msb0(&self) -> bool {
+        self.leftover.1 == Order::Msb0 || self.leftover.0.is_empty()
+    }
+
+    /// Writes the fields packed into `value` one at a time through the general bit
+    /// path, `widths` giving each field's width most-significant first.
+    ///
+    /// The per-field equivalent of [`Writer::write_bits_uint_msb0`], for when
+    /// [`Writer::can_write_bits_uint_msb0`] is false. One call rather than one per
+    /// field, so the branch the derive emits for it stays small.
+    #[cfg(feature = "bits")]
+    pub fn write_bits_uint_fields(
+        &mut self,
+        value: u64,
+        widths: &[usize],
+    ) -> Result<(), DekuError> {
+        let total: usize = widths.iter().sum();
+        debug_assert!((1..=64).contains(&total));
+
+        let mut consumed = 0usize;
+        for &amt in widths {
+            let shift = total - consumed - amt;
+            let mask = if amt >= u64::BITS as usize {
+                u64::MAX
+            } else {
+                (1u64 << amt) - 1
+            };
+            // Left-align so an `Msb0` view reads the bits most-significant first.
+            let bytes = (((value >> shift) & mask) << (u64::BITS as usize - amt)).to_be_bytes();
+            self.write_bits_order(&bytes.view_bits::<Msb0>()[..amt], Order::Msb0)?;
+            consumed += amt;
+        }
         Ok(())
     }
 
@@ -346,7 +440,7 @@ impl<W: Write + Seek> Writer<W> {
         bits: &BitSlice<u8, Msb0>,
         order: Order,
     ) -> Result<(), DekuError> {
-        match self.leftover.1 {
+        let result = match self.leftover.1 {
             Order::Msb0 => match order {
                 Order::Msb0 => self.write_bits_order_msb_msb(bits, order),
                 Order::Lsb0 => self.write_bits_order_msb_lsb(bits, order),
@@ -355,7 +449,17 @@ impl<W: Write + Seek> Writer<W> {
                 Order::Msb0 => self.write_bits_order_lsb_msb(bits, order),
                 Order::Lsb0 => self.write_bits_order_lsb_lsb(bits, order),
             },
+        };
+
+        // The paths above record `order` even with no bits left pending, but an
+        // empty leftover has no order: left set, the flag steers the next write
+        // into a `Lsb0` path, which emits whole bytes back to front. Reset it, so
+        // every reader of the flag can take an empty leftover as `Msb0`.
+        if self.leftover.0.is_empty() {
+            self.leftover.1 = Order::Msb0;
         }
+
+        result
     }
 
     /// Write all bits to `Writer` buffer if bits can fit into a byte buffer
@@ -459,6 +563,37 @@ mod tests {
             &mut out_buf.into_inner(),
             &mut vec![0xaa, 0xbb, 0xf1, 0xaa, 0x1f, 0x1a, 0xaf]
         );
+    }
+
+    /// A `Lsb0` write that ends on a byte boundary leaves no bits pending, so it
+    /// must not steer the `Msb0` write that follows into the `Lsb0` path, which
+    /// emits whole bytes back to front.
+    #[test]
+    fn test_msb0_after_byte_aligned_lsb0_is_not_reordered() {
+        let mut stale = Cursor::new(vec![]);
+        let mut writer = Writer::new(&mut stale);
+        writer
+            .write_bits_order(&BitVec::<u8, Msb0>::from_slice(&[0x41]), Order::Lsb0)
+            .unwrap();
+        let pending = (writer.leftover.0.is_empty(), writer.leftover.1);
+        writer
+            .write_bits_order(&BitVec::<u8, Msb0>::from_slice(&[0xab, 0xcd]), Order::Msb0)
+            .unwrap();
+        writer.finalize().unwrap();
+
+        // The same two writes on a writer that never saw `Lsb0`.
+        let mut fresh = Cursor::new(vec![]);
+        let mut writer = Writer::new(&mut fresh);
+        writer
+            .write_bits_order(&BitVec::<u8, Msb0>::from_slice(&[0x41]), Order::Msb0)
+            .unwrap();
+        writer
+            .write_bits_order(&BitVec::<u8, Msb0>::from_slice(&[0xab, 0xcd]), Order::Msb0)
+            .unwrap();
+        writer.finalize().unwrap();
+
+        assert_eq_hex!(stale.into_inner(), fresh.into_inner());
+        assert_eq!(pending, (true, Order::Msb0));
     }
 
     #[test]

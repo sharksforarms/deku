@@ -95,7 +95,7 @@ fn an_oversized_field_is_still_rejected() {
         length: 0,
     };
     let err = bad.to_bytes().expect_err("13-bit field cannot hold 0xFFFF");
-    let msg = format!("{err}");
+    let msg = format!("{err:?}");
     assert!(
         msg.contains("bit size of input is larger than bit requested size"),
         "unexpected message: {msg}"
@@ -110,7 +110,7 @@ fn an_oversized_field_is_still_rejected() {
         length: 0,
     };
     let plain_err = plain.to_bytes().expect_err("same field, same rejection");
-    assert_eq!(format!("{plain_err}"), msg);
+    assert_eq!(format!("{plain_err:?}"), msg);
 }
 
 /// The boundary, not just the overflow.
@@ -236,15 +236,18 @@ fn check_bit_size_boundaries() {
 
     // One bit too wide, and the message names both widths.
     let err = check_bit_size::<false>(0b100, 2).expect_err("3 bits do not fit in 2");
-    let msg = format!("{err}");
+    let msg = format!("{err:?}");
     assert!(
         msg.contains("bit size of input is larger than bit requested size"),
         "unexpected message: {msg}"
     );
-    assert!(msg.contains('3') && msg.contains('2'), "message: {msg}");
-
-    let err = check_bit_size::<false>(0x100, 8).expect_err("9 bits do not fit in 8");
-    assert!(format!("{err}").contains('9'));
+    // Only `descriptive-errors` appends the two widths.
+    #[cfg(feature = "descriptive-errors")]
+    {
+        assert!(msg.contains('3') && msg.contains('2'), "message: {msg}");
+        let err = check_bit_size::<false>(0x100, 8).expect_err("9 bits do not fit in 8");
+        assert!(format!("{err:?}").contains('9'));
+    }
 
     // Same verdict either way; only the wording differs.
     for (value, bits) in [(0b11u64, 2), (0xFF, 8), (0, 1), (u64::MAX, 64), (0b100, 2)] {
@@ -254,7 +257,7 @@ fn check_bit_size_boundaries() {
             "{value:#x} in {bits} bits"
         );
     }
-    let ordered = format!("{}", check_bit_size::<true>(0b100, 2).unwrap_err());
+    let ordered = format!("{:?}", check_bit_size::<true>(0b100, 2).unwrap_err());
     assert!(
         ordered.contains("bit size of input is larger than requested size")
             && !ordered.contains("bit requested size"),
@@ -368,9 +371,9 @@ fn a_byte_wide_bool_in_a_run_rejects_a_non_boolean_value() {
         let data = [byte, 0x42];
         let b = Batched::from_bytes((&data, 0)).expect_err("not a bool");
         let p = Unbatched::from_bytes((&data, 0)).expect_err("not a bool");
-        assert_eq!(format!("{b}"), format!("{p}"), "byte {byte:#04x}");
+        assert_eq!(format!("{b:?}"), format!("{p:?}"), "byte {byte:#04x}");
         assert!(
-            format!("{b}").contains("cannot parse bool value"),
+            format!("{b:?}").contains("cannot parse bool value"),
             "unexpected message: {b}"
         );
     }
@@ -405,11 +408,11 @@ fn an_explicit_msb_bit_order_batches() {
     }
 
     let batched = format!(
-        "{}",
+        "{:?}",
         OrderedBatched { a: 0, b: 0xFFFF }.to_bytes().unwrap_err()
     );
     let unbatched = format!(
-        "{}",
+        "{:?}",
         OrderedUnbatched { a: 0, b: 0xFFFF }.to_bytes().unwrap_err()
     );
     assert_eq!(batched, unbatched);
@@ -448,7 +451,7 @@ fn a_mixed_run_keeps_each_fields_wording() {
     assert_eq!(m.to_bytes().unwrap(), data);
 
     let ordered_err = format!(
-        "{}",
+        "{:?}",
         Mixed {
             ordered: 0xFF,
             plain: 0
@@ -463,7 +466,7 @@ fn a_mixed_run_keeps_each_fields_wording() {
     );
 
     let plain_err = format!(
-        "{}",
+        "{:?}",
         Mixed {
             ordered: 0,
             plain: 0xFF

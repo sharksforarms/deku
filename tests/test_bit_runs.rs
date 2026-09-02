@@ -512,3 +512,215 @@ fn a_run_after_an_lsb0_parent() {
     assert_eq!(p.child.field_b, 0b001_0110);
     assert_eq!(p.to_bytes().unwrap(), data);
 }
+
+// ---------------------------------------------------------------------------
+// Equivalence audit: places where a batched path could diverge from the
+// per-field one it replaces. Each pairs a batched struct with an `assert`-
+// disqualified twin and compares everything observable.
+// ---------------------------------------------------------------------------
+
+/// `from_bytes` reports the trailing slice and bit offset from `bits_read`, so a
+/// run must account for exactly the bits its fields would have.
+#[test]
+fn from_bytes_reports_the_same_rest_and_offset() {
+    macro_rules! h {
+        ($name:ident, $($extra:tt)*) => {
+            #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+            #[deku(endian = "big")]
+            struct $name {
+                #[deku(bits = 3 $($extra)*)]
+                a: u8,
+                #[deku(bits = 7 $($extra)*)]
+                b: u8,
+            }
+        };
+    }
+    h!(RestBatched,);
+    h!(RestUnbatched, , assert = "true");
+
+    let data = [0xABu8, 0xCD, 0xEF];
+    let ((rb, ob), _) = RestBatched::from_bytes((&data, 0)).unwrap();
+    let ((ru, ou), _) = RestUnbatched::from_bytes((&data, 0)).unwrap();
+    assert_eq!((rb, ob), (ru, ou));
+    // 10 bits consumed: two bits into the second byte.
+    assert_eq!(ob, 2);
+    assert_eq!(rb, &data[1..]);
+}
+
+/// A run that starts part way through a byte, so the batched read splices onto a
+/// partial leftover rather than starting aligned.
+#[test]
+fn a_run_starting_mid_byte() {
+    macro_rules! h {
+        ($name:ident, $($extra:tt)*) => {
+            #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+            #[deku(endian = "big")]
+            struct $name {
+                // Disqualified, so the run starts at bit 3.
+                #[deku(bits = 3, assert = "true")]
+                head: u8,
+                #[deku(bits = 5 $($extra)*)]
+                a: u8,
+                #[deku(bits = 8 $($extra)*)]
+                b: u8,
+            }
+        };
+    }
+    h!(MidBatched,);
+    h!(MidUnbatched, , assert = "true");
+
+    for seed in 1..2_000u32 {
+        let data = wire(2, seed);
+        let (_, x) = MidBatched::from_bytes((&data, 0)).unwrap();
+        let (_, y) = MidUnbatched::from_bytes((&data, 0)).unwrap();
+        assert_eq!((x.head, x.a, x.b), (y.head, y.a, y.b), "seed {seed}");
+        assert_eq!(x.to_bytes().unwrap(), data, "seed {seed}");
+    }
+}
+
+/// Reading from a non-zero starting bit offset, which `from_bytes` reaches via
+/// `skip_bits` before the first field.
+#[test]
+fn a_run_at_every_starting_bit_offset() {
+    macro_rules! h {
+        ($name:ident, $($extra:tt)*) => {
+            #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+            #[deku(endian = "big")]
+            struct $name {
+                #[deku(bits = 5 $($extra)*)]
+                a: u8,
+                #[deku(bits = 3 $($extra)*)]
+                b: u8,
+            }
+        };
+    }
+    h!(OffBatched,);
+    h!(OffUnbatched, , assert = "true");
+
+    for off in 0..8usize {
+        for seed in 1..200u32 {
+            let data = wire(3, seed);
+            let (_, x) = OffBatched::from_bytes((&data, off)).unwrap();
+            let (_, y) = OffUnbatched::from_bytes((&data, off)).unwrap();
+            assert_eq!((x.a, x.b), (y.a, y.b), "offset {off}, seed {seed}");
+        }
+    }
+}
+
+/// A bit-packed enum id leaves a partial byte before the variant's run.
+#[test]
+fn a_run_after_a_bit_packed_enum_id() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(id_type = "u8", bits = 4, endian = "big")]
+    enum Batched {
+        #[deku(id = 1)]
+        A {
+            #[deku(bits = 4)]
+            a: u8,
+            #[deku(bits = 8)]
+            b: u8,
+        },
+    }
+
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(id_type = "u8", bits = 4, endian = "big")]
+    enum Unbatched {
+        #[deku(id = 1)]
+        A {
+            #[deku(bits = 4, assert = "true")]
+            a: u8,
+            #[deku(bits = 8, assert = "true")]
+            b: u8,
+        },
+    }
+
+    for seed in 1..500u32 {
+        let mut data = wire(2, seed);
+        data[0] = 0x10 | (data[0] & 0x0F); // id = 1
+        let (_, x) = Batched::from_bytes((&data, 0)).unwrap();
+        let (_, y) = Unbatched::from_bytes((&data, 0)).unwrap();
+        let (Batched::A { a: xa, b: xb }, Unbatched::A { a: ya, b: yb }) = (&x, &y);
+        assert_eq!((xa, xb), (ya, yb), "seed {seed}");
+        assert_eq!(x.to_bytes().unwrap(), data, "seed {seed}");
+    }
+}
+
+/// `deku::byte_offset` on a field after a run must see the bits the run consumed.
+#[test]
+fn byte_offset_after_a_run_is_correct() {
+    #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+    #[deku(endian = "big")]
+    struct S {
+        a: u8,
+        b: u16,
+        // Three bytes consumed by the run above.
+        #[deku(assert = "deku::byte_offset == 3")]
+        tail: u8,
+    }
+
+    let data = [1u8, 2, 3, 4];
+    let (_, s) = S::from_bytes((&data, 0)).unwrap();
+    assert_eq!(
+        s,
+        S {
+            a: 1,
+            b: 0x0203,
+            tail: 4
+        }
+    );
+    assert_eq!(s.to_bytes().unwrap(), data);
+}
+
+/// A partial `Lsb0` leftover before a run: one batched write would reorder across
+/// bytes, so the derive falls back to a write per field. Must be byte-identical to
+/// the per-field path it replaces.
+#[test]
+fn a_run_after_a_partial_lsb0_leftover() {
+    macro_rules! kid {
+        ($name:ident, $($extra:tt)*) => {
+            #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+            #[deku(endian = "big", ctx = "_: deku::ctx::Endian, _: deku::ctx::Order")]
+            struct $name {
+                #[deku(bits = 6 $($extra)*)]
+                a: u8,
+                #[deku(bits = 7 $($extra)*)]
+                b: u8,
+                #[deku(bits = 3 $($extra)*)]
+                c: u8,
+            }
+        };
+    }
+    kid!(KidBatched,);
+    kid!(KidPlain, , assert = "true");
+
+    macro_rules! parent {
+        ($name:ident, $kid:ident) => {
+            #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+            #[deku(endian = "big", bit_order = "lsb")]
+            struct $name {
+                // Three bits, so the child starts mid-byte with an `Lsb0` leftover.
+                #[deku(bits = 3)]
+                x: u8,
+                child: $kid,
+            }
+        };
+    }
+    parent!(PBatched, KidBatched);
+    parent!(PPlain, KidPlain);
+
+    for seed in 1..3_000u32 {
+        let data = wire(3, seed);
+        let (_, b) = PBatched::from_bytes((&data, 0)).unwrap();
+        let (_, p) = PPlain::from_bytes((&data, 0)).unwrap();
+        assert_eq!(
+            (b.x, b.child.a, b.child.b, b.child.c),
+            (p.x, p.child.a, p.child.b, p.child.c),
+            "read, seed {seed}"
+        );
+        assert_eq!(
+            b.to_bytes().unwrap(),
+            p.to_bytes().unwrap(),
+            "write, seed {seed}"
+        );
+    }
+}

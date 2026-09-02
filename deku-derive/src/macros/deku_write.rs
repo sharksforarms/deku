@@ -516,6 +516,7 @@ fn emit_bit_run_write(
 
     let mut checks = TokenStream::new();
     let mut terms = Vec::with_capacity(run.len());
+    let mut widths = Vec::with_capacity(run.len());
     let mut consumed = 0usize;
     for (offset, field) in run.iter().enumerate() {
         let f = fields.fields[start + offset];
@@ -538,13 +539,20 @@ fn emit_bit_run_write(
             });
         }
         terms.push(quote! { ((#value & #mask) << #shift) });
+        widths.push(bits);
         consumed += bits;
     }
 
     quote! {
         #checks
         let __deku_bit_run: u64 = #(#terms)|*;
-        __deku_writer.write_bits_uint_msb0(__deku_bit_run, #total)?;
+        // A partial `Lsb0` leftover cannot be spliced onto in one go: the general
+        // path reorders across a multi-byte write, so fall back per field.
+        if __deku_writer.can_write_bits_uint_msb0() {
+            __deku_writer.write_bits_uint_msb0(__deku_bit_run, #total)?;
+        } else {
+            __deku_writer.write_bits_uint_fields(__deku_bit_run, &[#(#widths),*])?;
+        }
     }
 }
 
@@ -971,12 +979,15 @@ mod tests {
 
     #[test]
     fn the_emitted_write_makes_one_call_for_the_whole_run() {
-        assert_eq!(emitted(RUN).matches("write_bits_uint_msb0").count(), 1);
+        assert_eq!(emitted(RUN).matches("can_write_bits_uint_msb0").count(), 1);
     }
 
     #[test]
     fn without_a_run_no_batched_write_is_emitted() {
-        assert_eq!(emitted(NO_RUN).matches("write_bits_uint_msb0").count(), 0);
+        assert_eq!(
+            emitted(NO_RUN).matches("can_write_bits_uint_msb0").count(),
+            0
+        );
     }
 
     #[test]
@@ -1010,6 +1021,6 @@ mod tests {
                 #[deku(bits = 4)] b: u8,
             },
         }"#;
-        assert_eq!(emitted(src).matches("write_bits_uint_msb0").count(), 1);
+        assert_eq!(emitted(src).matches("can_write_bits_uint_msb0").count(), 1);
     }
 }

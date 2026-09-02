@@ -123,19 +123,11 @@ impl<W: Write + Seek> Writer<W> {
     pub fn write_bits_uint_msb0(&mut self, value: u64, amt: usize) -> Result<(), DekuError> {
         debug_assert!((1..=64).contains(&amt));
 
-        if self.leftover.1 != Order::Msb0 {
-            if !self.leftover.0.is_empty() {
-                // Partial `Lsb0` byte pending: one batched write is not equivalent
-                // to the per-field writes it replaces, so refuse rather than
-                // silently reorder.
-                return Err(DekuError::InvalidParam(
-                    "cannot batch an Msb0 write onto a partial Lsb0 leftover".into(),
-                ));
-            }
-            // Byte-aligned, so the order flag is merely stale from a previous
-            // `Lsb0` write and carries no pending bits.
-            self.leftover.1 = Order::Msb0;
-        }
+        // A stale `Lsb0` flag over an empty leftover describes no pending bits, so
+        // it is safe to reset. A partial `Lsb0` byte is not: callers must check
+        // `can_write_bits_uint_msb0` and use `write_bits_uint` instead.
+        debug_assert!(self.can_write_bits_uint_msb0());
+        self.leftover.1 = Order::Msb0;
 
         let (lead, lead_len) = self.leftover.0.as_msb0_byte();
         // Leftover bits first, then the value's low `amt` bits: at most 7 + 64.
@@ -166,6 +158,47 @@ impl<W: Write + Seek> Writer<W> {
             self.leftover.0 = BoundedBitVec::from_msb0_byte(tail << (8 - rest), rest);
         }
         self.leftover.1 = Order::Msb0;
+        Ok(())
+    }
+
+    /// Whether [`Writer::write_bits_uint_msb0`] can serve the next write.
+    ///
+    /// False only with a partial `Lsb0` byte pending, where one batched write is
+    /// not equivalent to the per-field writes it would replace.
+    #[inline]
+    #[cfg(feature = "bits")]
+    pub fn can_write_bits_uint_msb0(&self) -> bool {
+        self.leftover.1 == Order::Msb0 || self.leftover.0.is_empty()
+    }
+
+    /// Writes the fields packed into `value` one at a time through the general bit
+    /// path, `widths` giving each field's width most-significant first.
+    ///
+    /// The per-field equivalent of [`Writer::write_bits_uint_msb0`], for when
+    /// [`Writer::can_write_bits_uint_msb0`] is false. One call rather than one per
+    /// field, so the branch the derive emits for it stays small.
+    #[cfg(feature = "bits")]
+    pub fn write_bits_uint_fields(
+        &mut self,
+        value: u64,
+        widths: &[usize],
+    ) -> Result<(), DekuError> {
+        let total: usize = widths.iter().sum();
+        debug_assert!((1..=64).contains(&total));
+
+        let mut consumed = 0usize;
+        for &amt in widths {
+            let shift = total - consumed - amt;
+            let mask = if amt >= u64::BITS as usize {
+                u64::MAX
+            } else {
+                (1u64 << amt) - 1
+            };
+            // Left-align so an `Msb0` view reads the bits most-significant first.
+            let bytes = (((value >> shift) & mask) << (u64::BITS as usize - amt)).to_be_bytes();
+            self.write_bits_order(&bytes.view_bits::<Msb0>()[..amt], Order::Msb0)?;
+            consumed += amt;
+        }
         Ok(())
     }
 

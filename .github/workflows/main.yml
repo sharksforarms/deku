@@ -1,88 +1,264 @@
-on: [push, pull_request]
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
 
 name: CI
 
+permissions:
+  contents: read
+
+# Keep only the newest CI run for each pull request or branch.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-test-run:
+  checks:
+    name: CI (${{ matrix.toolchain }})
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
+      fail-fast: false
       matrix:
-        toolchain:
-          - stable
-
+        toolchain: [msrv, stable, beta]
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@master
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Resolve the concrete stable/beta versions and pass them as build args:
+      # changed args invalidate the image layer cache, so the environment is
+      # rebuilt when Rust releases. Pinning the channels inside the image would
+      # leave a cached image (and its toolchains) stale forever.
+      - name: Resolve current Rust releases
+        id: rust
+        shell: bash
+        env:
+          SELECTED_TOOLCHAIN: ${{ matrix.toolchain }}
+        run: |
+          set -euo pipefail
+          resolve_channel() {
+            curl --fail --silent --show-error \
+              "https://static.rust-lang.org/dist/channel-rust-$1.toml" |
+              awk '/^\[pkg\.rust\]$/ { found = 1; next }
+                   found && /^version = / { gsub(/"/, "", $3); print $3; found = 0 }'
+          }
+          msrv=$(awk -F= '$1 == "ARG MSRV_TOOLCHAIN" { print $2; exit }' Dockerfile)
+          stable=$(resolve_channel stable)
+          beta=$(resolve_channel beta)
+          case "$SELECTED_TOOLCHAIN" in
+            msrv) rust_version="$msrv" ;;
+            stable) rust_version="$stable" ;;
+            beta) rust_version="$beta" ;;
+            *) echo "unsupported toolchain: $SELECTED_TOOLCHAIN" >&2; exit 1 ;;
+          esac
+          test -n "$msrv" && test -n "$stable" && test -n "$beta" && test -n "$rust_version"
+          printf 'msrv=%s\nstable=%s\nbeta=%s\nversion=%s\nuid=%s\ngid=%s\n' \
+            "$msrv" "$stable" "$beta" "$rust_version" "$(id -u)" "$(id -g)" >> "$GITHUB_OUTPUT"
+
+      - name: Build shared build environment
+        uses: docker/build-push-action@v7
         with:
-          toolchain: ${{ matrix.toolchain }}
+          context: .
+          load: true
+          tags: deku-build:${{ matrix.toolchain }}
+          build-args: |
+            MSRV_TOOLCHAIN=${{ steps.rust.outputs.msrv }}
+            STABLE_TOOLCHAIN=${{ steps.rust.outputs.stable }}
+            BETA_TOOLCHAIN=${{ steps.rust.outputs.beta }}
+            USER_UID=${{ steps.rust.outputs.uid }}
+            USER_GID=${{ steps.rust.outputs.gid }}
+          # The image is identical for every matrix job. Stable is the sole
+          # exporter; the other jobs consume this shared scope without racing
+          # concurrent cache writes.
+          cache-from: type=gha,scope=deku-build-environment
+          cache-to: ${{ matrix.toolchain == 'stable' && 'type=gha,mode=max,scope=deku-build-environment' || '' }}
 
-      # build
-      - run: cargo build --all
-      # test
-      - run: cargo test --all
-      - run: cargo test --all-features
-      - run: cargo test --no-default-features
-      - run: cargo test --no-default-features --features=alloc
-      - run: cargo test --no-default-features --features=descriptive-errors
-      - run: cargo test --no-default-features --features=bits
-      - run: cargo test --no-default-features --features=logging
-      - run: cargo test --no-default-features --features=bits,alloc
-      # run examples
-      - run: cargo run --example 2>&1 | grep -P '   ' | awk '{print $1}' | xargs -i cargo run --example {}
+      # On a cache miss Docker creates missing bind-mount sources as root,
+      # leaving the non-root container user unable to write to the caches.
+      # Pre-create them so they are owned by the runner user, matching the
+      # UID/GID the container's deku user is built with.
+      - name: Create cache directories
+        run: mkdir -p .ci-cache/cargo-registry .ci-cache/cargo-git .ci-cache/target
 
-  # Only build on MSRV, since trybuild will fail on older version
-  build-msrv:
+      - name: Restore Cargo build cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            .ci-cache/cargo-registry
+            .ci-cache/cargo-git
+            .ci-cache/target/.rustc_info.json
+            .ci-cache/target/debug
+            .ci-cache/target/llvm-cov-target
+            .ci-cache/target/tests
+            .ci-cache/target/thumbv6m-none-eabi
+            .ci-cache/target/thumbv7em-none-eabihf
+            .ci-cache/target/wasm32-unknown-unknown
+          key: deku-cargo-v3-${{ runner.os }}-${{ matrix.toolchain }}-${{ steps.rust.outputs.version }}-${{ hashFiles('Cargo.lock', '**/Cargo.toml', 'Dockerfile', 'compose.yaml', 'compose.ci.yaml', 'Justfile', 'rustfmt.toml') }}
+          restore-keys: |
+            deku-cargo-v3-${{ runner.os }}-${{ matrix.toolchain }}-${{ steps.rust.outputs.version }}-
+
+      - name: Run CI commands in the build environment
+        env:
+          DEKU_IMAGE: deku-build:${{ matrix.toolchain }}
+          DEKU_TOOLCHAIN: ${{ matrix.toolchain }}
+        run: docker compose -f compose.yaml -f compose.ci.yaml run --rm build just ci-${{ matrix.toolchain }}
+
+  miri:
+    name: Miri
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        toolchain:
-            # msrv
-          - 1.88
-
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@master
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Resolve current Rust releases
+        id: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          resolve_channel() {
+            curl --fail --silent --show-error \
+              "https://static.rust-lang.org/dist/channel-rust-$1.toml" |
+              awk '/^\[pkg\.rust\]$/ { found = 1; next }
+                   found && /^version = / { gsub(/"/, "", $3); print $3; found = 0 }'
+          }
+          msrv=$(awk -F= '$1 == "ARG MSRV_TOOLCHAIN" { print $2; exit }' Dockerfile)
+          stable=$(resolve_channel stable)
+          beta=$(resolve_channel beta)
+          nightly_release=$(resolve_channel nightly)
+          if [[ "$nightly_release" =~ \(([0-9]{4}-[0-9]{2}-[0-9]{2})\)$ ]]; then
+            nightly_date="${BASH_REMATCH[1]}"
+          else
+            echo "could not determine nightly release date from: $nightly_release" >&2
+            exit 1
+          fi
+          nightly_version="${nightly_release%% (*}-${nightly_date}"
+          nightly_toolchain="nightly-${nightly_date}"
+          test -n "$msrv" && test -n "$stable" && test -n "$beta" && test -n "$nightly_version"
+          printf 'msrv=%s\nstable=%s\nbeta=%s\nnightly_toolchain=%s\nversion=%s\nuid=%s\ngid=%s\n' \
+            "$msrv" "$stable" "$beta" "$nightly_toolchain" "$nightly_version" "$(id -u)" "$(id -g)" >> "$GITHUB_OUTPUT"
+
+      - name: Build Miri environment
+        uses: docker/build-push-action@v7
         with:
-          toolchain: ${{ matrix.toolchain }}
+          context: .
+          target: deku-build-miri
+          load: true
+          tags: deku-build:miri
+          build-args: |
+            MSRV_TOOLCHAIN=${{ steps.rust.outputs.msrv }}
+            STABLE_TOOLCHAIN=${{ steps.rust.outputs.stable }}
+            BETA_TOOLCHAIN=${{ steps.rust.outputs.beta }}
+            NIGHTLY_TOOLCHAIN=${{ steps.rust.outputs.nightly_toolchain }}
+            USER_UID=${{ steps.rust.outputs.uid }}
+            USER_GID=${{ steps.rust.outputs.gid }}
+          # Reuse the normal image layers and keep the nightly/Miri layer in
+          # its own scope because it is only used by this job.
+          cache-from: |
+            type=gha,scope=deku-build-environment
+            type=gha,scope=deku-miri-build-environment
+          cache-to: type=gha,mode=max,scope=deku-miri-build-environment
 
-      # build
-      - run: cargo build --all
+      - name: Create cache directories
+        run: mkdir -p .ci-cache/cargo-registry .ci-cache/cargo-git .ci-cache/target
 
-  fmt-clippy-check:
+      - name: Restore Miri build cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            .ci-cache/cargo-registry
+            .ci-cache/cargo-git
+            .ci-cache/target/.rustc_info.json
+            .ci-cache/target/debug
+            .ci-cache/target/miri
+          key: deku-cargo-v3-${{ runner.os }}-miri-${{ steps.rust.outputs.version }}-${{ hashFiles('Cargo.lock', '**/Cargo.toml', 'Dockerfile', 'compose.yaml', 'compose.ci.yaml', 'Justfile', 'rustfmt.toml') }}
+          restore-keys: |
+            deku-cargo-v3-${{ runner.os }}-miri-${{ steps.rust.outputs.version }}-
+
+      - name: Run Miri test matrix
+        env:
+          DEKU_IMAGE: deku-build:miri
+          DEKU_TOOLCHAIN: nightly
+        run: docker compose -f compose.yaml -f compose.ci.yaml run --rm build just miri-test
+
+  coverage:
+    name: Coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
 
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo fmt --all -- --check
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
-  ensure_no_std:
-    name: Ensure no_std
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [thumbv7em-none-eabihf, thumbv6m-none-eabi]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly
-          targets: ${{ matrix.target }}
-      - run: cd ensure_no_std && cargo build --release --target ${{ matrix.target }}
-      - run: cd ensure_no_std && cargo build --release --target ${{ matrix.target }} --no-default-features
+      - name: Resolve current Rust releases
+        id: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          resolve_channel() {
+            curl --fail --silent --show-error \
+              "https://static.rust-lang.org/dist/channel-rust-$1.toml" |
+              awk '/^\[pkg\.rust\]$/ { found = 1; next }
+                   found && /^version = / { gsub(/"/, "", $3); print $3; found = 0 }'
+          }
+          msrv=$(awk -F= '$1 == "ARG MSRV_TOOLCHAIN" { print $2; exit }' Dockerfile)
+          stable=$(resolve_channel stable)
+          beta=$(resolve_channel beta)
+          test -n "$msrv" && test -n "$stable" && test -n "$beta"
+          printf 'msrv=%s\nstable=%s\nbeta=%s\nversion=%s\nuid=%s\ngid=%s\n' \
+            "$msrv" "$stable" "$beta" "$stable" "$(id -u)" "$(id -g)" >> "$GITHUB_OUTPUT"
 
-  ensure_wasm:
-    name: Ensure wasm
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@master
+      - name: Build shared build environment
+        uses: docker/build-push-action@v7
         with:
-          toolchain: nightly
-      - uses: jetli/wasm-pack-action@v0.3.0
+          context: .
+          load: true
+          tags: deku-build:coverage
+          build-args: |
+            MSRV_TOOLCHAIN=${{ steps.rust.outputs.msrv }}
+            STABLE_TOOLCHAIN=${{ steps.rust.outputs.stable }}
+            BETA_TOOLCHAIN=${{ steps.rust.outputs.beta }}
+            USER_UID=${{ steps.rust.outputs.uid }}
+            USER_GID=${{ steps.rust.outputs.gid }}
+          # Coverage reads the shared image cache but does not export it.
+          cache-from: type=gha,scope=deku-build-environment
+
+      - name: Create cache directories
+        run: mkdir -p .ci-cache/cargo-registry .ci-cache/cargo-git .ci-cache/target
+
+      - name: Restore Cargo build cache
+        uses: actions/cache@v5
         with:
-          version: 'latest'
-      - run: cd ensure_wasm && wasm-pack build --target web && wasm-pack test --node
+          path: |
+            .ci-cache/cargo-registry
+            .ci-cache/cargo-git
+            .ci-cache/target/.rustc_info.json
+            .ci-cache/target/debug
+            .ci-cache/target/llvm-cov-target
+            .ci-cache/target/tests
+            .ci-cache/target/thumbv6m-none-eabi
+            .ci-cache/target/thumbv7em-none-eabihf
+            .ci-cache/target/wasm32-unknown-unknown
+          key: deku-cargo-v3-${{ runner.os }}-coverage-${{ steps.rust.outputs.version }}-${{ hashFiles('Cargo.lock', '**/Cargo.toml', 'Dockerfile', 'compose.yaml', 'compose.ci.yaml', 'Justfile', 'rustfmt.toml') }}
+          restore-keys: |
+            deku-cargo-v3-${{ runner.os }}-coverage-${{ steps.rust.outputs.version }}-
+
+      - name: Generate code coverage
+        env:
+          DEKU_IMAGE: deku-build:coverage
+          DEKU_TOOLCHAIN: stable
+        run: docker compose -f compose.yaml -f compose.ci.yaml run --rm build just coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: codecov.json
+          fail_ci_if_error: true

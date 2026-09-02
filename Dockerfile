@@ -2,7 +2,7 @@
 
 FROM node:24-bookworm-slim AS node-runtime
 
-FROM rust:1.88-slim-bookworm
+FROM rust:1.88-slim-bookworm AS deku-build-base
 
 ARG STABLE_TOOLCHAIN=stable
 ARG MSRV_TOOLCHAIN=1.88.0
@@ -51,3 +51,20 @@ ENV CARGO_HOME=/home/deku/.cargo \
 
 USER deku
 WORKDIR /workspace
+
+FROM deku-build-base AS deku-build-miri
+
+ARG NIGHTLY_TOOLCHAIN=nightly
+
+USER root
+
+RUN export CARGO_HOME=/usr/local/cargo \
+    && rustup toolchain install "${NIGHTLY_TOOLCHAIN}" --profile minimal \
+    && rustup component add --toolchain "${NIGHTLY_TOOLCHAIN}" miri rust-src
+
+ENV DEKU_NIGHTLY_TOOLCHAIN=${NIGHTLY_TOOLCHAIN}
+
+USER deku
+WORKDIR /workspace
+
+FROM deku-build-base AS deku-build

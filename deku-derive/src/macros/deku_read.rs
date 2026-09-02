@@ -366,14 +366,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     }
 
     // if default
-    if !has_default_match {
-        if let Some(variant_read_func) = default_reader {
-            variant_matches.push(quote! {
-                _ => {
-                    #variant_read_func
-                }
-            });
-        }
+    if !has_default_match && let Some(variant_read_func) = default_reader {
+        variant_matches.push(quote! {
+            _ => {
+                #variant_read_func
+            }
+        });
     }
 
     let variant_id_read = if id.is_some() {
@@ -817,20 +815,15 @@ fn emit_field_read(
         } else if let Some(field_count) = &f.count {
             use syn::{GenericArgument, PathArguments, Type};
             let mut is_vec_u8 = false;
-            if let Type::Path(type_path) = &f.ty {
-                if type_path.path.segments.len() == 1 && type_path.path.segments[0].ident == "Vec" {
-                    if let PathArguments::AngleBracketed(ref generic_args) =
-                        type_path.path.segments[0].arguments
-                    {
-                        if generic_args.args.len() == 1 {
-                            if let GenericArgument::Type(Type::Path(ref arg_path)) =
-                                generic_args.args[0]
-                            {
-                                is_vec_u8 = arg_path.path.is_ident("u8");
-                            }
-                        }
-                    }
-                }
+            if let Type::Path(type_path) = &f.ty
+                && type_path.path.segments.len() == 1
+                && type_path.path.segments[0].ident == "Vec"
+                && let PathArguments::AngleBracketed(generic_args) =
+                    &type_path.path.segments[0].arguments
+                && generic_args.args.len() == 1
+                && let GenericArgument::Type(Type::Path(arg_path)) = &generic_args.args[0]
+            {
+                is_vec_u8 = arg_path.path.is_ident("u8");
             }
             if is_vec_u8 {
                 quote! {

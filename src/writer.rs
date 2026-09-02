@@ -112,8 +112,9 @@ impl<W: Write + Seek> Writer<W> {
     /// big-endian `Msb0` bit-fields in one go.
     ///
     /// A pending `Lsb0` leftover cannot be spliced onto by the integer path, so
-    /// that case falls back to `write_bits_order`. It happens when a struct
-    /// written `Lsb0` is followed by one written `Msb0`.
+    /// that case falls back to [`Writer::write_bits_uint_fields`]. It happens when
+    /// a struct written `Lsb0` is followed by one written `Msb0`.
+    ///
     /// Equivalent to `write_bits_order(.., Order::Msb0)` over the same bits, but
     /// the value never becomes a `BitSlice`: whole bytes leave in one `write_all`
     /// instead of one call per byte, and the leftover is a byte and a length
@@ -123,11 +124,10 @@ impl<W: Write + Seek> Writer<W> {
     pub fn write_bits_uint_msb0(&mut self, value: u64, amt: usize) -> Result<(), DekuError> {
         debug_assert!((1..=64).contains(&amt));
 
-        // A stale `Lsb0` flag over an empty leftover describes no pending bits, so
-        // it is safe to reset. A partial `Lsb0` byte is not: callers must check
-        // `can_write_bits_uint_msb0` and use `write_bits_uint` instead.
+        // A partial `Lsb0` byte cannot be spliced onto here: callers must check
+        // `can_write_bits_uint_msb0` and use `write_bits_uint_fields` instead. An
+        // empty leftover is already `Msb0`, so there is no flag to reset.
         debug_assert!(self.can_write_bits_uint_msb0());
-        self.leftover.1 = Order::Msb0;
 
         let (lead, lead_len) = self.leftover.0.as_msb0_byte();
         // Leftover bits first, then the value's low `amt` bits: at most 7 + 64.
@@ -440,7 +440,7 @@ impl<W: Write + Seek> Writer<W> {
         bits: &BitSlice<u8, Msb0>,
         order: Order,
     ) -> Result<(), DekuError> {
-        match self.leftover.1 {
+        let result = match self.leftover.1 {
             Order::Msb0 => match order {
                 Order::Msb0 => self.write_bits_order_msb_msb(bits, order),
                 Order::Lsb0 => self.write_bits_order_msb_lsb(bits, order),
@@ -449,7 +449,17 @@ impl<W: Write + Seek> Writer<W> {
                 Order::Msb0 => self.write_bits_order_lsb_msb(bits, order),
                 Order::Lsb0 => self.write_bits_order_lsb_lsb(bits, order),
             },
+        };
+
+        // The paths above record `order` even with no bits left pending, but an
+        // empty leftover has no order: left set, the flag steers the next write
+        // into a `Lsb0` path, which emits whole bytes back to front. Reset it, so
+        // every reader of the flag can take an empty leftover as `Msb0`.
+        if self.leftover.0.is_empty() {
+            self.leftover.1 = Order::Msb0;
         }
+
+        result
     }
 
     /// Write all bits to `Writer` buffer if bits can fit into a byte buffer
@@ -553,6 +563,37 @@ mod tests {
             &mut out_buf.into_inner(),
             &mut vec![0xaa, 0xbb, 0xf1, 0xaa, 0x1f, 0x1a, 0xaf]
         );
+    }
+
+    /// A `Lsb0` write that ends on a byte boundary leaves no bits pending, so it
+    /// must not steer the `Msb0` write that follows into the `Lsb0` path, which
+    /// emits whole bytes back to front.
+    #[test]
+    fn test_msb0_after_byte_aligned_lsb0_is_not_reordered() {
+        let mut stale = Cursor::new(vec![]);
+        let mut writer = Writer::new(&mut stale);
+        writer
+            .write_bits_order(&BitVec::<u8, Msb0>::from_slice(&[0x41]), Order::Lsb0)
+            .unwrap();
+        let pending = (writer.leftover.0.is_empty(), writer.leftover.1);
+        writer
+            .write_bits_order(&BitVec::<u8, Msb0>::from_slice(&[0xab, 0xcd]), Order::Msb0)
+            .unwrap();
+        writer.finalize().unwrap();
+
+        // The same two writes on a writer that never saw `Lsb0`.
+        let mut fresh = Cursor::new(vec![]);
+        let mut writer = Writer::new(&mut fresh);
+        writer
+            .write_bits_order(&BitVec::<u8, Msb0>::from_slice(&[0x41]), Order::Msb0)
+            .unwrap();
+        writer
+            .write_bits_order(&BitVec::<u8, Msb0>::from_slice(&[0xab, 0xcd]), Order::Msb0)
+            .unwrap();
+        writer.finalize().unwrap();
+
+        assert_eq_hex!(stale.into_inner(), fresh.into_inner());
+        assert_eq!(pending, (true, Order::Msb0));
     }
 
     #[test]

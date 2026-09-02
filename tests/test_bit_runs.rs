@@ -724,3 +724,54 @@ fn a_run_after_a_partial_lsb0_leftover() {
         );
     }
 }
+
+/// A byte-aligned `Lsb0` parent leaves no bits pending, so both paths write the
+/// child from a clean boundary and must agree. The child spans more than a byte,
+/// which is where the `Lsb0` write path would reorder whole bytes.
+#[test]
+fn a_byte_aligned_lsb0_parent_before_a_run() {
+    macro_rules! kid {
+        ($name:ident, $($extra:tt)*) => {
+            #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+            #[deku(endian = "big", ctx = "_: deku::ctx::Endian, _: deku::ctx::Order")]
+            struct $name {
+                #[deku(bits = 12 $($extra)*)]
+                a: u16,
+                #[deku(bits = 4 $($extra)*)]
+                b: u8,
+            }
+        };
+    }
+    kid!(KidBatched,);
+    kid!(KidPlain, , assert = "true");
+
+    macro_rules! parent {
+        ($name:ident, $kid:ident) => {
+            #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+            #[deku(endian = "big", bit_order = "lsb")]
+            struct $name {
+                // Fills the byte, so the child starts aligned.
+                #[deku(bits = 8)]
+                x: u8,
+                child: $kid,
+            }
+        };
+    }
+    parent!(PBatched, KidBatched);
+    parent!(PPlain, KidPlain);
+
+    for seed in 1..3_000u32 {
+        let data = wire(3, seed);
+        let (_, b) = PBatched::from_bytes((&data, 0)).unwrap();
+        let (_, p) = PPlain::from_bytes((&data, 0)).unwrap();
+        assert_eq!(
+            (b.x, b.child.a, b.child.b),
+            (p.x, p.child.a, p.child.b),
+            "read, seed {seed}"
+        );
+        let (bb, pb) = (b.to_bytes().unwrap(), p.to_bytes().unwrap());
+        assert_eq!(bb, pb, "write, seed {seed}");
+        // Neither path may reorder the child's bytes, so both round-trip.
+        assert_eq!(bb, data, "round-trip, seed {seed}");
+    }
+}

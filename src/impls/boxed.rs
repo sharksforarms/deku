@@ -81,10 +81,10 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
+    use crate::bitvec::{bits, BitVec, Msb0};
     use crate::ctx::*;
     use crate::native_endian;
     use crate::reader::Reader;
-    use bitvec::prelude::*;
 
     #[rstest(input, expected,
         case(
@@ -118,7 +118,7 @@ mod tests {
         bit_size: Option<usize>,
         limit: Limit<u16, Predicate>,
         expected: Box<[u16]>,
-        expected_rest_bits: &bitvec::slice::BitSlice<u8, bitvec::prelude::Msb0>,
+        expected_rest_bits: BitVec<u8, Msb0>,
         expected_rest_bytes: &[u8],
         expected_write: Vec<u8>,
     ) {

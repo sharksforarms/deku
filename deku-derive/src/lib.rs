@@ -48,6 +48,7 @@ mod macros;
 //
 // [github-search-pad-bytes]:
 //   https://github.com/search?q=pad_bytes_before+OR+pad_bytes_after&type=code
+#[allow(dead_code)]
 const PAD_ARRAY_SIZE: usize = 64;
 
 #[derive(Debug)]

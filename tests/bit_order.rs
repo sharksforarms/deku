@@ -1,7 +1,7 @@
 #[cfg(all(feature = "alloc", feature = "bits"))]
 mod tests {
     use assert_hex::assert_eq_hex;
-    use bitvec::prelude::*;
+    use deku::bitvec::BitVec;
     use deku::ctx::{BitSize, Order};
     use deku::prelude::*;
 
@@ -542,7 +542,12 @@ mod tests {
                 writer: &mut Writer<W>,
                 _: (),
             ) -> Result<(), DekuError> {
-                let data = BitVec::from_iter(self.0.as_slice().as_bits::<Lsb0>().iter().rev());
+                let data = BitVec::<u8, deku::bitvec::Msb0>::from_iter(
+                    self.0
+                        .iter()
+                        .flat_map(|byte| (0..8).map(move |bit| *byte & (1 << bit) != 0))
+                        .rev(),
+                );
                 writer.write_bits_order(&data, Order::Lsb0)
             }
         }

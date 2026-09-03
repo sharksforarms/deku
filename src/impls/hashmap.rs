@@ -251,7 +251,7 @@ mod tests {
     use crate::reader::Reader;
 
     use super::*;
-    use bitvec::prelude::*;
+    use crate::bitvec::{bits, BitVec, Msb0};
 
     // Macro to create a deterministic HashMap for tests
     // This is needed for tests since the default HashMap Hasher
@@ -301,7 +301,7 @@ mod tests {
         bit_size: Option<usize>,
         limit: Limit<(u8, u8), Predicate>,
         expected: FxHashMap<u8, u8>,
-        expected_rest_bits: &BitSlice<u8, Msb0>,
+        expected_rest_bits: BitVec<u8, Msb0>,
         expected_rest_bytes: &[u8],
     ) {
         let mut cursor = Cursor::new(input);

@@ -1,6 +1,6 @@
 use no_std_io::io::{Read, Seek, Write};
 
-use crate::{writer::Writer, DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, writer::Writer};
 
 impl<'a, T: DekuReader<'a, Ctx>, Ctx: Copy> DekuReader<'a, Ctx> for Option<T> {
     fn from_reader_with_ctx<R: Read + Seek>(

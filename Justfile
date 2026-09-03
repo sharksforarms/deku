@@ -58,7 +58,7 @@ ci-core: build test examples
 lint:
     cargo +{{stable}} clippy --workspace --lib --bins --examples --tests --all-features -- -D warnings
     cargo +{{stable}} clippy --workspace --lib --bins --examples --tests --no-default-features -- -D warnings
-    cargo +{{stable}} fmt --all -- --check --config style_edition=2021
+    cargo +{{stable}} fmt --all -- --check
 
 # Compile the no_std fixture for a target.
 no-std target:

@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
-use darling::ast::{Data, Fields};
 use darling::ToTokens;
+use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
 #[cfg(feature = "bits")]
@@ -15,7 +15,7 @@ use crate::macros::{
     assertion_failed, gen_ctx_types_and_arg, gen_field_args, gen_internal_field_idents,
     token_contains_string, wrap_default_ctx,
 };
-use crate::{from_token, DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
+use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id, from_token};
 
 use super::{gen_internal_field_ident, gen_type_from_ctx_id};
 

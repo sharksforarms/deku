@@ -1,4 +1,4 @@
-use deku::{ctx::Limit, prelude::*, DekuRead, DekuWrite};
+use deku::{DekuRead, DekuWrite, ctx::Limit, prelude::*};
 use std::io::Cursor;
 
 #[derive(Debug, DekuRead, DekuWrite)]

@@ -4,7 +4,7 @@
 use bitvec::prelude::*;
 use no_std_io::io::{ErrorKind, Read, Seek, SeekFrom};
 
-use crate::{ctx::Order, prelude::NeedSize, DekuError};
+use crate::{DekuError, ctx::Order, prelude::NeedSize};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;

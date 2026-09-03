@@ -1,7 +1,7 @@
 //! Writer for writer functions
 
 #[cfg(feature = "bits")]
-use crate::{bitvec::*, BoundedBitVec};
+use crate::{BoundedBitVec, bitvec::*};
 use no_std_io::io::{Seek, SeekFrom, Write};
 
 #[cfg(feature = "logging")]

@@ -251,7 +251,7 @@ mod tests {
     use crate::reader::Reader;
 
     use super::*;
-    use crate::bitvec::{bits, BitVec, Msb0};
+    use crate::bitvec::{BitVec, Msb0, bits};
 
     // Macro to create a deterministic HashMap for tests
     // This is needed for tests since the default HashMap Hasher

@@ -19,8 +19,13 @@ fn main() -> ! {
         #[global_allocator]
         static HEAP: Heap = Heap::empty();
         const HEAP_SIZE: usize = 1024;
-        static HEAP_MEM: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
-        unsafe { HEAP.init(HEAP_MEM.as_ptr() as usize, HEAP_SIZE) }
+        static mut HEAP_MEM: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
+        // SAFETY: the heap backing storage is a dedicated writable static region,
+        // its size is correct, and initialization happens exactly once before
+        // any allocation.
+        unsafe {
+            HEAP.init((&raw mut HEAP_MEM).cast::<u8>() as usize, HEAP_SIZE)
+        }
     }
 
     // now the allocator is ready types like Box, Vec can be used.

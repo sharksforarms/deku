@@ -114,3 +114,10 @@ coverage:
 # Run the Criterion benchmarks.
 bench:
     cargo +{{toolchain}} bench --workspace
+
+# Run the workspace test suite under Miri.
+# Miri requires the nightly toolchain and its rust-src component.
+miri:
+    rustup component add miri rust-src --toolchain nightly
+    cargo +nightly miri setup
+    cargo +nightly miri test --workspace --all-features

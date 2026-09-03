@@ -544,36 +544,25 @@ fn emit_bit_byte_offsets(
 #[cfg(feature = "bits")]
 fn emit_padding(bit_size: &TokenStream, bit_order: Option<&LitStr>) -> TokenStream {
     let crate_ = super::get_crate_name();
-    const PAD: usize = crate::PAD_ARRAY_SIZE * 8;
     if let Some(bit_order) = bit_order {
         let order = gen_bit_order_from_str(bit_order).unwrap();
         quote! {
             {
                 use core::convert::TryFrom;
-                let mut __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                     ::#crate_::deku_error!(::#crate_::DekuError::InvalidParam, "Invalid padding param, cannot convert to usize", "{}", stringify!(#bit_size))
                 )?;
-                let __deku_pad_source = ::#crate_::bitvec::bitarr!(u8, ::#crate_::bitvec::Msb0; 0; #PAD);
-                while __deku_pad > 0 {
-                    let __deku_pad_chunk = core::cmp::min(__deku_pad_source.len(), __deku_pad);
-                    __deku_writer.write_bits_order(&__deku_pad_source[..__deku_pad_chunk], #order)?;
-                    __deku_pad -= __deku_pad_chunk;
-                }
+                __deku_writer.write_zeros(__deku_pad, #order)?;
             }
         }
     } else {
         quote! {
             {
                 use core::convert::TryFrom;
-                let mut __deku_pad = usize::try_from(#bit_size).map_err(|e|
+                let __deku_pad = usize::try_from(#bit_size).map_err(|e|
                     ::#crate_::deku_error!(::#crate_::DekuError::InvalidParam, "Invalid padding param, cannot convert to usize", "{}", stringify!(#bit_size))
                 )?;
-                let __deku_pad_source = ::#crate_::bitvec::bitarr!(u8, ::#crate_::bitvec::Msb0; 0; #PAD);
-                while __deku_pad > 0 {
-                    let __deku_pad_chunk = core::cmp::min(__deku_pad_source.len(), __deku_pad);
-                    __deku_writer.write_bits(&__deku_pad_source[..__deku_pad_chunk])?;
-                    __deku_pad -= __deku_pad_chunk;
-                }
+                __deku_writer.write_zeros(__deku_pad, ::#crate_::ctx::Order::default())?;
             }
         }
     }

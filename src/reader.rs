@@ -1,11 +1,13 @@
 //! Reader for reader functions
 
-#[cfg(feature = "bits")]
-use bitvec::prelude::*;
 use no_std_io::io::{ErrorKind, Read, Seek, SeekFrom};
 
 use crate::{DekuError, ctx::Order, prelude::NeedSize};
 
+#[cfg(all(feature = "bits", feature = "alloc"))]
+use crate::bitvec::BitVec;
+#[cfg(feature = "bits")]
+use crate::bitvec::{BitSlice, BitSliceMut, Msb0};
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(feature = "bits")]
@@ -135,12 +137,14 @@ impl<R: Read + Seek> Reader<R> {
         match &self.leftover {
             Some(Leftover::Bits(bits)) => {
                 debug_assert!(bits.len() <= 8);
-                bits.as_bitslice().iter().by_vals().collect()
+                bits.as_bitslice().iter().collect()
             }
             Some(Leftover::Byte(byte)) => {
                 let bytes: &[u8] = &[*byte];
-                let bits: BitVec<u8, Msb0> = BitVec::try_from_slice(bytes).unwrap();
-                bits.iter().by_vals().collect()
+                BitVec::<u8, Msb0>::from_slice(bytes)
+                    .as_bitslice()
+                    .iter()
+                    .collect()
             }
             None => alloc::vec![],
         }
@@ -189,10 +193,12 @@ impl<R: Read + Seek> Reader<R> {
             log::trace!("skip_bits: {amt}");
 
             if let Some(Leftover::Bits(bits)) = &self.leftover {
-                let mut buf = bitarr!(u8, Msb0; 0; 8);
+                let mut buf = [0u8; 1];
                 let needed = core::cmp::min(amt, bits.len());
                 amt -= needed;
-                self.read_bits_into(&mut buf[..needed], _order)?;
+                let mut all = BitSliceMut::from_slice(&mut buf);
+                let mut dst = all.subslice(0, needed);
+                self.read_bits_into(&mut dst, _order)?;
             }
 
             let bytes_amt = amt / 8;
@@ -209,8 +215,10 @@ impl<R: Read + Seek> Reader<R> {
 
             // Save, and keep the leftover bits since the read will most likely be less than a byte
             // Note that the leftover bits are kept in self.leftover
-            let mut buf = bitarr!(u8, Msb0; 0; 8);
-            self.read_bits_into(&mut buf[..bits_amt], _order)?;
+            let mut buf = [0u8; 1];
+            let mut all = BitSliceMut::from_slice(&mut buf);
+            let mut dst = all.subslice(0, bits_amt);
+            self.read_bits_into(&mut dst, _order)?;
         }
 
         #[cfg(not(feature = "bits"))]
@@ -239,7 +247,7 @@ impl<R: Read + Seek> Reader<R> {
     #[cfg(feature = "bits")]
     pub fn read_bits_into(
         &mut self,
-        dst: &mut BitSlice<u8, Msb0>,
+        dst: &mut BitSliceMut<'_, u8, Msb0>,
         order: Order,
     ) -> Result<(), DekuError> {
         #[cfg(feature = "logging")]
@@ -253,7 +261,9 @@ impl<R: Read + Seek> Reader<R> {
         core::mem::swap(&mut leftover, &mut self.leftover);
 
         if let Some(Leftover::Byte(byte)) = leftover {
-            leftover = Some(Leftover::Bits(BitArray::from([byte]).into()));
+            leftover = Some(Leftover::Bits(crate::BoundedBitVec::from_msb0_byte(
+                byte, 8,
+            )));
         }
 
         let previous_len = if let Some(Leftover::Bits(bits)) = &leftover {
@@ -271,107 +281,105 @@ impl<R: Read + Seek> Reader<R> {
                 match order {
                     Order::Lsb0 => {
                         let used = bits.split_off(bits.len() - dst.len());
-                        dst.copy_from_bitslice(used.as_bitslice());
+                        dst.copy_from_bitslice(&used.as_bitslice());
                         self.leftover = Some(Leftover::Bits(bits));
                     }
                     Order::Msb0 => {
                         let used = bits.split_off(dst.len());
-                        dst.copy_from_bitslice(bits.as_bitslice());
+                        dst.copy_from_bitslice(&bits.as_bitslice());
                         self.leftover = Some(Leftover::Bits(used));
                     }
                 }
             }
             Ordering::Equal => {
-                let Some(Leftover::Bits(bits)) = &mut leftover else {
+                let Some(Leftover::Bits(bits)) = leftover else {
                     unreachable!();
                 };
                 debug_assert!(bits.len() <= 8);
-                let mut bbv: crate::BoundedBitVec<[u8; 1], Msb0> = crate::BoundedBitVec::new();
-                core::mem::swap(&mut bbv, bits);
-                let (consumed, _dst) = dst.split_at_mut(bbv.len());
-                let end = bbv.len();
-                // Make sure stores for `consumed` and `bbv` are typed as T::Alias
-                consumed.copy_from_bitslice(bbv.as_mut_bitslice().split_at_mut(end).0);
+                dst.copy_from_bitslice(&bits.as_bitslice());
             }
             Ordering::Greater => {
                 let (start, end) = if order == Order::Lsb0 {
                     let need = dst.len() - previous_len;
-                    let start = 8 - ((need.div_ceil(8) * 8) - need);
+                    let start = need % 8;
                     (start, need)
                 } else if let Some(Leftover::Bits(bits)) = &leftover {
                     debug_assert_eq!(order, Order::Msb0);
                     let end = bits.len();
-                    dst[..end].copy_from_bitslice(bits.as_bitslice().split_at(end).0);
+                    dst.copy_from_bitslice_at(0, &bits.as_bitslice());
                     (end, dst.len())
                 } else {
                     (0, dst.len())
                 };
 
-                // read in new bytes
-                // TODO: Profile and optimise
-                let remainder = if order == Order::Lsb0 {
-                    let mut iter = dst[..end].rchunks_exact_mut(8);
-                    for slot in iter.by_ref() {
-                        let mut buf: [u8; 1] = [0u8];
-                        if let Err(e) = self.inner.read_exact(&mut buf)
-                            && e.kind() == ErrorKind::UnexpectedEof
-                        {
-                            return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                        }
-                        slot.store_be(buf[0]);
-                    }
-                    iter.into_remainder()
-                } else {
-                    debug_assert_eq!(order, Order::Msb0);
-                    let mut iter = dst[start..end].chunks_exact_mut(8);
-                    for slot in iter.by_ref() {
-                        let mut buf: [u8; 1] = [0u8];
-                        if let Err(e) = self.inner.read_exact(&mut buf)
-                            && e.kind() == ErrorKind::UnexpectedEof
-                        {
-                            return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                        }
-                        slot.store_be(buf[0]);
-                    }
-                    iter.into_remainder()
-                };
-
+                // Read full bytes into the destination. Lsb0 fills complete
+                // chunks from the right so the byte stream is interpreted
+                // least-significant chunk first.
                 if order == Order::Lsb0 {
-                    if !remainder.is_empty() {
-                        let mut buf: [u8; 1] = [0u8];
+                    let remainder_len = end % 8;
+                    let full_chunks = end / 8;
+                    for chunk in (0..full_chunks).rev() {
+                        let mut buf = [0u8; 1];
                         if let Err(e) = self.inner.read_exact(&mut buf) {
                             if e.kind() == ErrorKind::UnexpectedEof {
                                 return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
                             }
                             return Err(DekuError::Io(e.kind()));
                         }
-                        let slice: &mut BitSlice<u8, Msb0> =
-                            BitSlice::try_from_slice_mut(buf.as_mut_slice()).unwrap();
-                        let (rest, used) = slice.split_at_mut(8 - remainder.len());
-                        let len = used.len();
-                        remainder.copy_from_bitslice(used.split_at_mut(len).0);
-                        self.leftover = Some(Leftover::Bits(rest.into()));
-                    }
-                    if let Some(Leftover::Bits(bits)) = leftover {
-                        dst[end..].copy_from_bitslice(bits.as_bitslice());
-                    }
-                } else if !remainder.is_empty() {
-                    debug_assert_eq!(Order::Msb0, order);
-                    let mut buf: [u8; 1] = [0u8];
-                    if let Err(e) = self.inner.read_exact(&mut buf) {
-                        if e.kind() == ErrorKind::UnexpectedEof {
-                            return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                        }
-                        return Err(DekuError::Io(e.kind()));
+                        let target = remainder_len + chunk * 8;
+                        let source = BitSlice::<u8, Msb0>::from_slice(&buf);
+                        dst.copy_from_bitslice_at(target, &source);
                     }
 
-                    // mut horror-show due to bitvec generic/safety shenanigans
-                    let slice: &mut BitSlice<u8, Msb0> =
-                        BitSlice::try_from_slice_mut(buf.as_mut_slice()).unwrap();
-                    let (used, rest) = slice.split_at_mut(remainder.len());
-                    let end = used.len();
-                    remainder.copy_from_bitslice(used.split_at_mut(end).0);
-                    self.leftover = Some(Leftover::Bits(rest.into()));
+                    if remainder_len != 0 {
+                        let mut buf = [0u8; 1];
+                        if let Err(e) = self.inner.read_exact(&mut buf) {
+                            if e.kind() == ErrorKind::UnexpectedEof {
+                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
+                            }
+                            return Err(DekuError::Io(e.kind()));
+                        }
+                        let source = BitSlice::<u8, Msb0>::from_slice(&buf);
+                        let used = source.subslice(8 - remainder_len, 8);
+                        dst.copy_from_bitslice_at(0, &used);
+                        let rest = source.subslice(0, 8 - remainder_len);
+                        self.leftover = Some(Leftover::Bits((&rest).into()));
+                    }
+                    if let Some(Leftover::Bits(bits)) = leftover {
+                        dst.copy_from_bitslice_at(end, &bits.as_bitslice());
+                    }
+                } else {
+                    debug_assert_eq!(order, Order::Msb0);
+                    let available = end - start;
+                    let full_chunks = available / 8;
+                    for chunk in 0..full_chunks {
+                        let mut buf = [0u8; 1];
+                        if let Err(e) = self.inner.read_exact(&mut buf) {
+                            if e.kind() == ErrorKind::UnexpectedEof {
+                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
+                            }
+                            return Err(DekuError::Io(e.kind()));
+                        }
+                        let target = start + chunk * 8;
+                        let source = BitSlice::<u8, Msb0>::from_slice(&buf);
+                        dst.copy_from_bitslice_at(target, &source);
+                    }
+
+                    let remainder_len = available % 8;
+                    if remainder_len != 0 {
+                        let mut buf = [0u8; 1];
+                        if let Err(e) = self.inner.read_exact(&mut buf) {
+                            if e.kind() == ErrorKind::UnexpectedEof {
+                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
+                            }
+                            return Err(DekuError::Io(e.kind()));
+                        }
+                        let source = BitSlice::<u8, Msb0>::from_slice(&buf);
+                        let used = source.subslice(0, remainder_len);
+                        dst.copy_from_bitslice_at(start + full_chunks * 8, &used);
+                        let rest = source.subslice(remainder_len, 8);
+                        self.leftover = Some(Leftover::Bits((&rest).into()));
+                    }
                 }
             }
         }
@@ -464,7 +472,8 @@ impl<R: Read + Seek> Reader<R> {
         order: Order,
     ) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
         let mut vec = BitVec::repeat(false, amt);
-        self.read_bits_into(vec.as_mut_bitslice(), order)?;
+        let mut bits = vec.as_mut_bitslice();
+        self.read_bits_into(&mut bits, order)?;
         Ok(Some(vec))
     }
 
@@ -510,7 +519,7 @@ impl<R: Read + Seek> Reader<R> {
         &mut self,
         amt: usize,
         buf: &mut [u8],
-        order: Order,
+        _order: Order,
     ) -> Result<ReaderRet, DekuError> {
         #[cfg(not(feature = "bits"))]
         let _ = order;
@@ -519,9 +528,9 @@ impl<R: Read + Seek> Reader<R> {
             Some(Leftover::Byte(byte)) => self.read_bytes_leftover(buf, byte, amt),
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
-                let slice = BitSlice::from_slice_mut(&mut buf[..amt]);
-                self.read_bits_into(slice, order)?;
-                if order == Order::Lsb0 {
+                let mut slice = BitSliceMut::from_slice(&mut buf[..amt]);
+                self.read_bits_into(&mut slice, _order)?;
+                if _order == Order::Lsb0 {
                     buf[..amt].reverse();
                 }
                 Ok(ReaderRet::Bytes)
@@ -609,7 +618,7 @@ impl<R: Read + Seek> Reader<R> {
     fn read_bytes_const_other<const N: usize>(
         &mut self,
         buf: &mut [u8; N],
-        order: Order,
+        _order: Order,
     ) -> Result<ReaderRet, DekuError> {
         #[cfg(not(feature = "bits"))]
         let _ = order;
@@ -621,9 +630,9 @@ impl<R: Read + Seek> Reader<R> {
             }
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
-                let slice = BitSlice::from_slice_mut(buf);
-                self.read_bits_into(slice, order)?;
-                if order == Order::Lsb0 {
+                let mut slice = BitSliceMut::from_slice(buf);
+                self.read_bits_into(&mut slice, _order)?;
+                if _order == Order::Lsb0 {
                     buf.reverse();
                 }
                 Ok(ReaderRet::Bytes)
@@ -668,7 +677,7 @@ impl<R: Read + Seek> Reader<R> {
     fn read_bytes_const_into_other<const N: usize>(
         &mut self,
         buf: &mut [u8; N],
-        order: Order,
+        _order: Order,
     ) -> Result<(), DekuError> {
         #[cfg(not(feature = "bits"))]
         let _ = order;
@@ -677,9 +686,9 @@ impl<R: Read + Seek> Reader<R> {
             Some(Leftover::Byte(byte)) => self.read_bytes_const_leftover(buf, byte),
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
-                let slice = BitSlice::from_slice_mut(buf);
-                self.read_bits_into(slice, order)?;
-                if order == Order::Lsb0 {
+                let mut slice = BitSliceMut::from_slice(buf);
+                self.read_bits_into(&mut slice, _order)?;
+                if _order == Order::Lsb0 {
                     buf.reverse();
                 }
                 Ok(())
@@ -735,6 +744,8 @@ impl<R: Read + Seek> Reader<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(feature = "alloc", feature = "bits"))]
+    use crate::bitvec;
     use hexlit::hex;
     use no_std_io::io::Cursor;
 

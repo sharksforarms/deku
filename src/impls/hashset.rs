@@ -215,7 +215,7 @@ impl<T: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for HashSet<T, S> {
 #[allow(clippy::too_many_arguments)]
 mod tests {
     #[cfg(feature = "bits")]
-    use crate::bitvec::{BitSlice, Msb0, bits};
+    use crate::bitvec::{bits, BitVec, Msb0};
     use no_std_io::io::Cursor;
     use rstest::rstest;
     use rustc_hash::FxHashSet;
@@ -257,7 +257,7 @@ mod tests {
         bit_size: Option<usize>,
         limit: Limit<u8, Predicate>,
         expected: FxHashSet<u8>,
-        expected_rest_bits: &BitSlice<u8, Msb0>,
+        expected_rest_bits: BitVec<u8, Msb0>,
         expected_rest_bytes: &[u8],
     ) {
         let mut cursor = Cursor::new(input);
@@ -315,7 +315,7 @@ mod tests {
         bit_size: Option<usize>,
         limit: Limit<u16, Predicate>,
         expected: FxHashSet<u16>,
-        expected_rest_bits: &BitSlice<u8, Msb0>,
+        expected_rest_bits: BitVec<u8, Msb0>,
         expected_rest_bytes: &[u8],
         expected_write: Vec<u8>,
     ) {

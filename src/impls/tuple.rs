@@ -59,7 +59,7 @@ macro_rules! ImplDekuTupleTraits {
         {
             #[allow(non_snake_case)]
             fn to_writer<W: Write + Seek>(&self, writer: &mut Writer<W>, ctx: Ctx) -> Result<(), DekuError> {
-                let ($(ref $T,)+) = *self;
+                let ($($T,)+) = self;
                 $(
                     $T.to_writer(writer, ctx)?;
                 )+

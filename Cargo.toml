@@ -1,6 +1,6 @@
 [package]
 authors = ["sharks <sharks@sharks>"]
-edition = "2021"
+edition = "2024"
 name = "deku"
 version = "0.20.3"
 license = "MIT OR Apache-2.0"

@@ -1,0 +1,12 @@
+error[E0599]: no method named `deku_id` found for enum `Body` in the current scope
+  --> tests/test_compile/cases/no_deku_id_generic_enum.rs:12:7
+   |
+5  | pub enum Body<T: for<'a> DekuReader<'a>> {
+   | ---------------------------------------- method `deku_id` not found for this enum
+...
+12 |     n.deku_id();
+   |       ^^^^^^^ method not found in `Body<u8>`
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `deku_id`, perhaps you need to implement it:
+           candidate #1: `deku::DekuEnumExt`

@@ -1,7 +1,11 @@
 set shell := ["bash", "-euc"]
 
 stable := env_var_or_default("DEKU_STABLE_TOOLCHAIN", "stable")
-toolchain := env_var_or_default("DEKU_TOOLCHAIN", "stable")
+msrv := env_var_or_default("DEKU_MSRV_TOOLCHAIN", "1.88.0")
+beta := env_var_or_default("DEKU_BETA_TOOLCHAIN", "beta")
+pipeline := env_var_or_default("DEKU_TOOLCHAIN", "stable")
+toolchain := if pipeline == "msrv" { msrv } else if pipeline == "stable" { stable } else if pipeline == "beta" { beta } else { pipeline }
+trybuild_profile := if pipeline == "msrv" { "msrv" } else if pipeline == "beta" { "beta" } else { "stable" }
 
 # Non-default feature combinations exercised by the test and coverage matrix.
 feature_matrix := "std alloc descriptive-errors bits logging bits,alloc"
@@ -18,6 +22,7 @@ build:
 test:
     #!/usr/bin/env bash
     set -euo pipefail
+    export DEKU_TRYBUILD_PROFILE="{{trybuild_profile}}"
     cargo +{{toolchain}} test --all
     cargo +{{toolchain}} test --all-features
     cargo +{{toolchain}} test --no-default-features

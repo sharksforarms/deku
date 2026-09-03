@@ -1,0 +1,5 @@
+error: skip must have exactly one argument
+ --> tests/test_compile/cases/skip_empty_arg.rs:6:12
+  |
+6 |     #[deku(skip())]
+  |            ^^^^

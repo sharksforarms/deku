@@ -1,0 +1,5 @@
+error: skip argument must be 'read' or 'write'
+ --> tests/test_compile/cases/skip_invalid_arg.rs:6:12
+  |
+6 |     #[deku(skip(invalid))]
+  |            ^^^^

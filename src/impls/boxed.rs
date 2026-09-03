@@ -81,7 +81,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::bitvec::{bits, BitVec, Msb0};
+    use crate::bitvec::{BitVec, Msb0, bits};
     use crate::ctx::*;
     use crate::native_endian;
     use crate::reader::Reader;

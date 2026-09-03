@@ -215,7 +215,7 @@ impl<T: DekuWriter<Ctx>, S, Ctx: Copy> DekuWriter<Ctx> for HashSet<T, S> {
 #[allow(clippy::too_many_arguments)]
 mod tests {
     #[cfg(feature = "bits")]
-    use crate::bitvec::{bits, BitVec, Msb0};
+    use crate::bitvec::{BitVec, Msb0, bits};
     use no_std_io::io::Cursor;
     use rstest::rstest;
     use rustc_hash::FxHashSet;

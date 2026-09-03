@@ -66,6 +66,11 @@ harness = false
 required-features = ["alloc", "bits"]
 
 [[bench]]
+name = "bits_raw"
+harness = false
+required-features = ["alloc", "bits"]
+
+[[bench]]
 name = "bebits_callgrind"
 harness = false
 required-features = ["alloc", "bits"]

@@ -434,7 +434,7 @@ mod tests {
             let mut cursor = Cursor::new(data);
             let mut reader = Reader::new(&mut cursor);
             let result = Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(0)).unwrap();
-            assert_eq!(result, vec![]);
+            assert!(result.is_empty());
         }
 
         /// This test verifies the seek-based bounds check prevents

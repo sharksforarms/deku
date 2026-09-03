@@ -512,6 +512,9 @@ impl<R: Read + Seek> Reader<R> {
         buf: &mut [u8],
         order: Order,
     ) -> Result<ReaderRet, DekuError> {
+        #[cfg(not(feature = "bits"))]
+        let _ = order;
+
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_leftover(buf, byte, amt),
             #[cfg(feature = "bits")]
@@ -608,6 +611,9 @@ impl<R: Read + Seek> Reader<R> {
         buf: &mut [u8; N],
         order: Order,
     ) -> Result<ReaderRet, DekuError> {
+        #[cfg(not(feature = "bits"))]
+        let _ = order;
+
         match self.leftover {
             Some(Leftover::Byte(byte)) => {
                 self.read_bytes_const_leftover(buf, byte)?;
@@ -640,6 +646,9 @@ impl<R: Read + Seek> Reader<R> {
         buf: &mut [u8; N],
         order: Order,
     ) -> Result<(), DekuError> {
+        #[cfg(not(feature = "bits"))]
+        let _ = order;
+
         if self.leftover.is_none() {
             if let Err(e) = self.inner.read_exact(buf) {
                 if e.kind() == ErrorKind::UnexpectedEof {
@@ -661,6 +670,9 @@ impl<R: Read + Seek> Reader<R> {
         buf: &mut [u8; N],
         order: Order,
     ) -> Result<(), DekuError> {
+        #[cfg(not(feature = "bits"))]
+        let _ = order;
+
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_const_leftover(buf, byte),
             #[cfg(feature = "bits")]

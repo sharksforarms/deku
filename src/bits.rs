@@ -259,6 +259,13 @@ impl<T, O> BitSource for BitSlice<'_, T, O> {
     }
 }
 
+impl BitSource for [u8] {
+    #[inline]
+    fn bit_slice(&self) -> BitSlice<'_, u8, Msb0> {
+        BitSlice::from_slice(self)
+    }
+}
+
 /// Iterator over a [`BitSlice`].
 #[derive(Clone, Copy)]
 pub struct BitIter<'a, T = u8, O = Msb0> {
@@ -688,14 +695,16 @@ fn set_bit(bytes: &mut [u8], index: usize, value: bool) {
     }
 }
 
-/// Return the highest set-bit index when each byte is traversed LSB-first.
-pub(crate) fn last_one_lsb(bytes: &[u8]) -> Option<usize> {
+/// Return the highest index of the requested bit when each byte is traversed LSB-first.
+#[inline]
+fn last_lsb_matching(bytes: &[u8], set: bool) -> Option<usize> {
     bytes
         .iter()
         .enumerate()
         .rev()
         .find_map(|(byte_index, byte)| {
-            if *byte == 0 {
+            let byte = if set { *byte } else { !*byte };
+            if byte == 0 {
                 None
             } else {
                 Some(byte_index * 8 + (u8::BITS as usize - 1 - byte.leading_zeros() as usize))
@@ -703,20 +712,14 @@ pub(crate) fn last_one_lsb(bytes: &[u8]) -> Option<usize> {
         })
 }
 
+/// Return the highest set-bit index when each byte is traversed LSB-first.
+pub(crate) fn last_one_lsb(bytes: &[u8]) -> Option<usize> {
+    last_lsb_matching(bytes, true)
+}
+
 /// Return the highest clear-bit index when each byte is traversed LSB-first.
 pub(crate) fn last_zero_lsb(bytes: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
-        .rev()
-        .find_map(|(byte_index, byte)| {
-            let inverse = !*byte;
-            if inverse == 0 {
-                None
-            } else {
-                Some(byte_index * 8 + (u8::BITS as usize - 1 - inverse.leading_zeros() as usize))
-            }
-        })
+    last_lsb_matching(bytes, false)
 }
 
 #[doc(hidden)]

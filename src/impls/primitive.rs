@@ -1,9 +1,9 @@
 use core::convert::TryInto;
 
-#[cfg(all(test, feature = "alloc", feature = "std"))]
+#[cfg(all(test, feature = "alloc", feature = "std", feature = "bits"))]
 use crate::bitvec::BitVec;
 #[cfg(feature = "bits")]
-use crate::bitvec::{BitSlice, BitSliceMut, Msb0};
+use crate::bitvec::{BitSlice, Msb0};
 use no_std_io::io::{Read, Seek, Write};
 
 use crate::ctx::*;
@@ -30,6 +30,36 @@ trait DekuRead<Ctx = ()> {
     ) -> Result<(usize, Self), DekuError>
     where
         Self: Sized;
+}
+
+#[cfg(feature = "bits")]
+#[inline]
+fn write_low_bits<W: Write + Seek>(
+    writer: &mut Writer<W>,
+    input_bits: &BitSlice<'_, u8, Msb0>,
+    bit_size: usize,
+    order: Order,
+) -> Result<(), DekuError> {
+    if bit_size == 0 {
+        return Ok(());
+    }
+
+    let mut remaining_bits = bit_size;
+    for chunk in input_bits.chunks(8) {
+        let chunk_len = core::cmp::min(chunk.len(), remaining_bits);
+        let chunk = if chunk_len == chunk.len() {
+            chunk
+        } else {
+            chunk.subslice(chunk.len() - chunk_len, chunk.len())
+        };
+        writer.write_bits_order(&chunk, order)?;
+        remaining_bits -= chunk_len;
+        if remaining_bits == 0 {
+            break;
+        }
+    }
+    debug_assert_eq!(remaining_bits, 0);
+    Ok(())
 }
 
 // specialize u8 for ByteSize
@@ -230,10 +260,7 @@ macro_rules! ImplDekuReadBits {
                     let mut bits = crate::BoundedBitVec::<[u8; MAX_TYPE_BYTES], Msb0>::new();
 
                     bits.extend_from_bitslice(bit_slice);
-
-                    for _ in 0..pad {
-                        bits.insert(0, false);
-                    }
+                    bits.prepend_zeros(pad);
 
                     let mut buf = [0u8; MAX_TYPE_BYTES];
                     let skip = if input_is_le {
@@ -274,17 +301,14 @@ macro_rules! ImplDekuReadBits {
                         } else {
                             0
                         };
-                        for _ in 0..pad {
-                            bits.insert(index, false);
-                        }
+                        bits.insert_zeros(index, pad);
 
                         // Pad up-to size of type
-                        for _ in 0..(MAX_TYPE_BITS - bits.len()) {
-                            if input_is_le {
-                                bits.push(false);
-                            } else {
-                                bits.insert(0, false);
-                            }
+                        let padding = MAX_TYPE_BITS - bits.len();
+                        if input_is_le {
+                            bits.append_zeros(padding);
+                        } else {
+                            bits.prepend_zeros(padding);
                         }
 
                         bits
@@ -310,79 +334,12 @@ macro_rules! ImplDekuReadBits {
                 input: &BitSlice<'_, u8, Msb0>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<(usize, Self), DekuError> {
-                const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
-                let bit_size: usize = size.0;
-
-                let input_is_le = endian.is_le();
-
+                let bit_size = size.0;
                 let bit_slice = input.subslice(0, bit_size);
-
-                let pad = 8 * bit_slice.len().div_ceil(8) - bit_slice.len();
-
-                // if everything is aligned, just read the value
-                if pad == 0 && bit_slice.len() == MAX_TYPE_BITS {
-                    let bytes = bit_slice.aligned_bytes().unwrap();
-
-                    if bytes.len() * 8 == MAX_TYPE_BITS {
-                        // Read value
-                        let value = if input_is_le {
-                            <$typ>::from_le_bytes(bytes.try_into()?)
-                        } else {
-                            <$typ>::from_be_bytes(bytes.try_into()?)
-                        };
-                        return Ok((bit_size, value));
-                    }
-                }
-
-                // Fast path: big-endian. This impl has no `Order` parameter and
-                // so is always Msb0. See the comment on the same fast path in
-                // the `(Endian, BitSize, Order)` impl above for why the generic
-                // path below is quadratic in the container width.
-                if !input_is_le && bit_size > 0 {
-                    let value = bit_slice.load_be::<$inner>();
-                    return Ok((bit_size, <$typ>::from_be_bytes(value.to_be_bytes())));
-                }
-
-                // Create a new BoundedBitVec from the slice and pad un-aligned chunks
-                // i.e. [10010110, 1110] -> [10010110, 00001110]
-                const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
-                let bits: crate::BoundedBitVec<[u8; MAX_TYPE_BYTES], Msb0> = {
-                    let mut bits = crate::BoundedBitVec::new();
-
-                    // Copy bits to new BoundedBitVec
-                    bits.extend_from_bitslice(&bit_slice);
-
-                    // Some padding to next byte
-                    let index = if input_is_le {
-                        bits.len() - (8 - pad)
-                    } else {
-                        0
-                    };
-                    for _ in 0..pad {
-                        bits.insert(index, false);
-                    }
-
-                    // Pad up-to size of type
-                    for _ in 0..(MAX_TYPE_BITS - bits.len()) {
-                        if input_is_le {
-                            bits.push(false);
-                        } else {
-                            bits.insert(0, false);
-                        }
-                    }
-
-                    bits
-                };
-
-                let bytes = bits.as_raw_slice();
-
-                // Read value
-                let value = if input_is_le {
-                    <$typ>::from_le_bytes(bytes.try_into()?)
-                } else {
-                    <$typ>::from_be_bytes(bytes.try_into()?)
-                };
-                Ok((bit_size, value))
+                <$typ as DekuRead<(Endian, BitSize, Order)>>::read(
+                    &bit_slice,
+                    (endian, size, Order::Msb0),
+                )
             }
         }
 
@@ -410,10 +367,8 @@ macro_rules! ImplDekuReadBits {
                     return Ok(<$typ>::from_be_bytes(value.to_be_bytes()));
                 }
                 let mut bytes = [0u8; MAX_TYPE_BITS / 8];
-                let mut all_bits = BitSliceMut::from_slice(&mut bytes);
-                let mut bits = all_bits.subslice(0, size.0);
-                reader.read_bits_into(&mut bits, Order::default())?;
-                let input = bits.as_bitslice();
+                reader.read_bits_into_bytes(&mut bytes, size.0, Order::default())?;
+                let input = BitSlice::from_slice(&bytes).subslice(0, size.0);
                 let a = <$typ>::read(&input, (endian, size))?;
                 Ok(a.1)
             }
@@ -442,10 +397,8 @@ macro_rules! ImplDekuReadBits {
                     return Ok(<$typ>::from_be_bytes(value.to_be_bytes()));
                 }
                 let mut bytes = [0u8; MAX_TYPE_BITS / 8];
-                let mut all_bits = BitSliceMut::from_slice(&mut bytes);
-                let mut bits = all_bits.subslice(0, size.0);
-                reader.read_bits_into(&mut bits, order)?;
-                let input = bits.as_bitslice();
+                reader.read_bits_into_bytes(&mut bytes, size.0, order)?;
+                let input = BitSlice::from_slice(&bytes).subslice(0, size.0);
                 let a = <$typ>::read(&input, (endian, size, order))?;
                 Ok(a.1)
             }
@@ -632,10 +585,8 @@ macro_rules! ImplDekuReadSignExtend {
                     ));
                 }
                 let mut bytes = [0u8; MAX_TYPE_BITS / 8];
-                let mut all_bits = BitSliceMut::from_slice(&mut bytes);
-                let mut bits = all_bits.subslice(0, size.0);
-                reader.read_bits_into(&mut bits, order)?;
-                let input = bits.as_bitslice();
+                reader.read_bits_into_bytes(&mut bytes, size.0, order)?;
+                let input = BitSlice::from_slice(&bytes).subslice(0, size.0);
                 let a = <$typ>::read(&input, (endian, size, order))?;
                 Ok(a.1)
             }
@@ -858,19 +809,7 @@ macro_rules! ImplDekuWrite {
                             }
                         }
 
-                        let mut remaining_bits = bit_size;
-                        for chunk in input_bits.chunks(8) {
-                            if chunk.len() > remaining_bits {
-                                writer.write_bits_order(
-                                    &chunk.subslice(chunk.len() - remaining_bits, chunk.len()),
-                                    order,
-                                )?;
-                                break;
-                            } else {
-                                writer.write_bits_order(&chunk, order)?;
-                            }
-                            remaining_bits -= chunk.len();
-                        }
+                        write_low_bits(writer, &input_bits, bit_size, order)?;
                     }
                     (Endian::Big, Order::Lsb0) => {
                         const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
@@ -893,19 +832,7 @@ macro_rules! ImplDekuWrite {
                                 order,
                             )?;
                         } else {
-                            let mut remaining_bits = bit_size;
-                            for chunk in input_bits.chunks(8) {
-                                if chunk.len() > remaining_bits {
-                                    writer.write_bits_order(
-                                        &chunk.subslice(chunk.len() - remaining_bits, chunk.len()),
-                                        order,
-                                    )?;
-                                    break;
-                                } else {
-                                    writer.write_bits_order(&chunk, order)?;
-                                }
-                                remaining_bits -= chunk.len();
-                            }
+                            write_low_bits(writer, &input_bits, bit_size, order)?;
                         }
                     }
                     (Endian::Big, Order::Msb0) => {
@@ -1068,18 +995,7 @@ macro_rules! ImplDekuWriteDetails {
 
                     // Example read 10 bits u32 [0xAB, 0b11_000000]
                     // => [10101011, 00000011, 00000000, 00000000]
-                    let mut remaining_bits = bit_size;
-                    for chunk in input_bits.chunks(8) {
-                        if chunk.len() > remaining_bits {
-                            writer.write_bits(
-                                &chunk.subslice(chunk.len() - remaining_bits, chunk.len()),
-                            )?;
-                            break;
-                        } else {
-                            writer.write_bits(&chunk)?;
-                        }
-                        remaining_bits -= chunk.len();
-                    }
+                    write_low_bits(writer, &input_bits, bit_size, Order::Msb0)?;
                 } else {
                     const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                     // Check for extra bits before sending into writer
@@ -1168,18 +1084,7 @@ macro_rules! ImplDekuWriteDetails {
 
                     // Example read 10 bits u32 [0xAB, 0b11_000000]
                     // => [10101011, 00000011, 00000000, 00000000]
-                    let mut remaining_bits = bit_size;
-                    for chunk in input_bits.chunks(8) {
-                        if chunk.len() > remaining_bits {
-                            writer.write_bits(
-                                &chunk.subslice(chunk.len() - remaining_bits, chunk.len()),
-                            )?;
-                            break;
-                        } else {
-                            writer.write_bits(&chunk)?;
-                        }
-                        remaining_bits -= chunk.len();
-                    }
+                    write_low_bits(writer, &input_bits, bit_size, Order::Msb0)?;
                 } else {
                     const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                     // Check for extra bits before sending into writer
@@ -1404,8 +1309,7 @@ ImplDekuSize!(isize);
 ImplDekuSize!(f32);
 ImplDekuSize!(f64);
 
-#[cfg(feature = "std")]
-#[cfg(test)]
+#[cfg(all(feature = "std", feature = "bits", test))]
 mod tests {
     use rstest::rstest;
     use std::io::Cursor;

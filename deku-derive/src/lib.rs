@@ -10,7 +10,7 @@ use std::convert::TryFrom;
 use std::fmt::Display;
 use syn::{Attribute, Meta, Type};
 
-use darling::{ast, ast::NestedMeta, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};
+use darling::{FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens, ast, ast::NestedMeta};
 use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use syn::punctuated::Punctuated;

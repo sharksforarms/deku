@@ -13,7 +13,7 @@
 //! left the cursor, so nothing overlaps. Every field is folded into a value the
 //! closure returns, so no read can be dropped. Divide by N for the per-struct
 //! cost; that is the number to quote.
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use deku::prelude::*;
 use no_std_io::io::Cursor;
 use std::hint::black_box;

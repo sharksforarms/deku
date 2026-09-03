@@ -5,8 +5,8 @@ use no_std_io::io::{Read, Seek, Write};
 
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{ctx::*, DekuReader};
 use crate::{DekuError, DekuWriter};
+use crate::{DekuReader, ctx::*};
 
 impl<Ctx: Copy> DekuWriter<Ctx> for CString
 where

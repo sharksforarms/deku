@@ -1,12 +1,12 @@
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
+use syn::Lifetime;
+#[cfg(feature = "bits")]
+use syn::LitStr;
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::Lifetime;
-#[cfg(feature = "bits")]
-use syn::LitStr;
 
 use crate::Num;
 

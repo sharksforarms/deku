@@ -232,7 +232,7 @@ impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Vec<T> {
 #[allow(clippy::too_many_arguments)]
 mod tests {
     #[cfg(feature = "bits")]
-    use crate::bitvec::{BitSlice, Msb0, bits};
+    use crate::bitvec::{bits, BitVec, Msb0};
     use rstest::rstest;
     use std::io::Cursor;
 
@@ -279,7 +279,7 @@ mod tests {
         mut input: &[u8],
         limit: Limit<u8, Predicate>,
         expected: Vec<u8>,
-        expected_rest_bits: &BitSlice<u8, Msb0>,
+        expected_rest_bits: BitVec<u8, Msb0>,
         expected_rest_bytes: &[u8],
     ) {
         let mut cursor = Cursor::new(&mut input);
@@ -324,7 +324,7 @@ mod tests {
         bit_size: Option<usize>,
         limit: Limit<u8, Predicate>,
         expected: Vec<u8>,
-        expected_rest_bits: &BitSlice<u8, Msb0>,
+        expected_rest_bits: BitVec<u8, Msb0>,
         expected_rest_bytes: &[u8],
     ) {
         let mut cursor = Cursor::new(input);
@@ -372,7 +372,7 @@ mod tests {
         bit_size: Option<usize>,
         limit: Limit<u16, Predicate>,
         expected: Vec<u16>,
-        expected_rest_bits: &BitSlice<u8, Msb0>,
+        expected_rest_bits: BitVec<u8, Msb0>,
         expected_rest_bytes: &[u8],
         expected_write: Vec<u8>,
     ) {

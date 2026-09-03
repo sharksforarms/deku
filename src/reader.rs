@@ -160,12 +160,12 @@ impl<R: Read + Seek> Reader<R> {
             false
         } else {
             let mut buf = [0; 1];
-            if let Err(e) = self.inner.read_exact(&mut buf) {
-                if e.kind() == ErrorKind::UnexpectedEof {
-                    #[cfg(feature = "logging")]
-                    log::trace!("end");
-                    return true;
-                }
+            if let Err(e) = self.inner.read_exact(&mut buf)
+                && e.kind() == ErrorKind::UnexpectedEof
+            {
+                #[cfg(feature = "logging")]
+                log::trace!("end");
+                return true;
             }
 
             #[cfg(feature = "logging")]
@@ -313,10 +313,10 @@ impl<R: Read + Seek> Reader<R> {
                     let mut iter = dst[..end].rchunks_exact_mut(8);
                     for slot in iter.by_ref() {
                         let mut buf: [u8; 1] = [0u8];
-                        if let Err(e) = self.inner.read_exact(&mut buf) {
-                            if e.kind() == ErrorKind::UnexpectedEof {
-                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                            }
+                        if let Err(e) = self.inner.read_exact(&mut buf)
+                            && e.kind() == ErrorKind::UnexpectedEof
+                        {
+                            return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
                         }
                         slot.store_be(buf[0]);
                     }
@@ -326,10 +326,10 @@ impl<R: Read + Seek> Reader<R> {
                     let mut iter = dst[start..end].chunks_exact_mut(8);
                     for slot in iter.by_ref() {
                         let mut buf: [u8; 1] = [0u8];
-                        if let Err(e) = self.inner.read_exact(&mut buf) {
-                            if e.kind() == ErrorKind::UnexpectedEof {
-                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                            }
+                        if let Err(e) = self.inner.read_exact(&mut buf)
+                            && e.kind() == ErrorKind::UnexpectedEof
+                        {
+                            return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
                         }
                         slot.store_be(buf[0]);
                     }

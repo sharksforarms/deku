@@ -217,17 +217,16 @@ fn gen_type_from_ctx_id(
 
         let types = ctx.iter().find_map(|arg| {
             let mut t = None;
-            if let syn::FnArg::Typed(pat_type) = arg {
-                if let syn::Pat::Ident(ident) = &*pat_type.pat {
-                    if id == ident.ident {
-                        let mut pat_type = pat_type.clone();
-                        if let syn::Type::Reference(r) = pat_type.ty.as_mut() {
-                            r.lifetime = Some(Lifetime::new("'__deku", Span::call_site()));
-                        }
-                        let ty = &pat_type.ty;
-                        t = Some(quote! {#ty});
-                    }
+            if let syn::FnArg::Typed(pat_type) = arg
+                && let syn::Pat::Ident(ident) = &*pat_type.pat
+                && id == ident.ident
+            {
+                let mut pat_type = pat_type.clone();
+                if let syn::Type::Reference(r) = pat_type.ty.as_mut() {
+                    r.lifetime = Some(Lifetime::new("'__deku", Span::call_site()));
                 }
+                let ty = &pat_type.ty;
+                t = Some(quote! {#ty});
             }
 
             t

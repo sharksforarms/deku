@@ -68,6 +68,36 @@ wasm:
 # Run the build, test, example, no_std, and WebAssembly checks for the selected toolchain.
 ci: ci-core no-std-v7 no-std-v6 wasm
 
+# Run the complete CI pipeline with a specific toolchain.
+ci-msrv:
+    DEKU_TOOLCHAIN=msrv just ci
+
+ci-stable:
+    DEKU_TOOLCHAIN=stable just ci
+
+ci-lint:
+    DEKU_TOOLCHAIN=stable just lint
+
+ci-beta:
+    DEKU_TOOLCHAIN=beta just ci
+
+# Generate one Codecov JSON report from the complete feature test matrix.
+coverage:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Discard stale execution data while retaining instrumented build artifacts.
+    cargo +{{stable}} llvm-cov clean --profraw-only
+
+    cargo +{{stable}} llvm-cov --workspace --no-report
+    cargo +{{stable}} llvm-cov --workspace --all-features --no-report
+    cargo +{{stable}} llvm-cov --package deku --no-default-features --no-report
+    for features in {{feature_matrix}}; do
+        cargo +{{stable}} llvm-cov --package deku --no-default-features --features="${features}" --no-report
+    done
+
+    cargo +{{stable}} llvm-cov report --package deku --package deku_derive --codecov --output-path codecov.json
+
 # Run the Criterion benchmarks.
 bench:
     cargo +{{toolchain}} bench --workspace

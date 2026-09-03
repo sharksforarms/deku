@@ -472,8 +472,96 @@ impl<R: Read + Seek> Reader<R> {
         order: Order,
     ) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
         let mut vec = BitVec::repeat(false, amt);
+
+        if order == Order::Msb0 && self.leftover.is_none() {
+            let full_bytes = amt / 8;
+            let remainder = amt % 8;
+
+            if full_bytes != 0 {
+                if let Err(e) = self
+                    .inner
+                    .read_exact(&mut vec.as_raw_slice_mut()[..full_bytes])
+                {
+                    if e.kind() == ErrorKind::UnexpectedEof {
+                        return Err(DekuError::Incomplete(NeedSize::new(amt)));
+                    }
+                    return Err(DekuError::Io(e.kind()));
+                }
+            }
+
+            if remainder != 0 {
+                let mut tail = [0u8; 1];
+                if let Err(e) = self.inner.read_exact(&mut tail) {
+                    if e.kind() == ErrorKind::UnexpectedEof {
+                        return Err(DekuError::Incomplete(NeedSize::new(amt)));
+                    }
+                    return Err(DekuError::Io(e.kind()));
+                }
+                vec.as_raw_slice_mut()[full_bytes] = tail[0] & (u8::MAX << (8 - remainder));
+                self.leftover = Some(Leftover::Bits(crate::BoundedBitVec::from_msb0_byte(
+                    tail[0] << remainder,
+                    8 - remainder,
+                )));
+            }
+
+            self.bits_read += amt;
+            return Ok(Some(vec));
+        }
+
+        if order == Order::Lsb0 && self.leftover.is_none() {
+            return self.read_bits_lsb0_direct(vec, amt);
+        }
+
         let mut bits = vec.as_mut_bitslice();
         self.read_bits_into(&mut bits, order)?;
+        Ok(Some(vec))
+    }
+
+    #[inline(never)]
+    #[cfg(all(feature = "bits", feature = "alloc"))]
+    fn read_bits_lsb0_direct(
+        &mut self,
+        mut vec: BitVec<u8, Msb0>,
+        amt: usize,
+    ) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
+        if let Err(e) = self.inner.read_exact(vec.as_raw_slice_mut()) {
+            if e.kind() == ErrorKind::UnexpectedEof {
+                return Err(DekuError::Incomplete(NeedSize::new(amt)));
+            }
+            return Err(DekuError::Io(e.kind()));
+        }
+
+        let remainder = amt % 8;
+        let raw = vec.as_raw_slice_mut();
+        if remainder == 0 {
+            raw.reverse();
+        } else {
+            let tail = raw[raw.len() - 1];
+            raw.reverse();
+
+            let shift = 8 - remainder;
+            let mask = (1u8 << remainder) - 1;
+            if raw.len() == 1 {
+                raw[0] = (tail & mask) << shift;
+            } else {
+                let last = raw.len() - 1;
+                let mut right = raw[last];
+                raw[last] = right << shift;
+                for index in (1..last).rev() {
+                    let current = raw[index];
+                    raw[index] = (current << shift) | (right >> remainder);
+                    right = current;
+                }
+                raw[0] = ((tail & mask) << shift) | (right >> remainder);
+            }
+
+            self.leftover = Some(Leftover::Bits(crate::BoundedBitVec::from_msb0_byte(
+                tail & (u8::MAX << remainder),
+                8 - remainder,
+            )));
+        }
+
+        self.bits_read += amt;
         Ok(Some(vec))
     }
 
@@ -522,7 +610,7 @@ impl<R: Read + Seek> Reader<R> {
         _order: Order,
     ) -> Result<ReaderRet, DekuError> {
         #[cfg(not(feature = "bits"))]
-        let _ = order;
+        let _ = _order;
 
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_leftover(buf, byte, amt),
@@ -621,7 +709,7 @@ impl<R: Read + Seek> Reader<R> {
         _order: Order,
     ) -> Result<ReaderRet, DekuError> {
         #[cfg(not(feature = "bits"))]
-        let _ = order;
+        let _ = _order;
 
         match self.leftover {
             Some(Leftover::Byte(byte)) => {
@@ -680,7 +768,7 @@ impl<R: Read + Seek> Reader<R> {
         _order: Order,
     ) -> Result<(), DekuError> {
         #[cfg(not(feature = "bits"))]
-        let _ = order;
+        let _ = _order;
 
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_const_leftover(buf, byte),
@@ -920,6 +1008,43 @@ mod tests {
         assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1]));
         let bits = reader.read_bits(4, Order::Msb0).unwrap();
         assert_eq!(bits, Some(bitvec![u8, Msb0; 0, 1, 0, 1]));
+    }
+
+    #[cfg(all(feature = "alloc", feature = "bits"))]
+    #[test]
+    fn test_direct_bit_reads() {
+        let input = hex!("abcd");
+        let mut reader = Reader::new(Cursor::new(input));
+        assert_eq!(reader.read_bits(0, Order::Msb0).unwrap(), Some(bitvec![]));
+        let bits = reader.read_bits(8, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 1]));
+        let bits = reader.read_bits(8, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 1]));
+
+        let mut reader = Reader::new(Cursor::new(input));
+        let bits = reader.read_bits(12, Order::Msb0).unwrap();
+        assert_eq!(
+            bits,
+            Some(bitvec![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0])
+        );
+        let bits = reader.read_bits(4, Order::Msb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 1, 0, 1]));
+
+        let mut reader = Reader::new(Cursor::new(input));
+        let bits = reader.read_bits(16, Order::Lsb0).unwrap();
+        assert_eq!(
+            bits,
+            Some(bitvec![u8, Msb0; 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1])
+        );
+
+        let mut reader = Reader::new(Cursor::new(input));
+        let bits = reader.read_bits(12, Order::Lsb0).unwrap();
+        assert_eq!(
+            bits,
+            Some(bitvec![u8, Msb0; 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1])
+        );
+        let bits = reader.read_bits(4, Order::Lsb0).unwrap();
+        assert_eq!(bits, Some(bitvec![u8, Msb0; 1, 1, 0, 0]));
     }
 
     #[cfg(all(feature = "alloc", feature = "bits"))]

@@ -232,7 +232,7 @@ impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Vec<T> {
 #[allow(clippy::too_many_arguments)]
 mod tests {
     #[cfg(feature = "bits")]
-    use crate::bitvec::{bits, BitVec, Msb0};
+    use crate::bitvec::{BitVec, Msb0, bits};
     use rstest::rstest;
     use std::io::Cursor;
 

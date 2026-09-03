@@ -54,6 +54,11 @@ name = "bebits"
 harness = false
 required-features = ["alloc", "bits"]
 
+[[bench]]
+name = "bits_raw"
+harness = false
+required-features = ["alloc", "bits"]
+
 [[example]]
 name = "custom_reader_and_writer"
 required-features = ["alloc", "bits"]

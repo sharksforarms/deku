@@ -81,7 +81,7 @@ mod tests {
 
     use super::*;
     #[cfg(feature = "bits")]
-    use crate::bitvec::{bits, BitVec, Msb0};
+    use crate::bitvec::{BitVec, Msb0, bits};
     #[cfg(feature = "bits")]
     use crate::ctx::{BitSize, Endian};
     use crate::native_endian;

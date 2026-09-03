@@ -851,9 +851,7 @@ where
     A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
     fn from(value: &BitSlice<'_, u8, P>) -> Self {
-        let mut bbv = BoundedBitVec::new();
-        bbv.extend_from_bitslice(value);
-        bbv
+        Self::from_bitslice(value)
     }
 }
 
@@ -863,9 +861,7 @@ where
     A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
     fn from(value: &mut BitSliceMut<'_, u8, P>) -> Self {
-        let mut bbv = BoundedBitVec::new();
-        bbv.extend_from_bitslice(&value.as_bitslice());
-        bbv
+        Self::from_bitslice(&value.as_bitslice())
     }
 }
 
@@ -875,9 +871,7 @@ where
     A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
     fn from(value: crate::bitvec::BitVec<u8, P>) -> Self {
-        let mut bbv = Self::new();
-        bbv.extend_from_bitslice(&value.as_bitslice());
-        bbv
+        Self::from_bitslice(&value.as_bitslice())
     }
 }
 
@@ -900,6 +894,12 @@ impl<A, O> BoundedBitVec<A, O>
 where
     A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
+    fn from_bitslice<P>(value: &BitSlice<'_, u8, P>) -> Self {
+        let mut bbv = Self::new();
+        bbv.extend_from_bitslice(value);
+        bbv
+    }
+
     fn new() -> Self {
         Self {
             bits: A::default(),
@@ -961,11 +961,33 @@ where
         self.size += 1;
     }
 
+    #[inline]
+    fn insert_zeros(&mut self, index: usize, count: usize) {
+        assert!(self.size + count <= self.capacity());
+        assert!(index <= self.size);
+        for _ in 0..count {
+            self.insert(index, false);
+        }
+    }
+
+    #[inline]
+    fn prepend_zeros(&mut self, count: usize) {
+        self.insert_zeros(0, count);
+    }
+
     fn push(&mut self, value: bool) {
         assert!(self.len() < self.capacity());
         let index = self.size;
         self.as_mut_bitslice().set(index, value);
         self.size += 1;
+    }
+
+    #[inline]
+    fn append_zeros(&mut self, count: usize) {
+        assert!(self.size + count <= self.capacity());
+        for _ in 0..count {
+            self.push(false);
+        }
     }
 
     fn split_off(&mut self, index: usize) -> Self {

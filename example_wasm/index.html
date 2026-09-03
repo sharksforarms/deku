@@ -14,7 +14,7 @@
       // will "boot" the module and make it ready to use. Currently browsers
       // don't support natively imported WebAssembly as an ES module, but
       // eventually the manual initialization won't be required!
-      import init, { deku_read, deku_write } from './pkg/ensure_wasm.js';
+      import init, { deku_read, deku_write } from './pkg/example_wasm.js';
 
       async function run() {
         // First up we need to actually load the wasm file, so we use the

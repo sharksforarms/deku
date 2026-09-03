@@ -49,8 +49,8 @@ lint:
 
 # Compile the no_std fixture for a target.
 no-std target:
-    cd ensure_no_std && cargo +{{toolchain}} build --release --target {{target}}
-    cd ensure_no_std && cargo +{{toolchain}} build --release --target {{target}} --no-default-features
+    cd example_no_std && cargo +{{toolchain}} build --release --target {{target}}
+    cd example_no_std && cargo +{{toolchain}} build --release --target {{target}} --no-default-features
 
 # Run the thumbv7em no_std checks.
 no-std-v7:
@@ -62,8 +62,8 @@ no-std-v6:
 
 # Build and test the WebAssembly fixture.
 wasm:
-    cd ensure_wasm && RUSTUP_TOOLCHAIN={{toolchain}} wasm-pack build --target web
-    cd ensure_wasm && RUSTUP_TOOLCHAIN={{toolchain}} wasm-pack test --node
+    cd example_wasm && RUSTUP_TOOLCHAIN={{toolchain}} wasm-pack build --target web
+    cd example_wasm && RUSTUP_TOOLCHAIN={{toolchain}} wasm-pack test --node
 
 # Run the build, test, example, no_std, and WebAssembly checks for the selected toolchain.
 ci: ci-core no-std-v7 no-std-v6 wasm

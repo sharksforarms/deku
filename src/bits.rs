@@ -183,6 +183,13 @@ impl<'a, T, O> BitSlice<'a, T, O> {
     #[inline]
     pub fn load_be<V: BitValue>(&self) -> V {
         assert!(self.len <= V::BITS);
+        if let Some(bytes) = self.aligned_bytes() {
+            let mut value = 0u128;
+            for &byte in bytes {
+                value = (value << 8) | u128::from(byte);
+            }
+            return V::from_u128(value);
+        }
         let mut value = 0u128;
         for bit in self.iter() {
             value = (value << 1) | u128::from(bit);
@@ -194,6 +201,13 @@ impl<'a, T, O> BitSlice<'a, T, O> {
     #[inline]
     pub fn load_le<V: BitValue>(&self) -> V {
         assert!(self.len <= V::BITS);
+        if let Some(bytes) = self.aligned_bytes() {
+            let mut value = 0u128;
+            for &byte in bytes.iter().rev() {
+                value = (value << 8) | u128::from(byte);
+            }
+            return V::from_u128(value);
+        }
         let mut value = 0u128;
         let mut end = self.offset + self.len;
 
@@ -467,11 +481,17 @@ impl<T, O> BitVec<T, O> {
     /// Create a bit vector from boolean bits.
     #[inline]
     pub fn from_bits(bits: &[bool]) -> Self {
-        let mut result = Self::new();
-        result.bytes.resize(bits.len().div_ceil(8), 0);
-        result.len = bits.len();
-        for (index, bit) in bits.iter().copied().enumerate() {
-            set_bit(&mut result.bytes, index, bit);
+        let mut result = Self {
+            bytes: alloc::vec![0; bits.len().div_ceil(8)],
+            len: bits.len(),
+            _marker: PhantomData,
+        };
+        for (slot, chunk) in result.bytes.iter_mut().zip(bits.chunks(8)) {
+            let mut value = 0u8;
+            for &bit in chunk {
+                value = (value << 1) | u8::from(bit);
+            }
+            *slot = value << (8 - chunk.len());
         }
         result
     }
@@ -504,6 +524,12 @@ impl<T, O> BitVec<T, O> {
     #[inline]
     pub fn as_mut_bitslice(&mut self) -> BitSliceMut<'_, T, O> {
         BitSliceMut::from_parts(&mut self.bytes, 0, self.len)
+    }
+
+    /// Borrow the packed bytes for crate-internal I/O fast paths.
+    #[inline]
+    pub(crate) fn as_raw_slice_mut(&mut self) -> &mut [u8] {
+        &mut self.bytes
     }
 
     /// Return the bit at `index`.

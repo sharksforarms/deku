@@ -43,7 +43,8 @@ impl BitOrder for Lsb0 {
 /// An immutable view over packed, MSB-first bits.
 ///
 /// Bit zero is the high bit of the first byte. The view may start and end at
-/// arbitrary bit offsets without allocating.
+/// arbitrary bit offsets without allocating. `T` and `O` are compatibility
+/// markers and do not change how the view interprets bits.
 pub struct BitSlice<'a, T = u8, O = Msb0> {
     bytes: &'a [u8],
     offset: usize,
@@ -62,9 +63,12 @@ impl<'a, T, O> Clone for BitSlice<'a, T, O> {
 
 impl<'a, T, O> BitSlice<'a, T, O> {
     /// View all bits in `bytes`.
+    ///
+    /// # Panics
+    /// Panics if `bytes.len() * 8` cannot be represented by `usize`.
     #[inline]
     pub fn from_slice(bytes: &'a [u8]) -> Self {
-        Self::from_parts(bytes, 0, bytes.len().saturating_mul(8))
+        Self::from_parts(bytes, 0, bit_len_from_bytes(bytes.len()))
     }
 
     /// Create an empty bit view.
@@ -81,8 +85,8 @@ impl<'a, T, O> BitSlice<'a, T, O> {
     /// Create a view over a bit range in `bytes`.
     #[inline]
     pub(crate) fn from_parts(bytes: &'a [u8], offset: usize, len: usize) -> Self {
-        assert!(offset.checked_add(len).is_some());
-        assert!(offset.saturating_add(len) <= bytes.len().saturating_mul(8));
+        let end = offset.checked_add(len).expect("bit range overflow");
+        assert!(end <= bytes.len().saturating_mul(8));
         Self {
             bytes,
             offset,
@@ -125,6 +129,9 @@ impl<'a, T, O> BitSlice<'a, T, O> {
     }
 
     /// Iterate over consecutive chunks, including a final partial chunk.
+    ///
+    /// # Panics
+    /// Panics if `chunk_len` is zero.
     #[inline]
     pub fn chunks(&self, chunk_len: usize) -> BitChunks<'a, T, O> {
         assert!(chunk_len != 0);
@@ -180,27 +187,33 @@ impl<'a, T, O> BitSlice<'a, T, O> {
     }
 
     /// Load this bit sequence as a big-endian integer.
+    ///
+    /// # Panics
+    /// Panics if the bit sequence is wider than `V::BITS`, or if `V::BITS` is
+    /// greater than 128.
     #[inline]
     pub fn load_be<V: BitValue>(&self) -> V {
-        assert!(self.len <= V::BITS);
+        assert_bit_value_len::<V>(self.len);
         if let Some(bytes) = self.aligned_bytes() {
-            let mut value = 0u128;
-            for &byte in bytes {
-                value = (value << 8) | u128::from(byte);
-            }
-            return V::from_u128(value);
+            return V::from_u128(load_be_bytes(bytes, 0, bytes.len()));
         }
-        let mut value = 0u128;
-        for bit in self.iter() {
-            value = (value << 1) | u128::from(bit);
+        if self.len == 0 {
+            return V::from_u128(0);
         }
-        V::from_u128(value)
+        if self.len <= 8 {
+            return V::from_u128(u128::from(load_be_chunk(self.bytes, self.offset, self.len)));
+        }
+        V::from_u128(load_be_unaligned(self.bytes, self.offset, self.len))
     }
 
     /// Load this bit sequence as a little-endian integer.
+    ///
+    /// # Panics
+    /// Panics if the bit sequence is wider than `V::BITS`, or if `V::BITS` is
+    /// greater than 128.
     #[inline]
     pub fn load_le<V: BitValue>(&self) -> V {
-        assert!(self.len <= V::BITS);
+        assert_bit_value_len::<V>(self.len);
         if let Some(bytes) = self.aligned_bytes() {
             let mut value = 0u128;
             for &byte in bytes.iter().rev() {
@@ -208,21 +221,10 @@ impl<'a, T, O> BitSlice<'a, T, O> {
             }
             return V::from_u128(value);
         }
-        let mut value = 0u128;
-        let mut end = self.offset + self.len;
-
-        // The storage element order is little-endian, while the bits inside
-        // each byte retain their packed MSB-first representation. This is the
-        // behavior callers get from bitvec's `BitSlice<u8, Msb0>::load_le`:
-        // byte-sized pieces are concatenated from the last piece to the first.
-        while end > self.offset {
-            let byte_start = (end - 1) / 8 * 8;
-            let start = core::cmp::max(self.offset, byte_start);
-            let chunk = self.subslice(start - self.offset, end - self.offset);
-            value = (value << chunk.len()) | u128::from(chunk.load_be::<u8>());
-            end = start;
+        if self.len == 0 {
+            return V::from_u128(0);
         }
-        V::from_u128(value)
+        V::from_u128(load_le_unaligned(self.bytes, self.offset, self.len))
     }
 
     /// Load this bit sequence using its packed MSB-first representation.
@@ -256,6 +258,13 @@ impl<T, O> BitSource for BitSlice<'_, T, O> {
     #[inline]
     fn bit_slice(&self) -> BitSlice<'_, u8, Msb0> {
         BitSlice::from_parts(self.bytes, self.offset, self.len)
+    }
+}
+
+impl BitSource for [u8] {
+    #[inline]
+    fn bit_slice(&self) -> BitSlice<'_, u8, Msb0> {
+        BitSlice::from_slice(self)
     }
 }
 
@@ -328,7 +337,7 @@ impl<'a, T, O> Iterator for BitChunks<'a, T, O> {
         if self.index >= self.slice.len() {
             return None;
         }
-        let end = core::cmp::min(self.index + self.chunk_len, self.slice.len());
+        let end = chunk_end(self.index, self.slice.len(), self.chunk_len);
         let chunk = self.slice.subslice(self.index, end);
         self.index = end;
         Some(chunk)
@@ -352,17 +361,20 @@ pub struct BitSliceMut<'a, T = u8, O = Msb0> {
 
 impl<'a, T, O> BitSliceMut<'a, T, O> {
     /// View all bits in `bytes`.
+    ///
+    /// # Panics
+    /// Panics if `bytes.len() * 8` cannot be represented by `usize`.
     #[inline]
     pub fn from_slice(bytes: &'a mut [u8]) -> Self {
-        let len = bytes.len().saturating_mul(8);
+        let len = bit_len_from_bytes(bytes.len());
         Self::from_parts(bytes, 0, len)
     }
 
     /// Create a mutable view over a bit range in `bytes`.
     #[inline]
     pub(crate) fn from_parts(bytes: &'a mut [u8], offset: usize, len: usize) -> Self {
-        assert!(offset.checked_add(len).is_some());
-        assert!(offset.saturating_add(len) <= bytes.len().saturating_mul(8));
+        let end = offset.checked_add(len).expect("bit range overflow");
+        assert!(end <= bytes.len().saturating_mul(8));
         Self {
             bytes,
             offset,
@@ -417,8 +429,28 @@ impl<'a, T, O> BitSliceMut<'a, T, O> {
     pub fn copy_from_bitslice_at<U, P>(&mut self, start: usize, source: &BitSlice<'_, U, P>) {
         assert!(start.checked_add(source.len()).is_some());
         assert!(start + source.len() <= self.len);
-        for (index, bit) in source.iter().enumerate() {
-            self.set(start + index, bit);
+
+        let destination_start = self.offset + start;
+        if destination_start.is_multiple_of(8)
+            && let Some(source_bytes) = source.aligned_bytes()
+        {
+            let destination_start = destination_start / 8;
+            let destination_end = destination_start + source_bytes.len();
+            self.bytes[destination_start..destination_end].copy_from_slice(source_bytes);
+            return;
+        }
+
+        let mut copied = 0;
+        while copied < source.len() {
+            let destination_bit = destination_start + copied;
+            let destination_offset = destination_bit % 8;
+            let take = core::cmp::min(source.len() - copied, 8 - destination_offset);
+            let value = load_be_chunk(source.bytes, source.offset + copied, take);
+            let shift = 8 - destination_offset - take;
+            let mask = (((1u16 << take) - 1) as u8) << shift;
+            let slot = &mut self.bytes[destination_bit / 8];
+            *slot = (*slot & !mask) | ((value << shift) & mask);
+            copied += take;
         }
     }
 
@@ -430,6 +462,9 @@ impl<'a, T, O> BitSliceMut<'a, T, O> {
 }
 
 /// A packed, growable bit vector.
+///
+/// Storage is byte-based regardless of `T`. `O` controls byte conversion in
+/// [`from_slice`](Self::from_slice) and [`into_vec`](Self::into_vec).
 #[cfg(feature = "alloc")]
 #[derive(Clone)]
 pub struct BitVec<T = u8, O = Msb0> {
@@ -463,14 +498,17 @@ impl<T, O> BitVec<T, O> {
     }
 
     /// Create a bit vector from a byte-aligned bit sequence.
+    ///
+    /// # Panics
+    /// Panics if `bytes.len() * 8` cannot be represented by `usize`.
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Self
     where
         O: BitOrder,
     {
+        let len = bit_len_from_bytes(bytes.len());
         let mut bytes = bytes.to_vec();
         O::decode(&mut bytes);
-        let len = bytes.len().saturating_mul(8);
         Self {
             bytes,
             len,
@@ -539,13 +577,17 @@ impl<T, O> BitVec<T, O> {
     }
 
     /// Append one bit.
+    ///
+    /// # Panics
+    /// Panics if the resulting bit length cannot be represented by `usize`.
     #[inline]
     pub fn push(&mut self, value: bool) {
+        let next_len = next_bit_len(self.len);
         if self.len.is_multiple_of(8) {
             self.bytes.push(0);
         }
         set_bit(&mut self.bytes, self.len, value);
-        self.len += 1;
+        self.len = next_len;
     }
 
     /// Append all bits in `source`.
@@ -648,6 +690,9 @@ impl<T, O> fmt::Debug for BitVec<T, O> {
 }
 
 /// Integer types supported by packed bit loading.
+///
+/// Implementations must set `BITS` to a value no greater than 128. Loading
+/// asserts this limit because packed values are accumulated in `u128`.
 pub trait BitValue: Copy {
     /// Number of bits in the integer type.
     const BITS: usize;
@@ -674,6 +719,136 @@ macro_rules! impl_bit_value {
 impl_bit_value!(u8, u16, u32, u64, u128, usize);
 
 #[inline]
+fn assert_bit_value_len<V: BitValue>(len: usize) {
+    assert!(V::BITS <= u128::BITS as usize, "BitValue::BITS exceeds 128");
+    assert!(len <= V::BITS);
+}
+
+#[inline]
+fn bit_len_from_bytes(len: usize) -> usize {
+    len.checked_mul(u8::BITS as usize)
+        .expect("bit length exceeds usize::MAX")
+}
+
+#[inline]
+fn load_be_chunk(bytes: &[u8], offset: usize, len: usize) -> u8 {
+    debug_assert!((1..=8).contains(&len));
+    let byte_index = offset / 8;
+    let within_byte = offset % 8;
+    let mut pair = u16::from(bytes[byte_index]) << 8;
+    if within_byte + len > 8 {
+        pair |= u16::from(bytes[byte_index + 1]);
+    }
+    let shift = 16 - within_byte - len;
+    let mask = (1u16 << len) - 1;
+    ((pair >> shift) & mask) as u8
+}
+
+#[inline(never)]
+fn load_be_unaligned(bytes: &[u8], offset: usize, len: usize) -> u128 {
+    if len == 0 {
+        return 0;
+    }
+    let within_byte = offset % 8;
+    let byte_start = offset / 8;
+    let window_bits = within_byte + len;
+    let byte_len = window_bits.div_ceil(8);
+    let mut value = if byte_len <= 16 {
+        load_be_bytes(bytes, byte_start, byte_len) >> (byte_len * 8 - window_bits)
+    } else {
+        let first_len = 8 - within_byte;
+        let first = load_be_chunk(bytes, offset, first_len);
+        let rest_len = len - first_len;
+        let rest_byte_start = (offset + first_len) / 8;
+        let rest_byte_len = rest_len.div_ceil(8);
+        let rest =
+            load_be_bytes(bytes, rest_byte_start, rest_byte_len) >> (rest_byte_len * 8 - rest_len);
+        (u128::from(first) << rest_len) | (rest & low_mask(rest_len))
+    };
+    value &= low_mask(len);
+    value
+}
+
+#[inline(never)]
+fn load_le_unaligned(bytes: &[u8], offset: usize, len: usize) -> u128 {
+    // `load_le` reverses the order of byte-sized groups while keeping each
+    // group's bits in MSB-first order. Keep the partial edge groups and reverse
+    // the complete interior bytes as one integer operation.
+    let leading_len = if offset.is_multiple_of(8) {
+        0
+    } else {
+        core::cmp::min(len, 8 - offset % 8)
+    };
+    let trailing_len = if leading_len == len {
+        0
+    } else {
+        (offset + len) % 8
+    };
+    let middle_len = len - leading_len - trailing_len;
+    debug_assert_eq!(middle_len % 8, 0);
+
+    let leading = if leading_len == 0 {
+        0
+    } else {
+        u128::from(load_be_chunk(bytes, offset, leading_len))
+    };
+    let middle = load_be_bytes(bytes, (offset + leading_len) / 8, middle_len / 8);
+    let middle_reversed = if middle_len == 0 {
+        0
+    } else {
+        (middle << (u128::BITS as usize - middle_len)).swap_bytes() & low_mask(middle_len)
+    };
+    let trailing = if trailing_len == 0 {
+        0
+    } else {
+        u128::from(load_be_chunk(
+            bytes,
+            offset + len - trailing_len,
+            trailing_len,
+        ))
+    };
+
+    (trailing << (middle_len + leading_len)) | (middle_reversed << leading_len) | leading
+}
+
+#[inline]
+fn load_be_bytes(bytes: &[u8], start: usize, len: usize) -> u128 {
+    let bytes = &bytes[start..start + len];
+    match bytes.len() {
+        0 => 0,
+        1 => u128::from(bytes[0]),
+        2 => u128::from(u16::from_be_bytes(bytes.try_into().unwrap())),
+        4 => u128::from(u32::from_be_bytes(bytes.try_into().unwrap())),
+        8 => u128::from(u64::from_be_bytes(bytes.try_into().unwrap())),
+        16 => u128::from_be_bytes(bytes.try_into().unwrap()),
+        _ => bytes
+            .iter()
+            .fold(0, |value, &byte| (value << 8) | u128::from(byte)),
+    }
+}
+
+#[inline]
+fn low_mask(width: usize) -> u128 {
+    if width == u128::BITS as usize {
+        u128::MAX
+    } else {
+        (1u128 << width) - 1
+    }
+}
+
+#[inline]
+#[cfg(feature = "alloc")]
+fn next_bit_len(len: usize) -> usize {
+    len.checked_add(1)
+        .expect("bit vector length exceeds usize::MAX")
+}
+
+#[inline]
+fn chunk_end(index: usize, len: usize, chunk_len: usize) -> usize {
+    index + core::cmp::min(chunk_len, len - index)
+}
+
+#[inline]
 fn bit_at(bytes: &[u8], index: usize) -> bool {
     bytes[index / 8] & (0x80 >> (index % 8)) != 0
 }
@@ -688,14 +863,16 @@ fn set_bit(bytes: &mut [u8], index: usize, value: bool) {
     }
 }
 
-/// Return the highest set-bit index when each byte is traversed LSB-first.
-pub(crate) fn last_one_lsb(bytes: &[u8]) -> Option<usize> {
+/// Return the highest index of the requested bit when each byte is traversed LSB-first.
+#[inline]
+fn last_lsb_matching(bytes: &[u8], set: bool) -> Option<usize> {
     bytes
         .iter()
         .enumerate()
         .rev()
         .find_map(|(byte_index, byte)| {
-            if *byte == 0 {
+            let byte = if set { *byte } else { !*byte };
+            if byte == 0 {
                 None
             } else {
                 Some(byte_index * 8 + (u8::BITS as usize - 1 - byte.leading_zeros() as usize))
@@ -703,20 +880,14 @@ pub(crate) fn last_one_lsb(bytes: &[u8]) -> Option<usize> {
         })
 }
 
+/// Return the highest set-bit index when each byte is traversed LSB-first.
+pub(crate) fn last_one_lsb(bytes: &[u8]) -> Option<usize> {
+    last_lsb_matching(bytes, true)
+}
+
 /// Return the highest clear-bit index when each byte is traversed LSB-first.
 pub(crate) fn last_zero_lsb(bytes: &[u8]) -> Option<usize> {
-    bytes
-        .iter()
-        .enumerate()
-        .rev()
-        .find_map(|(byte_index, byte)| {
-            let inverse = !*byte;
-            if inverse == 0 {
-                None
-            } else {
-                Some(byte_index * 8 + (u8::BITS as usize - 1 - inverse.leading_zeros() as usize))
-            }
-        })
+    last_lsb_matching(bytes, false)
 }
 
 #[doc(hidden)]
@@ -736,6 +907,7 @@ macro_rules! __deku_bit {
     };
 }
 
+#[cfg(feature = "alloc")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! bitvec {
@@ -749,6 +921,7 @@ macro_rules! bitvec {
     };
 }
 
+#[cfg(feature = "alloc")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! bitarr {
@@ -757,6 +930,7 @@ macro_rules! bitarr {
     };
 }
 
+#[cfg(feature = "alloc")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! bits {
@@ -768,4 +942,183 @@ macro_rules! bits {
             &[$($crate::__deku_bit!($bit)),*]
         )
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reference_bits() -> [bool; 136] {
+        core::array::from_fn(|index| (index * 73 + 19) % 11 < 5)
+    }
+
+    fn pack_reference(bits: &[bool; 136]) -> [u8; 17] {
+        let mut bytes = [0; 17];
+        for (index, &bit) in bits.iter().enumerate() {
+            if bit {
+                bytes[index / 8] |= 0x80 >> (index % 8);
+            }
+        }
+        bytes
+    }
+
+    fn load_be_reference(bits: &[bool]) -> u128 {
+        bits.iter()
+            .fold(0u128, |value, &bit| (value << 1) | u128::from(bit))
+    }
+
+    fn load_le_reference(bits: &[bool], offset: usize) -> u128 {
+        let mut value = 0u128;
+        let mut end = offset + bits.len();
+        while end > offset {
+            let start = core::cmp::max(offset, (end - 1) / 8 * 8);
+            let group = &bits[start - offset..end - offset];
+            value = (value << group.len()) | load_be_reference(group);
+            end = start;
+        }
+        value
+    }
+
+    #[derive(Clone, Copy)]
+    struct TooWide;
+
+    impl BitValue for TooWide {
+        const BITS: usize = 129;
+
+        fn from_u128(_: u128) -> Self {
+            Self
+        }
+    }
+
+    #[test]
+    fn chunks_reach_the_end_without_overflowing() {
+        assert_eq!(
+            chunk_end(usize::MAX / 2 + 1, usize::MAX, usize::MAX / 2 + 1),
+            usize::MAX
+        );
+    }
+
+    #[test]
+    fn chunks_include_a_partial_final_chunk() {
+        let bytes = [0b1011_0010, 0b0110_0000];
+        let mut chunks = BitSlice::<u8, Msb0>::from_slice(&bytes).chunks(6);
+
+        assert_eq!(chunks.next().unwrap().load_be::<u8>(), 0b10_1100);
+        assert_eq!(chunks.next().unwrap().load_be::<u8>(), 0b10_0110);
+        assert_eq!(chunks.next().unwrap().load_be::<u8>(), 0);
+        assert!(chunks.next().is_none());
+    }
+
+    #[test]
+    fn slices_match_reference_for_all_offsets_and_lengths() {
+        let expected = reference_bits();
+        let bytes = pack_reference(&expected);
+        let all_bits = BitSlice::<u8, Msb0>::from_slice(&bytes);
+
+        for offset in 0..8 {
+            for len in 0..=128 {
+                let end = offset + len;
+                let expected_slice = &expected[offset..end];
+                let slice = all_bits.subslice(offset, end);
+
+                assert!(slice.iter().eq(expected_slice.iter().copied()));
+                assert_eq!(slice.load_be::<u128>(), load_be_reference(expected_slice));
+                assert_eq!(
+                    slice.load_le::<u128>(),
+                    load_le_reference(expected_slice, offset)
+                );
+            }
+        }
+
+        let mut mutable_bytes = [0; 17];
+        let mut mutable = BitSliceMut::<u8, Msb0>::from_slice(&mut mutable_bytes);
+        for (index, &bit) in expected.iter().enumerate() {
+            mutable.set(index, bit);
+        }
+        assert!(mutable.as_bitslice().iter().eq(expected));
+        assert_eq!(mutable_bytes, bytes);
+    }
+
+    #[test]
+    fn chunks_match_reference_across_offsets_and_chunk_lengths() {
+        let expected = reference_bits();
+        let bytes = pack_reference(&expected);
+        let all_bits = BitSlice::<u8, Msb0>::from_slice(&bytes);
+
+        for offset in 0..8 {
+            let end = offset + 128;
+            let expected_slice = &expected[offset..end];
+            let slice = all_bits.subslice(offset, end);
+            for chunk_len in 1..=16 {
+                assert!(
+                    slice
+                        .chunks(chunk_len)
+                        .flat_map(|chunk| chunk.iter())
+                        .eq(expected_slice.iter().copied())
+                );
+            }
+        }
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn vectors_match_reference_for_all_lengths_and_orders() {
+        let expected = reference_bits();
+
+        for len in 0..=expected.len() {
+            let bits = &expected[..len];
+            let vector = BitVec::<u8, Msb0>::from_bits(bits);
+            assert!(vector.iter().eq(bits.iter().copied()));
+
+            let mut pushed = BitVec::<u8, Msb0>::new();
+            for &bit in bits {
+                pushed.push(bit);
+            }
+            assert_eq!(pushed, vector);
+
+            let mut packed = alloc::vec![0; len.div_ceil(8)];
+            for (index, &bit) in bits.iter().enumerate() {
+                if bit {
+                    packed[index / 8] |= 0x80 >> (index % 8);
+                }
+            }
+            assert_eq!(vector.into_vec(), packed);
+
+            let mut lsb0_packed = packed.clone();
+            for byte in &mut lsb0_packed {
+                *byte = byte.reverse_bits();
+            }
+            let lsb0 = BitVec::<u8, Lsb0>::from_bits(bits);
+            assert_eq!(lsb0.into_vec(), lsb0_packed);
+
+            let decoded = BitVec::<u8, Lsb0>::from_slice(&lsb0_packed);
+            assert!(decoded.iter().take(len).eq(bits.iter().copied()));
+            assert!(decoded.iter().skip(len).all(|bit| !bit));
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "BitValue::BITS exceeds 128")]
+    fn load_be_rejects_values_wider_than_its_accumulator() {
+        let _ = BitSlice::<u8, Msb0>::empty().load_be::<TooWide>();
+    }
+
+    #[test]
+    #[should_panic(expected = "BitValue::BITS exceeds 128")]
+    fn load_le_rejects_values_wider_than_its_accumulator() {
+        let _ = BitSlice::<u8, Msb0>::empty().load_le::<TooWide>();
+    }
+
+    #[test]
+    #[should_panic(expected = "bit length exceeds usize::MAX")]
+    fn byte_lengths_that_overflow_the_bit_count_are_rejected() {
+        let _ = bit_len_from_bytes(usize::MAX / 8 + 1);
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    #[should_panic(expected = "bit vector length exceeds usize::MAX")]
+    fn bit_vector_length_cannot_overflow() {
+        let _ = next_bit_len(usize::MAX);
+    }
 }

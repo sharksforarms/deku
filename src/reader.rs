@@ -73,6 +73,34 @@ impl<R: Read + Seek> AsMut<R> for Reader<R> {
 }
 
 impl<R: Read + Seek> Reader<R> {
+    #[inline]
+    fn read_exact_or_incomplete(
+        &mut self,
+        buf: &mut [u8],
+        needed_bits: usize,
+    ) -> Result<(), DekuError> {
+        match self.inner.read_exact(buf) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == ErrorKind::UnexpectedEof => {
+                Err(DekuError::Incomplete(NeedSize::new(needed_bits)))
+            }
+            Err(e) => Err(DekuError::Io(e.kind())),
+        }
+    }
+
+    #[cfg(feature = "bits")]
+    #[inline]
+    pub(crate) fn read_bits_into_bytes(
+        &mut self,
+        bytes: &mut [u8],
+        bit_size: usize,
+        order: Order,
+    ) -> Result<(), DekuError> {
+        let mut all_bits = BitSliceMut::from_slice(bytes);
+        let mut bits = all_bits.subslice(0, bit_size);
+        self.read_bits_into(&mut bits, order)
+    }
+
     /// Create a new `Reader`
     #[inline]
     pub fn new(inner: R) -> Self {
@@ -203,9 +231,7 @@ impl<R: Read + Seek> Reader<R> {
                 let mut buf = [0u8; 1];
                 let needed = core::cmp::min(amt, bits.len());
                 amt -= needed;
-                let mut all = BitSliceMut::from_slice(&mut buf);
-                let mut dst = all.subslice(0, needed);
-                self.read_bits_into(&mut dst, _order)?;
+                self.read_bits_into_bytes(&mut buf, needed, _order)?;
             }
 
             let bytes_amt = amt / 8;
@@ -223,9 +249,7 @@ impl<R: Read + Seek> Reader<R> {
             // Save, and keep the leftover bits since the read will most likely be less than a byte
             // Note that the leftover bits are kept in self.leftover
             let mut buf = [0u8; 1];
-            let mut all = BitSliceMut::from_slice(&mut buf);
-            let mut dst = all.subslice(0, bits_amt);
-            self.read_bits_into(&mut dst, _order)?;
+            self.read_bits_into_bytes(&mut buf, bits_amt, _order)?;
         }
 
         #[cfg(not(feature = "bits"))]
@@ -246,8 +270,8 @@ impl<R: Read + Seek> Reader<R> {
     /// "Read".
     ///
     /// # Guarantees
-    /// - if Some(bits), `dst` will be filled and `self.bits_read` will increase
-    ///   by `dst.len()`.
+    /// - On success, `dst` will be filled and `self.bits_read` will increase by
+    ///   `dst.len()`.
     /// - Implementation will not allocate on the heap
     ///
     /// # Params
@@ -330,12 +354,7 @@ impl<R: Read + Seek> Reader<R> {
                     let full_chunks = end / 8;
                     for chunk in (0..full_chunks).rev() {
                         let mut buf = [0u8; 1];
-                        if let Err(e) = self.inner.read_exact(&mut buf) {
-                            if e.kind() == ErrorKind::UnexpectedEof {
-                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                            }
-                            return Err(DekuError::Io(e.kind()));
-                        }
+                        self.read_exact_or_incomplete(&mut buf, dst.len())?;
                         let target = remainder_len + chunk * 8;
                         let source = BitSlice::<u8, Msb0>::from_slice(&buf);
                         dst.copy_from_bitslice_at(target, &source);
@@ -343,12 +362,7 @@ impl<R: Read + Seek> Reader<R> {
 
                     if remainder_len != 0 {
                         let mut buf = [0u8; 1];
-                        if let Err(e) = self.inner.read_exact(&mut buf) {
-                            if e.kind() == ErrorKind::UnexpectedEof {
-                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                            }
-                            return Err(DekuError::Io(e.kind()));
-                        }
+                        self.read_exact_or_incomplete(&mut buf, dst.len())?;
                         let source = BitSlice::<u8, Msb0>::from_slice(&buf);
                         let used = source.subslice(8 - remainder_len, 8);
                         dst.copy_from_bitslice_at(0, &used);
@@ -364,12 +378,7 @@ impl<R: Read + Seek> Reader<R> {
                     let full_chunks = available / 8;
                     for chunk in 0..full_chunks {
                         let mut buf = [0u8; 1];
-                        if let Err(e) = self.inner.read_exact(&mut buf) {
-                            if e.kind() == ErrorKind::UnexpectedEof {
-                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                            }
-                            return Err(DekuError::Io(e.kind()));
-                        }
+                        self.read_exact_or_incomplete(&mut buf, dst.len())?;
                         let target = start + chunk * 8;
                         let source = BitSlice::<u8, Msb0>::from_slice(&buf);
                         dst.copy_from_bitslice_at(target, &source);
@@ -378,12 +387,7 @@ impl<R: Read + Seek> Reader<R> {
                     let remainder_len = available % 8;
                     if remainder_len != 0 {
                         let mut buf = [0u8; 1];
-                        if let Err(e) = self.inner.read_exact(&mut buf) {
-                            if e.kind() == ErrorKind::UnexpectedEof {
-                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                            }
-                            return Err(DekuError::Io(e.kind()));
-                        }
+                        self.read_exact_or_incomplete(&mut buf, dst.len())?;
                         let source = BitSlice::<u8, Msb0>::from_slice(&buf);
                         let used = source.subslice(0, remainder_len);
                         dst.copy_from_bitslice_at(start + full_chunks * 8, &used);
@@ -413,10 +417,13 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// Reads whole bytes from the stream only when the leftover cannot satisfy
     /// `amt`, exactly as `read_bits_into` does, so it consumes no more input.
+    ///
+    /// # Panics
+    /// Panics if `amt` is outside `1..=64`.
     #[inline]
     #[cfg(feature = "bits")]
     pub fn read_bits_uint_msb0(&mut self, amt: usize) -> Result<u64, DekuError> {
-        debug_assert!((1..=64).contains(&amt));
+        assert!((1..=64).contains(&amt), "amt must be in 1..=64");
 
         // Up to 7 leftover bits plus 64 requested does not fit a u64.
         let mut acc: u128 = 0;
@@ -447,12 +454,7 @@ impl<R: Read + Seek> Reader<R> {
         // the above statement.
         while have < amt {
             let mut buf = [0u8; 1];
-            if let Err(e) = self.inner.read_exact(&mut buf) {
-                if e.kind() == ErrorKind::UnexpectedEof {
-                    return Err(DekuError::Incomplete(NeedSize::new(amt)));
-                }
-                return Err(DekuError::Io(e.kind()));
-            }
+            self.read_exact_or_incomplete(&mut buf, amt)?;
             acc = (acc << 8) | u128::from(buf[0]);
             have += 8;
         }
@@ -495,25 +497,12 @@ impl<R: Read + Seek> Reader<R> {
             let remainder = amt % 8;
 
             if full_bytes != 0 {
-                if let Err(e) = self
-                    .inner
-                    .read_exact(&mut vec.as_raw_slice_mut()[..full_bytes])
-                {
-                    if e.kind() == ErrorKind::UnexpectedEof {
-                        return Err(DekuError::Incomplete(NeedSize::new(amt)));
-                    }
-                    return Err(DekuError::Io(e.kind()));
-                }
+                self.read_exact_or_incomplete(&mut vec.as_raw_slice_mut()[..full_bytes], amt)?;
             }
 
             if remainder != 0 {
                 let mut tail = [0u8; 1];
-                if let Err(e) = self.inner.read_exact(&mut tail) {
-                    if e.kind() == ErrorKind::UnexpectedEof {
-                        return Err(DekuError::Incomplete(NeedSize::new(amt)));
-                    }
-                    return Err(DekuError::Io(e.kind()));
-                }
+                self.read_exact_or_incomplete(&mut tail, amt)?;
                 vec.as_raw_slice_mut()[full_bytes] = tail[0] & (u8::MAX << (8 - remainder));
                 self.leftover = Some(Leftover::Bits(crate::BoundedBitVec::from_msb0_byte(
                     tail[0] << remainder,
@@ -541,12 +530,7 @@ impl<R: Read + Seek> Reader<R> {
         mut vec: BitVec<u8, Msb0>,
         amt: usize,
     ) -> Result<Option<BitVec<u8, Msb0>>, DekuError> {
-        if let Err(e) = self.inner.read_exact(vec.as_raw_slice_mut()) {
-            if e.kind() == ErrorKind::UnexpectedEof {
-                return Err(DekuError::Incomplete(NeedSize::new(amt)));
-            }
-            return Err(DekuError::Io(e.kind()));
-        }
+        self.read_exact_or_incomplete(vec.as_raw_slice_mut(), amt)?;
 
         let remainder = amt % 8;
         let raw = vec.as_raw_slice_mut();
@@ -610,12 +594,7 @@ impl<R: Read + Seek> Reader<R> {
         }
 
         if self.leftover.is_none() {
-            if let Err(e) = self.inner.read_exact(&mut buf[..amt]) {
-                if e.kind() == ErrorKind::UnexpectedEof {
-                    return Err(DekuError::Incomplete(NeedSize::new(amt * 8)));
-                }
-                return Err(DekuError::Io(e.kind()));
-            }
+            self.read_exact_or_incomplete(&mut buf[..amt], amt * 8)?;
 
             let bits_read = amt * 8;
             self.bits_read += bits_read;
@@ -643,8 +622,7 @@ impl<R: Read + Seek> Reader<R> {
             Some(Leftover::Byte(byte)) => self.read_bytes_leftover(buf, byte, amt),
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
-                let mut slice = BitSliceMut::from_slice(&mut buf[..amt]);
-                self.read_bits_into(&mut slice, _order)?;
+                self.read_bits_into_bytes(&mut buf[..amt], amt * 8, _order)?;
                 if _order == Order::Lsb0 {
                     buf[..amt].reverse();
                 }
@@ -678,15 +656,7 @@ impl<R: Read + Seek> Reader<R> {
         if buf_len < remaining {
             return Err(DekuError::Incomplete(NeedSize::new(remaining * 8)));
         }
-        if let Err(e) = self
-            .inner
-            .read_exact(&mut buf[amt - remaining..][..remaining])
-        {
-            if e.kind() == ErrorKind::UnexpectedEof {
-                return Err(DekuError::Incomplete(NeedSize::new(remaining * 8)));
-            }
-            return Err(DekuError::Io(e.kind()));
-        }
+        self.read_exact_or_incomplete(&mut buf[amt - remaining..][..remaining], remaining * 8)?;
         self.bits_read += amt * 8;
 
         #[cfg(feature = "logging")]
@@ -715,12 +685,7 @@ impl<R: Read + Seek> Reader<R> {
         }
 
         if self.leftover.is_none() {
-            if let Err(e) = self.inner.read_exact(buf) {
-                if e.kind() == ErrorKind::UnexpectedEof {
-                    return Err(DekuError::Incomplete(NeedSize::new(N * 8)));
-                }
-                return Err(DekuError::Io(e.kind()));
-            }
+            self.read_exact_or_incomplete(buf, N * 8)?;
 
             self.bits_read += N * 8;
 
@@ -749,8 +714,7 @@ impl<R: Read + Seek> Reader<R> {
             }
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
-                let mut slice = BitSliceMut::from_slice(buf);
-                self.read_bits_into(&mut slice, _order)?;
+                self.read_bits_into_bytes(buf, N * 8, _order)?;
                 if _order == Order::Lsb0 {
                     buf.reverse();
                 }
@@ -782,12 +746,7 @@ impl<R: Read + Seek> Reader<R> {
         }
 
         if self.leftover.is_none() {
-            if let Err(e) = self.inner.read_exact(buf) {
-                if e.kind() == ErrorKind::UnexpectedEof {
-                    return Err(DekuError::Incomplete(NeedSize::new(N * 8)));
-                }
-                return Err(DekuError::Io(e.kind()));
-            }
+            self.read_exact_or_incomplete(buf, N * 8)?;
             self.bits_read += N * 8;
 
             return Ok(());
@@ -809,8 +768,7 @@ impl<R: Read + Seek> Reader<R> {
             Some(Leftover::Byte(byte)) => self.read_bytes_const_leftover(buf, byte),
             #[cfg(feature = "bits")]
             Some(Leftover::Bits(_)) => {
-                let mut slice = BitSliceMut::from_slice(buf);
-                self.read_bits_into(&mut slice, _order)?;
+                self.read_bits_into_bytes(buf, N * 8, _order)?;
                 if _order == Order::Lsb0 {
                     buf.reverse();
                 }
@@ -846,15 +804,7 @@ impl<R: Read + Seek> Reader<R> {
         if buf_len < remaining {
             return Err(DekuError::Incomplete(NeedSize::new(remaining * 8)));
         }
-        if let Err(e) = self
-            .inner
-            .read_exact(&mut buf[N - remaining..][..remaining])
-        {
-            if e.kind() == ErrorKind::UnexpectedEof {
-                return Err(DekuError::Incomplete(NeedSize::new(remaining * 8)));
-            }
-            return Err(DekuError::Io(e.kind()));
-        }
+        self.read_exact_or_incomplete(&mut buf[N - remaining..][..remaining], remaining * 8)?;
         self.bits_read += N * 8;
 
         #[cfg(feature = "logging")]
@@ -1534,5 +1484,13 @@ mod tests {
             second_bits,
             Some(bitvec![u8, Msb0; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
         );
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    #[should_panic(expected = "1..=64")]
+    fn read_bits_uint_rejects_invalid_width() {
+        let mut reader = Reader::new(Cursor::new([]));
+        let _ = reader.read_bits_uint_msb0(0);
     }
 }

@@ -529,11 +529,18 @@ pub mod no_std_io {
 mod bits;
 
 /// Packed bit storage used by the `bits` feature.
+///
+/// This module exposes deku's smaller packed-bit API with selected bitvec-style
+/// names. `BitSlice` views always interpret bits in MSB-first order, and the
+/// convenience macros construct an owned `BitVec` when `alloc` is enabled.
+/// Applications migrating from the former upstream re-export may need to
+/// replace imports of types such as `BitField`, `BitView`, or `BitArray`.
 #[cfg(feature = "bits")]
 pub mod bitvec {
     #[cfg(feature = "alloc")]
     pub use crate::bits::BitVec;
     pub use crate::bits::{BitOrder, BitSlice, BitSliceMut, BitSource, BitValue, Lsb0, Msb0};
+    #[cfg(feature = "alloc")]
     pub use crate::{bitarr, bits, bitvec};
 }
 
@@ -855,9 +862,7 @@ where
     A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
     fn from(value: &BitSlice<'_, u8, P>) -> Self {
-        let mut bbv = BoundedBitVec::new();
-        bbv.extend_from_bitslice(value);
-        bbv
+        Self::from_bitslice(value)
     }
 }
 
@@ -867,9 +872,7 @@ where
     A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
     fn from(value: &mut BitSliceMut<'_, u8, P>) -> Self {
-        let mut bbv = BoundedBitVec::new();
-        bbv.extend_from_bitslice(&value.as_bitslice());
-        bbv
+        Self::from_bitslice(&value.as_bitslice())
     }
 }
 
@@ -879,9 +882,7 @@ where
     A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
     fn from(value: crate::bitvec::BitVec<u8, P>) -> Self {
-        let mut bbv = Self::new();
-        bbv.extend_from_bitslice(&value.as_bitslice());
-        bbv
+        Self::from_bitslice(&value.as_bitslice())
     }
 }
 
@@ -904,6 +905,12 @@ impl<A, O> BoundedBitVec<A, O>
 where
     A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
+    fn from_bitslice<P>(value: &BitSlice<'_, u8, P>) -> Self {
+        let mut bbv = Self::new();
+        bbv.extend_from_bitslice(value);
+        bbv
+    }
+
     fn new() -> Self {
         Self {
             bits: A::default(),
@@ -935,7 +942,11 @@ where
         self.size = 0;
     }
 
+    #[inline]
     fn extend_from_bitslice<P>(&mut self, bits: &BitSlice<'_, u8, P>) {
+        if bits.is_empty() {
+            return;
+        }
         assert!(self.size + bits.len() <= self.capacity());
         let start = self.size;
         self.as_mut_bitslice().copy_from_bitslice_at(start, bits);
@@ -965,11 +976,33 @@ where
         self.size += 1;
     }
 
+    #[inline]
+    fn insert_zeros(&mut self, index: usize, count: usize) {
+        assert!(self.size + count <= self.capacity());
+        assert!(index <= self.size);
+        for _ in 0..count {
+            self.insert(index, false);
+        }
+    }
+
+    #[inline]
+    fn prepend_zeros(&mut self, count: usize) {
+        self.insert_zeros(0, count);
+    }
+
     fn push(&mut self, value: bool) {
         assert!(self.len() < self.capacity());
         let index = self.size;
         self.as_mut_bitslice().set(index, value);
         self.size += 1;
+    }
+
+    #[inline]
+    fn append_zeros(&mut self, count: usize) {
+        assert!(self.size + count <= self.capacity());
+        for _ in 0..count {
+            self.push(false);
+        }
     }
 
     fn split_off(&mut self, index: usize) -> Self {

@@ -135,7 +135,7 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(
             reader.rest(),
-            expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
+            expected_rest_bits.iter().collect::<Vec<bool>>()
         );
         let mut buf = vec![];
         cursor.read_to_end(&mut buf).unwrap();

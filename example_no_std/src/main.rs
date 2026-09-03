@@ -25,9 +25,7 @@ fn main() -> ! {
         // SAFETY: the heap backing storage is a dedicated writable static region,
         // its size is correct, and initialization happens exactly once before
         // any allocation.
-        unsafe {
-            HEAP.init((&raw mut HEAP_MEM).cast::<u8>() as usize, HEAP_SIZE)
-        }
+        unsafe { HEAP.init((&raw mut HEAP_MEM).cast::<u8>() as usize, HEAP_SIZE) }
     }
 
     // now the allocator is ready types like Box, Vec can be used.

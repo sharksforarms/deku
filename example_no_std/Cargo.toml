@@ -1,5 +1,5 @@
 [package]
-name = "ensure_no_std"
+name = "example_no_std"
 version = "0.1.0"
 authors = ["sharks <sharks@sharks>"]
 edition = "2024"
@@ -18,7 +18,7 @@ name = "no_std_lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "ensure_no_std"
+name = "example_no_std"
 path = "src/main.rs"
 
 [features]

@@ -59,8 +59,8 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo fmt --all -- --check
 
-  ensure_no_std:
-    name: Ensure no_std
+  example_no_std:
+    name: Example no_std
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -71,11 +71,11 @@ jobs:
         with:
           toolchain: nightly
           targets: ${{ matrix.target }}
-      - run: cd ensure_no_std && cargo build --release --target ${{ matrix.target }}
-      - run: cd ensure_no_std && cargo build --release --target ${{ matrix.target }} --no-default-features
+      - run: cd example_no_std && cargo build --release --target ${{ matrix.target }}
+      - run: cd example_no_std && cargo build --release --target ${{ matrix.target }} --no-default-features
 
-  ensure_wasm:
-    name: Ensure wasm
+  example_wasm:
+    name: Example wasm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -85,4 +85,4 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.3.0
         with:
           version: 'latest'
-      - run: cd ensure_wasm && wasm-pack build --target web && wasm-pack test --node
+      - run: cd example_wasm && wasm-pack build --target web && wasm-pack test --node

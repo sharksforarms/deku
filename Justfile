@@ -3,6 +3,7 @@ set shell := ["bash", "-euc"]
 stable := env_var_or_default("DEKU_STABLE_TOOLCHAIN", "stable")
 msrv := env_var_or_default("DEKU_MSRV_TOOLCHAIN", "1.88.0")
 beta := env_var_or_default("DEKU_BETA_TOOLCHAIN", "beta")
+nightly := env_var_or_default("DEKU_NIGHTLY_TOOLCHAIN", "nightly")
 pipeline := env_var_or_default("DEKU_TOOLCHAIN", "stable")
 toolchain := if pipeline == "msrv" { msrv } else if pipeline == "stable" { stable } else if pipeline == "beta" { beta } else { pipeline }
 trybuild_profile := if pipeline == "msrv" { "msrv" } else if pipeline == "beta" { "beta" } else { "stable" }
@@ -28,6 +29,18 @@ test:
     cargo +{{toolchain}} test --no-default-features
     for features in {{feature_matrix}}; do
         cargo +{{toolchain}} test --no-default-features --features="${features}"
+    done
+
+# Run the same test matrix under Miri.
+miri-test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo +{{nightly}} miri setup
+    cargo +{{nightly}} miri test --workspace
+    cargo +{{nightly}} miri test --workspace --all-features
+    cargo +{{nightly}} miri test --workspace --no-default-features
+    for features in {{feature_matrix}}; do
+        cargo +{{nightly}} miri test --workspace --no-default-features --features="${features}"
     done
 
 # Run every example with the default feature set.

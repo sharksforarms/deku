@@ -1,0 +1,5 @@
+error: `ctx_default` must be used with `ctx`
+ --> $DIR/ctx_validation.rs:4:22
+  |
+4 | #[deku(ctx_default = "1")]
+  |                      ^^^

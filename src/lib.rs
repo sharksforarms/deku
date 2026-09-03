@@ -14,8 +14,8 @@ understand the struct in a "packed" C way.
 
 Under the hood, many specializations are done in order to achieve performant code.
 For reading and writing bytes, the std library is used.
-When bit-level control is required, it makes use of the [bitvec](https://crates.io/crates/bitvec)
-crate as the "Reader" and “Writer”.
+When bit-level control is required, it uses a small packed-bit implementation
+for the "Reader" and "Writer".
 
 For documentation and examples on available `#[deku]` attributes and features,
 see [attributes list](attributes)
@@ -491,10 +491,10 @@ environment, you will see logging messages as Deku does its deserialising.
 - `DekuError` whenever possible will use a `'static str`, to make the errors compile away when following a
   guide such as [min-sized-rust](https://github.com/johnthagen/min-sized-rust).
 
-# Performance: Compile without `bitvec`
-The feature `bits` enables the `bitvec` crate to use when reading and writing, which is enabled by default.
-This however slows down the reading and writing process if your code doesn't use `bits` and the `bit_offset`
-in `from_bytes`.
+# Performance: Compile without bit support
+The feature `bits` enables bit-level reading and writing, and is enabled by
+default. Disabling it reduces the parser code size when your code does not use
+the `bits` attribute or a non-zero bit offset in `from_bytes`.
 
 # NoSeek
 Unseekable streams such as [TcpStream](https://doc.rust-lang.org/std/net/struct.TcpStream.html) are supported through the [NoSeek](noseek::NoSeek) wrapper.
@@ -510,6 +510,9 @@ extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
+#[cfg(feature = "bits")]
+use core::marker::PhantomData;
+
 /// re-export of [no_std_io2](https://crates.io/crates/no-std-io2)
 pub mod no_std_io {
     pub use no_std_io::io::Cursor;
@@ -522,24 +525,20 @@ pub mod no_std_io {
     pub use no_std_io::io::Write;
 }
 
-/// re-export of bitvec
+#[cfg(feature = "bits")]
+mod bits;
+
+/// Packed bit storage used by the `bits` feature.
 #[cfg(feature = "bits")]
 pub mod bitvec {
-    pub use bitvec::field::BitField;
-    pub use bitvec::prelude::*;
-    pub use bitvec::view::BitView;
+    #[cfg(feature = "alloc")]
+    pub use crate::bits::BitVec;
+    pub use crate::bits::{BitOrder, BitSlice, BitSliceMut, BitSource, BitValue, Lsb0, Msb0};
+    pub use crate::{bitarr, bits, bitvec};
 }
 
 #[cfg(feature = "bits")]
-use ::bitvec::array::BitArray;
-#[cfg(feature = "bits")]
-use ::bitvec::order::BitOrder;
-#[cfg(feature = "bits")]
-use ::bitvec::slice::BitSlice;
-#[cfg(feature = "bits")]
-use ::bitvec::store::BitStore;
-#[cfg(feature = "bits")]
-use ::bitvec::view::BitViewSized;
+use crate::bits::{BitSlice, BitSliceMut};
 
 pub use deku_derive::*;
 
@@ -772,7 +771,7 @@ pub trait DekuContainerWrite: DekuWriter<()> {
         DekuWriter::to_writer(self, &mut __deku_writer, ())?;
         let leftover = __deku_writer.leftover;
         let mut bv = bitvec::BitVec::from_slice(&out_buf);
-        bv.extend_from_bitslice(leftover.0.as_bitslice());
+        bv.extend_from_bitslice(&leftover.0.as_bitslice());
         Ok(bv)
     }
 }
@@ -834,39 +833,24 @@ where
     }
 }
 
-/// Like BitVec but with bounded, local storage
+/// Like [`crate::bitvec::BitVec`] but with bounded, local storage.
 #[cfg(feature = "bits")]
 #[derive(Clone, Debug)]
 pub struct BoundedBitVec<A, O>
 where
-    A: BitViewSized,
-    O: BitOrder,
+    A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
-    bits: crate::bitvec::BitArray<A, O>,
+    bits: A,
     size: usize,
+    _marker: PhantomData<O>,
 }
 
 #[cfg(feature = "bits")]
-impl<A, O> From<BitArray<A, O>> for BoundedBitVec<A, O>
+impl<A, O, P> From<&BitSlice<'_, u8, P>> for BoundedBitVec<A, O>
 where
-    A: BitViewSized,
-    O: BitOrder,
+    A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
-    fn from(value: BitArray<A, O>) -> Self {
-        Self {
-            bits: value.clone(),
-            size: value.len(),
-        }
-    }
-}
-
-#[cfg(feature = "bits")]
-impl<A, O> From<&BitSlice<A::Store, O>> for BoundedBitVec<A, O>
-where
-    A: BitViewSized,
-    O: BitOrder,
-{
-    fn from(value: &BitSlice<A::Store, O>) -> Self {
+    fn from(value: &BitSlice<'_, u8, P>) -> Self {
         let mut bbv = BoundedBitVec::new();
         bbv.extend_from_bitslice(value);
         bbv
@@ -874,33 +858,25 @@ where
 }
 
 #[cfg(feature = "bits")]
-impl<A, O> From<&mut BitSlice<<A::Store as BitStore>::Alias, O>> for BoundedBitVec<A, O>
+impl<A, O, P> From<&mut BitSliceMut<'_, u8, P>> for BoundedBitVec<A, O>
 where
-    A: BitViewSized,
-    O: BitOrder,
+    A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
-    fn from(value: &mut BitSlice<<A::Store as BitStore>::Alias, O>) -> Self {
+    fn from(value: &mut BitSliceMut<'_, u8, P>) -> Self {
         let mut bbv = BoundedBitVec::new();
-        let end = value.len();
-        debug_assert!(end <= bbv.bits.len());
-        bbv.bits[..end]
-            .split_at_mut(end)
-            .0
-            .copy_from_bitslice(value);
-        bbv.size = value.len();
+        bbv.extend_from_bitslice(&value.as_bitslice());
         bbv
     }
 }
 
 #[cfg(all(feature = "bits", feature = "alloc"))]
-impl<A, O> From<crate::bitvec::BitVec<A::Store, O>> for BoundedBitVec<A, O>
+impl<A, O, P> From<crate::bitvec::BitVec<u8, P>> for BoundedBitVec<A, O>
 where
-    A: BitViewSized,
-    O: BitOrder,
+    A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
-    fn from(value: crate::bitvec::BitVec<A::Store, O>) -> Self {
+    fn from(value: crate::bitvec::BitVec<u8, P>) -> Self {
         let mut bbv = Self::new();
-        bbv.extend_from_bitslice(value.as_bitslice());
+        bbv.extend_from_bitslice(&value.as_bitslice());
         bbv
     }
 }
@@ -908,8 +884,7 @@ where
 #[cfg(feature = "bits")]
 impl<A, O> From<&[bool]> for BoundedBitVec<A, O>
 where
-    A: BitViewSized,
-    O: BitOrder,
+    A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
     fn from(value: &[bool]) -> Self {
         let mut bbv = BoundedBitVec::new();
@@ -923,44 +898,43 @@ where
 #[cfg(feature = "bits")]
 impl<A, O> BoundedBitVec<A, O>
 where
-    A: BitViewSized,
-    O: BitOrder,
+    A: AsRef<[u8]> + AsMut<[u8]> + Copy + Default,
 {
     fn new() -> Self {
         Self {
-            bits: crate::bitvec::BitArray::ZERO,
+            bits: A::default(),
             size: 0,
+            _marker: PhantomData,
         }
     }
 
-    fn as_bitslice(&self) -> &BitSlice<A::Store, O> {
-        assert!(self.size <= self.bits.len());
-        &self.bits[..self.size]
+    fn as_bitslice(&self) -> BitSlice<'_, u8, O> {
+        assert!(self.size <= self.capacity());
+        BitSlice::from_parts(self.bits.as_ref(), 0, self.size)
     }
 
-    fn as_mut_bitslice(&mut self) -> &mut BitSlice<A::Store, O> {
-        assert!(self.size <= self.bits.len());
-        &mut self.bits[..self.size]
+    fn as_mut_bitslice(&mut self) -> BitSliceMut<'_, u8, O> {
+        let capacity = self.capacity();
+        assert!(self.size <= capacity);
+        BitSliceMut::from_parts(self.bits.as_mut(), 0, capacity)
     }
 
-    fn as_raw_slice(&self) -> &[A::Store] {
-        self.bits.as_raw_slice()
+    fn as_raw_slice(&self) -> &[u8] {
+        self.bits.as_ref()
     }
 
     fn capacity(&self) -> usize {
-        self.bits.len()
+        self.bits.as_ref().len().saturating_mul(8)
     }
 
     fn clear(&mut self) {
         self.size = 0;
     }
 
-    fn extend_from_bitslice(&mut self, bits: &BitSlice<A::Store, O>) {
-        assert!(self.size + bits.len() <= self.bits.len());
-        self.bits
-            .get_mut(self.size..{ self.size + bits.len() })
-            .expect("Asserted already")
-            .copy_from_bitslice(bits);
+    fn extend_from_bitslice<P>(&mut self, bits: &BitSlice<'_, u8, P>) {
+        assert!(self.size + bits.len() <= self.capacity());
+        let start = self.size;
+        self.as_mut_bitslice().copy_from_bitslice_at(start, bits);
         self.size += bits.len();
     }
 
@@ -969,7 +943,7 @@ where
     }
 
     fn is_full(&self) -> bool {
-        self.size == self.bits.len()
+        self.size == self.capacity()
     }
 
     fn len(&self) -> usize {
@@ -977,26 +951,31 @@ where
     }
 
     fn insert(&mut self, index: usize, value: bool) {
-        assert!(self.size < self.bits.len());
-        assert!(index < self.size);
-        let (_left, right) = self.bits.split_at_mut(index);
-        right.shift_end(1);
-        right.set(0, value);
+        assert!(self.size < self.capacity());
+        assert!(index <= self.size);
+        for current in (index..self.size).rev() {
+            let bit = self.as_bitslice().get(current);
+            self.as_mut_bitslice().set(current + 1, bit);
+        }
+        self.as_mut_bitslice().set(index, value);
         self.size += 1;
     }
 
     fn push(&mut self, value: bool) {
-        assert!(self.len() < self.bits.len());
-        *self.bits.get_mut(self.size).expect("Bad index") = value;
+        assert!(self.len() < self.capacity());
+        let index = self.size;
+        self.as_mut_bitslice().set(index, value);
         self.size += 1;
     }
 
     fn split_off(&mut self, index: usize) -> Self {
-        assert!(index < self.size);
-        let (left, right) = self.bits[..self.size].split_at(index);
-        debug_assert_eq!(left.len() + right.len(), self.size);
-        self.size = left.len();
-        right.into()
+        assert!(index <= self.size);
+        let mut result = Self::new();
+        for current in index..self.size {
+            result.push(self.as_bitslice().get(current));
+        }
+        self.size = index;
+        result
     }
 }
 
@@ -1010,16 +989,16 @@ impl BoundedBitVec<[u8; 1], crate::bitvec::Msb0> {
     #[inline]
     fn from_msb0_byte(byte: u8, size: usize) -> Self {
         debug_assert!(size <= 8);
-        Self {
-            bits: BitArray::new([byte]),
-            size,
-        }
+        let mut result = Self::new();
+        result.bits.as_mut()[0] = byte;
+        result.size = size;
+        result
     }
 
     /// The leftover as `(high-aligned byte, bit count)`.
     #[inline]
     fn as_msb0_byte(&self) -> (u8, usize) {
-        (self.bits.as_raw_slice()[0], self.size)
+        (self.bits.as_ref()[0], self.size)
     }
 }
 

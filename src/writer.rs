@@ -59,7 +59,7 @@ impl<W: Write + Seek> Writer<W> {
     #[inline]
     #[cfg(all(feature = "bits", feature = "alloc"))]
     pub fn rest(&mut self) -> alloc::vec::Vec<bool> {
-        self.leftover.0.as_bitslice().iter().by_vals().collect()
+        self.leftover.0.as_bitslice().iter().collect()
     }
 
     /// Writes the low `amt` bits (`1..=64`) of `value`, most-significant-bit
@@ -111,7 +111,7 @@ impl<W: Write + Seek> Writer<W> {
     #[cfg(feature = "bits")]
     fn write_bits_order_msb_msb(
         &mut self,
-        bits: &BitSlice<u8, Msb0>,
+        bits: &BitSlice<'_, u8, Msb0>,
         order: Order,
     ) -> Result<(), DekuError> {
         assert_eq!(self.leftover.1, Order::Msb0);
@@ -123,7 +123,7 @@ impl<W: Write + Seek> Writer<W> {
         core::mem::swap(&mut self.leftover, &mut leftover);
 
         let rest = if leftover.0.is_empty() {
-            (bits, order)
+            (*bits, order)
         } else {
             debug_assert!(leftover.0.capacity() >= leftover.0.len());
             let complement = leftover.0.capacity() - leftover.0.len();
@@ -135,8 +135,8 @@ impl<W: Write + Seek> Writer<W> {
                 (rest, order),
             );
 
-            self.leftover.0.extend_from_bitslice(first.0);
-            self.leftover.0.extend_from_bitslice(complement.0);
+            self.leftover.0.extend_from_bitslice(&first.0);
+            self.leftover.0.extend_from_bitslice(&complement.0);
 
             debug_assert!(self.leftover.0.is_full() || rest.0.is_empty());
 
@@ -148,15 +148,17 @@ impl<W: Write + Seek> Writer<W> {
             rest
         };
 
-        let iter = rest.0.chunks_exact(bits_of::<u8>());
-        let remainder = iter.remainder();
-        for byte in iter {
-            self.inner.write_all(&[byte.load_be()])?;
+        let chunk_bits = bits_of::<u8>();
+        let full_bits = rest.0.len() / chunk_bits * chunk_bits;
+        for start in (0..full_bits).step_by(chunk_bits) {
+            let byte = rest.0.subslice(start, start + chunk_bits);
+            self.inner.write_all(&[byte.load_be::<u8>()])?;
         }
 
-        self.bits_written += rest.0.len() - remainder.len();
+        let remainder = rest.0.subslice(full_bits, rest.0.len());
+        self.bits_written += full_bits;
         debug_assert!(self.leftover.0.len() + remainder.len() <= self.leftover.0.capacity());
-        self.leftover.0.extend_from_bitslice(remainder);
+        self.leftover.0.extend_from_bitslice(&remainder);
         self.leftover.1 = order;
         Ok(())
     }
@@ -164,7 +166,7 @@ impl<W: Write + Seek> Writer<W> {
     #[cfg(feature = "bits")]
     fn write_bits_order_msb_lsb(
         &mut self,
-        bits: &BitSlice<u8, Msb0>,
+        bits: &BitSlice<'_, u8, Msb0>,
         order: Order,
     ) -> Result<(), DekuError> {
         assert_eq!(self.leftover.1, Order::Msb0);
@@ -179,7 +181,7 @@ impl<W: Write + Seek> Writer<W> {
             (
                 (BitSlice::empty(), leftover.1),
                 (BitSlice::empty(), order),
-                (bits, order),
+                (*bits, order),
                 (BitSlice::empty(), leftover.1),
             )
         } else {
@@ -197,8 +199,8 @@ impl<W: Write + Seek> Writer<W> {
             )
         };
 
-        self.leftover.0.extend_from_bitslice(first.0);
-        self.leftover.0.extend_from_bitslice(complement.0);
+        self.leftover.0.extend_from_bitslice(&first.0);
+        self.leftover.0.extend_from_bitslice(&complement.0);
 
         if self.leftover.0.is_full() {
             self.inner.write_all(self.leftover.0.as_raw_slice())?;
@@ -206,19 +208,21 @@ impl<W: Write + Seek> Writer<W> {
             self.leftover = (BoundedBitVec::new(), Order::Msb0);
         }
 
-        let iter = bulk.0.chunks_exact(bits_of::<u8>());
-        let remainder = iter.remainder();
-        for byte in iter {
-            self.inner.write_all(&[byte.load_be()])?;
+        let chunk_bits = bits_of::<u8>();
+        let full_bits = bulk.0.len() / chunk_bits * chunk_bits;
+        for start in (0..full_bits).step_by(chunk_bits) {
+            let byte = bulk.0.subslice(start, start + chunk_bits);
+            self.inner.write_all(&[byte.load_be::<u8>()])?;
         }
-        self.bits_written += bulk.0.len() - remainder.len();
+        self.bits_written += full_bits;
 
+        let remainder = bulk.0.subslice(full_bits, bulk.0.len());
         debug_assert!(self.leftover.0.len() + remainder.len() <= self.leftover.0.capacity());
         let complement = leftover.0.capacity() - remainder.len();
         let complement = core::cmp::min(complement, last.0.len());
         let (complement, rest) = last.0.split_at(complement);
-        self.leftover.0.extend_from_bitslice(remainder);
-        self.leftover.0.extend_from_bitslice(complement);
+        self.leftover.0.extend_from_bitslice(&remainder);
+        self.leftover.0.extend_from_bitslice(&complement);
 
         debug_assert!(self.leftover.0.is_full() || rest.is_empty());
 
@@ -228,7 +232,7 @@ impl<W: Write + Seek> Writer<W> {
             self.leftover = (BoundedBitVec::new(), Order::Msb0);
         }
 
-        self.leftover.0.extend_from_bitslice(rest);
+        self.leftover.0.extend_from_bitslice(&rest);
         self.leftover.1 = order;
         Ok(())
     }
@@ -236,7 +240,7 @@ impl<W: Write + Seek> Writer<W> {
     #[cfg(feature = "bits")]
     fn write_bits_order_lsb_msb(
         &mut self,
-        bits: &BitSlice<u8, Msb0>,
+        bits: &BitSlice<'_, u8, Msb0>,
         order: Order,
     ) -> Result<(), DekuError> {
         assert_eq!(self.leftover.1, Order::Lsb0);
@@ -249,7 +253,7 @@ impl<W: Write + Seek> Writer<W> {
 
         let (first, complement, rest) = if leftover.0.is_empty() {
             (
-                (bits, order),
+                (*bits, order),
                 (BitSlice::empty(), leftover.1),
                 (BitSlice::empty(), leftover.1),
             )
@@ -258,20 +262,24 @@ impl<W: Write + Seek> Writer<W> {
             let complement = leftover.0.capacity() - remainder;
             let complement = core::cmp::min(complement, leftover.0.len());
             let (complement, rest) = leftover.0.as_bitslice().split_at(complement);
-            ((bits, order), (complement, leftover.1), (rest, leftover.1))
+            ((*bits, order), (complement, leftover.1), (rest, leftover.1))
         };
 
-        let iter = first.0.rchunks_exact(bits_of::<u8>());
-        let remainder = iter.remainder();
-        for byte in iter {
-            self.inner.write_all(&[byte.load_be()])?;
+        let chunk_bits = bits_of::<u8>();
+        let full_chunks = first.0.len() / chunk_bits;
+        let full_bits = full_chunks * chunk_bits;
+        let remainder = first.0.subslice(0, first.0.len() - full_bits);
+        for chunk in (0..full_chunks).rev() {
+            let start = remainder.len() + chunk * chunk_bits;
+            let byte = first.0.subslice(start, start + chunk_bits);
+            self.inner.write_all(&[byte.load_be::<u8>()])?;
         }
 
-        self.bits_written += first.0.len() - remainder.len();
+        self.bits_written += full_bits;
         debug_assert!(self.leftover.0.len() + remainder.len() <= self.leftover.0.capacity());
 
-        self.leftover.0.extend_from_bitslice(remainder);
-        self.leftover.0.extend_from_bitslice(complement.0);
+        self.leftover.0.extend_from_bitslice(&remainder);
+        self.leftover.0.extend_from_bitslice(&complement.0);
         self.leftover.1 = order;
 
         debug_assert!(self.leftover.0.is_full() || rest.0.is_empty());
@@ -282,14 +290,14 @@ impl<W: Write + Seek> Writer<W> {
             self.leftover = (BoundedBitVec::new(), Order::Msb0);
         }
 
-        self.leftover.0.extend_from_bitslice(rest.0);
+        self.leftover.0.extend_from_bitslice(&rest.0);
         Ok(())
     }
 
     #[cfg(feature = "bits")]
     fn write_bits_order_lsb_lsb(
         &mut self,
-        bits: &BitSlice<u8, Msb0>,
+        bits: &BitSlice<'_, u8, Msb0>,
         order: Order,
     ) -> Result<(), DekuError> {
         assert_eq!(self.leftover.1, Order::Lsb0);
@@ -301,7 +309,7 @@ impl<W: Write + Seek> Writer<W> {
         core::mem::swap(&mut self.leftover, &mut leftover);
 
         let rest = if leftover.0.is_empty() {
-            (bits, order)
+            (*bits, order)
         } else {
             let complement = leftover.0.capacity() - leftover.0.len();
             let complement = core::cmp::min(complement, bits.len());
@@ -312,8 +320,8 @@ impl<W: Write + Seek> Writer<W> {
                 (rest, order),
             );
 
-            self.leftover.0.extend_from_bitslice(first.0);
-            self.leftover.0.extend_from_bitslice(complement.0);
+            self.leftover.0.extend_from_bitslice(&first.0);
+            self.leftover.0.extend_from_bitslice(&complement.0);
 
             debug_assert!(self.leftover.0.is_full() || rest.0.is_empty());
 
@@ -325,15 +333,19 @@ impl<W: Write + Seek> Writer<W> {
             rest
         };
 
-        let iter = rest.0.rchunks_exact(bits_of::<u8>());
-        let remainder = iter.remainder();
-        for byte in iter {
-            self.inner.write_all(&[byte.load_be()])?;
+        let chunk_bits = bits_of::<u8>();
+        let full_chunks = rest.0.len() / chunk_bits;
+        let full_bits = full_chunks * chunk_bits;
+        let remainder = rest.0.subslice(0, rest.0.len() - full_bits);
+        for chunk in (0..full_chunks).rev() {
+            let start = remainder.len() + chunk * chunk_bits;
+            let byte = rest.0.subslice(start, start + chunk_bits);
+            self.inner.write_all(&[byte.load_be::<u8>()])?;
         }
 
-        self.bits_written += rest.0.len() - remainder.len();
+        self.bits_written += full_bits;
         debug_assert!(self.leftover.0.len() + remainder.len() <= self.leftover.0.capacity());
-        self.leftover.0.extend_from_bitslice(remainder);
+        self.leftover.0.extend_from_bitslice(&remainder);
         self.leftover.1 = order;
         Ok(())
     }
@@ -341,19 +353,20 @@ impl<W: Write + Seek> Writer<W> {
     /// Write all bits to `Writer` buffer if bits can fit into a byte buffer
     #[cfg(feature = "bits")]
     #[inline]
-    pub fn write_bits_order(
+    pub fn write_bits_order<B: BitSource + ?Sized>(
         &mut self,
-        bits: &BitSlice<u8, Msb0>,
+        source: &B,
         order: Order,
     ) -> Result<(), DekuError> {
+        let bits = source.bit_slice();
         match self.leftover.1 {
             Order::Msb0 => match order {
-                Order::Msb0 => self.write_bits_order_msb_msb(bits, order),
-                Order::Lsb0 => self.write_bits_order_msb_lsb(bits, order),
+                Order::Msb0 => self.write_bits_order_msb_msb(&bits, order),
+                Order::Lsb0 => self.write_bits_order_msb_lsb(&bits, order),
             },
             Order::Lsb0 => match order {
-                Order::Msb0 => self.write_bits_order_lsb_msb(bits, order),
-                Order::Lsb0 => self.write_bits_order_lsb_lsb(bits, order),
+                Order::Msb0 => self.write_bits_order_lsb_msb(&bits, order),
+                Order::Lsb0 => self.write_bits_order_lsb_lsb(&bits, order),
             },
         }
     }
@@ -361,8 +374,22 @@ impl<W: Write + Seek> Writer<W> {
     /// Write all bits to `Writer` buffer if bits can fit into a byte buffer
     #[cfg(feature = "bits")]
     #[inline]
-    pub fn write_bits(&mut self, bits: &BitSlice<u8, Msb0>) -> Result<(), DekuError> {
-        self.write_bits_order(bits, Order::Msb0)
+    pub fn write_bits<B: BitSource + ?Sized>(&mut self, source: &B) -> Result<(), DekuError> {
+        self.write_bits_order(source, Order::Msb0)
+    }
+
+    /// Write `amt` zero bits without allocating a temporary bit buffer.
+    #[cfg(feature = "bits")]
+    #[inline]
+    pub fn write_zeros(&mut self, mut amt: usize, order: Order) -> Result<(), DekuError> {
+        let zeros = [0u8; 1];
+        let bits = BitSlice::<u8, Msb0>::from_slice(&zeros);
+        while amt != 0 {
+            let chunk = core::cmp::min(amt, bits.len());
+            self.write_bits_order(&bits.subslice(0, chunk), order)?;
+            amt -= chunk;
+        }
+        Ok(())
     }
 
     /// Write `buf` into `Writer`
@@ -379,7 +406,8 @@ impl<W: Write + Seek> Writer<W> {
 
             // TODO: we could check here and only send the required bits to finish the byte?
             // (instead of sending the entire thing)
-            self.write_bits(BitSlice::from_slice(buf))?;
+            let bits = BitSlice::<u8, Msb0>::from_slice(buf);
+            self.write_bits(&bits)?;
         } else {
             if let Err(e) = self.inner.write_all(buf) {
                 return Err(DekuError::Io(e.kind()));
@@ -404,10 +432,12 @@ impl<W: Write + Seek> Writer<W> {
     pub fn finalize(&mut self) -> Result<(), DekuError> {
         #[cfg(feature = "bits")]
         {
-            let padded = bitarr!(u8, Msb0; 0; 8);
+            let padded = [0u8; 1];
+            let padded = BitSlice::<u8, Msb0>::from_slice(&padded);
             debug_assert!(self.leftover.0.len() < 8);
             let len = (8 - self.leftover.0.len()) % 8;
-            self.write_bits_order(&padded[..len], self.leftover.1)?;
+            let padded = padded.subslice(0, len);
+            self.write_bits_order(&padded, self.leftover.1)?;
         }
         Ok(())
     }
@@ -419,6 +449,7 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+    use crate::bitvec;
     use assert_hex::assert_eq_hex;
     use hexlit::hex;
 

@@ -10,7 +10,7 @@ use std::convert::TryFrom;
 use std::fmt::Display;
 use syn::{Attribute, Meta, Type};
 
-use darling::{ast, ast::NestedMeta, FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens};
+use darling::{FromDeriveInput, FromField, FromMeta, FromVariant, ToTokens, ast, ast::NestedMeta};
 use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use syn::punctuated::Punctuated;
@@ -353,16 +353,13 @@ fn find_order_param_in_ctx(
     ctx: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
 ) -> Option<String> {
     for arg in ctx {
-        if let syn::FnArg::Typed(pat_type) = arg {
-            if let syn::Type::Path(type_path) = pat_type.ty.as_ref() {
-                if let Some(last_segment) = type_path.path.segments.last() {
-                    if last_segment.ident == "Order" {
-                        if let syn::Pat::Ident(pat_ident) = pat_type.pat.as_ref() {
-                            return Some(pat_ident.ident.to_string());
-                        }
-                    }
-                }
-            }
+        if let syn::FnArg::Typed(pat_type) = arg
+            && let syn::Type::Path(type_path) = pat_type.ty.as_ref()
+            && let Some(last_segment) = type_path.path.segments.last()
+            && last_segment.ident == "Order"
+            && let syn::Pat::Ident(pat_ident) = pat_type.pat.as_ref()
+        {
+            return Some(pat_ident.ident.to_string());
         }
     }
     None
@@ -1005,13 +1002,13 @@ impl VariantData {
             ));
         }
 
-        if let Some(id) = &data.id {
-            if id.to_string() == "_" {
-                return Err(cerror(
-                    data.ident.span(),
-                    "error: `id_pat` should be used for `_`",
-                ));
-            }
+        if let Some(id) = &data.id
+            && id.to_string() == "_"
+        {
+            return Err(cerror(
+                data.ident.span(),
+                "error: `id_pat` should be used for `_`",
+            ));
         }
 
         Ok(())
@@ -1382,16 +1379,16 @@ fn remove_deku_field_attrs(fields: &mut syn::punctuated::Punctuated<syn::Field, 
 
 fn remove_deku_attrs(fields: &mut syn::Fields) {
     match fields {
-        syn::Fields::Named(ref mut fields) => remove_deku_field_attrs(&mut fields.named),
-        syn::Fields::Unnamed(ref mut fields) => remove_deku_field_attrs(&mut fields.unnamed),
+        syn::Fields::Named(fields) => remove_deku_field_attrs(&mut fields.named),
+        syn::Fields::Unnamed(fields) => remove_deku_field_attrs(&mut fields.unnamed),
         syn::Fields::Unit => {}
     }
 }
 
 fn remove_temp_fields(fields: &mut syn::Fields) {
     match fields {
-        syn::Fields::Named(ref mut fields) => remove_deku_temp_fields(&mut fields.named),
-        syn::Fields::Unnamed(ref mut fields) => remove_deku_temp_fields(&mut fields.unnamed),
+        syn::Fields::Named(fields) => remove_deku_temp_fields(&mut fields.named),
+        syn::Fields::Unnamed(fields) => remove_deku_temp_fields(&mut fields.unnamed),
         syn::Fields::Unit => {}
     }
 }
@@ -1437,9 +1434,9 @@ pub fn deku_derive(
     // Remove the temp fields
     let mut input = syn::parse_macro_input!(item as syn::DeriveInput);
 
-    match input.data {
-        syn::Data::Struct(ref mut input_struct) => remove_temp_fields(&mut input_struct.fields),
-        syn::Data::Enum(ref mut input_enum) => {
+    match &mut input.data {
+        syn::Data::Struct(input_struct) => remove_temp_fields(&mut input_struct.fields),
+        syn::Data::Enum(input_enum) => {
             for variant in input_enum.variants.iter_mut() {
                 remove_temp_fields(&mut variant.fields)
             }
@@ -1455,12 +1452,12 @@ pub fn deku_derive(
     };
 
     // Remove attributes
-    match input.data {
-        syn::Data::Struct(ref mut input_struct) => {
+    match &mut input.data {
+        syn::Data::Struct(input_struct) => {
             input.attrs.retain(is_not_deku);
             remove_deku_attrs(&mut input_struct.fields)
         }
-        syn::Data::Enum(ref mut input_enum) => {
+        syn::Data::Enum(input_enum) => {
             for variant in input_enum.variants.iter_mut() {
                 variant.attrs.retain(is_not_deku);
                 remove_deku_attrs(&mut variant.fields)

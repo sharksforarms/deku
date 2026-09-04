@@ -1,0 +1,5 @@
+error: conflicting: only one `seek` attribute can be used at one time
+ --> tests/test_compile/cases/seek_conflict.rs:6:13
+  |
+6 |     byte_a: u8,
+  |             ^^

@@ -4,7 +4,7 @@ use no_std_io::io::{Read, Seek, Write};
 use crate::ctx::*;
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{deku_error, DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, deku_error};
 
 macro_rules! ImplDekuTraitsCtx {
     ($typ:ty, $readtype:ty, $ctx_arg:tt, $ctx_type:tt) => {

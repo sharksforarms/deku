@@ -13,8 +13,8 @@ fn main() -> ! {
     // Initialize the allocator BEFORE you use it
     #[cfg(feature = "alloc")]
     {
-        use embedded_alloc::LlffHeap as Heap;
         use core::mem::MaybeUninit;
+        use embedded_alloc::LlffHeap as Heap;
 
         #[global_allocator]
         static HEAP: Heap = Heap::empty();

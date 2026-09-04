@@ -11,15 +11,12 @@ trybuild_profile := if pipeline == "msrv" { "msrv" } else if pipeline == "beta" 
 # Non-default feature combinations exercised by the test and coverage matrix.
 feature_matrix := "std alloc descriptive-errors bits logging bits,alloc"
 
-# List the available build commands.
 default:
     @just --list
 
-# Compile the complete workspace with the selected toolchain.
 build:
     cargo +{{toolchain}} build --all
 
-# Run the test matrix used by CI.
 test:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -31,7 +28,6 @@ test:
         cargo +{{toolchain}} test --no-default-features --features="${features}"
     done
 
-# Run the same test matrix under Miri.
 miri-test:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -43,7 +39,6 @@ miri-test:
         cargo +{{nightly}} miri test --workspace --no-default-features --features="${features}"
     done
 
-# Run every example with the default feature set.
 examples:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -51,37 +46,31 @@ examples:
         cargo +{{toolchain}} run --example "$(basename "${path}" .rs)" >/dev/null
     done
 
-# Run the build, test, and example checks for the selected toolchain.
-ci-core: build test examples
-
-# Run formatting and Clippy checks with stable Rust.
 lint:
     cargo +{{stable}} clippy --workspace --lib --bins --examples --tests --all-features -- -D warnings
     cargo +{{stable}} clippy --workspace --lib --bins --examples --tests --no-default-features -- -D warnings
     cargo +{{stable}} fmt --all -- --check
+    cargo +{{stable}} fmt --manifest-path example_no_std/Cargo.toml -- --check
+    cargo +{{stable}} fmt --manifest-path example_wasm/Cargo.toml -- --check
+    cargo +{{stable}} clippy --manifest-path example_no_std/Cargo.toml --lib -- -D warnings
+    cargo +{{stable}} clippy --manifest-path example_wasm/Cargo.toml --lib -- -D warnings
 
-# Compile the no_std fixture for a target.
 no-std target:
     cd example_no_std && cargo +{{toolchain}} build --release --target {{target}}
     cd example_no_std && cargo +{{toolchain}} build --release --target {{target}} --no-default-features
 
-# Run the thumbv7em no_std checks.
 no-std-v7:
     just no-std thumbv7em-none-eabihf
 
-# Run the thumbv6m no_std checks.
 no-std-v6:
     just no-std thumbv6m-none-eabi
 
-# Build and test the WebAssembly fixture.
 wasm:
     cd example_wasm && RUSTUP_TOOLCHAIN={{toolchain}} wasm-pack build --target web
     cd example_wasm && RUSTUP_TOOLCHAIN={{toolchain}} wasm-pack test --node
 
-# Run the build, test, example, no_std, and WebAssembly checks for the selected toolchain.
-ci: ci-core no-std-v7 no-std-v6 wasm
+ci: build test examples no-std-v7 no-std-v6 wasm
 
-# Run the complete CI pipeline with a specific toolchain.
 ci-msrv:
     DEKU_TOOLCHAIN=msrv just ci
 
@@ -94,7 +83,6 @@ ci-lint:
 ci-beta:
     DEKU_TOOLCHAIN=beta just ci
 
-# Generate one Codecov JSON report from the complete feature test matrix.
 coverage:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -111,6 +99,5 @@ coverage:
 
     cargo +{{stable}} llvm-cov report --package deku --package deku_derive --codecov --output-path codecov.json
 
-# Run the Criterion benchmarks.
 bench:
     cargo +{{toolchain}} bench --workspace

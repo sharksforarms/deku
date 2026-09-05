@@ -1,17 +1,114 @@
-//! Implementations of DekuRead and DekuWrite for [T; N] where 0 < N <= 32
+//! Implementations of DekuRead and DekuWrite for slices and arrays.
 
+use crate::ctx::{BitSize, ByteSize, Limit, ReadExact};
 use crate::reader::Reader;
 use crate::writer::Writer;
 use crate::{DekuError, DekuReader, DekuWriter};
 use core::mem::MaybeUninit;
 use no_std_io::io::{Read, Seek, Write};
 
+impl<'a> DekuReader<'a, ReadExact> for &'a [u8] {
+    fn from_reader_with_ctx<R: Read + Seek>(
+        reader: &mut Reader<'a, R>,
+        exact: ReadExact,
+    ) -> Result<Self, DekuError> {
+        reader.read_bytes_ref(exact.0)
+    }
+}
+
+impl<'a, Ctx, Predicate: FnMut(&u8) -> bool> DekuReader<'a, (Limit<u8, Predicate>, Ctx)>
+    for &'a [u8]
+{
+    fn from_reader_with_ctx<R: Read + Seek>(
+        reader: &mut Reader<'a, R>,
+        (limit, _inner_ctx): (Limit<u8, Predicate>, Ctx),
+    ) -> Result<Self, DekuError> {
+        match limit {
+            Limit::Count(count) => reader.read_bytes_ref(count),
+            Limit::ByteSize(ByteSize(size)) => reader.read_bytes_ref(size),
+            Limit::BitSize(BitSize(size)) => {
+                if !size.is_multiple_of(8) {
+                    return Err(crate::deku_error!(
+                        DekuError::InvalidParam,
+                        "borrowed byte slices require a byte-aligned bit size"
+                    ));
+                }
+                reader.read_bytes_ref(size / 8)
+            }
+            Limit::End => {
+                let Some(source) = reader.source_bytes() else {
+                    return Err(crate::deku_error!(
+                        DekuError::InvalidParam,
+                        "reading a borrowed slice to the end requires Reader::from_bytes"
+                    ));
+                };
+                let start = reader.bits_read / 8;
+                let size = source.len().saturating_sub(start);
+                reader.read_bytes_ref(size)
+            }
+            Limit::Until(mut predicate, _) => {
+                let start = reader.bits_read / 8;
+                loop {
+                    let byte = reader.read_bytes_ref(1)?[0];
+                    if predicate(&byte) {
+                        break;
+                    }
+                }
+                let end = reader.bits_read / 8;
+                let Some(source) = reader.source_bytes() else {
+                    return Err(crate::deku_error!(
+                        DekuError::InvalidParam,
+                        "reading a borrowed slice until a predicate requires Reader::from_bytes"
+                    ));
+                };
+                Ok(&source[start..end])
+            }
+        }
+    }
+}
+
+impl<'a, Predicate: FnMut(&u8) -> bool> DekuReader<'a, Limit<u8, Predicate>> for &'a [u8] {
+    fn from_reader_with_ctx<R: Read + Seek>(
+        reader: &mut Reader<'a, R>,
+        limit: Limit<u8, Predicate>,
+    ) -> Result<Self, DekuError> {
+        <Self as DekuReader<'a, (Limit<u8, Predicate>, ())>>::from_reader_with_ctx(
+            reader,
+            (limit, ()),
+        )
+    }
+}
+
+impl<'a> DekuReader<'a, ByteSize> for &'a [u8] {
+    fn from_reader_with_ctx<R: Read + Seek>(
+        reader: &mut Reader<'a, R>,
+        size: ByteSize,
+    ) -> Result<Self, DekuError> {
+        reader.read_bytes_ref(size.0)
+    }
+}
+
+impl<'a> DekuReader<'a, BitSize> for &'a [u8] {
+    fn from_reader_with_ctx<R: Read + Seek>(
+        reader: &mut Reader<'a, R>,
+        size: BitSize,
+    ) -> Result<Self, DekuError> {
+        if !size.0.is_multiple_of(8) {
+            return Err(crate::deku_error!(
+                DekuError::InvalidParam,
+                "borrowed byte slices require a byte-aligned bit size"
+            ));
+        }
+        reader.read_bytes_ref(size.0 / 8)
+    }
+}
+
 impl<'a, Ctx: Copy, T, const N: usize> DekuReader<'a, Ctx> for [T; N]
 where
     T: DekuReader<'a, Ctx>,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut Reader<R>,
+        reader: &mut Reader<'a, R>,
         ctx: Ctx,
     ) -> Result<Self, DekuError>
     where

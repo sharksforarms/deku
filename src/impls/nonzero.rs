@@ -8,9 +8,9 @@ use crate::{DekuError, DekuReader, DekuWriter, deku_error};
 
 macro_rules! ImplDekuTraitsCtx {
     ($typ:ty, $readtype:ty, $ctx_arg:tt, $ctx_type:tt) => {
-        impl DekuReader<'_, $ctx_type> for $typ {
+        impl<'a> DekuReader<'a, $ctx_type> for $typ {
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 $ctx_arg: $ctx_type,
             ) -> Result<Self, DekuError> {
                 let value = <$readtype>::from_reader_with_ctx(reader, $ctx_arg)?;

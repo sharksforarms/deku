@@ -6,7 +6,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 #[cfg(feature = "bits")]
 use syn::LitStr;
-use syn::{Ident, LitByteStr};
+use syn::{GenericArgument, Ident, LitByteStr, PathArguments, Type};
 
 #[cfg(feature = "bits")]
 use crate::macros::gen_bit_order_from_str;
@@ -87,8 +87,6 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         quote! {}
     };
 
-    let magic_read = emit_magic_read(input);
-
     // check if the first field has an ident, if not, it's a unnamed struct
     let is_named_struct = fields
         .fields
@@ -96,6 +94,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         .and_then(|v| v.ident.as_ref())
         .is_some();
 
+    let magic_read = emit_magic_read(input);
     let (field_idents, field_reads) = emit_field_reads(input, &fields, &ident, false)?;
 
     // filter out temporary fields
@@ -123,28 +122,6 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             Ok((__deku_reader.bits_read, __deku_value))
         };
 
-        let from_bytes_body = quote! {
-            use core::convert::TryFrom;
-            use ::#crate_::DekuReader as _;
-            let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
-            let mut __deku_reader = &mut ::#crate_::reader::Reader::new(&mut __deku_cursor);
-            if __deku_input.1 != 0 {
-                __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
-            }
-
-            let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
-            let read_whole_byte = (__deku_reader.bits_read % 8) == 0;
-            let idx = if read_whole_byte {
-                __deku_reader.bits_read / 8
-            } else {
-                (__deku_reader.bits_read - (__deku_reader.bits_read % 8)) / 8
-            };
-            let Some(rest) = __deku_input.0.get(idx..) else {
-                return Err(::#crate_::DekuError::Incomplete(::#crate_::prelude::NeedSize::new(8 * (idx - __deku_input.0.len()))));
-            };
-            Ok(((rest, __deku_reader.bits_read % 8), __deku_value))
-        };
-
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
         tokens.extend(emit_container_read(
@@ -153,7 +130,6 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             &ident,
             wher,
             from_reader_body,
-            from_bytes_body,
         ));
     }
 
@@ -176,7 +152,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         #[automatically_derived]
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
             #[inline]
-            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<#lifetime, R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -189,7 +165,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             #[automatically_derived]
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
                 #[inline]
-                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<#lifetime, R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -223,7 +199,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let ident_as_string = ident.to_string();
 
     let magic_read = emit_magic_read(input);
-
     let mut has_default_match = false;
     let mut default_reader = None;
     let mut pre_match_tokens = Vec::with_capacity(variants.len());
@@ -344,7 +319,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 "DekuRead: `default` must be specified only once",
             ));
         } else if default_reader.is_none() && variant_has_default {
-            default_reader = Some(variant_read_func.clone())
+            default_reader = Some(variant_read_func.clone());
         }
 
         variant_matches.push(quote! {
@@ -371,7 +346,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             }
         });
     }
-
     let variant_id_read = if id.is_some() {
         quote! {
             let __deku_variant_id = (#id);
@@ -410,28 +384,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             Ok((__deku_reader.bits_read, __deku_value))
         };
 
-        let from_bytes_body = quote! {
-            use core::convert::TryFrom;
-            use ::#crate_::DekuReader as _;
-            let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
-            let mut __deku_reader = &mut ::#crate_::reader::Reader::new(&mut __deku_cursor);
-            if __deku_input.1 != 0 {
-                __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
-            }
-
-            let __deku_value = Self::from_reader_with_ctx(__deku_reader, ())?;
-            let read_whole_byte = (__deku_reader.bits_read % 8) == 0;
-            let idx = if read_whole_byte {
-                __deku_reader.bits_read / 8
-            } else {
-                (__deku_reader.bits_read - (__deku_reader.bits_read % 8)) / 8
-            };
-            let Some(rest) = __deku_input.0.get(idx..) else {
-                return Err(::#crate_::DekuError::Incomplete(::#crate_::prelude::NeedSize::new(8 * (idx - __deku_input.0.len()))));
-            };
-            Ok(((rest, __deku_reader.bits_read % 8), __deku_value))
-        };
-
         tokens.extend(emit_try_from(&imp, &lifetime, &ident, wher));
 
         tokens.extend(emit_container_read(
@@ -440,7 +392,6 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             &ident,
             wher,
             from_reader_body,
-            from_bytes_body,
         ));
     }
     let (ctx_types, ctx_arg) = gen_ctx_types_and_arg(input.ctx.as_ref())?;
@@ -461,7 +412,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         #[automatically_derived]
         impl #imp ::#crate_::DekuReader<#lifetime, #ctx_types> for #ident #wher {
             #[inline]
-            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
+            fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<#lifetime, R>, #ctx_arg) -> core::result::Result<Self, ::#crate_::DekuError> {
                 #read_body
             }
         }
@@ -475,7 +426,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             #[automatically_derived]
             impl #imp ::#crate_::DekuReader<#lifetime> for #ident #wher {
                 #[inline]
-                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
+                fn from_reader_with_ctx<R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_reader: &mut ::#crate_::reader::Reader<#lifetime, R>, _: ()) -> core::result::Result<Self, ::#crate_::DekuError> {
                     #read_body
                 }
             }
@@ -534,6 +485,140 @@ fn emit_magic_read_lit(crate_: &Ident, magic: &LitByteStr) -> TokenStream {
                 return Err(::#crate_::deku_error!(::#crate_::DekuError::Parse, "Missing magic value", "{:?}", #magic));
             }
         }
+    }
+}
+
+fn is_u8(ty: &Type) -> bool {
+    matches!(ty, Type::Path(type_path) if type_path.path.is_ident("u8"))
+}
+
+fn is_borrowed_byte_slice(ty: &Type) -> bool {
+    let Type::Reference(reference) = ty else {
+        return false;
+    };
+
+    reference.mutability.is_none()
+        && matches!(reference.elem.as_ref(), Type::Slice(slice) if is_u8(&slice.elem))
+}
+
+fn is_cow_byte_slice(ty: &Type) -> bool {
+    let Type::Path(type_path) = ty else {
+        return false;
+    };
+    let Some(segment) = type_path.path.segments.last() else {
+        return false;
+    };
+    if segment.ident != "Cow" {
+        return false;
+    }
+
+    let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+        return false;
+    };
+
+    arguments.args.iter().any(|argument| {
+        matches!(argument, GenericArgument::Type(Type::Slice(slice)) if is_u8(&slice.elem))
+    })
+}
+
+fn is_raw_byte_slice(ty: &Type) -> bool {
+    is_borrowed_byte_slice(ty) || is_cow_byte_slice(ty)
+}
+
+enum FieldReadPlan {
+    RawByteLimit(TokenStream),
+    #[cfg(feature = "bits")]
+    BitLimit(TokenStream),
+    PlainByteArray {
+        len: usize,
+    },
+    TypedContext(TokenStream),
+}
+
+fn plan_field_read(
+    input: &DekuData,
+    f: &FieldData,
+    field_type: &Type,
+    field_endian: Option<&syn::LitStr>,
+    field_bit_order: Option<&syn::LitStr>,
+    type_as_deku_read: &TokenStream,
+    read_args: &TokenStream,
+) -> Result<FieldReadPlan, syn::Error> {
+    let crate_ = super::get_crate_name();
+    let fixed_read_args =
+        gen_field_args(field_endian, None, None, f.ctx.as_ref(), field_bit_order)?;
+
+    if is_raw_byte_slice(field_type) {
+        if let Some(field_bytes) = &f.bytes {
+            return Ok(FieldReadPlan::RawByteLimit(quote! {
+                {
+                    use core::borrow::Borrow;
+                    #type_as_deku_read::from_reader_with_ctx
+                    (
+                        __deku_reader,
+                        (::#crate_::ctx::Limit::new_byte_size(::#crate_::ctx::ByteSize(#field_bytes)), (#fixed_read_args))
+                    )?
+                }
+            }));
+        }
+
+        #[cfg(feature = "bits")]
+        if let Some(field_bits) = &f.bits {
+            return Ok(FieldReadPlan::RawByteLimit(quote! {
+                {
+                    use core::borrow::Borrow;
+                    #type_as_deku_read::from_reader_with_ctx
+                    (
+                        __deku_reader,
+                        (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(#field_bits)), (#fixed_read_args))
+                    )?
+                }
+            }));
+        }
+    }
+
+    #[cfg(feature = "bits")]
+    if let Some(field_bits) = &f.bits_read {
+        return Ok(FieldReadPlan::BitLimit(quote! {
+            {
+                use core::borrow::Borrow;
+                #type_as_deku_read::from_reader_with_ctx
+                (
+                    __deku_reader,
+                    (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args))
+                )?
+            }
+        }));
+    }
+
+    if let Some(len) = byte_array_len(input, f) {
+        return Ok(FieldReadPlan::PlainByteArray { len });
+    }
+
+    Ok(FieldReadPlan::TypedContext(quote! {
+        #type_as_deku_read::from_reader_with_ctx
+        (
+            __deku_reader,
+            (#read_args)
+        )?
+    }))
+}
+
+fn emit_field_read_plan(plan: FieldReadPlan, crate_: &Ident) -> TokenStream {
+    match plan {
+        FieldReadPlan::RawByteLimit(read) | FieldReadPlan::TypedContext(read) => read,
+        #[cfg(feature = "bits")]
+        FieldReadPlan::BitLimit(read) => read,
+        FieldReadPlan::PlainByteArray { len } => quote! {
+            {
+                let mut __deku_bytes = [0u8; #len];
+                __deku_reader.read_bytes_const_into::<#len>(
+                    &mut __deku_bytes,
+                    ::#crate_::ctx::Order::Msb0,
+                )?;
+                __deku_bytes
+            }
+        },
     }
 }
 
@@ -1017,49 +1102,16 @@ fn emit_field_read(
                 }
             }
         } else {
-            let mut ret = quote! {};
-
-            #[cfg(feature = "bits")]
-            if let Some(field_bits) = &f.bits_read {
-                ret.extend(quote! {
-                    {
-                        use core::borrow::Borrow;
-                        #type_as_deku_read::from_reader_with_ctx
-                        (
-                            __deku_reader,
-                            (::#crate_::ctx::Limit::new_bit_size(::#crate_::ctx::BitSize(usize::try_from(*((#field_bits).borrow()))?)), (#read_args))
-                        )?
-                    }
-                })
-            }
-            // One `read_exact` for a plain byte array, in place of one read per
-            // element through the generic `[T; N]` impl.
-            if ret.is_empty()
-                && let Some(n) = byte_array_len(input, f)
-            {
-                ret.extend(quote! {
-                    {
-                        let mut __deku_bytes = [0u8; #n];
-                        __deku_reader.read_bytes_const_into::<#n>(
-                            &mut __deku_bytes,
-                            ::#crate_::ctx::Order::Msb0,
-                        )?;
-                        __deku_bytes
-                    }
-                })
-            }
-
-            if ret.is_empty() {
-                ret.extend(quote! {
-                    #type_as_deku_read::from_reader_with_ctx
-                    (
-                        __deku_reader,
-                        (#read_args)
-                    )?
-                })
-            }
-
-            ret
+            let plan = plan_field_read(
+                input,
+                f,
+                field_type,
+                field_endian,
+                field_bit_order,
+                &type_as_deku_read,
+                &read_args,
+            )?;
+            emit_field_read_plan(plan, &crate_)
         }
     };
 
@@ -1156,14 +1208,13 @@ fn emit_field_read(
     Ok((field_ident, field_read))
 }
 
-/// emit `from_reader()` and `from_bytes()` for struct/enum
+/// emit the source-reader implementation for struct/enum
 pub fn emit_container_read(
     imp: &syn::ImplGenerics,
     lifetime: &TokenStream,
     ident: &TokenStream,
     wher: Option<&syn::WhereClause>,
     from_reader_body: TokenStream,
-    from_bytes_body: TokenStream,
 ) -> TokenStream {
     let crate_ = super::get_crate_name();
     quote! {
@@ -1171,14 +1222,8 @@ pub fn emit_container_read(
         impl #imp ::#crate_::DekuContainerRead<#lifetime> for #ident #wher {
             #[allow(non_snake_case)]
             #[inline]
-            fn from_reader<'a, R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_input: (&'a mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
+            fn from_reader<'__deku_input, R: ::#crate_::no_std_io::Read + ::#crate_::no_std_io::Seek>(__deku_input: (&'__deku_input mut R, usize)) -> core::result::Result<(usize, Self), ::#crate_::DekuError> {
                 #from_reader_body
-            }
-
-            #[allow(non_snake_case)]
-            #[inline]
-            fn from_bytes(__deku_input: (&#lifetime [u8], usize)) -> core::result::Result<((&#lifetime [u8], usize), Self), ::#crate_::DekuError> {
-                #from_bytes_body
             }
         }
     }
@@ -1200,15 +1245,10 @@ pub fn emit_try_from(
             #[inline]
             fn try_from(input: &#lifetime [u8]) -> core::result::Result<Self, Self::Error> {
                 let total_len = input.len();
-                let mut cursor = ::#crate_::no_std_io::Cursor::new(input);
-                let (bits_read, res) = <Self as ::#crate_::DekuContainerRead>::from_reader((&mut cursor, 0))?;
-                let bytes_read = bits_read / 8;
-                if bytes_read < total_len {
-                    return Err(::#crate_::deku_error!(::#crate_::DekuError::Parse, "Too much data", "Read {} but total length was {}", {bits_read / 8}, total_len));
-                }
-                // Possible Seek beyond end
-                if bytes_read > total_len {
-                    return Err(::#crate_::DekuError::Incomplete(::#crate_::error::NeedSize::new(bits_read - { total_len * 8 })));
+                let ((rest, bit_offset), res) =
+                    <Self as ::#crate_::DekuContainerRead>::from_bytes((input, 0))?;
+                if !rest.is_empty() || bit_offset != 0 {
+                    return Err(::#crate_::deku_error!(::#crate_::DekuError::Parse, "Too much data", "Read {} but total length was {}", total_len - rest.len(), total_len));
                 }
                 Ok(res)
             }

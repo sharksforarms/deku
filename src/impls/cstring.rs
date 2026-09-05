@@ -22,9 +22,9 @@ where
     }
 }
 
-impl DekuReader<'_> for CString {
+impl<'a> DekuReader<'a> for CString {
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut Reader<R>,
+        reader: &mut Reader<'a, R>,
         _: (),
     ) -> Result<Self, DekuError> {
         let bytes =
@@ -48,7 +48,7 @@ where
     u8: DekuReader<'a>,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut Reader<R>,
+        reader: &mut Reader<'a, R>,
         byte_size: ByteSize,
     ) -> Result<Self, DekuError> {
         let bytes = Vec::from_reader_with_ctx(reader, (Limit::from(byte_size.0), ()))?;

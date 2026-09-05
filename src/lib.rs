@@ -606,11 +606,28 @@ pub trait DekuReader<'a, Ctx = ()> {
     /// fn main() {}
     /// ```
     fn from_reader_with_ctx<R: no_std_io::Read + no_std_io::Seek>(
-        reader: &mut Reader<R>,
+        reader: &mut Reader<'a, R>,
         ctx: Ctx,
     ) -> Result<Self, DekuError>
     where
         Self: Sized;
+
+    /// Construct a type from an immutable byte slice, with context.
+    ///
+    /// The default implementation forwards to [`DekuReader::from_reader_with_ctx`]
+    /// using a source-aware [`Reader`]. Implementations normally only need to
+    /// implement `from_reader_with_ctx`; byte-backed readers can borrow through
+    /// [`Reader::read_bytes_ref`] when the reader was created with
+    /// [`Reader::from_bytes`].
+    fn from_bytes_with_ctx(
+        reader: &mut crate::reader::BytesReader<'a>,
+        ctx: Ctx,
+    ) -> Result<Self, DekuError>
+    where
+        Self: Sized,
+    {
+        Self::from_reader_with_ctx(reader, ctx)
+    }
 }
 
 /// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which
@@ -665,9 +682,27 @@ pub trait DekuContainerRead<'a>: DekuReader<'a, ()> {
     /// * **input** - Input given as data and bit offset
     ///
     /// Returns the remaining bytes and bit offset after parsing in addition to Self.
+    /// The default implementation validates the source-backed reader position
+    /// before computing the returned remainder.
     fn from_bytes(input: (&'a [u8], usize)) -> Result<((&'a [u8], usize), Self), DekuError>
     where
-        Self: Sized;
+        Self: Sized,
+    {
+        let mut reader = Reader::from_bytes(input.0);
+        reader.skip_bits(input.1, crate::ctx::Order::default())?;
+        let value = <Self as DekuReader<'a, ()>>::from_reader_with_ctx(&mut reader, ())?;
+        reader.byte_source_state()?;
+
+        let bits_read = reader.bits_read;
+        let idx = bits_read / 8;
+        let Some(rest) = input.0.get(idx..) else {
+            return Err(DekuError::Incomplete(crate::prelude::NeedSize::new(
+                8 * (idx - input.0.len()),
+            )));
+        };
+
+        Ok(((rest, bits_read % 8), value))
+    }
 }
 
 /// "Writer" trait: write from type to bytes

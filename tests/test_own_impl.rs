@@ -11,9 +11,9 @@ fn test_own_impl() {
         Offset(u64),
     }
 
-    impl DekuReader<'_, u32> for Data {
+    impl<'a> DekuReader<'a, u32> for Data {
         fn from_reader_with_ctx<R: Read + Seek>(
-            reader: &mut Reader<R>,
+            reader: &mut Reader<'a, R>,
             filesize: u32,
         ) -> Result<Data, DekuError> {
             let reader = reader.as_mut();

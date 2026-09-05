@@ -36,15 +36,28 @@ pub enum Leftover {
 }
 
 /// Reader to use with `from_reader_with_ctx`
-pub struct Reader<R: Read + Seek> {
+pub struct Reader<'a, R: Read + Seek> {
     inner: R,
+    source: Option<&'a [u8]>,
     /// bits stored from previous reads that didn't read to the end of a byte size
     pub leftover: Option<Leftover>,
     /// Amount of bits read during the use of [read_bits](Reader::read_bits) and [read_bytes](Reader::read_bytes)
     pub bits_read: usize,
 }
 
-impl<R: Read + Seek> Seek for Reader<R> {
+/// A [`Reader`] backed by an immutable byte slice.
+///
+/// Implementations can use it to return references into the original input
+/// without allocating or copying.
+pub type BytesReader<'a> = Reader<'a, crate::no_std_io::Cursor<&'a [u8]>>;
+
+pub(crate) enum ByteSourceState<'a> {
+    Unavailable,
+    Unaligned,
+    Ready { bytes: &'a [u8], offset: usize },
+}
+
+impl<'a, R: Read + Seek> Seek for Reader<'a, R> {
     #[inline]
     fn seek(&mut self, pos: SeekFrom) -> no_std_io::io::Result<u64> {
         #[cfg(feature = "logging")]
@@ -65,14 +78,14 @@ impl<R: Read + Seek> Seek for Reader<R> {
     }
 }
 
-impl<R: Read + Seek> AsMut<R> for Reader<R> {
+impl<'a, R: Read + Seek> AsMut<R> for Reader<'a, R> {
     #[inline]
     fn as_mut(&mut self) -> &mut R {
         &mut self.inner
     }
 }
 
-impl<R: Read + Seek> Reader<R> {
+impl<'a, R: Read + Seek> Reader<'a, R> {
     #[inline]
     fn read_exact_or_incomplete(
         &mut self,
@@ -106,6 +119,7 @@ impl<R: Read + Seek> Reader<R> {
     pub fn new(inner: R) -> Self {
         Self {
             inner,
+            source: None,
             leftover: None,
             bits_read: 0,
         }
@@ -814,6 +828,160 @@ impl<R: Read + Seek> Reader<R> {
     }
 }
 
+impl<'a> Reader<'a, crate::no_std_io::Cursor<&'a [u8]>> {
+    /// Create a reader that retains the original input for zero-copy reads.
+    #[inline]
+    pub fn from_bytes(bytes: &'a [u8]) -> Self {
+        Self {
+            inner: crate::no_std_io::Cursor::new(bytes),
+            source: Some(bytes),
+            leftover: None,
+            bits_read: 0,
+        }
+    }
+}
+
+impl<'a, R: Read + Seek> Reader<'a, R> {
+    /// Return the immutable input backing this reader, when it was created by
+    /// [`Reader::from_bytes`].
+    #[inline]
+    pub fn source_bytes(&self) -> Option<&'a [u8]> {
+        self.source
+    }
+
+    pub(crate) fn byte_source_state(&mut self) -> Result<ByteSourceState<'a>, DekuError> {
+        let Some(bytes) = self.source else {
+            return Ok(ByteSourceState::Unavailable);
+        };
+
+        let offset = self.bits_read / 8;
+        let bit_offset = self.bits_read % 8;
+        let cached_bits_len: Option<usize> = {
+            #[cfg(feature = "bits")]
+            {
+                match &self.leftover {
+                    Some(Leftover::Bits(bits)) => Some(bits.len()),
+                    _ => None,
+                }
+            }
+            #[cfg(not(feature = "bits"))]
+            {
+                None
+            }
+        };
+        let cached_byte = match &self.leftover {
+            Some(Leftover::Byte(byte)) => Some(*byte),
+            _ => None,
+        };
+
+        let unaligned = if let Some(bits_len) = cached_bits_len {
+            if bit_offset == 0 || bits_len != 8 - bit_offset || cached_byte.is_some() {
+                return Err(crate::deku_error!(
+                    DekuError::InvalidParam,
+                    "byte-backed reader state is inconsistent"
+                ));
+            }
+            true
+        } else {
+            if bit_offset != 0 {
+                return Err(crate::deku_error!(
+                    DekuError::InvalidParam,
+                    "byte-backed reader state is inconsistent"
+                ));
+            }
+            false
+        };
+
+        let buffered_bytes = usize::from(cached_byte.is_some() || unaligned);
+        let Some(expected_position) = offset.checked_add(buffered_bytes) else {
+            return Err(crate::deku_error!(
+                DekuError::InvalidParam,
+                "byte-backed reader state is inconsistent"
+            ));
+        };
+        let expected_position = u64::try_from(expected_position).map_err(|_| {
+            crate::deku_error!(
+                DekuError::InvalidParam,
+                "byte-backed reader state is inconsistent"
+            )
+        })?;
+        let actual_position = self
+            .inner
+            .stream_position()
+            .map_err(|error| DekuError::Io(error.kind()))?;
+        if actual_position != expected_position {
+            return Err(crate::deku_error!(
+                DekuError::InvalidParam,
+                "byte-backed reader state is inconsistent"
+            ));
+        }
+
+        if let Some(cached_byte) = cached_byte
+            && bytes.get(offset) != Some(&cached_byte)
+        {
+            return Err(crate::deku_error!(
+                DekuError::InvalidParam,
+                "byte-backed reader state is inconsistent"
+            ));
+        }
+
+        if unaligned {
+            Ok(ByteSourceState::Unaligned)
+        } else {
+            Ok(ByteSourceState::Ready { bytes, offset })
+        }
+    }
+
+    /// Read bytes by borrowing them directly from the immutable input.
+    ///
+    /// This operation requires the reader to be byte-aligned. It advances the
+    /// reader by `amt` bytes and returns a subslice of [`Self::source_bytes`].
+    #[inline]
+    pub fn read_bytes_ref(&mut self, amt: usize) -> Result<&'a [u8], DekuError> {
+        let (source, start) = match self.byte_source_state()? {
+            ByteSourceState::Unavailable => {
+                return Err(crate::deku_error!(
+                    DekuError::InvalidParam,
+                    "borrowed byte slices require Reader::from_bytes"
+                ));
+            }
+            ByteSourceState::Unaligned => {
+                return Err(crate::deku_error!(
+                    DekuError::InvalidParam,
+                    "cannot borrow bytes from an unaligned reader"
+                ));
+            }
+            ByteSourceState::Ready { bytes, offset } => (bytes, offset),
+        };
+
+        let source_len = source.len();
+        if start > source_len {
+            return Err(DekuError::Incomplete(NeedSize::new(
+                (start - source_len).saturating_mul(8),
+            )));
+        }
+
+        let Some(end) = start.checked_add(amt) else {
+            return Err(DekuError::Incomplete(NeedSize::new(usize::MAX)));
+        };
+        if end > source_len {
+            return Err(DekuError::Incomplete(NeedSize::new(amt.saturating_mul(8))));
+        }
+
+        if amt == 0 {
+            return Ok(&source[start..end]);
+        }
+
+        self.leftover = None;
+        self.inner
+            .seek(SeekFrom::Start(end as u64))
+            .map_err(|e| DekuError::Io(e.kind()))?;
+        self.bits_read = self.bits_read.saturating_add(amt.saturating_mul(8));
+
+        Ok(&source[start..end])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -888,6 +1056,58 @@ mod tests {
                 .is_ok()
         );
         assert!(matches!(reader.leftover, Some(Leftover::Byte(0xaa))));
+    }
+
+    #[test]
+    fn borrowed_reads_reject_untracked_cursor_movement() {
+        let input = [0xaa, 0xbb];
+        let mut reader = Reader::from_bytes(&input);
+        reader
+            .as_mut()
+            .seek(SeekFrom::Start(1))
+            .expect("move the underlying cursor");
+
+        let result = reader.read_bytes_ref(1);
+
+        assert!(matches!(result, Err(DekuError::InvalidParam(_))));
+        assert_eq!(reader.bits_read, 0);
+    }
+
+    #[test]
+    fn borrowed_reads_validate_and_consume_a_cached_probe_byte() {
+        let input = [0xaa, 0xbb];
+        let mut reader = Reader::from_bytes(&input);
+        assert!(!reader.try_end().unwrap());
+
+        let empty = reader.read_bytes_ref(0).unwrap();
+        assert!(empty.is_empty());
+        assert!(matches!(reader.leftover, Some(Leftover::Byte(0xaa))));
+
+        let first = reader.read_bytes_ref(1).unwrap();
+        assert_eq!(first, &input[..1]);
+        assert_eq!(first.as_ptr(), input.as_ptr());
+        assert_eq!(reader.bits_read, 8);
+
+        let second = reader.read_bytes_ref(1).unwrap();
+        assert_eq!(second, &input[1..]);
+        assert_eq!(second.as_ptr(), input[1..].as_ptr());
+        assert_eq!(reader.bits_read, 16);
+    }
+
+    #[test]
+    fn borrowed_reads_reject_a_cached_byte_that_differs_from_the_source() {
+        let input = [0xaa, 0xbb];
+        let mut reader = Reader::from_bytes(&input);
+        reader.leftover = Some(Leftover::Byte(0xff));
+        reader
+            .as_mut()
+            .seek(SeekFrom::Start(1))
+            .expect("move past the cached byte");
+
+        let result = reader.read_bytes_ref(1);
+
+        assert!(matches!(result, Err(DekuError::InvalidParam(_))));
+        assert_eq!(reader.bits_read, 0);
     }
 
     #[test]

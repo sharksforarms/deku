@@ -40,7 +40,7 @@ macro_rules! ImplDekuTupleTraits {
         impl<'a, Ctx: Copy, $($T:DekuReader<'a, Ctx>+Sized),+> DekuReader<'a, Ctx> for ($($T,)+)
         {
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut crate::reader::Reader<R>,
+                reader: &mut crate::reader::Reader<'a, R>,
                 ctx: Ctx,
             ) -> Result<Self, DekuError>
             where
@@ -53,6 +53,7 @@ macro_rules! ImplDekuTupleTraits {
                 )+
                 Ok(tuple)
             }
+
         }
 
         impl<Ctx: Copy, $($T:DekuWriter<Ctx>),+> DekuWriter<Ctx> for ($($T,)+)

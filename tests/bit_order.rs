@@ -292,14 +292,14 @@ mod tests {
 
     #[test]
     fn test_bit_order_custom_reader_writer() {
-        fn reader_lsb<R: Read + Seek>(reader: &mut Reader<R>) -> Result<(u16, u8), DekuError> {
+        fn reader_lsb<R: Read + Seek>(reader: &mut Reader<'_, R>) -> Result<(u16, u8), DekuError> {
             let first = u16::from_reader_with_ctx(reader, (BitSize(13), Order::Lsb0))?;
             let second = u8::from_reader_with_ctx(reader, BitSize(3))?;
 
             Ok((first, second))
         }
 
-        fn reader_msb<R: Read + Seek>(reader: &mut Reader<R>) -> Result<(u16, u8), DekuError> {
+        fn reader_msb<R: Read + Seek>(reader: &mut Reader<'_, R>) -> Result<(u16, u8), DekuError> {
             let first = u16::from_reader_with_ctx(reader, (BitSize(13), Order::Msb0))?;
             let second = u8::from_reader_with_ctx(reader, BitSize(3))?;
 
@@ -522,9 +522,9 @@ mod tests {
         #[derive(Clone, Debug, PartialEq, Default)]
         pub struct PacketByteArray(pub [u8; 2]);
 
-        impl DekuReader<'_, ()> for PacketByteArray {
+        impl<'a> DekuReader<'a, ()> for PacketByteArray {
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 _ctx: (),
             ) -> Result<Self, DekuError> {
                 let mut buffer = [0u8; 2];

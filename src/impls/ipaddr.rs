@@ -11,7 +11,7 @@ where
     u32: DekuReader<'a, Ctx>,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut Reader<R>,
+        reader: &mut Reader<'a, R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
         let ip = u32::from_reader_with_ctx(reader, inner_ctx)?;
@@ -38,7 +38,7 @@ where
     u128: DekuReader<'a, Ctx>,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut Reader<R>,
+        reader: &mut Reader<'a, R>,
         inner_ctx: Ctx,
     ) -> Result<Self, DekuError> {
         let ip = u128::from_reader_with_ctx(reader, inner_ctx)?;

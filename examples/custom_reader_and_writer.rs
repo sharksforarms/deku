@@ -7,7 +7,7 @@ use no_std_io::io::{Cursor, Read, Seek, Write};
 
 fn bit_flipper_read<R: Read + Seek>(
     field_a: u8,
-    reader: &mut Reader<R>,
+    reader: &mut Reader<'_, R>,
     bit_size: BitSize,
 ) -> Result<u8, DekuError> {
     // Access to previously read fields

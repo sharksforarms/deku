@@ -55,7 +55,7 @@ struct TestMap {
 
 fn dummy_reader<R: no_std_io::io::Read + no_std_io::io::Seek>(
     _offset: usize,
-    _reader: &mut Reader<R>,
+    _reader: &mut Reader<'_, R>,
 ) -> Result<usize, DekuError> {
     Ok(0)
 }

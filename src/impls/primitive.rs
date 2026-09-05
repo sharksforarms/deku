@@ -78,11 +78,11 @@ impl DekuRead<(Endian, ByteSize)> for u8 {
     }
 }
 
-impl DekuReader<'_, (Endian, ByteSize, Order)> for u8 {
+impl<'a> DekuReader<'a, (Endian, ByteSize, Order)> for u8 {
     /// Ignore endian, as this is a `u8`
     #[inline(always)]
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut Reader<R>,
+        reader: &mut Reader<'a, R>,
         (_endian, _size, order): (Endian, ByteSize, Order),
     ) -> Result<u8, DekuError> {
         const MAX_TYPE_BYTES: usize = core::mem::size_of::<u8>();
@@ -344,10 +344,10 @@ macro_rules! ImplDekuReadBits {
         }
 
         #[cfg(feature = "bits")]
-        impl DekuReader<'_, (Endian, BitSize)> for $typ {
+        impl<'a> DekuReader<'a, (Endian, BitSize)> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
@@ -375,10 +375,10 @@ macro_rules! ImplDekuReadBits {
         }
 
         #[cfg(feature = "bits")]
-        impl DekuReader<'_, (Endian, BitSize, Order)> for $typ {
+        impl<'a> DekuReader<'a, (Endian, BitSize, Order)> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 (endian, size, order): (Endian, BitSize, Order),
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
@@ -436,10 +436,10 @@ macro_rules! ImplDekuReadBytes {
             }
         }
 
-        impl DekuReader<'_, (Endian, ByteSize, Order)> for $typ {
+        impl<'a> DekuReader<'a, (Endian, ByteSize, Order)> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 (endian, size, order): (Endian, ByteSize, Order),
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
@@ -557,10 +557,10 @@ macro_rules! ImplDekuReadSignExtend {
         }
 
         #[cfg(feature = "bits")]
-        impl DekuReader<'_, (Endian, BitSize)> for $typ {
+        impl<'a> DekuReader<'a, (Endian, BitSize)> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 (endian, size): (Endian, BitSize),
             ) -> Result<$typ, DekuError> {
                 <$typ>::from_reader_with_ctx(reader, (endian, size, Order::default()))
@@ -568,10 +568,10 @@ macro_rules! ImplDekuReadSignExtend {
         }
 
         #[cfg(feature = "bits")]
-        impl DekuReader<'_, (Endian, BitSize, Order)> for $typ {
+        impl<'a> DekuReader<'a, (Endian, BitSize, Order)> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 (endian, size, order): (Endian, BitSize, Order),
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
@@ -592,10 +592,10 @@ macro_rules! ImplDekuReadSignExtend {
             }
         }
 
-        impl DekuReader<'_, (Endian, ByteSize, Order)> for $typ {
+        impl<'a> DekuReader<'a, (Endian, ByteSize, Order)> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 (endian, size, order): (Endian, ByteSize, Order),
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
@@ -652,10 +652,10 @@ macro_rules! ImplDekuReadSignExtend {
 
 macro_rules! ForwardDekuRead {
     ($typ:ty) => {
-        impl DekuReader<'_, (Endian, Order)> for $typ {
+        impl<'a> DekuReader<'a, (Endian, Order)> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 (endian, order): (Endian, Order),
             ) -> Result<$typ, DekuError> {
                 let byte_size = core::mem::size_of::<$typ>();
@@ -664,10 +664,10 @@ macro_rules! ForwardDekuRead {
             }
         }
 
-        impl DekuReader<'_, (Endian, ByteSize)> for $typ {
+        impl<'a> DekuReader<'a, (Endian, ByteSize)> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 (endian, byte_size): (Endian, ByteSize),
             ) -> Result<$typ, DekuError> {
                 <$typ>::from_reader_with_ctx(reader, (endian, byte_size, Order::default()))
@@ -675,10 +675,10 @@ macro_rules! ForwardDekuRead {
         }
 
         // Only have `endian`, specialize and use read_bytes_const
-        impl DekuReader<'_, Endian> for $typ {
+        impl<'a> DekuReader<'a, Endian> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 endian: Endian,
             ) -> Result<$typ, DekuError> {
                 const MAX_TYPE_BYTES: usize = core::mem::size_of::<$typ>();
@@ -693,10 +693,10 @@ macro_rules! ForwardDekuRead {
         }
 
         // Only have `byte_size`, set `endian` to `Endian::default`.
-        impl DekuReader<'_, ByteSize> for $typ {
+        impl<'a> DekuReader<'a, ByteSize> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 byte_size: ByteSize,
             ) -> Result<$typ, DekuError> {
                 let endian = Endian::default();
@@ -708,10 +708,10 @@ macro_rules! ForwardDekuRead {
 
         //// Only have `bit_size`, set `endian` to `Endian::default`.
         #[cfg(feature = "bits")]
-        impl DekuReader<'_, BitSize> for $typ {
+        impl<'a> DekuReader<'a, BitSize> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 bit_size: BitSize,
             ) -> Result<$typ, DekuError> {
                 let endian = Endian::default();
@@ -726,10 +726,10 @@ macro_rules! ForwardDekuRead {
 
         //// Only have `bit_size`, set `endian` to `Endian::default`.
         #[cfg(feature = "bits")]
-        impl DekuReader<'_, (BitSize, Order)> for $typ {
+        impl<'a> DekuReader<'a, (BitSize, Order)> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 (bit_size, order): (BitSize, Order),
             ) -> Result<$typ, DekuError> {
                 let endian = Endian::default();
@@ -742,20 +742,20 @@ macro_rules! ForwardDekuRead {
             }
         }
 
-        impl DekuReader<'_, Order> for $typ {
+        impl<'a> DekuReader<'a, Order> for $typ {
             #[inline]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 order: Order,
             ) -> Result<$typ, DekuError> {
                 <$typ>::from_reader_with_ctx(reader, (Endian::default(), order))
             }
         }
 
-        impl DekuReader<'_> for $typ {
+        impl<'a> DekuReader<'a> for $typ {
             #[inline(always)]
             fn from_reader_with_ctx<R: Read + Seek>(
-                reader: &mut Reader<R>,
+                reader: &mut Reader<'a, R>,
                 _: (),
             ) -> Result<$typ, DekuError> {
                 <$typ>::from_reader_with_ctx(reader, Endian::default())

@@ -1,67 +1,24 @@
 use core::hash::{BuildHasher, Hash};
 use std::collections::HashSet;
 
+use crate::reader::Reader;
 use crate::writer::Writer;
 use no_std_io::io::{Read, Seek, Write};
 
 use crate::ctx::*;
 use crate::{DekuError, DekuReader, DekuWriter};
 
-/// Read `T`s into a hashset until a given predicate returns true
-/// * `capacity` - an optional capacity to pre-allocate the hashset with
-/// * `ctx` - The context required by `T`. It will be passed to every `T` when constructing.
-/// * `predicate` - the predicate that decides when to stop reading `T`s
-///   The predicate takes two parameters: the number of bits that have been read so far,
-///   and a borrow of the latest value to have been read. It should return `true` if reading
-///   should now stop, and `false` otherwise
-#[allow(clippy::type_complexity)]
-fn from_reader_with_ctx_hashset_with_predicate<'a, T, S, Ctx, Predicate, R: Read + Seek>(
-    reader: &mut crate::reader::Reader<R>,
-    capacity: Option<usize>,
-    ctx: Ctx,
-    mut predicate: Predicate,
-) -> Result<HashSet<T, S>, DekuError>
+impl<T: Eq + Hash, S> super::ReadCollection<T> for HashSet<T, S>
 where
-    T: DekuReader<'a, Ctx> + Eq + Hash,
     S: BuildHasher + Default,
-    Ctx: Copy,
-    Predicate: FnMut(usize, &T) -> bool,
 {
-    let mut res = HashSet::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
-
-    let mut found_predicate = false;
-    let orig_bits_read = reader.bits_read;
-
-    while !found_predicate {
-        let val = <T>::from_reader_with_ctx(reader, ctx)?;
-        found_predicate = predicate(reader.bits_read - orig_bits_read, &val);
-        res.insert(val);
+    fn with_capacity(capacity: Option<usize>) -> Self {
+        HashSet::with_capacity_and_hasher(capacity.unwrap_or(0), S::default())
     }
 
-    Ok(res)
-}
-
-fn from_reader_with_ctx_hashset_to_end<'a, T, S, Ctx, R: Read + Seek>(
-    reader: &mut crate::reader::Reader<R>,
-    capacity: Option<usize>,
-    ctx: Ctx,
-) -> Result<HashSet<T, S>, DekuError>
-where
-    T: DekuReader<'a, Ctx> + Eq + Hash,
-    S: BuildHasher + Default,
-    Ctx: Copy,
-{
-    let mut res = HashSet::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
-
-    loop {
-        if reader.end() {
-            break;
-        }
-        let val = <T>::from_reader_with_ctx(reader, ctx)?;
-        res.insert(val);
+    fn insert_item(&mut self, item: T) {
+        self.insert(item);
     }
-
-    Ok(res)
 }
 
 impl<'a, T, S, Ctx, Predicate> DekuReader<'a, (Limit<T, Predicate>, Ctx)> for HashSet<T, S>
@@ -87,77 +44,15 @@ where
     /// assert_eq!(expected, set)
     /// ```
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut crate::reader::Reader<R>,
+        reader: &mut Reader<'a, R>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
     {
-        match limit {
-            // Read a given count of elements
-            Limit::Count(mut count) => {
-                // Handle the trivial case of reading an empty hashset
-                if count == 0 {
-                    return Ok(HashSet::<T, S>::default());
-                }
-
-                // Otherwise, read until we have read `count` elements
-                from_reader_with_ctx_hashset_with_predicate(
-                    reader,
-                    Some(count),
-                    inner_ctx,
-                    move |_, _| {
-                        count -= 1;
-                        count == 0
-                    },
-                )
-            }
-
-            // Read until a given predicate returns true
-            Limit::Until(mut predicate, _) => from_reader_with_ctx_hashset_with_predicate(
-                reader,
-                None,
-                inner_ctx,
-                move |_, value| predicate(value),
-            ),
-
-            // Read until a given quantity of bits have been read
-            Limit::BitSize(size) => {
-                let bit_size = size.0;
-
-                // Handle the trivial case of reading an empty hashset
-                if bit_size == 0 {
-                    return Ok(HashSet::<T, S>::default());
-                }
-
-                from_reader_with_ctx_hashset_with_predicate(
-                    reader,
-                    None,
-                    inner_ctx,
-                    move |read_bits, _| read_bits == bit_size,
-                )
-            }
-
-            // Read until a given quantity of bytes have been read
-            Limit::ByteSize(size) => {
-                let bit_size = size.0 * 8;
-
-                // Handle the trivial case of reading an empty hashset
-                if bit_size == 0 {
-                    return Ok(HashSet::<T, S>::default());
-                }
-
-                from_reader_with_ctx_hashset_with_predicate(
-                    reader,
-                    None,
-                    inner_ctx,
-                    move |read_bits, _| read_bits == bit_size,
-                )
-            }
-
-            // Read until `reader.end()` is true
-            Limit::End => from_reader_with_ctx_hashset_to_end(reader, None, inner_ctx),
-        }
+        super::read_collection_with_limit(reader, limit, inner_ctx, |reader, ctx| {
+            <T>::from_reader_with_ctx(reader, ctx)
+        })
     }
 }
 
@@ -166,7 +61,7 @@ impl<'a, T: DekuReader<'a> + Eq + Hash, S: BuildHasher + Default, Predicate: FnM
 {
     /// Read `T`s until the given limit from input for types which don't require context.
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut crate::reader::Reader<R>,
+        reader: &mut crate::reader::Reader<'a, R>,
         limit: Limit<T, Predicate>,
     ) -> Result<Self, DekuError>
     where

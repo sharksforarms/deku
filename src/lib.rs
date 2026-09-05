@@ -595,11 +595,28 @@ pub trait DekuReader<'a, Ctx = ()> {
     /// fn main() {}
     /// ```
     fn from_reader_with_ctx<R: no_std_io::Read + no_std_io::Seek>(
-        reader: &mut Reader<R>,
+        reader: &mut Reader<'a, R>,
         ctx: Ctx,
     ) -> Result<Self, DekuError>
     where
         Self: Sized;
+
+    /// Construct a type from an immutable byte slice, with context.
+    ///
+    /// The default implementation forwards to [`DekuReader::from_reader_with_ctx`]
+    /// using a source-aware [`Reader`]. Implementations normally only need to
+    /// implement `from_reader_with_ctx`; byte-backed readers can borrow through
+    /// [`Reader::read_bytes_ref`] when the reader was created with
+    /// [`Reader::from_bytes`].
+    fn from_bytes_with_ctx(
+        reader: &mut crate::reader::BytesReader<'a>,
+        ctx: Ctx,
+    ) -> Result<Self, DekuError>
+    where
+        Self: Sized,
+    {
+        Self::from_reader_with_ctx(reader, ctx)
+    }
 }
 
 /// "Reader" trait: implemented on DekuRead struct and enum containers. A `container` is a type which

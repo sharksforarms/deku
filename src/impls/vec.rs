@@ -10,9 +10,9 @@ use crate::writer::Writer;
 use crate::{DekuError, DekuWriter};
 use crate::{DekuReader, ctx::*};
 
-impl DekuReader<'_, ReadExact> for Vec<u8> {
+impl<'a> DekuReader<'a, ReadExact> for Vec<u8> {
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut Reader<R>,
+        reader: &mut Reader<'a, R>,
         exact: ReadExact,
     ) -> Result<Self, DekuError>
     where
@@ -42,71 +42,14 @@ impl DekuReader<'_, ReadExact> for Vec<u8> {
     }
 }
 
-/// Read `T`s into a vec until a given predicate returns true
-/// * `capacity` - an optional capacity to pre-allocate the vector with
-/// * `ctx` - The context required by `T`. It will be passed to every `T` when constructing.
-/// * `predicate` - the predicate that decides when to stop reading `T`s
-///   The predicate takes two parameters: the number of bits that have been read so far,
-///   and a borrow of the latest value to have been read. It should return `true` if reading
-///   should now stop, and `false` otherwise
-fn reader_vec_with_predicate<'a, T, Ctx, Predicate, R: Read + Seek>(
-    reader: &mut Reader<R>,
-    capacity: Option<usize>,
-    ctx: Ctx,
-    mut predicate: Predicate,
-) -> Result<Vec<T>, DekuError>
-where
-    T: DekuReader<'a, Ctx>,
-    Ctx: Copy,
-    Predicate: FnMut(usize, &T) -> bool,
-{
-    // ZST detected, return empty vec
-    if mem::size_of::<T>() == 0 {
-        return Ok(Vec::new());
+impl<T> super::ReadCollection<T> for Vec<T> {
+    fn with_capacity(capacity: Option<usize>) -> Self {
+        capacity.map_or_else(Vec::new, Vec::with_capacity)
     }
 
-    let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
-
-    let start_read = reader.bits_read;
-
-    loop {
-        let val = <T>::from_reader_with_ctx(reader, ctx)?;
-        res.push(val);
-
-        // This unwrap is safe as we are pushing to the vec immediately before it,
-        // so there will always be a last element
-        if predicate(reader.bits_read - start_read, res.last().unwrap()) {
-            break;
-        }
+    fn insert_item(&mut self, item: T) {
+        self.push(item);
     }
-
-    Ok(res)
-}
-
-fn reader_vec_to_end<'a, T, Ctx, R: Read + Seek>(
-    reader: &mut crate::reader::Reader<R>,
-    capacity: Option<usize>,
-    ctx: Ctx,
-) -> Result<Vec<T>, DekuError>
-where
-    T: DekuReader<'a, Ctx>,
-    Ctx: Copy,
-{
-    // ZST detected, return empty vec
-    if mem::size_of::<T>() == 0 {
-        return Ok(Vec::new());
-    }
-
-    let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
-    loop {
-        if reader.end() {
-            break;
-        }
-        let val = <T>::from_reader_with_ctx(reader, ctx)?;
-        res.push(val);
-    }
-
-    Ok(res)
 }
 
 impl<'a, T, Ctx, Predicate> DekuReader<'a, (Limit<T, Predicate>, Ctx)> for Vec<T>
@@ -116,62 +59,19 @@ where
     Predicate: FnMut(&T) -> bool,
 {
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut Reader<R>,
+        reader: &mut Reader<'a, R>,
         (limit, inner_ctx): (Limit<T, Predicate>, Ctx),
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
     {
-        match limit {
-            // Read a given count of elements
-            Limit::Count(mut count) => {
-                // Handle the trivial case of reading an empty vector
-                if count == 0 {
-                    return Ok(Vec::new());
-                }
-
-                // Otherwise, read until we have read `count` elements
-                reader_vec_with_predicate(reader, Some(count), inner_ctx, move |_, _| {
-                    count -= 1;
-                    count == 0
-                })
-            }
-
-            // Read until a given predicate returns true
-            Limit::Until(mut predicate, _) => {
-                reader_vec_with_predicate(reader, None, inner_ctx, move |_, value| predicate(value))
-            }
-
-            // Read until a given quantity of bits have been read
-            Limit::BitSize(size) => {
-                let bit_size = size.0;
-
-                // Handle the trivial case of reading an empty vector
-                if bit_size == 0 {
-                    return Ok(Vec::new());
-                }
-
-                reader_vec_with_predicate(reader, None, inner_ctx, move |read_bits, _| {
-                    read_bits == bit_size
-                })
-            }
-
-            // Read until a given quantity of bytes have been read
-            Limit::ByteSize(size) => {
-                let bit_size = size.0 * 8;
-
-                // Handle the trivial case of reading an empty vector
-                if bit_size == 0 {
-                    return Ok(Vec::new());
-                }
-
-                reader_vec_with_predicate(reader, None, inner_ctx, move |read_bits, _| {
-                    read_bits == bit_size
-                })
-            }
-
-            Limit::End => reader_vec_to_end(reader, None, inner_ctx),
+        if mem::size_of::<T>() == 0 {
+            return Ok(Vec::new());
         }
+
+        super::read_collection_with_limit(reader, limit, inner_ctx, |reader, ctx| {
+            <T>::from_reader_with_ctx(reader, ctx)
+        })
     }
 }
 
@@ -180,7 +80,7 @@ impl<'a, T: DekuReader<'a>, Predicate: FnMut(&T) -> bool> DekuReader<'a, Limit<T
 {
     /// Read `T`s until the given limit from input for types which don't require context.
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut Reader<R>,
+        reader: &mut Reader<'a, R>,
         limit: Limit<T, Predicate>,
     ) -> Result<Self, DekuError>
     where

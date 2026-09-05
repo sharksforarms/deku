@@ -4,66 +4,21 @@ use std::collections::HashMap;
 use no_std_io::io::{Read, Seek, Write};
 
 use crate::ctx::*;
+use crate::reader::Reader;
 use crate::writer::Writer;
 use crate::{DekuError, DekuReader, DekuWriter};
 
-/// Read `K, V`s into a hashmap until a given predicate returns true
-/// * `capacity` - an optional capacity to pre-allocate the hashmap with
-/// * `ctx` - The context required by `K, V`. It will be passed to every `K, V` when constructing.
-/// * `predicate` - the predicate that decides when to stop reading `K, V`s
-///   The predicate takes two parameters: the number of bits that have been read so far,
-///   and a borrow of the latest value to have been read. It should return `true` if reading
-///   should now stop, and `false` otherwise
-#[allow(clippy::type_complexity)]
-fn from_reader_with_ctx_hashmap_with_predicate<'a, K, V, S, Ctx, Predicate, R: Read + Seek>(
-    reader: &mut crate::reader::Reader<R>,
-    capacity: Option<usize>,
-    ctx: Ctx,
-    mut predicate: Predicate,
-) -> Result<HashMap<K, V, S>, DekuError>
+impl<K: Eq + Hash, V, S> super::ReadCollection<(K, V)> for HashMap<K, V, S>
 where
-    K: DekuReader<'a, Ctx> + Eq + Hash,
-    V: DekuReader<'a, Ctx>,
     S: BuildHasher + Default,
-    Ctx: Copy,
-    Predicate: FnMut(usize, &(K, V)) -> bool,
 {
-    let mut res = HashMap::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
-
-    let mut found_predicate = false;
-    let orig_bits_read = reader.bits_read;
-
-    while !found_predicate {
-        let val = <(K, V)>::from_reader_with_ctx(reader, ctx)?;
-        found_predicate = predicate(reader.bits_read - orig_bits_read, &val);
-        res.insert(val.0, val.1);
+    fn with_capacity(capacity: Option<usize>) -> Self {
+        HashMap::with_capacity_and_hasher(capacity.unwrap_or(0), S::default())
     }
 
-    Ok(res)
-}
-
-fn from_reader_with_ctx_hashmap_to_end<'a, K, V, S, Ctx, R: Read + Seek>(
-    reader: &mut crate::reader::Reader<R>,
-    capacity: Option<usize>,
-    ctx: Ctx,
-) -> Result<HashMap<K, V, S>, DekuError>
-where
-    K: DekuReader<'a, Ctx> + Eq + Hash,
-    V: DekuReader<'a, Ctx>,
-    S: BuildHasher + Default,
-    Ctx: Copy,
-{
-    let mut res = HashMap::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
-
-    loop {
-        if reader.end() {
-            break;
-        }
-        let val = <(K, V)>::from_reader_with_ctx(reader, ctx)?;
-        res.insert(val.0, val.1);
+    fn insert_item(&mut self, (key, value): (K, V)) {
+        self.insert(key, value);
     }
-
-    Ok(res)
 }
 
 impl<'a, K, V, S, Ctx, Predicate> DekuReader<'a, (Limit<(K, V), Predicate>, Ctx)>
@@ -102,77 +57,15 @@ where
     /// # fn main() {}
     /// ```
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut crate::reader::Reader<R>,
+        reader: &mut Reader<'a, R>,
         (limit, inner_ctx): (Limit<(K, V), Predicate>, Ctx),
     ) -> Result<Self, DekuError>
     where
         Self: Sized,
     {
-        match limit {
-            // Read a given count of elements
-            Limit::Count(mut count) => {
-                // Handle the trivial case of reading an empty hashmap
-                if count == 0 {
-                    return Ok(HashMap::<K, V, S>::default());
-                }
-
-                // Otherwise, read until we have read `count` elements
-                from_reader_with_ctx_hashmap_with_predicate(
-                    reader,
-                    Some(count),
-                    inner_ctx,
-                    move |_, _| {
-                        count -= 1;
-                        count == 0
-                    },
-                )
-            }
-
-            // Read until a given predicate returns true
-            Limit::Until(mut predicate, _) => from_reader_with_ctx_hashmap_with_predicate(
-                reader,
-                None,
-                inner_ctx,
-                move |_, kv| predicate(kv),
-            ),
-
-            // Read until a given quantity of bits have been read
-            Limit::BitSize(size) => {
-                let bit_size = size.0;
-
-                // Handle the trivial case of reading an empty hashmap
-                if bit_size == 0 {
-                    return Ok(HashMap::<K, V, S>::default());
-                }
-
-                from_reader_with_ctx_hashmap_with_predicate(
-                    reader,
-                    None,
-                    inner_ctx,
-                    move |read_bits, _| read_bits == bit_size,
-                )
-            }
-
-            // Read until a given quantity of byte bits have been read
-            Limit::ByteSize(size) => {
-                let bit_size = size.0 * 8;
-
-                // Handle the trivial case of reading an empty hashmap
-                if bit_size == 0 {
-                    return Ok(HashMap::<K, V, S>::default());
-                }
-
-                from_reader_with_ctx_hashmap_with_predicate(
-                    reader,
-                    None,
-                    inner_ctx,
-                    move |read_bits, _| read_bits == bit_size,
-                )
-            }
-
-            // Read until `reader.end()` is true
-            Limit::End => from_reader_with_ctx_hashmap_to_end(reader, None, inner_ctx),
-        }
+        super::read_collection_with_limit(reader, limit, inner_ctx, |reader, ctx| {
+            <(K, V)>::from_reader_with_ctx(reader, ctx)
+        })
     }
 }
 
@@ -185,7 +78,7 @@ where
 {
     /// Read `K, V`s until the given limit from input for types which don't require context.
     fn from_reader_with_ctx<R: Read + Seek>(
-        reader: &mut crate::reader::Reader<R>,
+        reader: &mut crate::reader::Reader<'a, R>,
         limit: Limit<(K, V), Predicate>,
     ) -> Result<Self, DekuError>
     where

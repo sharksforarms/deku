@@ -387,7 +387,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     }
                 }
             };
+        });
 
+        tokens.extend(quote! {
             #[automatically_derived]
             impl #imp ::#crate_::DekuContainerWrite for #ident #wher {}
         });

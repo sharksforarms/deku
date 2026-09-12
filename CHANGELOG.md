@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `Writer`: an `Lsb0` write that ends on a byte boundary no longer reorders the
+  whole bytes of the `Msb0` write that follows it ([#677](https://github.com/sharksforarms/deku/pull/677))
+
 ### Other
 
 - Bump MSRV to 1.88

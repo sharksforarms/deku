@@ -4,7 +4,7 @@
 use bitvec::prelude::*;
 use no_std_io::io::{ErrorKind, Read, Seek, SeekFrom};
 
-use crate::{ctx::Order, prelude::NeedSize, DekuError};
+use crate::{DekuError, ctx::Order, prelude::NeedSize};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
@@ -160,16 +160,16 @@ impl<R: Read + Seek> Reader<R> {
             false
         } else {
             let mut buf = [0; 1];
-            if let Err(e) = self.inner.read_exact(&mut buf) {
-                if e.kind() == ErrorKind::UnexpectedEof {
-                    #[cfg(feature = "logging")]
-                    log::trace!("end");
-                    return true;
-                }
+            if let Err(e) = self.inner.read_exact(&mut buf)
+                && e.kind() == ErrorKind::UnexpectedEof
+            {
+                #[cfg(feature = "logging")]
+                log::trace!("end");
+                return true;
             }
 
             #[cfg(feature = "logging")]
-            log::trace!("not end: read {:02x?}", buf);
+            log::trace!("not end: read {buf:02x?}");
 
             self.leftover = Some(Leftover::Byte(buf[0]));
             false
@@ -313,10 +313,10 @@ impl<R: Read + Seek> Reader<R> {
                     let mut iter = dst[..end].rchunks_exact_mut(8);
                     for slot in iter.by_ref() {
                         let mut buf: [u8; 1] = [0u8];
-                        if let Err(e) = self.inner.read_exact(&mut buf) {
-                            if e.kind() == ErrorKind::UnexpectedEof {
-                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                            }
+                        if let Err(e) = self.inner.read_exact(&mut buf)
+                            && e.kind() == ErrorKind::UnexpectedEof
+                        {
+                            return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
                         }
                         slot.store_be(buf[0]);
                     }
@@ -326,10 +326,10 @@ impl<R: Read + Seek> Reader<R> {
                     let mut iter = dst[start..end].chunks_exact_mut(8);
                     for slot in iter.by_ref() {
                         let mut buf: [u8; 1] = [0u8];
-                        if let Err(e) = self.inner.read_exact(&mut buf) {
-                            if e.kind() == ErrorKind::UnexpectedEof {
-                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
-                            }
+                        if let Err(e) = self.inner.read_exact(&mut buf)
+                            && e.kind() == ErrorKind::UnexpectedEof
+                        {
+                            return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
                         }
                         slot.store_be(buf[0]);
                     }
@@ -516,6 +516,9 @@ impl<R: Read + Seek> Reader<R> {
         buf: &mut [u8],
         order: Order,
     ) -> Result<ReaderRet, DekuError> {
+        #[cfg(not(feature = "bits"))]
+        let _ = order;
+
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_leftover(buf, byte, amt),
             #[cfg(feature = "bits")]
@@ -546,7 +549,7 @@ impl<R: Read + Seek> Reader<R> {
         let remaining = amt - 1;
         if remaining == 0 {
             #[cfg(feature = "logging")]
-            log::trace!("read_bytes_const_leftover: returning {:02x?}", buf);
+            log::trace!("read_bytes_const_leftover: returning {buf:02x?}");
 
             self.bits_read += amt * 8;
             return Ok(ReaderRet::Bytes);
@@ -567,7 +570,7 @@ impl<R: Read + Seek> Reader<R> {
         self.bits_read += amt * 8;
 
         #[cfg(feature = "logging")]
-        log::trace!("read_bytes_leftover: returning {:02x?}", buf);
+        log::trace!("read_bytes_leftover: returning {buf:02x?}");
 
         Ok(ReaderRet::Bytes)
     }
@@ -598,7 +601,7 @@ impl<R: Read + Seek> Reader<R> {
             self.bits_read += N * 8;
 
             #[cfg(feature = "logging")]
-            log::trace!("read_bytes_const: returning {:02x?}", buf);
+            log::trace!("read_bytes_const: returning {buf:02x?}");
 
             return Ok(ReaderRet::Bytes);
         }
@@ -612,6 +615,9 @@ impl<R: Read + Seek> Reader<R> {
         buf: &mut [u8; N],
         order: Order,
     ) -> Result<ReaderRet, DekuError> {
+        #[cfg(not(feature = "bits"))]
+        let _ = order;
+
         match self.leftover {
             Some(Leftover::Byte(byte)) => {
                 self.read_bytes_const_leftover(buf, byte)?;
@@ -644,6 +650,9 @@ impl<R: Read + Seek> Reader<R> {
         buf: &mut [u8; N],
         order: Order,
     ) -> Result<(), DekuError> {
+        #[cfg(not(feature = "bits"))]
+        let _ = order;
+
         if self.leftover.is_none() {
             if let Err(e) = self.inner.read_exact(buf) {
                 if e.kind() == ErrorKind::UnexpectedEof {
@@ -665,6 +674,9 @@ impl<R: Read + Seek> Reader<R> {
         buf: &mut [u8; N],
         order: Order,
     ) -> Result<(), DekuError> {
+        #[cfg(not(feature = "bits"))]
+        let _ = order;
+
         match self.leftover {
             Some(Leftover::Byte(byte)) => self.read_bytes_const_leftover(buf, byte),
             #[cfg(feature = "bits")]
@@ -697,7 +709,7 @@ impl<R: Read + Seek> Reader<R> {
         let remaining = N - 1;
         if remaining == 0 {
             #[cfg(feature = "logging")]
-            log::trace!("read_bytes_const_leftover: returning {:02x?}", buf);
+            log::trace!("read_bytes_const_leftover: returning {buf:02x?}");
             self.bits_read += N * 8;
 
             return Ok(());
@@ -718,7 +730,7 @@ impl<R: Read + Seek> Reader<R> {
         self.bits_read += N * 8;
 
         #[cfg(feature = "logging")]
-        log::trace!("read_bytes_const_leftover: returning {:02x?}", buf);
+        log::trace!("read_bytes_const_leftover: returning {buf:02x?}");
 
         Ok(())
     }

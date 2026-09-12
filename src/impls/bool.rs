@@ -2,7 +2,7 @@ use no_std_io::io::{Read, Seek, Write};
 
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{deku_error, DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, deku_error};
 
 impl<'a, Ctx> DekuReader<'a, Ctx> for bool
 where

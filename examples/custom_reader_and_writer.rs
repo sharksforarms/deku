@@ -2,7 +2,7 @@ use core::convert::TryInto;
 
 use deku::ctx::BitSize;
 use deku::writer::Writer;
-use deku::{prelude::*, DekuWriter};
+use deku::{DekuWriter, prelude::*};
 use no_std_io::io::{Cursor, Read, Seek, Write};
 
 fn bit_flipper_read<R: Read + Seek>(

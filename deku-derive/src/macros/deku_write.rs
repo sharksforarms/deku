@@ -13,7 +13,7 @@ use crate::macros::{
     assertion_failed, gen_ctx_types_and_arg, gen_field_args, gen_internal_field_ident,
     gen_struct_destruction, token_contains_string, wrap_default_ctx,
 };
-use crate::{from_token, DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
+use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id, from_token};
 
 pub(crate) fn emit_deku_write(input: &DekuData) -> Result<TokenStream, syn::Error> {
     match &input.data {

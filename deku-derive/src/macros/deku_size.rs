@@ -139,10 +139,7 @@ fn calculate_padding_size(
 /// Calculate padding size (without bits feature)
 #[cfg(not(feature = "bits"))]
 fn calculate_padding_size(pad_bytes: Option<&TokenStream>) -> Option<TokenStream> {
-    match pad_bytes {
-        Some(bytes) => Some(quote! { ((#bytes) * 8) }),
-        None => None,
-    }
+    pad_bytes.map(|bytes| quote! { ((#bytes) * 8) })
 }
 
 /// Add DekuSize trait bounds to where clause for fields that need them
@@ -232,7 +229,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 .unwrap_or_else(|| "unnamed field".to_string());
             return Err(syn::Error::new(
                 field.ty.span(),
-                format!("DekuSize cannot be derived for types with seek attributes on field '{}'. Seek operations make size unpredictable.", field_name),
+                format!(
+                    "DekuSize cannot be derived for types with seek attributes on field '{field_name}'. Seek operations make size unpredictable."
+                ),
             ));
         }
     }
@@ -291,7 +290,9 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                     .unwrap_or_else(|| "unnamed field".to_string());
                 return Err(syn::Error::new(
                     field.ty.span(),
-                    format!("DekuSize cannot be derived for types with seek attributes on field '{}'. Seek operations make size unpredictable.", field_name),
+                    format!(
+                        "DekuSize cannot be derived for types with seek attributes on field '{field_name}'. Seek operations make size unpredictable."
+                    ),
                 ));
             }
         }

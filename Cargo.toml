@@ -69,6 +69,16 @@ required-features = ["alloc", "bits"]
 name = "bebits_callgrind"
 harness = false
 required-features = ["alloc", "bits"]
+
+[[bench]]
+name = "protocol_pipeline"
+harness = false
+required-features = ["alloc", "bits"]
+
+[[bench]]
+name = "protocol_pipeline_callgrind"
+harness = false
+required-features = ["alloc", "bits"]
 [[example]]
 name = "custom_reader_and_writer"
 required-features = ["alloc", "bits"]

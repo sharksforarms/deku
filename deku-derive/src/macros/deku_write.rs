@@ -475,7 +475,7 @@ fn emit_field_writes(
     let mut is_id_pat = is_id_pat;
 
     #[cfg(feature = "bits")]
-    let runs = super::deku_read::plan_bit_runs(input, fields, is_id_pat);
+    let runs = super::plan_bit_runs(input, fields, is_id_pat);
 
     let mut writes = Vec::with_capacity(fields.len());
     let mut i = 0;
@@ -510,7 +510,7 @@ fn emit_field_writes(
 fn emit_bit_run_write(
     fields: &Fields<&FieldData>,
     start: usize,
-    run: &super::deku_read::BitRun,
+    run: &super::BitRun,
     object_prefix: &Option<TokenStream>,
     ident: &TokenStream,
 ) -> TokenStream {

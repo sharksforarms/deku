@@ -70,6 +70,16 @@ name = "bebits_callgrind"
 harness = false
 required-features = ["alloc", "bits"]
 
+[[bench]]
+name = "protocol_pipeline"
+harness = false
+required-features = ["alloc", "bits"]
+
+[[bench]]
+name = "protocol_pipeline_callgrind"
+harness = false
+required-features = ["alloc", "bits"]
+
 [lints]
 workspace = true
 

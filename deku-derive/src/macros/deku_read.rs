@@ -601,6 +601,10 @@ pub(crate) struct BitRunField {
     pub(crate) ordered: bool,
     /// Whether a value can exceed `bits` at all. If not, no check is emitted.
     pub(crate) can_overflow: bool,
+    /// Whether the field takes its type's whole width, so it is a plain byte
+    /// field rather than a packed one. A run of only these is already served by
+    /// the byte path.
+    pub(crate) whole_width: bool,
 }
 
 /// Widths of a run of adjacent fields that one read can serve.
@@ -670,6 +674,7 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
         ty: f.ty.clone(),
         ordered,
         can_overflow,
+        whole_width: bits == width,
     })
 }
 
@@ -711,7 +716,12 @@ pub(crate) fn plan_bit_runs(
             run.push(field);
             j += 1;
         }
-        if run.len() >= 2 {
+        // A run of only whole-width fields is a stretch of plain bytes. The byte
+        // path already reads those in one call, whereas a run sends them through
+        // the bit reader, which costs a `u64` accumulator and a shift and a mask
+        // per field for no gain. Batch only when the run holds a packed field.
+        let packed = run.iter().any(|f| !f.whole_width);
+        if run.len() >= 2 && packed {
             let len = run.len();
             runs.insert(i, run);
             i += len;
@@ -1328,6 +1338,31 @@ mod tests {
         sorted(plan_bit_runs(&data, &fields, use_id))
     }
 
+    /// The `whole_width` flag of every field of every run, keyed by start index.
+    ///
+    /// `plan` keeps only `bits`, which cannot show what a batched run carries into
+    /// the emitters.
+    fn plan_whole_width(src: &str) -> Vec<(usize, Vec<bool>)> {
+        let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
+        let fields = data
+            .data
+            .as_ref()
+            .take_struct()
+            .expect("test input should be a struct");
+
+        let mut runs: Vec<_> = plan_bit_runs(&data, &fields, false)
+            .into_iter()
+            .map(|(start, run)| {
+                (
+                    start,
+                    run.iter().map(|f| f.whole_width).collect::<Vec<bool>>(),
+                )
+            })
+            .collect();
+        runs.sort_by_key(|(start, _)| *start);
+        runs
+    }
+
     /// Every run the planner forms over one variant of an enum.
     fn plan_variant(src: &str, variant: usize, use_id: bool) -> Vec<(usize, Vec<usize>)> {
         let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
@@ -1364,19 +1399,37 @@ mod tests {
 
     #[test]
     fn plain_fields_without_bits_are_their_full_width() {
-        let src = r#"#[deku(endian = "big")] struct Test { a: u8, b: u16, c: u32 }"#;
-        assert_eq!(plan(src), vec![(0, vec![8, 16, 32])]);
+        // A packed field opens the run, so the three plain ones join it at the
+        // width of their type.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 4)] p: u8,
+            a: u8,
+            b: u16,
+            c: u32,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![4, 8, 16, 32])]);
     }
 
     #[test]
     fn a_run_is_capped_at_64_bits_and_the_next_one_starts_there() {
-        // 32 + 32 fills a run exactly, so the third field opens a second.
-        let src = r#"#[deku(endian = "big")] struct Test { a: u32, b: u32, c: u32, d: u32 }"#;
-        assert_eq!(plan(src), vec![(0, vec![32, 32]), (2, vec![32, 32])]);
+        // 4 + 32 + 16 leaves 12 bits, which the fourth field cannot fill, so it
+        // opens a second run with the packed field behind it.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 4)] p: u8,
+            a: u32,
+            b: u16,
+            c: u32,
+            #[deku(bits = 4)] q: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![4, 32, 16]), (3, vec![32, 4])]);
 
         // A field that does not fit closes the run rather than overflowing it.
-        let src = r#"#[deku(endian = "big")] struct Test { a: u32, b: u16, c: u32 }"#;
-        assert_eq!(plan(src), vec![(0, vec![32, 16])]);
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 4)] p: u8,
+            a: u32,
+            b: u32,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![4, 32])]);
     }
 
     #[test]
@@ -1396,41 +1449,54 @@ mod tests {
     #[test]
     fn endianness_must_be_explicitly_big() {
         // Absent means the target's endianness, little on x86.
-        assert_eq!(plan(r#"struct Test { a: u8, b: u8 }"#), vec![]);
         assert_eq!(
-            plan(r#"#[deku(endian = "little")] struct Test { a: u8, b: u8 }"#),
+            plan(r#"struct Test { #[deku(bits = 4)] a: u8, #[deku(bits = 4)] b: u8 }"#),
+            vec![]
+        );
+        assert_eq!(
+            plan(
+                r#"#[deku(endian = "little")] struct Test {
+                #[deku(bits = 4)] a: u8,
+                #[deku(bits = 4)] b: u8,
+            }"#
+            ),
             vec![]
         );
         // A field-level attribute qualifies a field inside a little-endian struct.
         let src = r#"#[deku(endian = "little")] struct Test {
-            #[deku(endian = "big")] a: u8,
-            #[deku(endian = "big")] b: u8,
+            #[deku(endian = "big", bits = 4)] a: u8,
+            #[deku(endian = "big", bits = 4)] b: u8,
         }"#;
-        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+        assert_eq!(plan(src), vec![(0, vec![4, 4])]);
     }
 
     #[test]
     fn bit_order_must_be_msb() {
         // `Msb0` is the default, so absent qualifies, and so does spelling it out.
-        let src = r#"#[deku(endian = "big")] struct Test { a: u8, b: u8 }"#;
-        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+        assert_eq!(plan(&be_struct(&[4, 4])), vec![(0, vec![4, 4])]);
 
-        let src = r#"#[deku(endian = "big", bit_order = "msb")] struct Test { a: u8, b: u8 }"#;
-        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+        let src = r#"#[deku(endian = "big", bit_order = "msb")] struct Test {
+            #[deku(bits = 4)] a: u8,
+            #[deku(bits = 4)] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![4, 4])]);
 
         let src = r#"#[deku(endian = "big")] struct Test {
-            #[deku(bit_order = "msb")] a: u8,
-            b: u8,
+            #[deku(bit_order = "msb", bits = 4)] a: u8,
+            #[deku(bits = 4)] b: u8,
         }"#;
-        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+        assert_eq!(plan(src), vec![(0, vec![4, 4])]);
 
         // "lsb" does not.
-        let src = r#"#[deku(endian = "big", bit_order = "lsb")] struct Test { a: u8, b: u8 }"#;
+        let src = r#"#[deku(endian = "big", bit_order = "lsb")] struct Test {
+            #[deku(bits = 4)] a: u8,
+            #[deku(bits = 4)] b: u8,
+        }"#;
         assert_eq!(plan(src), vec![]);
 
         let src = r#"#[deku(endian = "big")] struct Test {
-            #[deku(bit_order = "lsb")] a: u8,
-            b: u8,
+            #[deku(bit_order = "lsb", bits = 4)] a: u8,
+            #[deku(bits = 4)] b: u8,
         }"#;
         assert_eq!(plan(src), vec![]);
     }
@@ -1484,8 +1550,12 @@ mod tests {
         assert_eq!(plan(src), vec![(0, vec![2, 1, 5])]);
 
         // Without `bits` a bool is a byte, as `impls::bool` reads it.
-        let src = r#"#[deku(endian = "big")] struct Test { flag: bool, b: u8 }"#;
-        assert_eq!(plan(src), vec![(0, vec![8, 8])]);
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 4)] a: u8,
+            flag: bool,
+            b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![4, 8, 8])]);
     }
 
     #[test]
@@ -1508,8 +1578,15 @@ mod tests {
 
     #[test]
     fn only_unsigned_primitives_and_bool_qualify() {
+        // A packed `u8` either side, so only the type under test can break the run.
         for ty in ["i8", "i16", "f32", "MyEnum", "Vec<u8>", "[u8; 2]"] {
-            let src = format!(r#"#[deku(endian = "big")] struct Test {{ a: {ty}, b: {ty} }}"#);
+            let src = format!(
+                r#"#[deku(endian = "big")] struct Test {{
+                #[deku(bits = 4)] a: u8,
+                b: {ty},
+                #[deku(bits = 4)] c: u8,
+            }}"#
+            );
             assert_eq!(plan(&src), vec![], "{ty} must not form a run");
         }
     }
@@ -1553,13 +1630,25 @@ mod tests {
     #[case::seek_from_start("seek_from_start = \"0\"")]
     #[case::magic("magic = b\"\\x01\"")]
     fn a_disqualifying_attribute_keeps_a_field_out_of_a_run(#[case] attr: &str) {
-        let src =
-            format!(r#"#[deku(endian = "big")] struct Test {{ #[deku({attr})] a: u8, b: u8 }}"#);
+        // `b` is packed, so the run would form if `a` still qualified. `a` takes no
+        // `bits` of its own, since `bytes` conflicts with it.
+        let src = format!(
+            r#"#[deku(endian = "big")] struct Test {{
+            #[deku({attr})] a: u8,
+            #[deku(bits = 4)] b: u8,
+        }}"#
+        );
         assert_eq!(
             plan(&src),
             vec![],
             "`{attr}` must keep the field out of a run"
         );
+        // The same two fields batch without it, so the attribute is what stopped it.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            a: u8,
+            #[deku(bits = 4)] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 4])]);
     }
 
     #[test]
@@ -1627,5 +1716,265 @@ mod tests {
         let data = DekuData::from_input(src.parse().unwrap()).unwrap();
         let emitted = emit_deku_read(&data).unwrap().to_string();
         assert_eq!(emitted.matches("read_bits_uint_msb0").count(), 0);
+    }
+
+    /// `whole_width` marks a field that takes its type's full width, which is the
+    /// one signal the packed test reads.
+    #[test]
+    fn whole_width_marks_a_field_that_fills_its_type() {
+        let src = r#"#[deku(endian = "big")]
+        struct Test {
+            #[deku(bits = 4)]
+            narrowed: u8,
+            plain: u8,
+            #[deku(bits = 8)]
+            spelled_out: u8,
+            #[deku(bits = 15)]
+            narrowed_wide: u16,
+            wide: u16,
+            #[deku(bits = 1)] flag: bool,
+            byte_flag: bool,
+        }"#;
+        let data = DekuData::from_input(src.parse().unwrap()).unwrap();
+        let fields = data.data.as_ref().take_struct().unwrap();
+        let whole: Vec<bool> = fields
+            .fields
+            .iter()
+            .map(|f| {
+                run_field(&data, f)
+                    .expect("every field should qualify for a run")
+                    .whole_width
+            })
+            .collect();
+        // `bits` equal to the width is whole, as is its absence. A narrowed field
+        // is not, and a bool is a byte unless `bits` narrows it.
+        assert_eq!(
+            whole,
+            vec![false, true, true, false, true, false, true],
+            "narrowed, plain, spelled_out, narrowed_wide, wide, flag, byte_flag"
+        );
+    }
+
+    /// The regression #677 introduced: a struct of plain bytes holds no bit field,
+    /// so sending it through the bit reader costs a shift and a mask per field and
+    /// buys nothing. Such a run must stay on the byte path.
+    #[test]
+    fn a_run_of_only_whole_width_fields_does_not_batch() {
+        // `vec![]` alone would also hold if a field were ineligible for some other
+        // reason, so check that every field qualifies and is whole. Then the
+        // whole-width rule is the only thing left that can reject the run.
+        fn every_field_is_whole_and_eligible(src: &str) {
+            let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
+            let fields = data.data.as_ref().take_struct().unwrap();
+            for (i, f) in fields.fields.iter().enumerate() {
+                let field = run_field(&data, f).unwrap_or_else(|| {
+                    panic!("field {i} should qualify, leaving only the whole-width rule")
+                });
+                assert!(field.whole_width, "field {i} should be whole-width");
+            }
+            assert_eq!(plan(src), vec![], "a whole-width run must not batch");
+        }
+
+        // Plain `u8` fields, the shape a byte-aligned header takes.
+        every_field_is_whole_and_eligible(
+            r#"#[deku(endian = "big")] struct Test { a: u8, b: u8, c: u8, d: u8 }"#,
+        );
+
+        // Mixed widths, still every field whole.
+        every_field_is_whole_and_eligible(
+            r#"#[deku(endian = "big")] struct Test { a: u8, b: u16, c: u32 }"#,
+        );
+
+        // `bits` that merely restates the width is still whole.
+        every_field_is_whole_and_eligible(
+            r#"#[deku(endian = "big")]
+            struct Test {
+                #[deku(bits = 8)]
+                a: u8,
+                #[deku(bits = 16)]
+                b: u16,
+            }"#,
+        );
+
+        // Byte-wide bools included, since `impls::bool` reads one as a byte.
+        every_field_is_whole_and_eligible(
+            r#"#[deku(endian = "big")] struct Test { a: bool, b: bool, c: u8 }"#,
+        );
+
+        // No emitted call either, so the byte path really serves them.
+        let data = DekuData::from_input(
+            r#"#[deku(endian = "big")] struct Test { a: u8, b: u8, c: u8 }"#
+                .parse()
+                .unwrap(),
+        )
+        .unwrap();
+        let emitted = emit_deku_read(&data).unwrap().to_string();
+        assert_eq!(emitted.matches("read_bits_uint_msb0").count(), 0);
+    }
+
+    /// One packed field is enough to earn the batch, wherever it sits, since the
+    /// whole run then needs the bit reader anyway.
+    #[test]
+    fn one_packed_field_makes_a_whole_width_run_batch() {
+        // At the front, in the middle, and at the back. Each run carries the flag
+        // per field, which is what the emitters read, so assert those too.
+        let src = r#"#[deku(endian = "big")]
+        struct Test {
+            #[deku(bits = 4)]
+            p: u8,
+            a: u8,
+            b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![4, 8, 8])]);
+        assert_eq!(plan_whole_width(src), vec![(0, vec![false, true, true])]);
+
+        let src = r#"#[deku(endian = "big")]
+        struct Test {
+            a: u8,
+            #[deku(bits = 4)]
+            p: u8,
+            b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 4, 8])]);
+        assert_eq!(plan_whole_width(src), vec![(0, vec![true, false, true])]);
+
+        let src = r#"#[deku(endian = "big")]
+        struct Test {
+            a: u8,
+            b: u8,
+            #[deku(bits = 4)]
+            p: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 8, 4])]);
+        assert_eq!(plan_whole_width(src), vec![(0, vec![true, true, false])]);
+
+        // A one-bit bool is packed too, so it earns the batch on its own.
+        let src = r#"#[deku(endian = "big")]
+        struct Test {
+            #[deku(bits = 1)]
+            flag: bool,
+            a: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![1, 8])]);
+        assert_eq!(plan_whole_width(src), vec![(0, vec![false, true])]);
+    }
+
+    /// The packed test applies per run, not per struct, so a whole-width stretch
+    /// beside a packed one keeps the byte path.
+    #[test]
+    fn a_whole_width_stretch_beside_a_packed_run_stays_unbatched() {
+        // The little-endian field splits the struct in two. Only the packed half
+        // batches; the plain half keeps a read per field.
+        let src = r#"#[deku(endian = "big")]
+        struct Test {
+            a: u8,
+            b: u8,
+            #[deku(endian = "little")]
+            split: u16,
+            #[deku(bits = 4)]
+            c: u8,
+            #[deku(bits = 4)]
+            d: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(3, vec![4, 4])]);
+        // `a` and `b` are eligible and whole, so only the rule kept them out.
+        let data = DekuData::from_input(src.parse().unwrap()).unwrap();
+        let fields = data.data.as_ref().take_struct().unwrap();
+        for i in 0..2 {
+            assert!(
+                run_field(&data, fields.fields[i])
+                    .expect("the plain half should still be eligible")
+                    .whole_width
+            );
+        }
+        assert_eq!(plan_whole_width(src), vec![(3, vec![false, false])]);
+
+        // And the other way round, so the order does not matter.
+        let src = r#"#[deku(endian = "big")]
+        struct Test {
+            #[deku(bits = 4)]
+            a: u8,
+            #[deku(bits = 4)]
+            b: u8,
+            #[deku(endian = "little")]
+            split: u16,
+            c: u8,
+            d: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![4, 4])]);
+        assert_eq!(plan_whole_width(src), vec![(0, vec![false, false])]);
+    }
+
+    /// Rejecting a whole-width run advances one field, so the planner retries from
+    /// the second and can still reach a packed field the 64-bit cap had cut off.
+    #[test]
+    fn a_rejected_whole_width_run_retries_from_its_second_field() {
+        // 32 + 32 fills the cap, so `p` falls outside the first run, which is then
+        // whole-width and rejected. From `b` the cap leaves room for `p`, and that
+        // run is packed, so `a` alone keeps the byte path.
+        let src = r#"#[deku(endian = "big")]
+         struct Test {
+            a: u32,
+            b: u32,
+            #[deku(bits = 4)] p: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(1, vec![32, 4])]);
+        // The run that survives is the mixed one: a whole `u32` and packed `p`.
+        assert_eq!(plan_whole_width(src), vec![(1, vec![true, false])]);
+
+        // A third `u32` pushes the packed run one field further along: the retry
+        // walks one field at a time until `p` fits, so `a` and `b` are left behind.
+        let src = r#"#[deku(endian = "big")]
+        struct Test {
+            a: u32,
+            b: u32,
+            c: u32,
+            #[deku(bits = 4)]
+            p: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(2, vec![32, 4])]);
+        assert_eq!(plan_whole_width(src), vec![(2, vec![true, false])]);
+    }
+
+    /// A variant's first field can hold the id an `id_pat` matched, which the enum
+    /// has already read. The whole-width rule judges what is left, so the first
+    /// field must not count towards the packed test.
+    ///
+    /// Only an enum variant reaches this: `emit_field_reads` passes `use_id: false`
+    /// for every struct.
+    #[test]
+    fn the_id_storage_field_is_left_out_of_the_packed_test() {
+        // The id storage takes no attributes of its own, so it is always whole-width.
+        // Behind it sit two more whole-width fields, and the run must not form.
+        let src = r#"
+        #[deku(id_type = "u8", endian = "big")]
+        enum Test {
+            #[deku(id_pat = "_")]
+            CatchAll {
+                captured_id: u8,
+                a: u8,
+                b: u8,
+            },
+        }"#;
+        assert_eq!(plan_variant(src, 0, true), vec![]);
+        // Nor without the id: every field fills its type either way.
+        assert_eq!(plan_variant(src, 0, false), vec![]);
+
+        // A packed field of the variant's own earns the batch behind the id. The id
+        // is left out, so the run starts at field 1 and is two fields wide, not the
+        // three it would cover if the id counted.
+        let src = r#"
+        #[deku(id_type = "u8", endian = "big")]
+        enum Test {
+            #[deku(id_pat = "_")]
+            CatchAll {
+                captured_id: u8,
+                #[deku(bits = 4)] a: u8,
+                b: u8,
+            },
+        }"#;
+        assert_eq!(plan_variant(src, 0, true), vec![(1, vec![4, 8])]);
+        // Without the id the same fields batch from 0, which is the contrast.
+        assert_eq!(plan_variant(src, 0, false), vec![(0, vec![8, 4, 8])]);
     }
 }

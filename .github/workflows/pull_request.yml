@@ -1,22 +1,6 @@
 on: [pull_request]
 name: CI Pull Request
 jobs:
-  runBenchmark:
-    name: Benchmark
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-      - uses: wcampbell0x2a/rust-bench-compare-action@v1.0.0
-        with:
-          branchName: ${{ github.base_ref }}
-          benchName: deku
-          token: ${{ secrets.GITHUB_TOKEN }}
-
   runCallgrindBenchmark:
     name: Benchmark (callgrind)
     runs-on: ubuntu-latest

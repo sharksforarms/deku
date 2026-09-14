@@ -1,6 +1,12 @@
-//! Big-endian bit-packed headers: the shape used by real network / space
-//! protocols (CCSDS, IPv4, DVB-S2). Mirrors the CCSDS TM Transfer Frame
-//! primary header, 6 octets / 11 fields.
+//! Wall time for the big-endian bit-packed shapes in [`common`].
+//! `benches/bebits_callgrind.rs` measures the same shapes for instruction
+//! counts.
+//!
+//! This harness measures real silicon, so it sees cache behaviour, branch
+//! prediction, and instruction-level parallelism that callgrind cannot. It is
+//! also noisy on a shared machine. Read the two harnesses together: instruction
+//! count and time do not move in step, and on these shapes they disagree by up
+//! to two orders of magnitude.
 //!
 //! Each shape is measured twice.
 //!
@@ -13,78 +19,21 @@
 //! left the cursor, so nothing overlaps. Every field is folded into a value the
 //! closure returns, so no read can be dropped. Divide by N for the per-struct
 //! cost; that is the number to quote.
+use std::hint::black_box;
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use deku::prelude::*;
 use no_std_io::io::Cursor;
-use std::hint::black_box;
 
-/// Frames per sequential pass. 128 six-octet frames is 768 bytes, comfortably
-/// inside L1 so the measurement is field decoding rather than memory.
-const FRAMES: usize = 128;
-
-/// 1-bit fields per sequential pass: 1024 bits, i.e. 128 bytes.
-const BITS: usize = 1024;
-
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(endian = "big")]
-struct TmPrimaryHeader {
-    #[deku(bits = 2)]
-    tfvn: u8,
-    #[deku(bits = 10)]
-    scid: u16,
-    #[deku(bits = 3)]
-    vcid: u8,
-    #[deku(bits = 1)]
-    ocf: u8,
-    mcfc: u8,
-    vcfc: u8,
-    #[deku(bits = 1)]
-    tfs: u8,
-    #[deku(bits = 1)]
-    syn: u8,
-    #[deku(bits = 1)]
-    po: u8,
-    #[deku(bits = 2)]
-    sli: u8,
-    #[deku(bits = 11)]
-    fhp: u16,
-}
-
-/// Same 6 octets, byte-aligned: the deku fast path, for scale. Also the control
-/// for any change to the bit paths, which must leave this one alone.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(endian = "big")]
-struct SixBytes {
-    a: u8,
-    b: u8,
-    c: u8,
-    d: u8,
-    e: u8,
-    f: u8,
-}
-
-/// Worst case in the docs: a 1-bit field in a wide container.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(endian = "big")]
-struct OneBitU64 {
-    #[deku(bits = 1)]
-    a: u64,
-}
-
-/// A frame stream whose bytes are not compile-time constants.
-fn stream() -> [u8; FRAMES * 6] {
-    let mut buf = [0u8; FRAMES * 6];
-    let mut x: u32 = 0x1234_5678;
-    for b in buf.iter_mut() {
-        x = x.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-        *b = (x >> 24) as u8;
-    }
-    buf
-}
+#[path = "common/mod.rs"]
+mod common;
+use common::{
+    header, six, stream_array, OneBitU64, SixBytes, TmPrimaryHeader, BITS, FRAMES, HEADER_BYTES,
+};
 
 fn bench(c: &mut Criterion) {
-    let buf = [0x2Au8, 0xB5, 0x11, 0x22, 0xC7, 0xFF, 0x00, 0x99];
-    let stream = stream();
+    let buf = HEADER_BYTES;
+    let stream = stream_array();
 
     // One struct per iteration.
     c.bench_function("be_tm_primary_header_11_fields", |b| {
@@ -147,16 +96,8 @@ fn bench(c: &mut Criterion) {
 
     // Write side of the same shapes. Into a reused stack buffer, so the
     // measurement is the field writes rather than an allocation.
-    let mut r = Reader::new(Cursor::new(&buf));
-    let header = TmPrimaryHeader::from_reader_with_ctx(&mut r, ()).unwrap();
-    let six = SixBytes {
-        a: 1,
-        b: 2,
-        c: 3,
-        d: 4,
-        e: 5,
-        f: 6,
-    };
+    let header = header();
+    let six = six();
     c.bench_function("be_write_tm_primary_header_11_fields", |b| {
         let mut out = [0u8; 16];
         b.iter(|| {

@@ -71,6 +71,19 @@ struct OneBitU64 {
     a: u64,
 }
 
+/// Two 4-byte address fields, the shape `[u8; N]` makes expensive: the generic
+/// array impl reads them one element at a time. Same layout as the IPv4 source
+/// and destination addresses.
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "big")]
+struct Addresses {
+    source: [u8; 4],
+    destination: [u8; 4],
+}
+
+/// 8-octet items that fit in the same stream as the 6-octet frames.
+const ADDRS: usize = FRAMES * 6 / 8;
+
 /// A frame stream whose bytes are not compile-time constants.
 fn stream() -> [u8; FRAMES * 6] {
     let mut buf = [0u8; FRAMES * 6];
@@ -103,6 +116,18 @@ fn bench(c: &mut Criterion) {
         b.iter(|| {
             let mut r = Reader::new(Cursor::new(black_box(&buf)));
             OneBitU64::from_reader_with_ctx(&mut r, ()).unwrap()
+        })
+    });
+
+    c.bench_function("be_byte_arrays_x96", |b| {
+        b.iter(|| {
+            let mut r = Reader::new(Cursor::new(black_box(&stream)));
+            let mut acc: u64 = 0;
+            for _ in 0..ADDRS {
+                let a = Addresses::from_reader_with_ctx(&mut r, ()).unwrap();
+                acc ^= u64::from(a.source[0]) ^ u64::from(a.destination[3]);
+            }
+            acc
         })
     });
 
@@ -170,6 +195,21 @@ fn bench(c: &mut Criterion) {
         b.iter(|| {
             let mut w = Writer::new(Cursor::new(out.as_mut_slice()));
             black_box(&six).to_writer(&mut w, ()).unwrap();
+            w.finalize().unwrap();
+        })
+    });
+
+    let addresses = Addresses {
+        source: [10, 0, 0, 1],
+        destination: [192, 168, 1, 254],
+    };
+    c.bench_function("be_write_byte_arrays_x96", |b| {
+        let mut out = [0u8; ADDRS * 8];
+        b.iter(|| {
+            let mut w = Writer::new(Cursor::new(out.as_mut_slice()));
+            for _ in 0..ADDRS {
+                black_box(&addresses).to_writer(&mut w, ()).unwrap();
+            }
             w.finalize().unwrap();
         })
     });

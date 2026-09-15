@@ -232,6 +232,18 @@ struct DekuData {
     /// A magic value that must appear at the start of this struct/enum's data
     magic: Option<syn::LitByteStr>,
 
+    /// extra where-clause items for derived `DekuRead` impls
+    read_bound: Option<syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>>,
+
+    /// extra where-clause items for derived `DekuWrite` impls
+    write_bound: Option<syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>>,
+
+    /// extra where-clause items for derived `DekuSize` impls
+    size_bound: Option<syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>>,
+
+    /// extra where-clause items for all derived impls
+    bound: Option<syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>>,
+
     /// enum only: `id` value
     id: Option<Id>,
 
@@ -429,6 +441,10 @@ impl DekuData {
             ctx: receiver.ctx,
             ctx_default: receiver.ctx_default,
             magic: receiver.magic,
+            read_bound: receiver.read_bound,
+            write_bound: receiver.write_bound,
+            size_bound: receiver.size_bound,
+            bound: receiver.bound,
             id: receiver.id,
             id_type: receiver.id_type?,
             id_endian: receiver.id_endian,
@@ -617,7 +633,6 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataEnum<'a> {
 #[derive(Debug)]
 struct DekuDataStruct<'a> {
     imp: syn::ImplGenerics<'a>,
-    wher: Option<&'a syn::WhereClause>,
     ident: TokenStream,
     fields: darling::ast::Fields<&'a FieldData>,
 }
@@ -627,7 +642,7 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataStruct<'a> {
 
     /// Create common initializer variables for `emit_struct` read/write functions
     fn try_from(deku_data: &'a DekuData) -> Result<Self, Self::Error> {
-        let (imp, ty, wher) = deku_data.generics.split_for_impl();
+        let (imp, ty, _) = deku_data.generics.split_for_impl();
 
         let ident = &deku_data.ident;
         let ident = quote! { #ident #ty };
@@ -635,12 +650,42 @@ impl<'a> TryFrom<&'a DekuData> for DekuDataStruct<'a> {
         // Checked in `emit_deku_{read/write}`.
         let fields = deku_data.data.as_ref().take_struct().unwrap();
 
-        Ok(Self {
-            imp,
-            wher,
-            ident,
-            fields,
-        })
+        Ok(Self { imp, ident, fields })
+    }
+}
+
+impl<'a> DekuData {
+    fn merge_bounds<'b>(
+        &'a self,
+        bounds: impl Iterator<
+            Item = &'b syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>,
+        >,
+    ) -> Option<Cow<'a, syn::WhereClause>> {
+        let (_, _, wher) = self.generics.split_for_impl();
+        let mut wher = wher.map(Cow::Borrowed);
+
+        for bound in bounds {
+            wher.get_or_insert_with(|| {
+                Cow::Owned(syn::WhereClause {
+                    where_token: <syn::Token![where]>::default(),
+                    predicates: syn::punctuated::Punctuated::new(),
+                })
+            })
+            .to_mut()
+            .predicates
+            .extend(bound.iter().map(Clone::clone));
+        }
+
+        wher
+    }
+    fn read_where(&'a self) -> Option<Cow<'a, syn::WhereClause>> {
+        self.merge_bounds(self.read_bound.iter().chain(&self.bound))
+    }
+    fn write_where(&'a self) -> Option<Cow<'a, syn::WhereClause>> {
+        self.merge_bounds(self.write_bound.iter().chain(&self.bound))
+    }
+    fn size_where(&'a self) -> Option<Cow<'a, syn::WhereClause>> {
+        self.merge_bounds(self.size_bound.iter().chain(&self.bound))
     }
 }
 
@@ -1082,6 +1127,20 @@ struct DekuReceiver {
     /// A magic value that must appear at the start of this struct/enum's data
     #[darling(default)]
     magic: Option<syn::LitByteStr>,
+
+    /// extra where-clause items for derived `DekuRead` impls
+    #[darling(default)]
+    read_bound: Option<syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>>,
+
+    /// extra where-clause items for derived `DekuWrite` impls
+    #[darling(default)]
+    write_bound: Option<syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>>,
+
+    /// extra where-clause items for derived `DekuSize` impls
+    size_bound: Option<syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>>,
+
+    /// extra where-clause items for all derived impls
+    bound: Option<syn::punctuated::Punctuated<syn::WherePredicate, syn::token::Comma>>,
 
     /// enum only: `id` value
     #[darling(default)]

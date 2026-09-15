@@ -216,9 +216,11 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         ));
     }
 
+    let wher = input.size_where();
+    let wher = wher.as_deref();
+
     let DekuDataStruct {
         imp: _,
-        wher: _,
         ident: _,
         fields,
     } = DekuDataStruct::try_from(input)?;
@@ -245,9 +247,9 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     let size_calculation = calculate_fields_size(fields.iter().copied(), &crate_, false);
 
-    let (imp_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let (imp_generics, ty_generics, _) = input.generics.split_for_impl();
 
-    let mut where_clause = where_clause.cloned();
+    let mut where_clause = wher.cloned();
     add_field_bounds(&mut where_clause, fields.iter().copied(), &crate_, false);
 
     let ident = &input.ident;

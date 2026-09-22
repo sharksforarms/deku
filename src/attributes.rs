@@ -416,7 +416,7 @@ Example:
 # use std::convert::{TryInto, TryFrom};
 #
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(read_bound = "for<'a> T: DekuRead<'a, ()>", write_bound = "T: DekuWrite<()>")]
+#[deku(read_bound = "for<'a> T: DekuReader<'a, ()>", write_bound = "T: DekuWriter<()>")]
 struct DekuTest<T> {
     data: T,
 }

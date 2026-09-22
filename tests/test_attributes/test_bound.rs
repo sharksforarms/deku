@@ -6,8 +6,8 @@ use deku::prelude::*;
 fn test_bound() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(
-        read_bound = "for<'a> T: DekuRead<'a, ()>",
-        write_bound = "T: DekuWrite<()>"
+        read_bound = "for<'a> T: DekuReader<'a, ()>",
+        write_bound = "T: DekuWriter<()>"
     )]
     struct GenericType<T>(T);
 

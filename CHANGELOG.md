@@ -9,6 +9,8 @@
 
 ### Other
 
+- A plain `[u8; N]` field is read and written in one call rather than one per
+  element, except where a partial `Lsb0` remainder precedes it
 - Bump MSRV to 1.88
 - Update syn to 3.0 and darling to 0.24
 - Added a note concerning `skip`/`cond` attributes and padding (doc)

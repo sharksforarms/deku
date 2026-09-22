@@ -850,6 +850,23 @@ fn emit_field_write(
             } else {
                 quote! { core::result::Result::<(), ::#crate_::DekuError>::Ok(()) }
             }
+        } else if super::deku_read::byte_array_len(input, f).is_some() {
+            // One `write_all` for a plain byte array, but only with no partial
+            // `Lsb0` leftover pending: splicing whole bytes onto one reorders
+            // them. Whichever field came before leaves it, so this field's
+            // `bit_order` cannot rule it out. Same guard as a batched run.
+            #[cfg(feature = "bits")]
+            let write = quote! {
+                if __deku_writer.can_write_bits_uint_msb0() {
+                    __deku_writer.write_bytes(&#object_prefix #field_ident[..])
+                } else {
+                    ::#crate_::DekuWriter::to_writer(#object_prefix #field_ident, __deku_writer, (#write_args))
+                }
+            };
+            // Without `bits` nothing can leave a partial byte pending.
+            #[cfg(not(feature = "bits"))]
+            let write = quote! { __deku_writer.write_bytes(&#object_prefix #field_ident[..]) };
+            write
         } else {
             quote! { ::#crate_::DekuWriter::to_writer(#object_prefix #field_ident, __deku_writer, (#write_args)) }
         }

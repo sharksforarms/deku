@@ -18,6 +18,7 @@ writing implementations from the same definition. It is designed for network
 protocols, file formats, and embedded data.
 
 - Symmetric reading and writing from a single type definition
+- Designed for efficient binary reading and writing
 - Bit-sized fields with configurable byte and bit order
 - Tagged enums, variable-length collections, and conditional fields
 - Validation, context-aware types, and custom readers and writers

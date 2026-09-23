@@ -415,8 +415,10 @@ Example:
 # use deku::prelude::*;
 # use std::convert::{TryInto, TryFrom};
 #
+# #[cfg(feature = "alloc")]
+# fn main() {
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(read_bound = "for<'a> T: DekuReader<'a, ()>", write_bound = "T: DekuWriter<()>")]
+#[deku(read_bound = "for<'a> T: DekuReader<'a, ()>", write_bound = "T: DekuContainerWrite")]
 struct DekuTest<T> {
     data: T,
 }
@@ -431,6 +433,10 @@ assert_eq!(
 
 let write_value: Vec<u8> = read_value.try_into().unwrap();
 assert_eq!(data, write_value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
 ```
 
 # seek_from_current

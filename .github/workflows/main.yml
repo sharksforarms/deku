@@ -45,12 +45,8 @@ jobs:
               awk '/^\[pkg\.rust\]$/ { found = 1; next }
                    found && /^version = / { gsub(/"/, "", $3); print $3; found = 0 }'
           }
-          # extract MSRV from Cargo.toml
-          msrv=$(awk -F'"' '
-            /^\[package\]/ { in_package = 1; next }
-            /^\[/ { in_package = 0 }
-            in_package && /^[[:space:]]*rust-version[[:space:]]*=/ { print $2; exit }
-          ' Cargo.toml)
+          msrv=$(cargo metadata --no-deps --format-version 1 |
+            jq -er '.packages[] | select(.name == "deku") | .rust_version')
           stable=$(resolve_channel stable)
           beta=$(resolve_channel beta)
           test -n "$msrv" && test -n "$stable" && test -n "$beta"

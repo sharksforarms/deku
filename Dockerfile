@@ -1,11 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
+ARG MSRV_TOOLCHAIN=1.88.0
+
 FROM node:24-bookworm-slim AS node-runtime
 
-FROM rust:1.88-slim-bookworm AS deku-build-base
+FROM rust:${MSRV_TOOLCHAIN}-slim-bookworm AS deku-build-base
 
 ARG STABLE_TOOLCHAIN=stable
-ARG MSRV_TOOLCHAIN=1.88.0
+ARG MSRV_TOOLCHAIN
 ARG BETA_TOOLCHAIN=beta
 ARG JUST_VERSION=1.58.0
 ARG WASM_PACK_VERSION=0.15.0

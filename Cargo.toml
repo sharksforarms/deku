@@ -35,7 +35,7 @@ no_std_io = { version = "0.9.4", default-features = false, package = "no_std_io2
 rustversion = "1.0.22"
 
 [dev-dependencies]
-rstest = "0.26.1"
+rstest = "0.27.0"
 hexlit = "0.5.5"
 criterion = "0.8.2"
 alloc_counter = "0.0.4"

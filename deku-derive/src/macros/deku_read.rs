@@ -36,12 +36,10 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         .next()
         .map_or(quote!('_), |v| quote!(#v));
 
-    let DekuDataStruct {
-        imp,
-        wher,
-        ident,
-        fields,
-    } = DekuDataStruct::try_from(input)?;
+    let wher = input.read_where();
+    let wher = wher.as_deref();
+
+    let DekuDataStruct { imp, ident, fields } = DekuDataStruct::try_from(input)?;
 
     let seek = if let Some(num) = &input.seek_from_current {
         quote! {

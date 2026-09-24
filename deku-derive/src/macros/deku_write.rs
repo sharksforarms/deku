@@ -26,12 +26,10 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
     let crate_ = super::get_crate_name();
     let mut tokens = TokenStream::new();
 
-    let DekuDataStruct {
-        imp,
-        wher,
-        ident,
-        fields,
-    } = DekuDataStruct::try_from(input)?;
+    let wher = input.write_where();
+    let wher = wher.as_deref();
+
+    let DekuDataStruct { imp, ident, fields } = DekuDataStruct::try_from(input)?;
 
     let seek = if let Some(num) = &input.seek_from_current {
         quote! {

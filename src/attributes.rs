@@ -35,6 +35,10 @@ enum DekuEnum {
 | [endian](#endian) | top-level, field | Set the endianness
 | [bit_order](#bit_order) | top-level, field | Set the bit-order when reading bits
 | [magic](#magic) | top-level, field | A magic value that must be present at the start of this struct/enum/field
+| [bound](#bound) | top-level | Extra where-clause items for all derived impls
+| [read_bound](#bound) | top-level | Extra where-clause items for derived `DekuRead` impls
+| [write_bound](#bound) | top-level | Extra where-clause items for derived `DekuWrite` impls
+| [size_bound](#bound) | top-level | Extra where-clause items for derived `DekuSize` impls
 | [seek_from_current](#seek_from_current) | top-level, field | Sets the offset of reader and writer to the current position plus the specified number of bytes
 | [seek_from_end](#seek_from_end) | top-level, field | Sets the offset to the size of reader and writer plus the specified number of bytes
 | [seek_from_start](#seek_from_start) | top-level, field | Sets the offset of reader and writer to provided number of bytes
@@ -392,6 +396,43 @@ assert_eq!(
 
 let value: Vec<u8> = value.try_into().unwrap();
 assert_eq!(data, value);
+# }
+#
+# #[cfg(not(feature = "alloc"))]
+# fn main() {}
+```
+
+# bound
+
+Adds extra where-clause items to the derived impls.
+
+Clauses listed with `bound` will be applied to _all_ deku derives.
+
+If you need to apply certain bounds specifically to a given derive, you may use the `read_bound`, `write_bound`, and `size_bound` attributes to specify bounds that only apply to their respective derives.
+
+Example:
+```rust
+# use deku::prelude::*;
+# use std::convert::{TryInto, TryFrom};
+#
+# #[cfg(feature = "alloc")]
+# fn main() {
+# #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(read_bound = "for<'a> T: DekuReader<'a, ()>", write_bound = "T: DekuWriter")]
+struct DekuTest<T> {
+    data: T,
+}
+
+let data: Vec<u8> = vec![0x01];
+
+let read_value = <DekuTest<u8>>::try_from(data.as_ref()).unwrap();
+assert_eq!(
+    DekuTest { data: 0x01_u8 },
+    read_value,
+);
+
+let write_value: Vec<u8> = read_value.try_into().unwrap();
+assert_eq!(data, write_value);
 # }
 #
 # #[cfg(not(feature = "alloc"))]

@@ -7,8 +7,8 @@ use alloc::vec::Vec;
 use crate::error::NeedSize;
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::{ctx::*, DekuReader};
 use crate::{DekuError, DekuWriter};
+use crate::{DekuReader, ctx::*};
 
 impl DekuReader<'_, ReadExact> for Vec<u8> {
     fn from_reader_with_ctx<R: Read + Seek>(
@@ -232,7 +232,7 @@ impl<T: DekuWriter<Ctx>, Ctx: Copy> DekuWriter<Ctx> for Vec<T> {
 #[allow(clippy::too_many_arguments)]
 mod tests {
     #[cfg(feature = "bits")]
-    use crate::bitvec::{bits, BitSlice, Msb0};
+    use crate::bitvec::{BitSlice, Msb0, bits};
     use rstest::rstest;
     use std::io::Cursor;
 
@@ -379,10 +379,10 @@ mod tests {
 
     mod read_exact_tests {
         use super::*;
+        use crate::DekuError;
         use crate::ctx::ReadExact;
         use crate::error::NeedSize;
         use crate::reader::Reader;
-        use crate::DekuError;
         use std::io::Cursor;
 
         #[test]
@@ -434,7 +434,7 @@ mod tests {
             let mut cursor = Cursor::new(data);
             let mut reader = Reader::new(&mut cursor);
             let result = Vec::<u8>::from_reader_with_ctx(&mut reader, ReadExact(0)).unwrap();
-            assert_eq!(result, vec![]);
+            assert!(result.is_empty());
         }
 
         /// This test verifies the seek-based bounds check prevents

@@ -147,18 +147,18 @@ impl From<core::convert::Infallible> for DekuError {
 #[cfg(feature = "std")]
 impl core::fmt::Display for DekuError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        match *self {
-            DekuError::Incomplete(ref size) => write!(
+        match self {
+            DekuError::Incomplete(size) => write!(
                 f,
                 "Not enough data, need {} bits (or {} bytes)",
                 size.bit_size(),
                 size.byte_size()
             ),
-            DekuError::Parse(ref err) => write!(f, "Parse error: {err}"),
-            DekuError::InvalidParam(ref err) => write!(f, "Invalid param error: {err}"),
-            DekuError::Assertion(ref err) => write!(f, "{err}"),
+            DekuError::Parse(err) => write!(f, "Parse error: {err}"),
+            DekuError::InvalidParam(err) => write!(f, "Invalid param error: {err}"),
+            DekuError::Assertion(err) => write!(f, "{err}"),
             DekuError::IdVariantNotFound => write!(f, "Could not resolve `id` for variant"),
-            DekuError::Io(ref e) => write!(f, "io errorr: {e:?}"),
+            DekuError::Io(e) => write!(f, "io errorr: {e:?}"),
         }
     }
 }

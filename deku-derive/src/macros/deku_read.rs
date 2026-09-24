@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
-use darling::ast::{Data, Fields};
 use darling::ToTokens;
+use darling::ast::{Data, Fields};
 use proc_macro2::TokenStream;
 use quote::quote;
 #[cfg(feature = "bits")]
@@ -15,7 +15,7 @@ use crate::macros::{
     assertion_failed, gen_ctx_types_and_arg, gen_field_args, gen_internal_field_idents,
     token_contains_string, wrap_default_ctx,
 };
-use crate::{from_token, DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id};
+use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id, from_token};
 
 use super::{gen_internal_field_ident, gen_type_from_ctx_id};
 
@@ -366,14 +366,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
     }
 
     // if default
-    if !has_default_match {
-        if let Some(variant_read_func) = default_reader {
-            variant_matches.push(quote! {
-                _ => {
-                    #variant_read_func
-                }
-            });
-        }
+    if !has_default_match && let Some(variant_read_func) = default_reader {
+        variant_matches.push(quote! {
+            _ => {
+                #variant_read_func
+            }
+        });
     }
 
     let variant_id_read = if id.is_some() {
@@ -627,10 +625,10 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
     // anything else is a ctx parameter name forwarded as a runtime order, which
     // could be either at run time.
     let explicit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());
-    if let Some(order) = explicit_order {
-        if order.value() != "msb" {
-            return None;
-        }
+    if let Some(order) = explicit_order
+        && order.value() != "msb"
+    {
+        return None;
     }
     // Which overflow wording this field's own write would have used.
     let ordered = explicit_order.is_some();
@@ -696,10 +694,10 @@ pub(crate) fn byte_array_len(input: &DekuData, f: &FieldData) -> Option<usize> {
     // `Msb0` only: on an unaligned cursor `read_bytes_const_into` reverses the
     // buffer for `Lsb0`. A byte has no byte order, so endianness needs no check.
     #[cfg(feature = "bits")]
-    if let Some(order) = f.bit_order.as_ref().or(input.bit_order.as_ref()) {
-        if order.value() != "msb" {
-            return None;
-        }
+    if let Some(order) = f.bit_order.as_ref().or(input.bit_order.as_ref())
+        && order.value() != "msb"
+    {
+        return None;
     }
     #[cfg(not(feature = "bits"))]
     let _ = input;
@@ -1086,20 +1084,15 @@ fn emit_field_read(
         } else if let Some(field_count) = &f.count {
             use syn::{GenericArgument, PathArguments, Type};
             let mut is_vec_u8 = false;
-            if let Type::Path(type_path) = &f.ty {
-                if type_path.path.segments.len() == 1 && type_path.path.segments[0].ident == "Vec" {
-                    if let PathArguments::AngleBracketed(ref generic_args) =
-                        type_path.path.segments[0].arguments
-                    {
-                        if generic_args.args.len() == 1 {
-                            if let GenericArgument::Type(Type::Path(ref arg_path)) =
-                                generic_args.args[0]
-                            {
-                                is_vec_u8 = arg_path.path.is_ident("u8");
-                            }
-                        }
-                    }
-                }
+            if let Type::Path(type_path) = &f.ty
+                && type_path.path.segments.len() == 1
+                && type_path.path.segments[0].ident == "Vec"
+                && let PathArguments::AngleBracketed(generic_args) =
+                    &type_path.path.segments[0].arguments
+                && generic_args.args.len() == 1
+                && let GenericArgument::Type(Type::Path(arg_path)) = &generic_args.args[0]
+            {
+                is_vec_u8 = arg_path.path.is_ident("u8");
             }
             if is_vec_u8 {
                 quote! {
@@ -1174,19 +1167,19 @@ fn emit_field_read(
             }
             // One `read_exact` for a plain byte array, in place of one read per
             // element through the generic `[T; N]` impl.
-            if ret.is_empty() {
-                if let Some(n) = byte_array_len(input, f) {
-                    ret.extend(quote! {
-                        {
-                            let mut __deku_bytes = [0u8; #n];
-                            __deku_reader.read_bytes_const_into::<#n>(
-                                &mut __deku_bytes,
-                                ::#crate_::ctx::Order::Msb0,
-                            )?;
-                            __deku_bytes
-                        }
-                    })
-                }
+            if ret.is_empty()
+                && let Some(n) = byte_array_len(input, f)
+            {
+                ret.extend(quote! {
+                    {
+                        let mut __deku_bytes = [0u8; #n];
+                        __deku_reader.read_bytes_const_into::<#n>(
+                            &mut __deku_bytes,
+                            ::#crate_::ctx::Order::Msb0,
+                        )?;
+                        __deku_bytes
+                    }
+                })
             }
 
             if ret.is_empty() {

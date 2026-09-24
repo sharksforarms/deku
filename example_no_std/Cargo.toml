@@ -1,8 +1,8 @@
 [package]
-name = "ensure_no_std"
+name = "example_no_std"
 version = "0.1.0"
 authors = ["sharks <sharks@sharks>"]
-edition = "2018"
+edition = "2024"
 
 [profile.dev]
 panic = "abort"
@@ -18,7 +18,7 @@ name = "no_std_lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "ensure_no_std"
+name = "example_no_std"
 path = "src/main.rs"
 
 [features]
@@ -29,4 +29,3 @@ alloc = []
 cortex-m-rt = "0.7.5"
 deku = { path = "../", default-features = false }
 embedded-alloc = "0.6.0"
-

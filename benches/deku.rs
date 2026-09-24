@@ -1,6 +1,6 @@
 use no_std_io::io::{Cursor, Read, Seek};
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use deku::prelude::*;
 
 #[cfg(feature = "bits")]

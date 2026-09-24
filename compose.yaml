@@ -1,0 +1,21 @@
+services:
+  build:
+    image: ${DEKU_IMAGE:-deku-build:latest}
+    build:
+      context: .
+      args:
+        USER_UID: ${DEKU_USER_UID:-1000}
+        USER_GID: ${DEKU_USER_GID:-1000}
+    init: true
+    environment:
+      DEKU_TOOLCHAIN: ${DEKU_TOOLCHAIN:-stable}
+    volumes:
+      - .:/workspace
+      - cargo-registry-user:/home/deku/.cargo/registry
+      - cargo-git-user:/home/deku/.cargo/git
+      - cargo-target-user:/workspace/target
+
+volumes:
+  cargo-registry-user:
+  cargo-git-user:
+  cargo-target-user:

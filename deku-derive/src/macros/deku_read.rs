@@ -625,10 +625,10 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
     // anything else is a ctx parameter name forwarded as a runtime order, which
     // could be either at run time.
     let explicit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());
-    if let Some(order) = explicit_order {
-        if order.value() != "msb" {
-            return None;
-        }
+    if let Some(order) = explicit_order
+        && order.value() != "msb"
+    {
+        return None;
     }
     // Which overflow wording this field's own write would have used.
     let ordered = explicit_order.is_some();
@@ -694,10 +694,10 @@ pub(crate) fn byte_array_len(input: &DekuData, f: &FieldData) -> Option<usize> {
     // `Msb0` only: on an unaligned cursor `read_bytes_const_into` reverses the
     // buffer for `Lsb0`. A byte has no byte order, so endianness needs no check.
     #[cfg(feature = "bits")]
-    if let Some(order) = f.bit_order.as_ref().or(input.bit_order.as_ref()) {
-        if order.value() != "msb" {
-            return None;
-        }
+    if let Some(order) = f.bit_order.as_ref().or(input.bit_order.as_ref())
+        && order.value() != "msb"
+    {
+        return None;
     }
     #[cfg(not(feature = "bits"))]
     let _ = input;
@@ -1167,19 +1167,19 @@ fn emit_field_read(
             }
             // One `read_exact` for a plain byte array, in place of one read per
             // element through the generic `[T; N]` impl.
-            if ret.is_empty() {
-                if let Some(n) = byte_array_len(input, f) {
-                    ret.extend(quote! {
-                        {
-                            let mut __deku_bytes = [0u8; #n];
-                            __deku_reader.read_bytes_const_into::<#n>(
-                                &mut __deku_bytes,
-                                ::#crate_::ctx::Order::Msb0,
-                            )?;
-                            __deku_bytes
-                        }
-                    })
-                }
+            if ret.is_empty()
+                && let Some(n) = byte_array_len(input, f)
+            {
+                ret.extend(quote! {
+                    {
+                        let mut __deku_bytes = [0u8; #n];
+                        __deku_reader.read_bytes_const_into::<#n>(
+                            &mut __deku_bytes,
+                            ::#crate_::ctx::Order::Msb0,
+                        )?;
+                        __deku_bytes
+                    }
+                })
             }
 
             if ret.is_empty() {

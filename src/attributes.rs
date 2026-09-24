@@ -418,7 +418,7 @@ Example:
 # #[cfg(feature = "alloc")]
 # fn main() {
 # #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(read_bound = "for<'a> T: DekuReader<'a, ()>", write_bound = "T: DekuContainerWrite")]
+#[deku(read_bound = "for<'a> T: DekuReader<'a, ()>", write_bound = "T: DekuWriter")]
 struct DekuTest<T> {
     data: T,
 }

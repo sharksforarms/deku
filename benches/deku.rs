@@ -3,37 +3,11 @@ use no_std_io::io::{Cursor, Read, Seek};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use deku::prelude::*;
 
+#[path = "shapes/mod.rs"]
+mod shapes;
+use shapes::{AllWrapper, CountNonSpecialize, CountWrapper, DekuBytes, DekuEnum, DekuVec};
 #[cfg(feature = "bits")]
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-struct DekuBits {
-    #[deku(bits = 1)]
-    data_01: u8,
-    #[deku(bits = 2)]
-    data_02: u8,
-    #[deku(bits = 5)]
-    data_03: u8,
-}
-
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-struct DekuBytes {
-    data_00: u8,
-    data_01: u16,
-    data_02: u32,
-}
-
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u8")]
-enum DekuEnum {
-    #[deku(id = "0x01")]
-    VariantA(u8),
-}
-
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-struct DekuVec {
-    count: u8,
-    #[deku(count = "count")]
-    data: Vec<u8>,
-}
+use shapes::{DekuBits, DekuBitsBeU32, DekuBitsBeU64, DekuBitsLeU64};
 
 fn deku_write<T: DekuContainerWrite>(input: &T) {
     let _v = input.to_bytes().unwrap();
@@ -82,6 +56,67 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    // The endian and width set. `benches/deku_callgrind.rs` counts instructions
+    // for the same three reads. Instruction count and time do not move in step
+    // on the bit paths, so a difference here needs both harnesses to explain.
+    #[cfg(feature = "bits")]
+    c.bench_function("deku_read_bits_be_u64", |b| {
+        let reader = Cursor::new(&[0xab; 8]);
+        b.iter_batched(
+            || reader.clone(),
+            |mut reader| deku_read::<DekuBitsBeU64>(&mut reader),
+            BatchSize::SmallInput,
+        )
+    });
+    #[cfg(feature = "bits")]
+    c.bench_function("deku_read_bits_be_u32", |b| {
+        let reader = Cursor::new(&[0xab; 4]);
+        b.iter_batched(
+            || reader.clone(),
+            |mut reader| deku_read::<DekuBitsBeU32>(&mut reader),
+            BatchSize::SmallInput,
+        )
+    });
+    #[cfg(feature = "bits")]
+    c.bench_function("deku_read_bits_le_u64", |b| {
+        let reader = Cursor::new(&[0xab; 8]);
+        b.iter_batched(
+            || reader.clone(),
+            |mut reader| deku_read::<DekuBitsLeU64>(&mut reader),
+            BatchSize::SmallInput,
+        )
+    });
+
+    #[cfg(feature = "bits")]
+    c.bench_function("deku_write_bits_be_u64", |b| {
+        b.iter(|| {
+            deku_write(std::hint::black_box(&DekuBitsBeU64 {
+                data_01: 0x01,
+                data_02: 0x03,
+                data_03: 0x00ff_ffff_ffff_ffff,
+            }))
+        })
+    });
+    #[cfg(feature = "bits")]
+    c.bench_function("deku_write_bits_be_u32", |b| {
+        b.iter(|| {
+            deku_write(std::hint::black_box(&DekuBitsBeU32 {
+                data_01: 0x01,
+                data_02: 0x7fff_ffff,
+            }))
+        })
+    });
+    #[cfg(feature = "bits")]
+    c.bench_function("deku_write_bits_le_u64", |b| {
+        b.iter(|| {
+            deku_write(std::hint::black_box(&DekuBitsLeU64 {
+                data_01: 0x01,
+                data_02: 0x03,
+                data_03: 0x00ff_ffff_ffff_ffff,
+            }))
+        })
+    });
+
     c.bench_function("deku_read_enum", |b| {
         let reader = Cursor::new(&[0x01; 2]);
         b.iter_batched(
@@ -112,24 +147,6 @@ fn criterion_benchmark(c: &mut Criterion) {
 }
 
 pub fn read_all_vs_count_vs_read_exact(c: &mut Criterion) {
-    #[derive(DekuRead, DekuWrite)]
-    pub struct AllWrapper {
-        #[deku(read_all)]
-        pub data: Vec<u8>,
-    }
-
-    #[derive(DekuRead, DekuWrite)]
-    pub struct CountWrapper {
-        #[deku(count = "1500")]
-        pub data: Vec<u8>,
-    }
-
-    #[derive(DekuRead, DekuWrite)]
-    pub struct CountNonSpecialize {
-        #[deku(count = "(1500/2)")]
-        pub data: Vec<u16>,
-    }
-
     #[derive(DekuRead, DekuWrite)]
     #[deku(ctx = "len: usize")]
     #[expect(dead_code)]

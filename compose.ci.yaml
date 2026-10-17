@@ -5,6 +5,8 @@ services:
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
+      RUSTFLAGS: "-D warnings"
+      RUSTDOCFLAGS: "-D warnings"
     volumes:
       - ./.ci-cache/cargo-registry:/home/deku/.cargo/registry
       - ./.ci-cache/cargo-git:/home/deku/.cargo/git

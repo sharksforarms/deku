@@ -69,4 +69,4 @@ ENV DEKU_NIGHTLY_TOOLCHAIN=${NIGHTLY_TOOLCHAIN}
 USER deku
 WORKDIR /workspace
 
-FROM deku-build-base AS deku-build
+FROM deku-build-miri AS deku-build

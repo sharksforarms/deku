@@ -67,8 +67,18 @@ no-std-v6:
     just no-std thumbv6m-none-eabi
 
 wasm:
-    cd example_wasm && RUSTUP_TOOLCHAIN={{toolchain}} wasm-pack build --target web
-    cd example_wasm && RUSTUP_TOOLCHAIN={{toolchain}} wasm-pack test --node
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Rust 1.88's wasm32 compiler-builtins archive emits linker diagnostics
+    # that are harmless for this target but fail under -D linker-messages.
+    # Keep every other warning denied and scope this exception to MSRV only.
+    wasm_rustflags="${RUSTFLAGS-}"
+    if [[ "{{pipeline}}" == "msrv" ]]; then
+        wasm_rustflags+=" -A linker-messages"
+    fi
+    cd example_wasm
+    RUSTFLAGS="$wasm_rustflags" RUSTUP_TOOLCHAIN={{toolchain}} wasm-pack build --target web
+    RUSTFLAGS="$wasm_rustflags" RUSTUP_TOOLCHAIN={{toolchain}} wasm-pack test --node
 
 ci: build test examples no-std-v7 no-std-v6 wasm
 

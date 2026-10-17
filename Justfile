@@ -55,9 +55,10 @@ lint:
     cargo +{{stable}} clippy --manifest-path example_no_std/Cargo.toml --lib -- -D warnings
     cargo +{{stable}} clippy --manifest-path example_wasm/Cargo.toml --lib -- -D warnings
 
+# CI's RUSTFLAGS replaces target-specific config, so preserve the linker script here.
 no-std target:
-    cd example_no_std && cargo +{{toolchain}} build --release --target {{target}}
-    cd example_no_std && cargo +{{toolchain}} build --release --target {{target}} --no-default-features
+    cd example_no_std && RUSTFLAGS="${RUSTFLAGS-} -C link-arg=-Tlink.x -D linker-messages" cargo +{{toolchain}} build --release --target {{target}}
+    cd example_no_std && RUSTFLAGS="${RUSTFLAGS-} -C link-arg=-Tlink.x -D linker-messages" cargo +{{toolchain}} build --release --target {{target}} --no-default-features
 
 no-std-v7:
     just no-std thumbv7em-none-eabihf

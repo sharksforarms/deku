@@ -65,6 +65,7 @@ jobs:
             USER_GID=${{ steps.rust.outputs.gid }}
           # The image is materialized by each matrix job on its own runner;
           # this job only populates the shared BuildKit cache.
+          outputs: type=cacheonly
           cache-from: type=gha,scope=deku-build-environment
           cache-to: type=gha,mode=max,scope=deku-build-environment,ignore-error=true
 
@@ -162,4 +163,5 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: codecov.json
+          disable_search: true
           fail_ci_if_error: true

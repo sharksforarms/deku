@@ -6,6 +6,8 @@ use no_std_lib::*;
 
 use core::panic::PanicInfo;
 
+#[cfg(feature = "alloc")]
+use cortex_m as _;
 use cortex_m_rt::entry;
 
 #[entry]

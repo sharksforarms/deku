@@ -23,14 +23,6 @@ enum NestedEnum {
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u32", bytes = 2, ctx = "_endian: Endian")]
-#[expect(dead_code)]
-enum NestedEnum2 {
-    #[deku(id = "0x01")]
-    VarA(u8),
-}
-
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
 struct TestDeku {
     field_a: u8,
@@ -44,7 +36,6 @@ struct TestDeku {
     field_g: u8, // 3 allocs (read_bits(Ordering::Greater))
     #[deku(bits = 5)]
     field_h: u8, // 1 alloc (read_bits(Ordering::Equal))
-                 //field_i: NestedEnum2,
 }
 
 mod tests {

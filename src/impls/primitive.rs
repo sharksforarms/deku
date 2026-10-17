@@ -1395,6 +1395,7 @@ ImplDekuSize!(f64);
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
+    #[cfg(any(feature = "bits", feature = "descriptive-errors"))]
     use rstest::rstest;
     use std::io::Cursor;
 

@@ -1,13 +1,13 @@
+# Deku
+
+Declarative binary reading and writing for Rust
+
 <p align="center">
   <a href="https://crates.io/crates/deku"><img src="https://img.shields.io/crates/v/deku.svg" alt="Latest Version"></a>
   <a href="https://docs.rs/deku"><img src="https://docs.rs/deku/badge.svg" alt="Rust Documentation"></a>
   <a href="https://github.com/sharksforarms/deku/actions/workflows/main.yml"><img src="https://github.com/sharksforarms/deku/actions/workflows/main.yml/badge.svg" alt="CI Status"></a>
   <a href="https://codecov.io/gh/sharksforarms/deku"><img src="https://codecov.io/gh/sharksforarms/deku/branch/master/graph/badge.svg" alt="codecov"></a>
 </p>
-
-
-Deku provides declarative binary reading and writing for Rust
-
 
 Describe a binary layout with annotated structs and enums, then derive bit-level reading and
 writing implementations from the same definition. It is designed for network

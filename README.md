@@ -1,8 +1,4 @@
 <p align="center">
-  <img src=".github/assets/deku-mascot.png" alt="Deku mascot transforming a bit stream into structured data" width="320">
-</p>
-
-<p align="center">
   <a href="https://crates.io/crates/deku"><img src="https://img.shields.io/crates/v/deku.svg" alt="Latest Version"></a>
   <a href="https://docs.rs/deku"><img src="https://docs.rs/deku/badge.svg" alt="Rust Documentation"></a>
   <a href="https://github.com/sharksforarms/deku/actions/workflows/main.yml"><img src="https://github.com/sharksforarms/deku/actions/workflows/main.yml/badge.svg" alt="CI Status"></a>

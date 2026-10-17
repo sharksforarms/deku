@@ -18,7 +18,9 @@ macro_rules! implFromBeBytes {(
    )*
 )}
 
-implFromBeBytes![u8, u16, u32, usize, u64, u128, i8, i16, i32, isize, i64, i128, f32, f64,];
+implFromBeBytes![
+    u8, u16, u32, usize, u64, u128, i8, i16, i32, isize, i64, i128, f32, f64,
+];
 
 /// Converts value to native endian
 ///

@@ -7,7 +7,7 @@ use no_std_io::io::{Read, Seek, Write};
 use crate::ctx::*;
 use crate::reader::{Reader, ReaderRet};
 use crate::writer::Writer;
-use crate::{deku_error, DekuError, DekuReader, DekuWriter};
+use crate::{DekuError, DekuReader, DekuWriter, deku_error};
 
 /// "Read" trait: read bits and construct type
 #[cfg(feature = "bits")]
@@ -1395,6 +1395,7 @@ ImplDekuSize!(f64);
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
+    #[cfg(any(feature = "bits", feature = "descriptive-errors"))]
     use rstest::rstest;
     use std::io::Cursor;
 

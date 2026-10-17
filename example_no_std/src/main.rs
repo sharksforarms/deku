@@ -6,6 +6,8 @@ use no_std_lib::*;
 
 use core::panic::PanicInfo;
 
+#[cfg(feature = "alloc")]
+use cortex_m as _;
 use cortex_m_rt::entry;
 
 #[entry]
@@ -13,8 +15,8 @@ fn main() -> ! {
     // Initialize the allocator BEFORE you use it
     #[cfg(feature = "alloc")]
     {
-        use embedded_alloc::LlffHeap as Heap;
         use core::mem::MaybeUninit;
+        use embedded_alloc::LlffHeap as Heap;
 
         #[global_allocator]
         static HEAP: Heap = Heap::empty();

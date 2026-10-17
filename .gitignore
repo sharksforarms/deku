@@ -1,3 +1,5 @@
 **/target
 **/*.rs.bk
 Cargo.lock
+.ci-cache
+codecov.json

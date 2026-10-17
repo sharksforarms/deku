@@ -3,7 +3,7 @@
 extern crate wasm_bindgen_test;
 use wasm_bindgen_test::*;
 
-use ensure_wasm::*;
+use example_wasm::*;
 
 use deku::prelude::*;
 

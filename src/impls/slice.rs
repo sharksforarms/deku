@@ -105,9 +105,9 @@ mod tests {
     use rstest::rstest;
     use std::io::Cursor;
 
-    use crate::{ctx::Endian, writer::Writer};
     #[cfg(feature = "bits")]
-    use crate::{reader::Reader, DekuReader};
+    use crate::{DekuReader, reader::Reader};
+    use crate::{ctx::Endian, writer::Writer};
 
     #[cfg(feature = "bits")]
     #[rstest(input,endian,expected,

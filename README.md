@@ -103,35 +103,10 @@ formats and `alloc` for heap-backed types:
 deku = { version = "0.20", default-features = false, features = ["bits", "alloc"] }
 ```
 
-## Development
+## Contributing
 
-Development commands are defined in the `Justfile` and run in Docker. To run
-the build, test, example, no_std, and WebAssembly checks used by CI (stable is
-the default):
-
-```sh
-docker compose build
-docker compose run --rm build just ci
-```
-
-Formatting and Clippy checks run with stable Rust:
-
-```sh
-docker compose run --rm build just lint
-```
-
-Select another pipeline toolchain with `DEKU_TOOLCHAIN=msrv` or
-`DEKU_TOOLCHAIN=beta`:
-
-```sh
-docker compose run --rm -e DEKU_TOOLCHAIN=msrv build just ci
-```
-
-To list available commands:
-
-```sh
-docker compose run --rm build just
-```
+See the [contribution guide](https://github.com/sharksforarms/deku/blob/master/CONTRIBUTING.md)
+for development, testing, linting, and CI instructions.
 
 ## License
 

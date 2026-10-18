@@ -30,7 +30,7 @@ jobs:
         with:
           toolchain: stable
       - uses: gungraun/setup-gungraun@v1.1.3
-      - uses: wcampbell0x2a/rust-bench-compare-action@v1.0.0
+      - uses: wcampbell0x2a/rust-bench-compare-action@v1.2.0
         with:
           harness: gungraun
           branchName: ${{ github.base_ref }}

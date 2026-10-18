@@ -1,12 +1,39 @@
 use core::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 
+use deku::ctx::{BitSize, Endian};
 use deku::prelude::*;
 use deku::reader::Reader;
 use deku::writer::Writer;
 
 /// General smoke tests for ctx
 /// TODO: These should be divided into smaller units
+
+#[test]
+fn test_endian_helpers() {
+    assert!(Endian::Little.is_le());
+    assert!(!Endian::Little.is_be());
+    assert!(!Endian::Big.is_le());
+    assert!(Endian::Big.is_be());
+    assert_eq!(Endian::default(), Endian::new());
+
+    for (input, expected) in [
+        ("little", Some(Endian::Little)),
+        ("big", Some(Endian::Big)),
+        ("Little", None),
+        ("", None),
+    ] {
+        assert_eq!(input.parse::<Endian>().ok(), expected);
+    }
+}
+
+#[test]
+fn test_bit_size_helpers() {
+    assert_eq!(BitSize::of::<u32>(), BitSize(32));
+
+    let value = [0u8; 3];
+    assert_eq!(BitSize::of_val(&value), BitSize(24));
+}
 
 #[test]
 fn test_ctx_struct() {

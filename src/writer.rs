@@ -597,6 +597,35 @@ mod tests {
     }
 
     #[test]
+    fn test_write_bits_uint_fields_matches_individual_fields() {
+        let prefix = bitvec![u8, Msb0; 1, 0, 1];
+        let fields = bitvec![u8, Msb0; 1, 0, 1, 1, 0, 0, 1];
+
+        let mut grouped = Cursor::new(vec![]);
+        let mut writer = Writer::new(&mut grouped);
+        writer.write_bits_order(&prefix, Order::Lsb0).unwrap();
+        writer.write_bits_uint_fields(0b101_1001, &[3, 4]).unwrap();
+        writer.finalize().unwrap();
+
+        let mut individual = Cursor::new(vec![]);
+        let mut writer = Writer::new(&mut individual);
+        writer.write_bits_order(&prefix, Order::Lsb0).unwrap();
+        writer.write_bits_order(&fields[..3], Order::Msb0).unwrap();
+        writer.write_bits_order(&fields[3..], Order::Msb0).unwrap();
+        writer.finalize().unwrap();
+
+        let grouped_output = grouped.into_inner();
+        let individual_output = individual.into_inner();
+        assert_eq!(grouped_output.as_slice(), &[0xb6, 0x40]);
+        assert_eq!(grouped_output, individual_output);
+
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        writer.write_bits_uint_fields(u64::MAX, &[64]).unwrap();
+        writer.finalize().unwrap();
+        assert_eq!(writer.inner.into_inner(), [0xff; 8]);
+    }
+
+    #[test]
     fn test_writer_bytes() {
         let mut out_buf = Cursor::new(vec![]);
         let mut writer = Writer::new(&mut out_buf);

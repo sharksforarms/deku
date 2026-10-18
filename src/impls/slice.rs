@@ -161,4 +161,12 @@ mod tests {
         input.to_writer(&mut writer, endian).unwrap();
         assert_eq!(expected, writer.inner.into_inner());
     }
+
+    #[test]
+    fn test_slice_write() {
+        let input: &[u8] = &[0xaa, 0xbb, 0xcc];
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        <&[u8] as crate::DekuWriter<Endian>>::to_writer(&input, &mut writer, Endian::Big).unwrap();
+        assert_eq!(writer.inner.into_inner(), [0xaa, 0xbb, 0xcc]);
+    }
 }

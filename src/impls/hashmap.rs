@@ -335,3 +335,24 @@ mod tests {
         assert_eq!(expected, writer.inner.into_inner());
     }
 }
+
+#[cfg(test)]
+mod no_context_tests {
+    use std::collections::HashMap;
+
+    use no_std_io::io::Cursor;
+
+    use crate::DekuReader;
+    use crate::ctx::Limit;
+    use crate::reader::Reader;
+
+    #[test]
+    fn test_hashmap_read_without_context() {
+        let mut cursor = Cursor::new([0x01, 0xaa]);
+        let mut reader = Reader::new(&mut cursor);
+        let limit = Limit::<(u8, u8), fn(&(u8, u8)) -> bool>::new_count(1);
+        let result = HashMap::<u8, u8>::from_reader_with_ctx(&mut reader, limit).unwrap();
+
+        assert_eq!(result.get(&0x01), Some(&0xaa));
+    }
+}

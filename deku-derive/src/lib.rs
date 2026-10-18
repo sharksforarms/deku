@@ -1604,12 +1604,9 @@ pub fn deku_derive(
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "bits")]
     use rstest::rstest;
-    #[cfg(feature = "bits")]
     use syn::parse_str;
 
-    #[cfg(feature = "bits")]
     use super::*;
 
     #[cfg(feature = "bits")]
@@ -1665,5 +1662,187 @@ mod tests {
 
         res_reader.unwrap();
         res_writer.unwrap();
+    }
+
+    #[rstest(
+        input,
+        expected,
+        case::token_string(r#""field + 1""#, "field + 1"),
+        case::integer("1", "1"),
+        case::boolean("true", "true"),
+        case::byte_string(r#"b"AB""#, "b\"AB\"")
+    )]
+    fn test_id_from_value(input: &str, expected: &str) {
+        let literal = parse_str::<syn::Lit>(input).unwrap();
+        let id = Id::from_value(&literal).unwrap();
+        assert_eq!(id.to_token_stream().to_string(), expected);
+    }
+
+    #[test]
+    fn test_id_from_string() {
+        let id = Id::from_string("field + 1").unwrap();
+        assert_eq!(id.to_token_stream().to_string(), "field + 1");
+    }
+
+    #[test]
+    fn test_id_rejects_unsupported_literal() {
+        let literal = parse_str::<syn::Lit>("1.0").unwrap();
+        assert!(Id::from_value(&literal).is_err());
+    }
+
+    #[rstest(
+        input,
+        expected,
+        case::quoted_number(r#""2""#, "2"),
+        case::integer("2", "2"),
+        case::expression(r#""field + 1""#, "field + 1")
+    )]
+    fn test_num_from_value(input: &str, expected: &str) {
+        let literal = parse_str::<syn::Lit>(input).unwrap();
+        let number = Num::from_value(&literal).unwrap();
+        assert_eq!(number.to_token_stream().to_string(), expected);
+        assert_eq!(number.to_string(), expected);
+    }
+
+    #[test]
+    fn test_num_rejects_unsupported_literal() {
+        let literal = parse_str::<syn::Lit>("true").unwrap();
+        assert!(Num::from_value(&literal).is_err());
+    }
+
+    #[rstest(
+        input,
+        expected,
+        case::struct_id(r#"#[deku(id = "1")] struct Test;"#, "`id` only supported on enum"),
+        case::struct_id_endian(
+            r#"#[deku(id_endian = "big")] struct Test;"#,
+            "`id_endian` only supported on enum"
+        ),
+        case::struct_bytes(r#"#[deku(bytes = 1)] struct Test;"#, "`bytes` only supported on enum"),
+        case::enum_missing_id(r#"enum Test { A }"#, "`id_type` or `id` must be specified on enum"),
+        case::enum_id_bytes(
+            r#"#[deku(id = "1", bytes = 1)] enum Test {}"#,
+            "cannot use `bytes` with `id`"
+        ),
+        case::field_default_without_skip_or_cond(
+            r#"
+            struct Test {
+                #[deku(default = "1")]
+                value: u8,
+            }"#,
+            "`default` attribute cannot be used here"
+        )
+    )]
+    fn test_data_validation_rejects(input: &str, expected: &str) {
+        let parsed = parse_str(input).unwrap();
+        let error = DekuData::from_input(parsed).unwrap_err().to_string();
+        assert!(error.contains(expected), "unexpected error: {error}");
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_id_cannot_use_bits() {
+        let parsed = parse_str(r#"#[deku(id = "1", bits = 1)] enum Test {}"#).unwrap();
+        let error = DekuData::from_input(parsed).unwrap_err().to_string();
+        assert!(error.contains("cannot use `bits` with `id`"));
+    }
+
+    fn parse_nested_meta(input: &str) -> Vec<NestedMeta> {
+        let tokens = input.parse::<TokenStream>().unwrap();
+        NestedMeta::parse_meta_list(tokens).unwrap()
+    }
+
+    #[rstest(
+        input,
+        expected,
+        case::read("read", SkipMode::Read),
+        case::write("write", SkipMode::Write)
+    )]
+    fn test_skip_mode_from_list(input: &str, expected: SkipMode) {
+        let items = parse_nested_meta(input);
+        assert_eq!(SkipMode::from_list(&items).unwrap(), expected);
+    }
+
+    #[test]
+    fn test_skip_mode_from_word() {
+        assert_eq!(SkipMode::from_word().unwrap(), SkipMode::All);
+    }
+
+    #[rstest(
+        input,
+        case::empty(""),
+        case::multiple("read, write"),
+        case::unknown("invalid"),
+        case::path("foo::bar"),
+        case::key_value("read = true"),
+        case::literal("1")
+    )]
+    fn test_skip_mode_rejects_invalid_lists(input: &str) {
+        let items = parse_nested_meta(input);
+        assert!(SkipMode::from_list(&items).is_err());
+    }
+
+    #[rstest(
+        repr_name,
+        expected,
+        case::unsigned8("u8", ReprType::U8),
+        case::unsigned16("u16", ReprType::U16),
+        case::unsigned32("u32", ReprType::U32),
+        case::unsigned64("u64", ReprType::U64),
+        case::unsigned128("u128", ReprType::U128),
+        case::signed8("i8", ReprType::I8),
+        case::signed16("i16", ReprType::I16),
+        case::signed32("i32", ReprType::I32),
+        case::signed64("i64", ReprType::I64),
+        case::signed128("i128", ReprType::I128)
+    )]
+    fn test_repr_parsing(repr_name: &str, expected: ReprType) {
+        let tokens = repr_name.parse::<TokenStream>().unwrap();
+        assert_eq!(from_token(tokens), Some(expected));
+
+        let input = format!("#[repr({repr_name})] struct Test;");
+        let parsed = parse_str::<syn::DeriveInput>(&input).unwrap();
+        assert_eq!(repr(&parsed.attrs), Some(expected));
+
+        let output: TokenStream = expected.into();
+        assert_eq!(output.to_string(), repr_name);
+    }
+
+    #[test]
+    fn test_repr_parsing_rejects_unknown_values() {
+        assert_eq!(from_token(quote! { C }), None);
+
+        let parsed = parse_str::<syn::DeriveInput>("struct Test;").unwrap();
+        assert_eq!(repr(&parsed.attrs), None);
+
+        let parsed = parse_str::<syn::DeriveInput>("#[repr(C)] struct Test;").unwrap();
+        assert_eq!(repr(&parsed.attrs), None);
+    }
+
+    #[rstest(
+        input,
+        expected,
+        case::plain("field + 1", "field + 1"),
+        case::internal_names(
+            "deku::reader + deku::writer + deku::bit_offset + deku::byte_offset",
+            "__deku_reader + __deku_writer + __deku_bit_offset + __deku_byte_offset"
+        )
+    )]
+    fn test_apply_replacements(input: &str, expected: &str) {
+        let literal = syn::LitStr::new(input, proc_macro2::Span::call_site());
+        let replaced = apply_replacements(&literal).unwrap();
+        assert_eq!(replaced.value(), expected);
+    }
+
+    #[test]
+    fn test_apply_replacements_rejects_internal_names() {
+        let literal = syn::LitStr::new("__deku_reader", proc_macro2::Span::call_site());
+        assert!(apply_replacements(&literal).is_err());
+    }
+
+    #[test]
+    fn test_optional_replacement_mappers_preserve_none() {
+        assert_eq!(map_option_litstr(None).unwrap(), None);
+        assert!(map_litstr_as_tokenstream(None).unwrap().is_none());
     }
 }

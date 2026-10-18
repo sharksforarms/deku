@@ -684,7 +684,7 @@ fn emit_bit_run_read(
         };
         let trace_field_log = if cfg!(feature = "logging") {
             let field_ident_str = field_ident.to_string();
-            quote! { log::trace!("Reading: {}.{}", #ident, #field_ident_str); }
+            quote! { ::#crate_::log::trace!("Reading: {}.{}", #ident, #field_ident_str); }
         } else {
             quote! {}
         };
@@ -894,7 +894,7 @@ fn emit_field_read(
 
     let trace_field_log = if cfg!(feature = "logging") {
         quote! {
-            log::trace!("Reading: {}.{}", #ident, #field_ident_str);
+            ::#crate_::log::trace!("Reading: {}.{}", #ident, #field_ident_str);
         }
     } else {
         quote! {}

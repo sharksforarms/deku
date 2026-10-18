@@ -1,3 +1,5 @@
+//! Context propagation, default-context, and endian handling tests.
+
 use core::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 
@@ -5,9 +7,7 @@ use deku::ctx::{BitSize, Endian};
 use deku::prelude::*;
 use deku::reader::Reader;
 use deku::writer::Writer;
-
-/// General smoke tests for ctx
-/// TODO: These should be divided into smaller units
+use rstest::rstest;
 
 #[test]
 fn test_endian_helpers() {
@@ -36,7 +36,7 @@ fn test_bit_size_helpers() {
 }
 
 #[test]
-fn test_ctx_struct() {
+fn test_field_ctx_roundtrip() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(ctx = "a: u8, b: u8")]
     struct SubTypeNeedCtx {
@@ -74,7 +74,7 @@ fn test_ctx_struct() {
 }
 
 #[test]
-fn test_top_level_ctx_enum() {
+fn test_top_level_enum_ctx_roundtrip() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(id_type = "u8", ctx = "a: u8, b: u8")]
     enum TopLevelCtxEnum {
@@ -104,7 +104,7 @@ fn test_top_level_ctx_enum() {
 }
 
 #[test]
-fn test_top_level_ctx_enum_default() {
+fn test_top_level_enum_ctx_default_and_explicit() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(id_type = "u8", ctx = "a: u8, b: u8", ctx_default = "1,2")]
     enum TopLevelCtxEnumDefault {
@@ -141,8 +141,9 @@ fn test_top_level_ctx_enum_default() {
     assert_eq!(test_data.to_vec(), out_buf.to_vec());
 }
 
-#[test]
-fn test_struct_enum_ctx_id() {
+mod struct_enum_context {
+    use super::*;
+
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(ctx = "my_id: u8, data: usize", id = "my_id, data")]
     enum EnumId {
@@ -176,79 +177,71 @@ fn test_struct_enum_ctx_id() {
         enum_from_just_id: EnumJustId,
     }
 
-    // VarA
-    let test_data = [0x01_u8, 0x01, 0xab, 0xab];
-    let ret_read = StructEnumId::try_from(test_data.as_slice()).unwrap();
+    fn assert_roundtrip(value: StructEnumId, input: &[u8]) {
+        let output: Vec<u8> = value.try_into().unwrap();
+        assert_eq!(output, input);
+    }
 
-    assert_eq!(
-        StructEnumId {
-            my_id: 0x01,
-            data: 0x01,
-            enum_from_id: EnumId::VarA(0xab),
-            enum_from_just_id: EnumJustId::VarA(0xab),
-        },
-        ret_read
-    );
+    #[rstest(
+        input,
+        expected,
+        case::tuple_id_payload(
+            &[0x01_u8, 0x01, 0xab, 0xab],
+            StructEnumId {
+                my_id: 0x01,
+                data: 0x01,
+                enum_from_id: EnumId::VarA(0xab),
+                enum_from_just_id: EnumJustId::VarA(0xab),
+            }
+        ),
+        case::tuple_id_unit(
+            &[0x02_u8, 0x02],
+            StructEnumId {
+                my_id: 0x02,
+                data: 0x02,
+                enum_from_id: EnumId::VarB,
+                enum_from_just_id: EnumJustId::VarB,
+            }
+        )
+    )]
+    fn test_context_drives_exact_enum_ids(input: &[u8], expected: StructEnumId) {
+        let actual = StructEnumId::try_from(input).unwrap();
+        assert_eq!(actual, expected);
+        assert_roundtrip(actual, input);
+    }
 
-    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(ret_write, test_data);
-
-    // VarB
-    let test_data = [0x02_u8, 0x02];
-    let ret_read = StructEnumId::try_from(test_data.as_slice()).unwrap();
-
-    assert_eq!(
-        StructEnumId {
-            my_id: 0x02,
-            data: 0x02,
-            enum_from_id: EnumId::VarB,
-            enum_from_just_id: EnumJustId::VarB,
-        },
-        ret_read
-    );
-
-    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(ret_write, test_data);
-
-    // VarC
-    let test_data = [0x02_u8, 0x03, 0xcc];
-    let mut cursor = Cursor::new(test_data);
-    let (_, ret_read) = StructEnumId::from_reader((&mut cursor, 0)).unwrap();
-
-    assert_eq!(
-        StructEnumId {
-            my_id: 0x02,
-            data: 0x03,
-            enum_from_id: EnumId::VarC(0xcc),
-            enum_from_just_id: EnumJustId::VarB,
-        },
-        ret_read
-    );
-
-    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(ret_write, test_data);
-
-    // VarPat
-    let test_data = [0x02_u8, 0xff, 0xcc];
-    let mut cursor = Cursor::new(test_data);
-    let (_, ret_read) = StructEnumId::from_reader((&mut cursor, 0)).unwrap();
-
-    assert_eq!(
-        StructEnumId {
-            my_id: 0x02,
-            data: 0xff,
-            enum_from_id: EnumId::VarAll(0xcc),
-            enum_from_just_id: EnumJustId::VarB,
-        },
-        ret_read
-    );
-
-    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
-    assert_eq!(ret_write, test_data);
+    #[rstest(
+        input,
+        expected,
+        case::tuple_id_payload(
+            &[0x02_u8, 0x03, 0xcc],
+            StructEnumId {
+                my_id: 0x02,
+                data: 0x03,
+                enum_from_id: EnumId::VarC(0xcc),
+                enum_from_just_id: EnumJustId::VarB,
+            }
+        ),
+        case::id_pattern_fallback(
+            &[0x02_u8, 0xff, 0xcc],
+            StructEnumId {
+                my_id: 0x02,
+                data: 0xff,
+                enum_from_id: EnumId::VarAll(0xcc),
+                enum_from_just_id: EnumJustId::VarB,
+            }
+        )
+    )]
+    fn test_context_drives_enum_ids_from_reader(input: &[u8], expected: StructEnumId) {
+        let mut cursor = Cursor::new(input);
+        let (_, actual) = StructEnumId::from_reader((&mut cursor, 0)).unwrap();
+        assert_eq!(actual, expected);
+        assert_roundtrip(actual, input);
+    }
 }
 
 #[test]
-fn test_ctx_default_struct() {
+fn test_struct_ctx_default_and_explicit() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(ctx = "a: u8, b: u8", ctx_default = "1, 2")]
     struct TopLevelCtxStructDefault {
@@ -286,7 +279,7 @@ fn test_ctx_default_struct() {
 }
 
 #[test]
-fn test_enum_endian_ctx() {
+fn test_enum_ctx_controls_endian() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     #[deku(id_type = "u32", endian = "endian", ctx = "endian: deku::ctx::Endian")]
     enum EnumTypeEndianCtx {

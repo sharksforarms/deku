@@ -535,7 +535,9 @@ fn emit_bit_run_write(
 
         if cfg!(feature = "logging") {
             let field_ident_str = field_ident.to_string();
-            traces.extend(quote! { ::#crate_::log::trace!("Writing: {}.{}", #ident, #field_ident_str); });
+            traces.extend(
+                quote! { ::#crate_::log::trace!("Writing: {}.{}", #ident, #field_ident_str); },
+            );
         }
 
         let value = quote! { (*(#object_prefix #field_ident) as u64) };

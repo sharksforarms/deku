@@ -714,7 +714,7 @@ struct FieldData {
     /// a predicate to decide when to stop reading elements into the container
     until: Option<TokenStream>,
 
-    /// read until `reader.try_end()`
+    /// read until `reader.try_end()` returns `Ok(true)`
     read_all: bool,
 
     /// apply a function to the field after it's read
@@ -1315,7 +1315,7 @@ struct DekuFieldReceiver {
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     until: Result<Option<TokenStream>, ReplacementError>,
 
-    /// read until `reader.try_end()`
+    /// read until `reader.try_end()` returns `Ok(true)`
     #[darling(default)]
     read_all: bool,
 

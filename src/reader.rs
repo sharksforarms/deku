@@ -148,31 +148,38 @@ impl<R: Read + Seek> Reader<R> {
         alloc::vec![]
     }
 
-    /// Return true if we are at the end of a reader and there are no cached bits in the reader.
-    /// Since this uses [Read] internally, this will return true when [Read] returns [ErrorKind::UnexpectedEof].
+    /// Probe for the end of the reader while preserving any available byte for later reads through
+    /// this `Reader`.
     ///
-    /// The byte that was read will be internally buffered and will *not* be included in the `bits_read` count.
+    /// Returns `Ok(true)` when the probe reaches [`ErrorKind::UnexpectedEof`]. Returns `Ok(false)`
+    /// if a byte or bits are already buffered, or if a byte is available from the underlying
+    /// reader. When the probe reads a byte, it buffers it for later reads through this `Reader`;
+    /// the underlying reader advances, but `bits_read` does not. Reading from the underlying
+    /// reader directly or calling [`into_inner`](Self::into_inner) bypasses that buffered byte.
+    /// Other I/O errors are returned as `Err(DekuError::Io(error.kind()))`.
     #[inline]
-    pub fn end(&mut self) -> bool {
+    pub fn try_end(&mut self) -> Result<bool, DekuError> {
         if self.leftover.is_some() {
             #[cfg(feature = "logging")]
             log::trace!("not end");
-            false
+            Ok(false)
         } else {
             let mut buf = [0; 1];
-            if let Err(e) = self.inner.read_exact(&mut buf)
-                && e.kind() == ErrorKind::UnexpectedEof
-            {
-                #[cfg(feature = "logging")]
-                log::trace!("end");
-                return true;
+            match self.inner.read_exact(&mut buf) {
+                Ok(()) => {
+                    #[cfg(feature = "logging")]
+                    log::trace!("not end: read {buf:02x?}");
+
+                    self.leftover = Some(Leftover::Byte(buf[0]));
+                    Ok(false)
+                }
+                Err(e) if e.kind() == ErrorKind::UnexpectedEof => {
+                    #[cfg(feature = "logging")]
+                    log::trace!("end");
+                    Ok(true)
+                }
+                Err(e) => Err(DekuError::Io(e.kind())),
             }
-
-            #[cfg(feature = "logging")]
-            log::trace!("not end: read {buf:02x?}");
-
-            self.leftover = Some(Leftover::Byte(buf[0]));
-            false
         }
     }
 
@@ -316,10 +323,11 @@ impl<R: Read + Seek> Reader<R> {
                     let mut iter = dst[..end].rchunks_exact_mut(8);
                     for slot in iter.by_ref() {
                         let mut buf: [u8; 1] = [0u8];
-                        if let Err(e) = self.inner.read_exact(&mut buf)
-                            && e.kind() == ErrorKind::UnexpectedEof
-                        {
-                            return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
+                        if let Err(e) = self.inner.read_exact(&mut buf) {
+                            if e.kind() == ErrorKind::UnexpectedEof {
+                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
+                            }
+                            return Err(DekuError::Io(e.kind()));
                         }
                         slot.store_be(buf[0]);
                     }
@@ -329,10 +337,11 @@ impl<R: Read + Seek> Reader<R> {
                     let mut iter = dst[start..end].chunks_exact_mut(8);
                     for slot in iter.by_ref() {
                         let mut buf: [u8; 1] = [0u8];
-                        if let Err(e) = self.inner.read_exact(&mut buf)
-                            && e.kind() == ErrorKind::UnexpectedEof
-                        {
-                            return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
+                        if let Err(e) = self.inner.read_exact(&mut buf) {
+                            if e.kind() == ErrorKind::UnexpectedEof {
+                                return Err(DekuError::Incomplete(NeedSize::new(dst.len())));
+                            }
+                            return Err(DekuError::Io(e.kind()));
                         }
                         slot.store_be(buf[0]);
                     }
@@ -495,6 +504,16 @@ impl<R: Read + Seek> Reader<R> {
         #[cfg(feature = "logging")]
         log::trace!("read_bytes: requesting {amt} bytes");
 
+        if buf.len() < amt {
+            return Err(crate::deku_error!(
+                DekuError::InvalidParam,
+                "buffer is too small"
+            ));
+        }
+        if amt == 0 {
+            return Ok(ReaderRet::Bytes);
+        }
+
         if self.leftover.is_none() {
             if let Err(e) = self.inner.read_exact(&mut buf[..amt]) {
                 if e.kind() == ErrorKind::UnexpectedEof {
@@ -596,6 +615,10 @@ impl<R: Read + Seek> Reader<R> {
         #[cfg(feature = "logging")]
         log::trace!("read_bytes_const: requesting {N} bytes");
 
+        if N == 0 {
+            return Ok(ReaderRet::Bytes);
+        }
+
         if self.leftover.is_none() {
             if let Err(e) = self.inner.read_exact(buf) {
                 if e.kind() == ErrorKind::UnexpectedEof {
@@ -658,6 +681,10 @@ impl<R: Read + Seek> Reader<R> {
     ) -> Result<(), DekuError> {
         #[cfg(not(feature = "bits"))]
         let _ = order;
+
+        if N == 0 {
+            return Ok(());
+        }
 
         if self.leftover.is_none() {
             if let Err(e) = self.inner.read_exact(buf) {
@@ -746,37 +773,106 @@ impl<R: Read + Seek> Reader<R> {
 mod tests {
     use super::*;
     use hexlit::hex;
-    use no_std_io::io::Cursor;
+    use no_std_io::io::{Cursor, Read, Seek, SeekFrom};
+
+    struct ErrorReader;
+
+    impl Read for ErrorReader {
+        fn read(&mut self, _buf: &mut [u8]) -> no_std_io::io::Result<usize> {
+            Err(ErrorKind::Other.into())
+        }
+    }
+
+    impl Seek for ErrorReader {
+        fn seek(&mut self, _pos: SeekFrom) -> no_std_io::io::Result<u64> {
+            Ok(0)
+        }
+    }
+
+    #[test]
+    fn try_end_propagates_arbitrary_io_errors() {
+        let mut reader = Reader::new(ErrorReader);
+
+        assert_eq!(reader.try_end(), Err(DekuError::Io(ErrorKind::Other)));
+        assert!(reader.leftover.is_none());
+    }
+
+    #[test]
+    fn zero_length_reads_are_noops_with_byte_leftover() {
+        let mut cursor = Cursor::new([0xaa]);
+        let mut reader = Reader::new(&mut cursor);
+        assert!(!reader.try_end().unwrap());
+
+        let mut empty = [];
+        assert!(reader.read_bytes(0, &mut empty, Order::Msb0).is_ok());
+
+        let mut empty_const = [];
+        assert!(
+            reader
+                .read_bytes_const::<0>(&mut empty_const, Order::Msb0)
+                .is_ok()
+        );
+        assert!(
+            reader
+                .read_bytes_const_into::<0>(&mut empty_const, Order::Msb0)
+                .is_ok()
+        );
+        assert!(matches!(reader.leftover, Some(Leftover::Byte(0xaa))));
+    }
+
+    #[test]
+    fn short_byte_destinations_return_an_error() {
+        let mut cursor = Cursor::new([0xaa, 0xbb]);
+        let mut reader = Reader::new(&mut cursor);
+        let mut buf = [0; 1];
+
+        let result = reader.read_bytes(2, &mut buf, Order::Msb0);
+
+        assert!(matches!(result, Err(DekuError::InvalidParam(_))));
+    }
+
+    #[test]
+    #[cfg(feature = "bits")]
+    fn bit_reads_propagate_arbitrary_io_errors() {
+        for order in [Order::Msb0, Order::Lsb0] {
+            let mut reader = Reader::new(ErrorReader);
+            let mut bits = bitarr!(u8, Msb0; 0; 8);
+
+            let result = reader.read_bits_into(&mut bits, order);
+
+            assert_eq!(result, Err(DekuError::Io(ErrorKind::Other)));
+        }
+    }
 
     #[test]
     #[cfg(all(feature = "alloc", feature = "bits"))]
-    fn test_end() {
+    fn test_try_end() {
         let input = hex!("aabb");
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        assert!(!reader.end());
+        assert!(!reader.try_end().unwrap());
         let mut buf = [0; 2];
         let _ = reader.read_bytes_const::<2>(&mut buf, Order::Lsb0).unwrap();
-        assert!(reader.end());
+        assert!(reader.try_end().unwrap());
         assert_eq!(reader.bits_read, 8 * 2);
 
         let input = hex!("aa");
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        assert!(!reader.end());
+        assert!(!reader.try_end().unwrap());
         let _ = reader.read_bits(4, Order::Lsb0).unwrap();
-        assert!(!reader.end());
+        assert!(!reader.try_end().unwrap());
         let _ = reader.read_bits(4, Order::Lsb0).unwrap();
-        assert!(reader.end());
+        assert!(reader.try_end().unwrap());
         assert_eq!(reader.bits_read, 8);
 
         let input = hex!("aa");
         let mut cursor = Cursor::new(input);
         let mut reader = Reader::new(&mut cursor);
-        assert!(!reader.end());
+        assert!(!reader.try_end().unwrap());
         let mut buf = [0; 1];
         let _ = reader.read_bytes(1, &mut buf, Order::Lsb0).unwrap();
-        assert!(reader.end());
+        assert!(reader.try_end().unwrap());
         assert_eq!(reader.bits_read, 8);
     }
 

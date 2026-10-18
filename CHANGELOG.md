@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Breaking
+
+- Remove `Reader::end()` in favor of `Reader::try_end()`, which propagates I/O errors
+
 ### Fixed
 
 - `Writer`: an `Lsb0` write that ends on a byte boundary no longer reorders the

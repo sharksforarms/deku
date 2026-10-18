@@ -18,6 +18,7 @@ bench = false
 members = [
     "deku-derive"
 ]
+exclude = ["tests/renamed_dependency"]
 
 [features]
 default = ["std", "bits", "descriptive-errors"]

@@ -27,17 +27,8 @@ fn test_pad_bytes_before() {
     assert_eq!(vec![0xaa, 0x00, 0x00, 0xdd], ret_write);
 }
 
-#[test]
 #[cfg(feature = "descriptive-errors")]
-#[cfg_attr(
-    feature = "bits",
-    should_panic(expected = "Incomplete(NeedSize { bits: 8 })")
-)]
-#[cfg_attr(
-    not(feature = "bits"),
-    should_panic(expected = "Incomplete(NeedSize { bits: 16 })")
-)]
-fn test_pad_bytes_before_not_enough() {
+fn read_pad_bytes_before_not_enough() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct TestStruct {
         field_a: u8,
@@ -48,6 +39,22 @@ fn test_pad_bytes_before_not_enough() {
     let data: Vec<u8> = vec![0xaa];
 
     let _ret_read = TestStruct::try_from(data.as_slice()).unwrap();
+}
+
+// With bits enabled, padding is skipped by seeking, so the next field reports EOF.
+#[test]
+#[cfg(all(feature = "descriptive-errors", feature = "bits"))]
+#[should_panic(expected = "Incomplete(NeedSize { bits: 8 })")]
+fn test_pad_bytes_before_not_enough_with_bits() {
+    read_pad_bytes_before_not_enough();
+}
+
+// Without bits, the padding read reports the full two-byte request on EOF.
+#[test]
+#[cfg(all(feature = "descriptive-errors", not(feature = "bits")))]
+#[should_panic(expected = "Incomplete(NeedSize { bits: 16 })")]
+fn test_pad_bytes_before_not_enough_without_bits() {
+    read_pad_bytes_before_not_enough();
 }
 
 // TODO: add cfg test with updated msg for not(bits)

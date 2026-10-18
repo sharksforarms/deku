@@ -1,0 +1,8 @@
+[package]
+name = "deku-renamed-dependency-test"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+renamed_deku = { package = "deku", path = "../..", default-features = false, features = ["std", "bits", "logging"] }

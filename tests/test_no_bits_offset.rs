@@ -3,6 +3,7 @@
 use deku::prelude::*;
 
 #[derive(DekuRead)]
+#[allow(dead_code)]
 struct Packet {
     value: u8,
 }

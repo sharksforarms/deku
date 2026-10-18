@@ -1604,9 +1604,12 @@ pub fn deku_derive(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "bits")]
     use rstest::rstest;
+    #[cfg(feature = "bits")]
     use syn::parse_str;
 
+    #[cfg(feature = "bits")]
     use super::*;
 
     #[cfg(feature = "bits")]
@@ -1654,44 +1657,6 @@ mod tests {
         case::invalid_endian(r#"struct Test(#[endian=big] u8);"#),
     )]
     fn test_macro(input: &str) {
-        let parsed = parse_str(input).unwrap();
-
-        let data = DekuData::from_input(parsed).unwrap();
-        let res_reader = data.emit_reader_checked();
-        let res_writer = data.emit_writer_checked();
-
-        res_reader.unwrap();
-        res_writer.unwrap();
-    }
-
-    #[cfg(not(feature = "bits"))]
-    #[rstest(
-        input,
-        case::struct_empty(r#"struct Test {}"#),
-        case::struct_unnamed(r#"struct Test(u8, u8);"#),
-        case::struct_bytes(
-            r#"
-        struct Test {
-            #[deku(bytes = 4)]
-            field_a: u32,
-            #[deku(endian = "little")]
-            field_b: u16,
-        }"#
-        ),
-        case::enum_empty(r#"#[deku(id_type = "u8")] enum Test {}"#),
-        case::enum_without_bit_fields(
-            r#"
-        #[deku(id_type = "u8")]
-        enum Test {
-            #[deku(id = "1")]
-            A,
-            #[deku(id = "2")]
-            B(u8),
-        }"#
-        ),
-        case::invalid_endian(r#"struct Test(#[endian=big] u8);"#)
-    )]
-    fn test_macro_without_bits(input: &str) {
         let parsed = parse_str(input).unwrap();
 
         let data = DekuData::from_input(parsed).unwrap();

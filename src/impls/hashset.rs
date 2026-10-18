@@ -220,7 +220,6 @@ mod tests {
     use rstest::rstest;
     use rustc_hash::FxHashSet;
 
-    #[cfg(feature = "bits")]
     use crate::reader::Reader;
 
     use super::*;
@@ -297,6 +296,16 @@ mod tests {
                     .chunks(core::mem::size_of::<u16>())
                     .any(|u| v == u))
         );
+    }
+
+    #[test]
+    fn test_hashset_read_without_context() {
+        let mut cursor = Cursor::new([0xaa]);
+        let mut reader = Reader::new(&mut cursor);
+        let limit = Limit::<u8, fn(&u8) -> bool>::new_count(1);
+        let result = HashSet::<u8>::from_reader_with_ctx(&mut reader, limit).unwrap();
+
+        assert_eq!(result, [0xaa].into_iter().collect());
     }
 
     // Note: These tests also exist in boxed.rs

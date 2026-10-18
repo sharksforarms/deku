@@ -1030,3 +1030,18 @@ impl BoundedBitVec<[u8; 1], crate::bitvec::Msb0> {
 #[cfg(test)]
 #[path = "../tests/test_common/mod.rs"]
 pub mod test_common;
+
+#[cfg(all(test, feature = "bits", feature = "alloc"))]
+mod tests {
+    use ::bitvec::prelude::{Msb0, bitvec};
+
+    use super::BoundedBitVec;
+
+    #[test]
+    fn test_bounded_bitvec_from_bitvec() {
+        let bits = bitvec![u8, Msb0; 1, 0, 1, 1];
+        let bounded = BoundedBitVec::<[u8; 1], Msb0>::from(bits);
+        assert_eq!(bounded.len(), 4);
+        assert_eq!(bounded.as_bitslice(), &bitvec![u8, Msb0; 1, 0, 1, 1][..]);
+    }
+}

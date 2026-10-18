@@ -99,10 +99,6 @@ jobs:
             name: coverage
             command: coverage
             toolchain: stable
-          - id: bench
-            name: benchmarks
-            command: ci-bench
-            toolchain: stable
     steps:
       - uses: actions/checkout@v7
 

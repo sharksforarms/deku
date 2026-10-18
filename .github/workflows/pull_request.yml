@@ -1,0 +1,39 @@
+on: [pull_request]
+name: CI Pull Request
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  runCallgrindBenchmark:
+    name: Benchmark (${{ matrix.bench }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        bench:
+          - deku_callgrind
+          - bebits_callgrind
+          - protocol_pipeline_callgrind
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: gungraun/setup-gungraun@v1.1.3
+      - uses: wcampbell0x2a/rust-bench-compare-action@v1.0.0
+        with:
+          harness: gungraun
+          branchName: ${{ github.base_ref }}
+          benchName: ${{ matrix.bench }}
+          features: alloc,bits
+          token: ${{ secrets.GITHUB_TOKEN }}

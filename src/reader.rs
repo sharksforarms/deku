@@ -216,7 +216,10 @@ impl<R: Read + Seek> Reader<R> {
         #[cfg(not(feature = "bits"))]
         {
             if amt > 0 {
-                panic!("requires deku feature: bits");
+                return Err(crate::deku_error!(
+                    DekuError::InvalidParam,
+                    "requires deku feature: bits"
+                ));
             }
         }
         Ok(())

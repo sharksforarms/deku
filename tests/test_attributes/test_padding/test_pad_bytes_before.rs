@@ -29,7 +29,14 @@ fn test_pad_bytes_before() {
 
 #[test]
 #[cfg(feature = "descriptive-errors")]
-#[should_panic(expected = "Incomplete(NeedSize { bits: 16 })")]
+#[cfg_attr(
+    feature = "bits",
+    should_panic(expected = "Incomplete(NeedSize { bits: 8 })")
+)]
+#[cfg_attr(
+    not(feature = "bits"),
+    should_panic(expected = "Incomplete(NeedSize { bits: 16 })")
+)]
 fn test_pad_bytes_before_not_enough() {
     #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
     struct TestStruct {

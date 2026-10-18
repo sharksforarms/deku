@@ -543,6 +543,10 @@ use ::bitvec::view::BitViewSized;
 
 pub use deku_derive::*;
 
+#[doc(hidden)]
+#[cfg(feature = "logging")]
+pub use log;
+
 pub mod attributes;
 pub mod ctx;
 pub mod error;

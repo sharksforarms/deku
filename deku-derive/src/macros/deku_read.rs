@@ -113,7 +113,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let from_reader_body = quote! {
             use core::convert::TryFrom;
             use ::#crate_::DekuReader as _;
-            let __deku_reader = &mut deku::reader::Reader::new(__deku_input.0);
+            let __deku_reader = &mut ::#crate_::reader::Reader::new(__deku_input.0);
             if __deku_input.1 != 0 {
                 __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
@@ -127,7 +127,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
             use core::convert::TryFrom;
             use ::#crate_::DekuReader as _;
             let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
-            let mut __deku_reader = &mut deku::reader::Reader::new(&mut __deku_cursor);
+            let mut __deku_reader = &mut ::#crate_::reader::Reader::new(&mut __deku_cursor);
             if __deku_input.1 != 0 {
                 __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
@@ -140,7 +140,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 (__deku_reader.bits_read - (__deku_reader.bits_read % 8)) / 8
             };
             let Some(rest) = __deku_input.0.get(idx..) else {
-                return Err(deku::DekuError::Incomplete(deku::prelude::NeedSize::new(8 * (idx - __deku_input.0.len()))));
+                return Err(::#crate_::DekuError::Incomplete(::#crate_::prelude::NeedSize::new(8 * (idx - __deku_input.0.len()))));
             };
             Ok(((rest, __deku_reader.bits_read % 8), __deku_value))
         };
@@ -400,7 +400,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let from_reader_body = quote! {
             use core::convert::TryFrom;
             use ::#crate_::DekuReader as _;
-            let __deku_reader = &mut deku::reader::Reader::new(__deku_input.0);
+            let __deku_reader = &mut ::#crate_::reader::Reader::new(__deku_input.0);
             if __deku_input.1 != 0 {
                 __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
@@ -414,7 +414,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
             use core::convert::TryFrom;
             use ::#crate_::DekuReader as _;
             let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
-            let mut __deku_reader = &mut deku::reader::Reader::new(&mut __deku_cursor);
+            let mut __deku_reader = &mut ::#crate_::reader::Reader::new(&mut __deku_cursor);
             if __deku_input.1 != 0 {
                 __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
             }
@@ -427,7 +427,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
                 (__deku_reader.bits_read - (__deku_reader.bits_read % 8)) / 8
             };
             let Some(rest) = __deku_input.0.get(idx..) else {
-                return Err(deku::DekuError::Incomplete(deku::prelude::NeedSize::new(8 * (idx - __deku_input.0.len()))));
+                return Err(::#crate_::DekuError::Incomplete(::#crate_::prelude::NeedSize::new(8 * (idx - __deku_input.0.len()))));
             };
             Ok(((rest, __deku_reader.bits_read % 8), __deku_value))
         };
@@ -684,7 +684,7 @@ fn emit_bit_run_read(
         };
         let trace_field_log = if cfg!(feature = "logging") {
             let field_ident_str = field_ident.to_string();
-            quote! { log::trace!("Reading: {}.{}", #ident, #field_ident_str); }
+            quote! { ::#crate_::log::trace!("Reading: {}.{}", #ident, #field_ident_str); }
         } else {
             quote! {}
         };
@@ -894,7 +894,7 @@ fn emit_field_read(
 
     let trace_field_log = if cfg!(feature = "logging") {
         quote! {
-            log::trace!("Reading: {}.{}", #ident, #field_ident_str);
+            ::#crate_::log::trace!("Reading: {}.{}", #ident, #field_ident_str);
         }
     } else {
         quote! {}

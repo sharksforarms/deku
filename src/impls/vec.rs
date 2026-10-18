@@ -99,7 +99,7 @@ where
 
     let mut res = capacity.map_or_else(Vec::new, Vec::with_capacity);
     loop {
-        if reader.end() {
+        if reader.try_end()? {
             break;
         }
         let val = <T>::from_reader_with_ctx(reader, ctx)?;
@@ -236,10 +236,36 @@ mod tests {
     use rstest::rstest;
     use std::io::Cursor;
 
-    #[cfg(feature = "bits")]
     use crate::reader::Reader;
 
     use super::*;
+
+    struct ErrorReader;
+
+    impl no_std_io::io::Read for ErrorReader {
+        fn read(&mut self, _buf: &mut [u8]) -> no_std_io::io::Result<usize> {
+            Err(no_std_io::io::ErrorKind::Other.into())
+        }
+    }
+
+    impl no_std_io::io::Seek for ErrorReader {
+        fn seek(&mut self, _pos: no_std_io::io::SeekFrom) -> no_std_io::io::Result<u64> {
+            Ok(0)
+        }
+    }
+
+    #[test]
+    fn read_all_propagates_errors_from_end_probe() {
+        let mut reader = Reader::new(ErrorReader);
+        let limit = Limit::<u8, fn(&u8) -> bool>::end();
+
+        let result = Vec::<u8>::from_reader_with_ctx(&mut reader, (limit, ()));
+
+        assert_eq!(
+            result,
+            Err(crate::DekuError::Io(no_std_io::io::ErrorKind::Other))
+        );
+    }
 
     #[cfg(feature = "bits")]
     #[rstest(input, limit, expected, expected_rest_bits, expected_rest_bytes,

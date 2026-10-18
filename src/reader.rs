@@ -188,6 +188,10 @@ impl<R: Read + Seek> Reader<R> {
             #[cfg(feature = "logging")]
             log::trace!("skip_bits: {amt}");
 
+            if let Some(Leftover::Byte(byte)) = self.leftover {
+                self.leftover = Some(Leftover::Bits(BitArray::from([byte]).into()));
+            }
+
             if let Some(Leftover::Bits(bits)) = &self.leftover {
                 let mut buf = bitarr!(u8, Msb0; 0; 8);
                 let needed = core::cmp::min(amt, bits.len());

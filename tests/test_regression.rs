@@ -479,6 +479,7 @@ fn pr_664_runtime_zero_bytes() {
 }
 
 // Problem where a Vec with `read_all` would break the `pad_` padding of the inner type.
+#[cfg(feature = "bits")]
 #[test]
 fn issue_656() {
     #[derive(Debug, PartialEq, Eq, DekuWrite, DekuRead)]

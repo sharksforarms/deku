@@ -21,15 +21,15 @@
 //! cost; that is the number to quote.
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use deku::prelude::*;
 use no_std_io::io::Cursor;
 
 #[path = "common/mod.rs"]
 mod common;
 use common::{
-    addresses, header, six, stream_array, Addresses, OneBitU64, SixBytes, TmPrimaryHeader, ADDRS,
-    BITS, FRAMES, HEADER_BYTES,
+    ADDRS, Addresses, BITS, FRAMES, HEADER_BYTES, OneBitU64, SixBytes, TmPrimaryHeader, addresses,
+    header, six, stream_array,
 };
 
 fn bench(c: &mut Criterion) {

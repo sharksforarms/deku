@@ -7,13 +7,13 @@
 //! `benches/bebits.rs` cannot show it.
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use deku::prelude::*;
 use no_std_io::io::Cursor;
 
 #[path = "protocol/mod.rs"]
 mod protocol;
-use protocol::{packets, read_packet, stream, BbHeader, Ipv4Header, Packet, SpacePacket, PACKETS};
+use protocol::{BbHeader, Ipv4Header, PACKETS, Packet, SpacePacket, packets, read_packet, stream};
 
 fn bench(c: &mut Criterion) {
     let bytes = stream();

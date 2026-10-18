@@ -99,6 +99,10 @@ jobs:
             name: coverage
             command: coverage
             toolchain: stable
+          - id: bench
+            name: benchmarks
+            command: ci-bench
+            toolchain: stable
     steps:
       - uses: actions/checkout@v7
 
@@ -142,6 +146,7 @@ jobs:
             .ci-cache/cargo-git
             .ci-cache/target/.rustc_info.json
             .ci-cache/target/debug
+            .ci-cache/target/release
             .ci-cache/target/llvm-cov-target
             .ci-cache/target/tests
             .ci-cache/target/thumbv6m-none-eabi

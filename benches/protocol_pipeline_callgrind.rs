@@ -11,7 +11,7 @@ use no_std_io::io::Cursor;
 
 #[path = "protocol/mod.rs"]
 mod protocol;
-use protocol::{packets, read_packet, stream, Packet, PACKETS};
+use protocol::{PACKETS, Packet, packets, read_packet, stream};
 
 #[library_benchmark]
 #[bench::mixed(Cursor::new(stream()))]

@@ -28,8 +28,8 @@ use no_std_io::io::Cursor;
 #[path = "common/mod.rs"]
 mod common;
 use common::{
-    addresses, header, read, six, stream_vec, Addresses, OneBitU64, SixBytes, TmPrimaryHeader,
-    ADDRS, BITS, FRAMES, HEADER_BYTES,
+    ADDRS, Addresses, BITS, FRAMES, HEADER_BYTES, OneBitU64, SixBytes, TmPrimaryHeader, addresses,
+    header, read, six, stream_vec,
 };
 
 fn cursor() -> Cursor<&'static [u8]> {

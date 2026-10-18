@@ -1,3 +1,4 @@
+#[cfg(feature = "bits")]
 use darling::ast::Fields;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, quote};
@@ -9,7 +10,9 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
 
-use crate::{DekuData, FieldData, Num};
+use crate::Num;
+#[cfg(feature = "bits")]
+use crate::{DekuData, FieldData};
 
 pub(crate) mod deku_read;
 pub(crate) mod deku_size;
@@ -471,10 +474,10 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
     // anything else is a ctx parameter name forwarded as a runtime order, which
     // could be either at run time.
     let explicit_order = f.bit_order.as_ref().or(input.bit_order.as_ref());
-    if let Some(order) = explicit_order {
-        if order.value() != "msb" {
-            return None;
-        }
+    if let Some(order) = explicit_order
+        && order.value() != "msb"
+    {
+        return None;
     }
     // Which overflow wording this field's own write would have used.
     let ordered = explicit_order.is_some();

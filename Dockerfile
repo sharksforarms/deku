@@ -12,10 +12,15 @@ ARG BETA_TOOLCHAIN=beta
 ARG JUST_VERSION=1.58.0
 ARG WASM_PACK_VERSION=0.15.0
 ARG CARGO_LLVM_COV_VERSION=0.8.7
+ARG GUNGRAUN_VERSION=0.19.4
 ARG USER_UID=1000
 ARG USER_GID=1000
 
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes valgrind \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN rustup toolchain install "${MSRV_TOOLCHAIN}" --profile minimal \
     && rustup toolchain install "${STABLE_TOOLCHAIN}" --profile minimal \
@@ -35,7 +40,8 @@ RUN --mount=type=cache,id=deku-tools-registry,target=/usr/local/cargo/registry,s
     export CARGO_TARGET_DIR=/tmp/cargo-target \
     && cargo +${STABLE_TOOLCHAIN} install just --version "${JUST_VERSION}" --locked \
     && cargo +${STABLE_TOOLCHAIN} install wasm-pack --version "${WASM_PACK_VERSION}" --locked \
-    && cargo +${STABLE_TOOLCHAIN} install cargo-llvm-cov --version "${CARGO_LLVM_COV_VERSION}" --locked
+    && cargo +${STABLE_TOOLCHAIN} install cargo-llvm-cov --version "${CARGO_LLVM_COV_VERSION}" --locked \
+    && cargo +${STABLE_TOOLCHAIN} install gungraun-runner --version "${GUNGRAUN_VERSION}" --locked
 
 RUN groupadd --gid "${USER_GID}" deku \
     && useradd --uid "${USER_UID}" --gid "${USER_GID}" --create-home --shell /bin/bash deku \
@@ -44,7 +50,8 @@ RUN groupadd --gid "${USER_GID}" deku \
         /home/deku/.cargo/git \
         /workspace/target
 
-ENV CARGO_HOME=/home/deku/.cargo \
+ENV PATH=/usr/local/cargo/bin:${PATH} \
+    CARGO_HOME=/home/deku/.cargo \
     CARGO_TARGET_DIR=/workspace/target \
     CARGO_TERM_COLOR=always \
     DEKU_STABLE_TOOLCHAIN=${STABLE_TOOLCHAIN} \

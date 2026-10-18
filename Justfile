@@ -111,4 +111,17 @@ coverage:
     cargo +{{stable}} llvm-cov report --package deku --package deku_derive --codecov --output-path codecov.json
 
 bench:
-    cargo +{{toolchain}} bench --workspace
+    cargo +{{toolchain}} bench --workspace --all-features
+
+bench-ci:
+    # Callgrind instruction counts are stable enough for CI; Criterion wall
+    # time depends on the runner and remains available through `just bench`.
+    cargo +{{toolchain}} bench --all-features --bench deku_callgrind
+    cargo +{{toolchain}} bench --all-features --bench bebits_callgrind
+    cargo +{{toolchain}} bench --all-features --bench protocol_pipeline_callgrind
+
+ci-bench:
+    # Unprivileged containers cannot use setarch to disable ASLR. The callgrind
+    # metric is an instruction count, so keep the job unprivileged and permit
+    # ASLR instead of adding a container capability just for this benchmark.
+    GUNGRAUN_ALLOW_ASLR=yes DEKU_TOOLCHAIN=stable just bench-ci

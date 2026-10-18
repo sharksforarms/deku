@@ -424,6 +424,9 @@ impl<R: Read + Seek> Reader<R> {
         // pipeline. Tried three times: with narrow fields, with a `need == 1`
         // fast path, and again after the derive started batching runs so the
         // reads are wide. Slower every time.
+        //
+        // See benches/protocol_pipeline{,_callgrind}.rs for more testing to "prove"
+        // the above statement.
         while have < amt {
             let mut buf = [0u8; 1];
             if let Err(e) = self.inner.read_exact(&mut buf) {

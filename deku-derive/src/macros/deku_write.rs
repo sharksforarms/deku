@@ -322,10 +322,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let variant_write = if variant_writer.is_some() {
             quote! { #variant_writer ?; }
         } else {
+            // With a user supplied `id`, the first field does not store the id
+            let first_field_stores_id = variant.id_pat.is_some() && id.is_none();
             let field_writes = emit_field_writes(
                 input,
                 &variant.fields.as_ref(),
-                variant.id_pat.is_some(),
+                first_field_stores_id,
                 None,
                 &ident,
             )?;

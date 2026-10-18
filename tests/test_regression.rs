@@ -477,3 +477,32 @@ fn pr_664_runtime_zero_bytes() {
     assert_eq!(16, amt_read);
     assert_eq!(Dynamic { n: 1, a: -100 }, val);
 }
+
+// Problem where a Vec with `read_all` would break the `pad_` padding of the inner type.
+#[test]
+fn issue_656() {
+    #[derive(Debug, PartialEq, Eq, DekuWrite, DekuRead)]
+    struct Outer {
+        #[deku(read_all)]
+        values: Vec<Inner>,
+    }
+
+    #[derive(Debug, PartialEq, Eq, DekuWrite, DekuRead)]
+    struct Inner {
+        #[deku(pad_bytes_before = "1")]
+        value: u8,
+    }
+
+    let data: &[u8] = &[0x00, 0x01, 0x02, 0x03, 0x04, 0x05];
+    let mut reader = Reader::new(Cursor::new(data));
+    let result = Outer::from_reader_with_ctx(&mut reader, ()).unwrap();
+
+    let expected = Outer {
+        values: vec![Inner { value: 1 }, Inner { value: 3 }, Inner { value: 5 }],
+    };
+
+    assert_eq!(result, expected);
+
+    let serialized = <Outer as DekuContainerWrite>::to_bytes(&expected).unwrap();
+    assert_eq!(&serialized, &[0x00, 0x01, 0x00, 0x03, 0x00, 0x05]);
+}

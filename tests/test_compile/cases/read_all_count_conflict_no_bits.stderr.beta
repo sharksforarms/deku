@@ -1,0 +1,7 @@
+error: conflicting: `read_all` cannot be used with `until`, `count`, `bits_read`, or `bytes_read`
+ --> tests/test_compile/cases/read_all_count_conflict_no_bits.rs:3:10
+  |
+3 | #[derive(DekuRead)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)

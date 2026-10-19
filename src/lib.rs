@@ -789,6 +789,61 @@ pub trait DekuEnumExt<'__deku, T> {
     fn deku_id(&self) -> Result<T, DekuError>;
 }
 
+/// "Bit field" trait: a type whose whole wire form is a fixed run of bits that
+/// converts to and from an integer without touching the reader or writer.
+///
+/// This is what lets a [`bit_field`](crate::attributes#bit_field) field join
+/// the single read or write deku emits for a run of adjacent bit fields.
+///
+/// `#[derive(DekuBitField)]` implements it for an enum read by reading its id
+/// and nothing else: all unit variants, an integer `id` on each (`id = 1` or
+/// `id = "1"`) that fits in `bits`, an unsigned primitive `id_type`, a literal
+/// `bits` no wider than that type, and `Msb0`. Past 8 bits the id must be
+/// big-endian, or take its endian from context.
+/// Any other shape is a compile error:
+///
+/// ```rust
+/// use deku::prelude::*;
+///
+/// #[derive(Debug, PartialEq, DekuRead, DekuWrite, DekuBitField)]
+/// #[deku(id_type = "u8", bits = 2, endian = "big")]
+/// enum Flag {
+///     #[deku(id = 0b00)]
+///     Off,
+///     #[deku(id = 0b11)]
+///     On,
+/// }
+///
+/// assert_eq!(<Flag as DekuBitField>::BITS, 2);
+/// assert_eq!(Flag::from_bit_run(0b11).unwrap(), Flag::On);
+/// assert_eq!(Flag::On.to_bit_run().unwrap(), 0b11);
+/// assert!(Flag::from_bit_run(0b01).is_err());
+/// ```
+///
+/// A hand-written impl must agree with the type's `DekuReader` and `DekuWriter`
+/// on the same bits: a run uses one or the other depending on whether it fits.
+#[cfg(feature = "bits")]
+pub trait DekuBitField: Sized {
+    /// Width of the wire form, in bits, from 1 to 64. A run holding a width
+    /// outside that range falls back to the individual reads and writes.
+    const BITS: usize;
+
+    /// Builds the value from the low `Self::BITS` bits of `raw`.
+    ///
+    /// Higher bits of `raw` are not part of this field and are ignored.
+    ///
+    /// # Errors
+    /// Whatever the type's own reader would have returned for those bits,
+    /// typically [`DekuError::Parse`] for an id matching no variant.
+    fn from_bit_run(raw: u64) -> Result<Self, DekuError>;
+
+    /// The wire form as its low `Self::BITS` bits, all higher bits zero.
+    ///
+    /// # Errors
+    /// Whatever the type's own writer would have returned.
+    fn to_bit_run(&self) -> Result<u64, DekuError>;
+}
+
 /// Trait for types with a known, fixed binary size at compile-time
 ///
 /// Only implemented for fixed-size types (primitives, arrays, structs/enums composed

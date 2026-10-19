@@ -482,13 +482,22 @@ fn emit_field_writes(
     while i < fields.len() {
         #[cfg(feature = "bits")]
         if let Some(run) = runs.get(&i) {
-            writes.push(emit_bit_run_write(fields, i, run, &object_prefix, ident));
+            writes.push(emit_bit_run_write(
+                input,
+                fields,
+                i,
+                run,
+                &object_prefix,
+                ident,
+            )?);
             i += run.len();
             is_id_pat = false;
             continue;
         }
 
         let f = fields.fields[i];
+        #[cfg(feature = "bits")]
+        writes.push(super::bit_field_bound(f));
         writes.push(emit_field_write(
             input,
             i,
@@ -508,52 +517,78 @@ fn emit_field_writes(
 /// which is the only per-field work the individual writes did.
 #[cfg(feature = "bits")]
 fn emit_bit_run_write(
+    input: &DekuData,
     fields: &Fields<&FieldData>,
     start: usize,
     run: &super::BitRun,
     object_prefix: &Option<TokenStream>,
     ident: &TokenStream,
-) -> TokenStream {
+) -> Result<TokenStream, syn::Error> {
+    use super::{BitRunField, batch_condition, needs_fallback, sum_bits};
+
     let crate_ = super::get_crate_name();
-    let total: usize = run.iter().map(|f| f.bits).sum();
-    let ident = ident.to_string();
+    let refs: Vec<&BitRunField> = run.iter().collect();
+    let total = sum_bits(&refs, &crate_);
+    let ident_str = ident.to_string();
 
     let mut traces = TokenStream::new();
     let mut checks = TokenStream::new();
     let mut terms = Vec::with_capacity(run.len());
     let mut widths = Vec::with_capacity(run.len());
-    let mut consumed = 0usize;
     for (offset, field) in run.iter().enumerate() {
         let f = fields.fields[start + offset];
         let field_ident = f.get_ident(start + offset, object_prefix.is_none());
-        let bits = field.bits;
-        let shift = total - consumed - bits;
-        // A run holds at least two fields totalling at most 64 bits, so no single
-        // field in one is 64 bits wide and the shift below cannot overflow.
-        debug_assert!(bits < u64::BITS as usize);
-        let mask: u64 = (1u64 << bits) - 1;
+        // How many bits of the run sit below this field.
+        let shift = sum_bits(&refs[offset + 1..], &crate_);
+        let mask = field.mask(&crate_);
 
         if cfg!(feature = "logging") {
             let field_ident_str = field_ident.to_string();
-            traces.extend(quote! { log::trace!("Writing: {}.{}", #ident, #field_ident_str); });
+            traces.extend(quote! { log::trace!("Writing: {}.{}", #ident_str, #field_ident_str); });
         }
 
-        let value = quote! { (*(#object_prefix #field_ident) as u64) };
-        // Every field keeps the rejection its own write performed. Where the field
-        // fills its type this folds away at compile time, because a value cast from
-        // that type cannot exceed the width.
-        if field.can_overflow {
-            let ordered = field.ordered;
-            checks.extend(quote! {
-                ::#crate_::writer::check_bit_size::<#ordered>(#value, #bits)?;
-            });
-        }
+        let value = match field {
+            BitRunField::Primitive {
+                bits,
+                ordered,
+                can_overflow,
+                ..
+            } => {
+                let value = quote! { (*(#object_prefix #field_ident) as u64) };
+                // Every field keeps the rejection its own write performed.
+                // Where it fills its type this folds away at compile time.
+                if *can_overflow {
+                    let ordered = *ordered;
+                    checks.extend(quote! {
+                        ::#crate_::writer::check_bit_size::<#ordered>(#value, #bits)?;
+                    });
+                }
+                value
+            }
+            // The type owns the "does this fit" question, so `to_bit_run` is
+            // both value and check. Called in field order among the checks, so
+            // the first failing field is the one reported, as unbatched.
+            BitRunField::BitField { ty } => {
+                let value = quote::format_ident!("__deku_bit_field_{}", start + offset);
+                checks.extend(quote! {
+                    let #value: u64 =
+                        <#ty as ::#crate_::DekuBitField>::to_bit_run(#object_prefix #field_ident)?;
+                    // The mask below would silently drop the bits of an impl
+                    // that breaks its contract.
+                    debug_assert!(
+                        #value & !#mask == 0,
+                        "DekuBitField::to_bit_run returned bits above BITS",
+                    );
+                });
+                quote! { #value }
+            }
+        };
+
         terms.push(quote! { ((#value & #mask) << #shift) });
-        widths.push(bits);
-        consumed += bits;
+        widths.push(field.bits(&crate_));
     }
 
-    quote! {
+    let batched = quote! {
         #traces
         #checks
         let __deku_bit_run: u64 = #(#terms)|*;
@@ -564,7 +599,32 @@ fn emit_bit_run_write(
         } else {
             __deku_writer.write_bits_uint_fields(__deku_bit_run, &[#(#widths),*])?;
         }
+    };
+
+    if !needs_fallback(run) {
+        return Ok(batched);
     }
+
+    // The field writes the run replaces, for when it turns out not to fit.
+    let mut fallback = TokenStream::new();
+    for offset in 0..run.len() {
+        fallback.extend(emit_field_write(
+            input,
+            start + offset,
+            fields.fields[start + offset],
+            object_prefix,
+            ident,
+            &mut false,
+        )?);
+    }
+    let batch = batch_condition(run, &crate_);
+    Ok(quote! {
+        if const { #batch } {
+            #batched
+        } else {
+            #fallback
+        }
+    })
 }
 
 fn emit_field_updates(

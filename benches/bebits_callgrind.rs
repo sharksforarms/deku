@@ -28,8 +28,9 @@ use no_std_io::io::Cursor;
 #[path = "common/mod.rs"]
 mod common;
 use common::{
-    ADDRS, Addresses, BITS, FRAMES, HEADER_BYTES, OneBitU64, SixBytes, TmPrimaryHeader, addresses,
-    header, read, six, stream_vec,
+    ADDRS, Addresses, BITS, FRAMES, HEADER_BYTES, OneBitU64, SixBytes, TmEnumHeader,
+    TmEnumHeaderBatched, TmPrimaryHeader, addresses, enum_header, enum_header_batched, header,
+    read, six, stream_vec,
 };
 
 fn cursor() -> Cursor<&'static [u8]> {
@@ -106,6 +107,34 @@ fn be_byte_arrays_x96(stream: Cursor<Vec<u8>>) -> u64 {
     black_box(acc)
 }
 
+// The same header with its flags typed as enums, batched against not.
+
+#[library_benchmark]
+#[bench::bytes(Cursor::new(stream_vec()))]
+fn be_tm_enum_header_x128(stream: Cursor<Vec<u8>>) -> u64 {
+    let mut r = Reader::new(black_box(stream));
+    let mut acc: u64 = 0;
+    for _ in 0..FRAMES {
+        acc ^= TmEnumHeader::from_reader_with_ctx(&mut r, ())
+            .unwrap()
+            .fold();
+    }
+    black_box(acc)
+}
+
+#[library_benchmark]
+#[bench::bytes(Cursor::new(stream_vec()))]
+fn be_tm_enum_header_batched_x128(stream: Cursor<Vec<u8>>) -> u64 {
+    let mut r = Reader::new(black_box(stream));
+    let mut acc: u64 = 0;
+    for _ in 0..FRAMES {
+        acc ^= TmEnumHeaderBatched::from_reader_with_ctx(&mut r, ())
+            .unwrap()
+            .fold();
+    }
+    black_box(acc)
+}
+
 // Write side of the same shapes. Into a reused stack buffer, so the
 // measurement is the field writes rather than an allocation.
 
@@ -165,6 +194,30 @@ fn be_write_six_bytes_aligned_x128(six: SixBytes) {
     black_box(&out);
 }
 
+#[library_benchmark]
+#[bench::header(enum_header())]
+fn be_write_tm_enum_header_x128(header: TmEnumHeader) {
+    let mut out = [0u8; FRAMES * 6];
+    let mut w = Writer::new(Cursor::new(out.as_mut_slice()));
+    for _ in 0..FRAMES {
+        black_box(&header).to_writer(&mut w, ()).unwrap();
+    }
+    w.finalize().unwrap();
+    black_box(&out);
+}
+
+#[library_benchmark]
+#[bench::header(enum_header_batched())]
+fn be_write_tm_enum_header_batched_x128(header: TmEnumHeaderBatched) {
+    let mut out = [0u8; FRAMES * 6];
+    let mut w = Writer::new(Cursor::new(out.as_mut_slice()));
+    for _ in 0..FRAMES {
+        black_box(&header).to_writer(&mut w, ()).unwrap();
+    }
+    w.finalize().unwrap();
+    black_box(&out);
+}
+
 library_benchmark_group!(
     name = read_group,
     benchmarks = [
@@ -175,6 +228,8 @@ library_benchmark_group!(
         be_six_bytes_aligned_x128,
         be_one_bit_in_u64_x1024,
         be_byte_arrays_x96,
+        be_tm_enum_header_x128,
+        be_tm_enum_header_batched_x128,
     ]
 );
 
@@ -186,6 +241,8 @@ library_benchmark_group!(
         be_write_tm_primary_header_x128,
         be_write_six_bytes_aligned_x128,
         be_write_byte_arrays_x96,
+        be_write_tm_enum_header_x128,
+        be_write_tm_enum_header_batched_x128,
     ]
 );
 main!(library_benchmark_groups = read_group, write_group);

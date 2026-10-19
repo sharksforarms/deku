@@ -28,8 +28,9 @@ use no_std_io::io::Cursor;
 #[path = "common/mod.rs"]
 mod common;
 use common::{
-    ADDRS, Addresses, BITS, FRAMES, HEADER_BYTES, OneBitU64, SixBytes, TmPrimaryHeader, addresses,
-    header, six, stream_array,
+    ADDRS, Addresses, BITS, FRAMES, HEADER_BYTES, OneBitU64, SixBytes, TmEnumHeader,
+    TmEnumHeaderBatched, TmPrimaryHeader, addresses, enum_header, enum_header_batched, header, six,
+    stream_array,
 };
 
 fn bench(c: &mut Criterion) {
@@ -94,6 +95,31 @@ fn bench(c: &mut Criterion) {
             acc
         })
     });
+    // The same header with its flags typed as enums, batched against not.
+    c.bench_function("be_tm_enum_header_x128", |b| {
+        b.iter(|| {
+            let mut r = Reader::new(Cursor::new(black_box(&stream)));
+            let mut acc: u64 = 0;
+            for _ in 0..FRAMES {
+                acc ^= TmEnumHeader::from_reader_with_ctx(&mut r, ())
+                    .unwrap()
+                    .fold();
+            }
+            acc
+        })
+    });
+    c.bench_function("be_tm_enum_header_batched_x128", |b| {
+        b.iter(|| {
+            let mut r = Reader::new(Cursor::new(black_box(&stream)));
+            let mut acc: u64 = 0;
+            for _ in 0..FRAMES {
+                acc ^= TmEnumHeaderBatched::from_reader_with_ctx(&mut r, ())
+                    .unwrap()
+                    .fold();
+            }
+            acc
+        })
+    });
     c.bench_function("be_byte_arrays_x96", |b| {
         b.iter(|| {
             let mut r = Reader::new(Cursor::new(black_box(&stream)));
@@ -111,6 +137,8 @@ fn bench(c: &mut Criterion) {
     let header = header();
     let six = six();
     let addresses = addresses();
+    let enum_header = enum_header();
+    let enum_header_batched = enum_header_batched();
     c.bench_function("be_write_tm_primary_header_11_fields", |b| {
         let mut out = [0u8; 16];
         b.iter(|| {
@@ -156,6 +184,28 @@ fn bench(c: &mut Criterion) {
             let mut w = Writer::new(Cursor::new(out.as_mut_slice()));
             for _ in 0..FRAMES {
                 black_box(&six).to_writer(&mut w, ()).unwrap();
+            }
+            w.finalize().unwrap();
+        })
+    });
+    c.bench_function("be_write_tm_enum_header_x128", |b| {
+        let mut out = [0u8; FRAMES * 6];
+        b.iter(|| {
+            let mut w = Writer::new(Cursor::new(out.as_mut_slice()));
+            for _ in 0..FRAMES {
+                black_box(&enum_header).to_writer(&mut w, ()).unwrap();
+            }
+            w.finalize().unwrap();
+        })
+    });
+    c.bench_function("be_write_tm_enum_header_batched_x128", |b| {
+        let mut out = [0u8; FRAMES * 6];
+        b.iter(|| {
+            let mut w = Writer::new(Cursor::new(out.as_mut_slice()));
+            for _ in 0..FRAMES {
+                black_box(&enum_header_batched)
+                    .to_writer(&mut w, ())
+                    .unwrap();
             }
             w.finalize().unwrap();
         })

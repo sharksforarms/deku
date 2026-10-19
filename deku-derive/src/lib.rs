@@ -378,6 +378,53 @@ fn find_order_param_in_ctx(
 }
 
 impl DekuData {
+    /// True if the container carries an attribute a `DekuBitField` impl cannot
+    /// reproduce. `from_bit_run` is handed a `u64`, with no reader to read from
+    /// the wire or move a cursor with.
+    #[cfg(feature = "bits")]
+    pub fn any_container_set_incompatible_with_bit_field(&self) -> bool {
+        // Exhaustive on purpose: a new container attribute fails to compile here
+        // until it is classified.
+        let Self {
+            // Not attributes.
+            ident: _,
+            generics: _,
+            data: _,
+            // Read by the caller, not merely tested: these decide the width and
+            // the orders a run has to line up with.
+            endian: _,
+            id: _,
+            id_type: _,
+            id_endian: _,
+            bits: _,
+            bit_order: _,
+            // Cannot affect matching a literal id out of a `u64`. A `repr`
+            // discriminant arrives with the variant `id` unset, already rejected.
+            repr: _,
+            ctx: _,
+            ctx_default: _,
+            // Where-clause items for generic impls; the caller rejects generics.
+            read_bound: _,
+            write_bound: _,
+            size_bound: _,
+            bound: _,
+
+            magic,
+            bytes,
+            seek_rewind,
+            seek_from_current,
+            seek_from_end,
+            seek_from_start,
+        } = self;
+
+        magic.is_some()
+            || bytes.is_some()
+            || *seek_rewind
+            || seek_from_current.is_some()
+            || seek_from_end.is_some()
+            || seek_from_start.is_some()
+    }
+
     fn from_input(input: TokenStream) -> Result<Self, TokenStream> {
         let input = match syn::parse2(input) {
             Ok(input) => input,
@@ -572,6 +619,12 @@ impl DekuData {
     /// Emit a size implementation, no compile_error
     fn emit_size_checked(&self) -> Result<TokenStream, syn::Error> {
         macros::deku_size::emit_deku_size(self)
+    }
+
+    /// Emit a `DekuBitField` implementation. On error, a compiler error is emitted
+    #[cfg(feature = "bits")]
+    fn emit_bit_field(&self) -> TokenStream {
+        macros::deku_bit_field::emit_deku_bit_field(self).unwrap_or_else(|e| e.to_compile_error())
     }
 }
 
@@ -785,6 +838,10 @@ struct FieldData {
 
     /// magic value that needs to appear before field
     magic: Option<syn::LitByteStr>,
+
+    /// the field's type implements `DekuBitField`, so it can join a run
+    #[cfg(feature = "bits")]
+    bit_field: bool,
 }
 
 impl FieldData {
@@ -831,13 +888,16 @@ impl FieldData {
             seek_from_start,
             bit_order,
             magic,
+            #[cfg(feature = "bits")]
+            bit_field,
         } = self;
 
         #[cfg(feature = "bits")]
         let bits_attr_set = bits.is_some()
             || bits_read.is_some()
             || pad_bits_before.is_some()
-            || pad_bits_after.is_some();
+            || pad_bits_after.is_some()
+            || *bit_field;
         #[cfg(not(feature = "bits"))]
         let bits_attr_set = false;
 
@@ -879,6 +939,7 @@ impl FieldData {
             bits: None,
             bit_order: None,
             update: None,
+            bit_field: false,
             ..self.clone()
         }
         .any_field_set()
@@ -887,8 +948,9 @@ impl FieldData {
     /// True if the field carries an attribute the one-call byte-array path
     /// cannot reproduce.
     ///
-    /// Excuses the three a bit run excuses, none of which change the bytes, but
-    /// not `bits`: a width on a byte array is a different read.
+    /// Excuses the three attributes a bit run excuses that do not change the
+    /// bytes, but not `bits` (a width on a byte array is a different read) or
+    /// `bit_field` (a byte array is not one).
     pub fn any_field_set_incompatible_with_byte_array(&self) -> bool {
         Self {
             endian: None,
@@ -943,6 +1005,8 @@ impl FieldData {
             seek_from_start: receiver.seek_from_start?,
             bit_order: receiver.bit_order,
             magic: receiver.magic,
+            #[cfg(feature = "bits")]
+            bit_field: receiver.bit_field,
         };
 
         FieldData::validate(&data)?;
@@ -993,6 +1057,16 @@ impl FieldData {
             return Err(cerror(
                 data.bits.span(),
                 "conflicting: both `bits` and `bytes` specified on field",
+            ));
+        }
+
+        // The width of a `bit_field` is `DekuBitField::BITS`: a `bits` would be a
+        // second answer to the same question.
+        #[cfg(feature = "bits")]
+        if data.bit_field && data.bits.is_some() {
+            return Err(cerror(
+                data.bits.span(),
+                "conflicting: both `bit_field` and `bits` specified on field",
             ));
         }
 
@@ -1067,6 +1141,35 @@ struct VariantData {
 }
 
 impl VariantData {
+    /// True if the variant carries something a `DekuBitField` impl cannot
+    /// reproduce. `from_bit_run` matches a literal id out of a `u64`: no reader
+    /// for a custom `reader`, no fields to populate.
+    #[cfg(feature = "bits")]
+    pub fn any_variant_set_incompatible_with_bit_field(&self) -> bool {
+        // Exhaustive on purpose: a new variant attribute fails to compile here
+        // until it is classified.
+        let Self {
+            // Not an attribute.
+            ident: _,
+            // The caller requires a literal `id`, which is more than being set.
+            id: _,
+            // Only reachable with `id` unset, which the caller rejects.
+            discriminant: _,
+
+            fields,
+            id_pat,
+            reader,
+            writer,
+            default,
+        } = self;
+
+        !fields.is_empty()
+            || id_pat.is_some()
+            || reader.is_some()
+            || writer.is_some()
+            || default.unwrap_or(false)
+    }
+
     fn from_receiver(receiver: DekuVariantReceiver) -> Result<Self, TokenStream> {
         let fields = ast::Fields::new(
             receiver.fields.style,
@@ -1402,6 +1505,11 @@ struct DekuFieldReceiver {
     /// magic value that needs to appear before field
     #[darling(default)]
     magic: Option<syn::LitByteStr>,
+
+    /// the field's type implements `DekuBitField`, so it can join a run
+    #[cfg(feature = "bits")]
+    #[darling(default)]
+    bit_field: bool,
 }
 
 /// Receiver for the variant-level attributes inside a enum
@@ -1456,6 +1564,16 @@ pub fn proc_deku_write(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 pub fn proc_deku_size(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     match DekuData::from_input(input.into()) {
         Ok(data) => data.emit_size().into(),
+        Err(err) => err.into(),
+    }
+}
+
+/// Entry function for `DekuBitField` proc-macro
+#[cfg(feature = "bits")]
+#[proc_macro_derive(DekuBitField, attributes(deku))]
+pub fn proc_deku_bit_field(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    match DekuData::from_input(input.into()) {
+        Ok(data) => data.emit_bit_field().into(),
         Err(err) => err.into(),
     }
 }

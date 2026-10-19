@@ -34,6 +34,7 @@ enum DekuEnum {
 |-----------|------------------|------------
 | [endian](#endian) | top-level, field | Set the endianness
 | [bit_order](#bit_order) | top-level, field | Set the bit-order when reading bits
+| [bit_field](#bit_field) | field | Let a [DekuBitField](crate::DekuBitField) field join a run of adjacent bit fields
 | [magic](#magic) | top-level, field | A magic value that must be present at the start of this struct/enum/field
 | [bound](#bound) | top-level | Extra where-clause items for all derived impls
 | [read_bound](#bound) | top-level | Extra where-clause items for derived `DekuRead` impls
@@ -329,6 +330,71 @@ assert_eq!(bytes, data);
 # #[cfg(not(all(feature = "alloc", feature = "bits")))]
 # fn main() {}
 ```
+
+# bit_field
+
+Lets a field whose type implements [DekuBitField](crate::DekuBitField), such as
+a flag enum, join the single read and write deku makes for a run of adjacent
+big-endian `Msb0` bit fields. The macro cannot see an enum's width, so without
+it the enum splits the run.
+
+The field must implement the trait even outside a run. Like any run field, it
+joins one only with no attribute besides `endian` and `bit_order`; `bits` is
+rejected, since the width is `DekuBitField::BITS`.
+
+```rust
+# use deku::prelude::*;
+# #[cfg(feature = "bits")]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, DekuBitField)]
+#[deku(id_type = "u8", bits = 1, endian = "endian", ctx = "endian: deku::ctx::Endian")]
+enum Flag {
+    #[deku(id = 0b0)]
+    Off,
+    #[deku(id = 0b1)]
+    On,
+}
+
+# #[cfg(feature = "bits")]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "big")]
+struct Header {
+    #[deku(bits = 3)]
+    version: u8,
+    #[deku(bit_field)]
+    secondary: Flag,
+    #[deku(bit_field)]
+    sync: Flag,
+    #[deku(bits = 3)]
+    channel: u8,
+}
+
+# #[cfg(all(feature = "alloc", feature = "bits"))]
+# fn main() {
+let data = vec![0b101_1_0_110];
+let (_, header) = Header::from_bytes((&data, 0)).unwrap();
+assert_eq!(header, Header {
+    version: 0b101,
+    secondary: Flag::On,
+    sync: Flag::Off,
+    channel: 0b110,
+});
+assert_eq!(header.to_bytes().unwrap(), data);
+# }
+#
+# #[cfg(not(all(feature = "alloc", feature = "bits")))]
+# fn main() {}
+```
+
+All four fields above are served by one read and one write instead of four of
+each, accepting and rejecting the same inputs as the individual reads. The one
+difference is on input too short for the whole run: the run reports
+`Incomplete` before any id is checked.
+
+A run is capped at the 64 bits one read returns. The macro cannot see a trait
+width when it groups fields, so a run holding a `bit_field` that turns out wider
+falls back to the individual reads and writes, chosen at compile time. So does
+a run of only whole bytes, such as an 8-bit enum among `u8` fields, which the
+individual reads serve faster.
 
 # magic
 

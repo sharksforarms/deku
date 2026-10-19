@@ -17,6 +17,8 @@ use crate::macros::{
 };
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id, from_token};
 
+#[cfg(feature = "bits")]
+use super::{BitRunField, batch_condition, bit_field_bound, is_bool, needs_fallback, sum_bits};
 use super::{gen_internal_field_ident, gen_type_from_ctx_id};
 
 pub(crate) fn emit_deku_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
@@ -356,9 +358,10 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
 
     // if no default match, return error
     if !has_default_match && default_reader.is_none() {
+        let no_variant = super::no_variant_error(&crate_, &ident_as_string);
         variant_matches.push(quote! {
             _ => {
-                return Err(::#crate_::deku_error!(::#crate_::DekuError::Parse, "Could not match enum variant", "ID {:?} not found on {}", __deku_variant_id, #ident_as_string));
+                return Err(#no_variant);
             }
         });
     }
@@ -560,7 +563,7 @@ fn emit_field_reads(
     while i < fields.len() {
         #[cfg(feature = "bits")]
         if let Some(run) = runs.get(&i) {
-            let (idents, read) = emit_bit_run_read(fields, i, run, ident);
+            let (idents, read) = emit_bit_run_read(input, fields, i, run, ident)?;
             for field_ident in idents {
                 field_idents.push(FieldIdent {
                     field_ident,
@@ -574,6 +577,8 @@ fn emit_field_reads(
         }
 
         let f = fields.fields[i];
+        #[cfg(feature = "bits")]
+        field_reads.push(bit_field_bound(f));
         let (field_ident, field_read) = emit_field_read(input, i, f, ident, use_id)?;
         use_id = false;
         field_idents.push(FieldIdent {
@@ -637,71 +642,115 @@ pub(crate) fn byte_array_len(input: &DekuData, f: &FieldData) -> Option<usize> {
 /// bit-cursor update per field with one of each per run.
 #[cfg(feature = "bits")]
 fn emit_bit_run_read(
+    input: &DekuData,
     fields: &Fields<&FieldData>,
     start: usize,
     run: &super::BitRun,
     ident: &TokenStream,
-) -> (Vec<TokenStream>, TokenStream) {
+) -> Result<(Vec<TokenStream>, TokenStream), syn::Error> {
     let crate_ = super::get_crate_name();
-    let total: usize = run.iter().map(|f| f.bits).sum();
+    let refs: Vec<&BitRunField> = run.iter().collect();
+    let total = sum_bits(&refs, &crate_);
     let run_ident = quote::format_ident!("__deku_bit_run_{}", start);
-    let ident = ident.to_string();
+    let ident_str = ident.to_string();
 
     let mut idents = Vec::with_capacity(run.len());
+    let mut internals = Vec::with_capacity(run.len());
     let mut extracts = TokenStream::new();
-    let mut consumed = 0usize;
+    // With a fallback, bind the fields after the `if const`.
+    let fallback = needs_fallback(run);
     for (offset, field) in run.iter().enumerate() {
         let f = fields.fields[start + offset];
         let field_ident = f.get_ident(start + offset, true);
         let internal = gen_internal_field_ident(&field_ident);
-        let shift = total - consumed - field.bits;
-        // A run is two or more fields in 64 bits, so none is 64 wide.
-        debug_assert!(field.bits < u64::BITS as usize);
-        let mask: u64 = (1u64 << field.bits) - 1;
-        let ty = &field.ty;
-        // `as` cannot produce a bool, so a bool field is compared rather than cast.
-        let extract = if super::is_bool(ty) {
-            if field.bits == 1 {
-                // One bit is 0 or 1: nothing to reject.
-                quote! { ((#run_ident >> #shift) & 1) != 0 }
-            } else {
-                // Wider bools reject anything but 0 and 1, as `impls::bool` does.
-                quote! {
-                    match (#run_ident >> #shift) & #mask {
-                        0 => false,
-                        1 => true,
-                        __deku_bool => return Err(::#crate_::deku_error!(
-                            ::#crate_::DekuError::Parse,
-                            "cannot parse bool value",
-                            "{}",
-                            __deku_bool as u8
-                        )),
+        // How many bits of the run sit below this field.
+        let shift = sum_bits(&refs[offset + 1..], &crate_);
+        let extract = match field {
+            BitRunField::Primitive { bits, ty, .. } => {
+                let mask = field.mask(&crate_);
+                // `as` cannot produce a bool, so a bool field is compared rather
+                // than cast.
+                if is_bool(ty) {
+                    if *bits == 1 {
+                        // One bit is 0 or 1: nothing to reject.
+                        quote! { ((#run_ident >> #shift) & 1) != 0 }
+                    } else {
+                        // Wider bools reject anything but 0 and 1, as `impls::bool` does.
+                        quote! {
+                            match (#run_ident >> #shift) & #mask {
+                                0 => false,
+                                1 => true,
+                                __deku_bool => return Err(::#crate_::deku_error!(
+                                    ::#crate_::DekuError::Parse,
+                                    "cannot parse bool value",
+                                    "{}",
+                                    __deku_bool as u8
+                                )),
+                            }
+                        }
                     }
+                } else {
+                    quote! { ((#run_ident >> #shift) & #mask) as #ty }
                 }
             }
-        } else {
-            quote! { ((#run_ident >> #shift) & #mask) as #ty }
+            // `from_bit_run` masks off the bits above its own, so the shift is
+            // all this side owes it.
+            BitRunField::BitField { ty } => quote! {
+                <#ty as ::#crate_::DekuBitField>::from_bit_run(#run_ident >> #shift)?
+            },
         };
         let trace_field_log = if cfg!(feature = "logging") {
             let field_ident_str = field_ident.to_string();
-            quote! { log::trace!("Reading: {}.{}", #ident, #field_ident_str); }
+            quote! { log::trace!("Reading: {}.{}", #ident_str, #field_ident_str); }
         } else {
             quote! {}
         };
         extracts.extend(quote! {
             #trace_field_log
             let #internal = #extract;
-            let #field_ident = &#internal;
         });
+        if !fallback {
+            extracts.extend(quote! { let #field_ident = &#internal; });
+        }
         idents.push(field_ident);
-        consumed += field.bits;
+        internals.push(internal);
     }
 
-    let read = quote! {
+    let batched = quote! {
         let #run_ident: u64 = __deku_reader.read_bits_uint_msb0(#total)?;
         #extracts
     };
-    (idents, read)
+
+    if !fallback {
+        return Ok((idents, batched));
+    }
+
+    // The field reads the run replaces, for when it turns out not to fit. Both
+    // arms are type-checked, so a field still needs everything its own read
+    // does, such as the context its type expects.
+    let mut fallback = TokenStream::new();
+    for offset in 0..run.len() {
+        let (_, read) = emit_field_read(
+            input,
+            start + offset,
+            fields.fields[start + offset],
+            ident,
+            false,
+        )?;
+        fallback.extend(read);
+    }
+    let batch = batch_condition(run, &crate_);
+    let read = quote! {
+        let (#(#internals,)*) = if const { #batch } {
+            #batched
+            (#(#internals,)*)
+        } else {
+            #fallback
+            (#(#internals,)*)
+        };
+        #(let #idents = &#internals;)*
+    };
+    Ok((idents, read))
 }
 
 fn emit_bit_byte_offsets(

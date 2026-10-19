@@ -4,6 +4,8 @@
 */
 pub use crate::error::DekuError;
 
+#[cfg(feature = "bits")]
+pub use crate::DekuBitField;
 pub use crate::error::NeedSize;
 pub use crate::{
     DekuContainerRead, DekuContainerWrite, DekuEnumExt, DekuRead, DekuReader, DekuSize, DekuUpdate,

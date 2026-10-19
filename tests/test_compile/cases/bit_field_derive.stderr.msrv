@@ -1,0 +1,29 @@
+error: DekuBitField: only enums are supported
+ --> tests/test_compile/cases/bit_field_derive.rs:4:8
+  |
+4 | struct NotAnEnum {
+  |        ^^^^^^^^^
+
+error: DekuBitField: every variant must be a unit variant, without `id_pat`, `reader`, `writer` or `default`
+  --> tests/test_compile/cases/bit_field_derive.rs:14:5
+   |
+14 |     Other,
+   |     ^^^^^
+
+error: DekuBitField: `id` 0b101 does not fit in 2 bits
+  --> tests/test_compile/cases/bit_field_derive.rs:22:17
+   |
+22 |     #[deku(id = 0b101)]
+   |                 ^^^^^
+
+error: DekuBitField: an id wider than 8 bits must be big-endian, or take its endian from context
+  --> tests/test_compile/cases/bit_field_derive.rs:28:6
+   |
+28 | enum LittleEndian {
+   |      ^^^^^^^^^^^^
+
+error: DekuBitField: `id_type` must be `u8`, `u16`, `u32` or `u64`
+  --> tests/test_compile/cases/bit_field_derive.rs:34:18
+   |
+34 | #[deku(id_type = "i8")]
+   |                  ^^^^

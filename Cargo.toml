@@ -44,7 +44,7 @@ rustc-hash = "=2.1.3"
 env_logger = "0.11.8"
 assert_hex = "0.4.1"
 log = { version = "0.4.28" }
-gungraun = "0.19.4"
+gungraun = "0.20.0"
 
 # gungraun (callgrind) needs debug symbols to resolve benchmark names.
 [profile.bench]

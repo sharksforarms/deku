@@ -81,11 +81,11 @@ mod tests {
 
     use super::*;
     #[cfg(feature = "bits")]
+    use crate::bitvec::{BitVec, Msb0, bits};
+    #[cfg(feature = "bits")]
     use crate::ctx::{BitSize, Endian};
     use crate::native_endian;
     use crate::reader::Reader;
-    #[cfg(feature = "bits")]
-    use bitvec::prelude::*;
 
     #[rstest(input, expected,
         case(
@@ -120,7 +120,7 @@ mod tests {
         bit_size: Option<usize>,
         limit: Limit<u16, Predicate>,
         expected: Arc<[u16]>,
-        expected_rest_bits: &bitvec::slice::BitSlice<u8, bitvec::prelude::Msb0>,
+        expected_rest_bits: BitVec<u8, Msb0>,
         expected_rest_bytes: &[u8],
         expected_write: Vec<u8>,
     ) {
@@ -135,7 +135,7 @@ mod tests {
         assert_eq!(expected, res_read);
         assert_eq!(
             reader.rest(),
-            expected_rest_bits.iter().by_vals().collect::<Vec<bool>>()
+            expected_rest_bits.iter().collect::<Vec<bool>>()
         );
         let mut buf = vec![];
         cursor.read_to_end(&mut buf).unwrap();

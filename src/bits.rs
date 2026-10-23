@@ -1010,6 +1010,58 @@ mod tests {
     }
 
     #[test]
+    fn bit_slice_searches_and_loads_match_packed_bits() {
+        let bytes = [0b0010_1000];
+        let bits = BitSlice::<u8, Msb0>::from_slice(&bytes).subslice(1, 6);
+
+        assert_eq!(bits.clone(), bits);
+        assert_eq!(bits.first_one(), Some(1));
+        assert_eq!(bits.first_zero(), Some(0));
+        assert_eq!(bits.last_one(), Some(3));
+        assert_eq!(bits.last_zero(), Some(4));
+        assert_eq!(bits.load::<u8>(), 0b01010);
+
+        let all_clear = BitSlice::<u8, Msb0>::from_slice(&[0]);
+        assert_eq!(all_clear.first_one(), None);
+        assert_eq!(all_clear.last_one(), None);
+
+        let all_set = BitSlice::<u8, Msb0>::from_slice(&[u8::MAX]);
+        assert_eq!(all_set.first_zero(), None);
+        assert_eq!(all_set.last_zero(), None);
+    }
+
+    #[test]
+    fn bit_iter_supports_mixed_front_and_back_iteration() {
+        let bytes = [0b1001_0000];
+        let bits = BitSlice::<u8, Msb0>::from_slice(&bytes).subslice(0, 4);
+        let mut iter = bits.iter().by_vals();
+
+        assert_eq!(iter.len(), 4);
+        assert_eq!(iter.next_back(), Some(true));
+        assert_eq!(iter.len(), 3);
+        assert_eq!(iter.next(), Some(true));
+        assert_eq!(iter.next_back(), Some(false));
+        assert_eq!(iter.next(), Some(false));
+        assert_eq!(iter.next_back(), None);
+        assert_eq!(iter.len(), 0);
+    }
+
+    #[test]
+    fn bit_chunks_size_hint_tracks_the_partial_final_chunk() {
+        let bytes = [0b1101_0110];
+        let mut chunks = BitSlice::<u8, Msb0>::from_slice(&bytes).chunks(3);
+
+        assert_eq!(chunks.size_hint(), (3, Some(3)));
+        assert_eq!(chunks.next().unwrap().load_be::<u8>(), 0b110);
+        assert_eq!(chunks.size_hint(), (2, Some(2)));
+        assert_eq!(chunks.next().unwrap().load_be::<u8>(), 0b101);
+        assert_eq!(chunks.size_hint(), (1, Some(1)));
+        assert_eq!(chunks.next().unwrap().load_be::<u8>(), 0b10);
+        assert_eq!(chunks.size_hint(), (0, Some(0)));
+        assert_eq!(chunks.next(), None);
+    }
+
+    #[test]
     fn slices_match_reference_for_all_offsets_and_lengths() {
         let expected = reference_bits();
         let bytes = pack_reference(&expected);
@@ -1034,6 +1086,7 @@ mod tests {
         let mut mutable = BitSliceMut::<u8, Msb0>::from_slice(&mut mutable_bytes);
         for (index, &bit) in expected.iter().enumerate() {
             mutable.set(index, bit);
+            assert_eq!(mutable.get(index), bit);
         }
         assert!(mutable.as_bitslice().iter().eq(expected));
         assert_eq!(mutable_bytes, bytes);
@@ -1095,6 +1148,50 @@ mod tests {
             assert!(decoded.iter().take(len).eq(bits.iter().copied()));
             assert!(decoded.iter().skip(len).all(|bit| !bit));
         }
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn bit_vector_accessors_and_repeat_preserve_partial_bytes() {
+        let empty = BitVec::<u8, Msb0>::default();
+        assert!(empty.is_empty());
+        assert_eq!(empty.len(), 0);
+        assert_eq!(alloc::format!("{empty:?}"), "BitVec { len: 0, bytes: [] }");
+
+        let bits = [true, false, true, false, true, false, true, false, true];
+        let vector = BitVec::<u8, Msb0>::from_bits(&bits);
+        assert!(!vector.is_empty());
+        assert_eq!(vector.len(), bits.len());
+        assert!(vector.get(0));
+        assert!(!vector.get(1));
+        assert!(vector.get(8));
+        assert!(vector.iter().eq(bits));
+        assert_eq!(vector.load_be::<u16>(), 341);
+        assert_eq!(vector.load_le::<u16>(), 426);
+        assert_eq!(vector.load::<u16>(), 341);
+        assert_eq!(
+            alloc::format!("{vector:?}"),
+            "BitVec { len: 9, bytes: [170, 128] }"
+        );
+        assert_eq!(
+            alloc::format!("{:?}", vector.as_bitslice()),
+            "BitSlice { len: 9 }"
+        );
+        assert_eq!(vector.into_vec(), alloc::vec![0xaa, 0x80]);
+
+        let all_set = BitVec::<u8, Msb0>::repeat(true, 9);
+        assert_eq!(
+            all_set.iter().collect::<alloc::vec::Vec<_>>(),
+            alloc::vec![true; 9]
+        );
+        assert_eq!(all_set.into_vec(), alloc::vec![0xff, 0x80]);
+
+        let all_clear = BitVec::<u8, Msb0>::repeat(false, 9);
+        assert_eq!(
+            all_clear.iter().collect::<alloc::vec::Vec<_>>(),
+            alloc::vec![false; 9]
+        );
+        assert_eq!(all_clear.into_vec(), alloc::vec![0, 0]);
     }
 
     #[test]

@@ -1466,6 +1466,20 @@ mod tests {
 
     #[cfg(all(feature = "alloc", feature = "bits"))]
     #[test]
+    fn test_lsb0_direct_read_carries_across_multiple_bytes() {
+        let mut reader = Reader::new(Cursor::new([0x12, 0x34, 0x56]));
+
+        let bits = reader.read_bits(20, Order::Lsb0).unwrap().unwrap();
+        assert_eq!(bits.into_vec(), vec![0x63, 0x41, 0x20]);
+        assert_eq!(reader.bits_read, 20);
+
+        let leftover = reader.read_bits(4, Order::Lsb0).unwrap().unwrap();
+        assert_eq!(leftover.into_vec(), vec![0x50]);
+        assert_eq!(reader.bits_read, 24);
+    }
+
+    #[cfg(all(feature = "alloc", feature = "bits"))]
+    #[test]
     // Issue #678
     fn test_regression_stream_position() {
         use alloc::vec;

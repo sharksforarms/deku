@@ -68,6 +68,12 @@ fn write_low_bits<W: Write + Seek>(
     Ok(())
 }
 
+#[cfg(feature = "bits")]
+#[inline]
+fn is_zero_width_zero_value(input: &[u8], bit_size: usize) -> bool {
+    bit_size == 0 && input.iter().all(|byte| *byte == 0)
+}
+
 // specialize u8 for ByteSize
 #[cfg(feature = "bits")]
 impl DekuRead<(Endian, ByteSize)> for u8 {
@@ -123,6 +129,10 @@ impl DekuWriter<(Endian, BitSize, Order)> for u8 {
     ) -> Result<(), DekuError> {
         let bit_size: usize = size.0;
         const MAX_TYPE_BITS: usize = BitSize::of::<u8>().0;
+
+        if bit_size == 0 && *self == 0 {
+            return Ok(());
+        }
 
         // Fast path, ahead of the bit-slice view: for a `u8` the checks below are
         // "does it fit" and "are there bits above `bit_size`", both of which are
@@ -818,6 +828,10 @@ macro_rules! ImplDekuWrite {
                         write_low_bits(writer, &input_bits, bit_size, order)?;
                     }
                     (Endian::Big, Order::Lsb0) => {
+                        if is_zero_width_zero_value(&input, bit_size) {
+                            return Ok(());
+                        }
+
                         const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
                         if let Some(first) = input_bits.first_one() {
                             let max = MAX_TYPE_BITS - bit_size;
@@ -842,6 +856,10 @@ macro_rules! ImplDekuWrite {
                         }
                     }
                     (Endian::Big, Order::Msb0) => {
+                        if is_zero_width_zero_value(&input, bit_size) {
+                            return Ok(());
+                        }
+
                         const MAX_TYPE_BITS: usize = BitSize::of::<$typ>().0;
 
                         // Fast path, ahead of the bit-slice scan. Significant-bit
@@ -982,6 +1000,10 @@ macro_rules! ImplDekuWriteDetails {
                     ));
                 }
 
+                if endian == Endian::Big && is_zero_width_zero_value(&input, bit_size) {
+                    return Ok(());
+                }
+
                 if matches!(endian, Endian::Little) {
                     // Check if this is a value that will fit inside the required bits, if
                     // not, throw an error
@@ -1053,6 +1075,10 @@ macro_rules! ImplDekuWriteDetails {
                         bit_size,
                         input_bits.len()
                     ));
+                }
+
+                if endian == Endian::Big && is_zero_width_zero_value(&input, bit_size) {
+                    return Ok(());
                 }
 
                 if matches!(endian, Endian::Little) {
@@ -1755,6 +1781,124 @@ mod tests {
         let decoded =
             i16::from_reader_with_ctx(&mut reader, (Endian::Big, BitSize(5), Order::Msb0)).unwrap();
         assert_eq!(decoded, -11);
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_zero_sized_u8_write_is_empty() {
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        0_u8.to_writer(&mut writer, (Endian::Big, BitSize(0)))
+            .unwrap();
+        writer.finalize().unwrap();
+
+        assert_eq!(writer.bits_written, 0);
+        assert!(writer.leftover.0.is_empty());
+        assert!(writer.inner.into_inner().is_empty());
+
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        let result = 1_u8.to_writer(&mut writer, (Endian::Big, BitSize(0)));
+        assert!(matches!(result, Err(DekuError::InvalidParam(_))));
+
+        let prefix_byte = [0x80];
+        let prefix = crate::bitvec::BitSlice::<u8, crate::bitvec::Msb0>::from_slice(&prefix_byte)
+            .subslice(0, 1);
+        let mut with_zero_width_field = Writer::new(Cursor::new(vec![]));
+        with_zero_width_field
+            .write_bits_order(&prefix, Order::Lsb0)
+            .unwrap();
+        0_u8.to_writer(
+            &mut with_zero_width_field,
+            (Endian::Big, BitSize(0), Order::Msb0),
+        )
+        .unwrap();
+        assert_eq!(with_zero_width_field.leftover.1, Order::Lsb0);
+        with_zero_width_field.finalize().unwrap();
+
+        let mut without_zero_width_field = Writer::new(Cursor::new(vec![]));
+        without_zero_width_field
+            .write_bits_order(&prefix, Order::Lsb0)
+            .unwrap();
+        without_zero_width_field.finalize().unwrap();
+        assert_eq!(
+            with_zero_width_field.inner.into_inner(),
+            without_zero_width_field.inner.into_inner()
+        );
+    }
+
+    fn assert_zero_width_write_preserves_lsb0_prefix(
+        write_zero: impl Fn(&mut Writer<Cursor<Vec<u8>>>) -> Result<(), DekuError>,
+    ) {
+        let mut empty = Writer::new(Cursor::new(vec![]));
+        write_zero(&mut empty).unwrap();
+        assert_eq!(empty.bits_written, 0);
+        assert!(empty.leftover.0.is_empty());
+        empty.finalize().unwrap();
+        assert!(empty.inner.into_inner().is_empty());
+
+        let prefix_bytes = [0x80];
+        let prefix = crate::bitvec::BitSlice::<u8, crate::bitvec::Msb0>::from_slice(&prefix_bytes)
+            .subslice(0, 1);
+        let mut actual = Writer::new(Cursor::new(vec![]));
+        actual.write_bits_order(&prefix, Order::Lsb0).unwrap();
+        write_zero(&mut actual).unwrap();
+        assert_eq!(actual.bits_written, 0);
+        assert_eq!(actual.leftover.0.len(), 1);
+        assert_eq!(actual.leftover.0.as_bitslice().iter().next(), Some(true));
+        assert_eq!(actual.leftover.1, Order::Lsb0);
+        actual.finalize().unwrap();
+
+        let mut expected = Writer::new(Cursor::new(vec![]));
+        expected.write_bits_order(&prefix, Order::Lsb0).unwrap();
+        expected.finalize().unwrap();
+        assert_eq!(actual.inner.into_inner(), expected.inner.into_inner());
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_zero_width_ordered_primitive_writes_are_empty() {
+        assert_zero_width_write_preserves_lsb0_prefix(|writer| {
+            0_u16.to_writer(writer, (Endian::Big, BitSize(0), Order::Msb0))
+        });
+        assert_zero_width_write_preserves_lsb0_prefix(|writer| {
+            0_u64.to_writer(writer, (Endian::Big, BitSize(0), Order::Msb0))
+        });
+        assert_zero_width_write_preserves_lsb0_prefix(|writer| {
+            0_u128.to_writer(writer, (Endian::Big, BitSize(0), Order::Msb0))
+        });
+        assert_zero_width_write_preserves_lsb0_prefix(|writer| {
+            0_i16.to_writer(writer, (Endian::Big, BitSize(0), Order::Msb0))
+        });
+        assert_zero_width_write_preserves_lsb0_prefix(|writer| {
+            0.0_f32.to_writer(writer, (Endian::Big, BitSize(0), Order::Msb0))
+        });
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_zero_width_unordered_primitive_writes_are_empty() {
+        assert_zero_width_write_preserves_lsb0_prefix(|writer| {
+            0_u16.to_writer(writer, (Endian::Big, BitSize(0)))
+        });
+        assert_zero_width_write_preserves_lsb0_prefix(|writer| {
+            0_i16.to_writer(writer, (Endian::Big, BitSize(0)))
+        });
+        assert_zero_width_write_preserves_lsb0_prefix(|writer| {
+            0.0_f32.to_writer(writer, (Endian::Big, BitSize(0)))
+        });
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_zero_width_little_endian_writes_are_empty() {
+        assert_zero_width_write_preserves_lsb0_prefix(|writer| {
+            0_u16.to_writer(writer, (Endian::Little, BitSize(0), Order::Msb0))
+        });
+        assert_zero_width_write_preserves_lsb0_prefix(|writer| {
+            0_u16.to_writer(writer, (Endian::Little, BitSize(0), Order::Lsb0))
+        });
+        assert_zero_width_write_preserves_lsb0_prefix(|writer| {
+            0_i16.to_writer(writer, (Endian::Little, BitSize(0)))
+        });
     }
 
     #[cfg(feature = "bits")]

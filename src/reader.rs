@@ -57,6 +57,8 @@ impl<R: Read + Seek> Seek for Reader<R> {
             self.inner.seek(pos)
         } else {
             let read_ahead = match self.leftover {
+                #[cfg(feature = "bits")]
+                Some(Leftover::Bits(ref b)) if !b.is_empty() => 1,
                 Some(Leftover::Byte(_)) => 1,
                 _ => 0,
             };
@@ -79,21 +81,13 @@ impl<R: Read + Seek> Seek for Reader<R> {
             }
             #[cfg(feature = "bits")]
             if let Some(Leftover::Bits(bits)) = &mut self.leftover {
-                if new_pos > 0 {
-                    let len_leftover = bits.len();
-                    let mut read_byte = [0u8; 1];
-                    self.inner.seek(SeekFrom::Current(-1))?;
-                    // This will implicitly move the Cursor forward one byte again. So, same as before.
-                    self.inner.read_exact(&mut read_byte)?;
+                let len_leftover = bits.len();
+                let mut read_byte = [0u8; 1];
+                // This will implicitly move the Cursor forward one byte again. So, same as before.
+                self.inner.read_exact(&mut read_byte)?;
 
-                    *bits = (&read_byte.view_bits()[8 - len_leftover..]).into();
-                    // bits_read was updated to align with the current Cursor position, but the len_leftover
-                    // bits before haven't actually been read yet.
-                    self.bits_read -= len_leftover;
-                } else {
-                    // This can happen if we land at the beginning of the Cursor. So, there can't be a leftover.
-                    self.leftover = None;
-                }
+                *bits = (&read_byte.view_bits()[8 - len_leftover..]).into();
+                self.bits_read += 8 - len_leftover;
             };
 
             Ok(new_pos)
@@ -1033,7 +1027,7 @@ mod tests {
         );
     }
 
-    #[cfg(all(feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     fn __helper_read_bytes_and_assert(
         reader: &mut Reader<Cursor<&[u8]>>,
         expected_slice: &[u8],
@@ -1067,7 +1061,7 @@ mod tests {
         );
     }
 
-    #[cfg(all(feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     #[test]
     fn test_seek_simple_cases() {
         let input = (0..42).collect::<Vec<u8>>();
@@ -1094,7 +1088,7 @@ mod tests {
         __helper_read_bytes_and_assert(&mut reader, &input[25..35], 35, 0);
     }
 
-    #[cfg(all(feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     #[test]
     fn test_seek_byte_leftover() {
         let input = (0..42).collect::<Vec<u8>>();

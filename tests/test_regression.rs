@@ -478,32 +478,89 @@ fn pr_664_runtime_zero_bytes() {
     assert_eq!(Dynamic { n: 1, a: -100 }, val);
 }
 
-// Problem where a Vec with `read_all` would break the `pad_` padding of the inner type.
+// Problem where a Vec with `read_all` would break the `pad_before` padding of the inner type or a `seek_from_current`.
 #[cfg(feature = "bits")]
 #[test]
 fn issue_656() {
+    // Regression for `pad_bytes_before`.
     #[derive(Debug, PartialEq, Eq, DekuWrite, DekuRead)]
-    struct Outer {
+    struct OuterPadByte {
         #[deku(read_all)]
-        values: Vec<Inner>,
+        values: Vec<InnerPadByte>,
     }
 
     #[derive(Debug, PartialEq, Eq, DekuWrite, DekuRead)]
-    struct Inner {
+    struct InnerPadByte {
         #[deku(pad_bytes_before = "1")]
         value: u8,
     }
 
     let data: &[u8] = &[0x00, 0x01, 0x02, 0x03, 0x04, 0x05];
     let mut reader = Reader::new(Cursor::new(data));
-    let result = Outer::from_reader_with_ctx(&mut reader, ()).unwrap();
+    let result = OuterPadByte::from_reader_with_ctx(&mut reader, ()).unwrap();
 
-    let expected = Outer {
-        values: vec![Inner { value: 1 }, Inner { value: 3 }, Inner { value: 5 }],
+    let expected = OuterPadByte {
+        values: vec![
+            InnerPadByte { value: 1 },
+            InnerPadByte { value: 3 },
+            InnerPadByte { value: 5 },
+        ],
     };
 
     assert_eq!(result, expected);
 
-    let serialized = <Outer as DekuContainerWrite>::to_bytes(&expected).unwrap();
+    let serialized = <OuterPadByte as DekuContainerWrite>::to_bytes(&expected).unwrap();
     assert_eq!(&serialized, &[0x00, 0x01, 0x00, 0x03, 0x00, 0x05]);
+
+    // Regression for `pad_bits_before`
+    #[derive(Debug, PartialEq, Eq, DekuWrite, DekuRead)]
+    struct OuterPadBits {
+        #[deku(read_all)]
+        values: Vec<InnerPadBits>,
+    }
+
+    #[derive(Debug, PartialEq, Eq, DekuWrite, DekuRead)]
+    struct InnerPadBits {
+        #[deku(pad_bits_before = "4")]
+        value: u8,
+    }
+
+    let data: &[u8] = &[0x0F, 0xF0, 0xFF];
+    let mut reader = Reader::new(Cursor::new(data));
+    let result = OuterPadBits::from_reader_with_ctx(&mut reader, ()).unwrap();
+
+    let expected = OuterPadBits {
+        values: vec![InnerPadBits { value: 0xFF }, InnerPadBits { value: 0xFF }],
+    };
+
+    assert_eq!(result, expected);
+
+    let serialized = <OuterPadBits as DekuContainerWrite>::to_bytes(&expected).unwrap();
+    assert_eq!(&serialized, &[0x0F, 0xF0, 0xFF]);
+
+    // Regression for `seek_from_current`.
+    #[derive(Debug, PartialEq, Eq, DekuWrite, DekuRead)]
+    struct OuterSeek {
+        #[deku(read_all)]
+        value: Vec<InnerSeek>,
+    }
+
+    #[derive(Debug, PartialEq, Eq, DekuWrite, DekuRead)]
+    struct InnerSeek {
+        #[deku(seek_from_current = "2")]
+        value: u8,
+    }
+
+    let data: &[u8] = &[0x00, 0x01, 0x02, 0x03, 0x04, 0x05];
+    let mut reader = Reader::new(Cursor::new(data));
+    let result = OuterSeek::from_reader_with_ctx(&mut reader, ()).unwrap();
+
+    let expected = OuterSeek {
+        value: vec![InnerSeek { value: 2 }, InnerSeek { value: 5 }],
+    };
+
+    assert_eq!(result, expected);
+
+    let serialized = <OuterSeek as DekuContainerWrite>::to_bytes(&expected).unwrap();
+    assert_eq!(&serialized, &[0x00, 0x00, 0x02, 0x00, 0x00, 0x05]);
 }

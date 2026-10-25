@@ -48,16 +48,48 @@ impl<R: Read + Seek> Seek for Reader<R> {
         #[cfg(feature = "logging")]
         log::trace!("seek: {pos:?}");
 
+        // In general, we want the following behavior for seek:
+        // - FromStart and FromEnd should discard any leftover
+        // - FromCurrent should seek to a byte boundary and then update the leftover to be bits from before the new position (if applicable)
+        // - They all should keep bits_read up to date correctly
+
         if pos == SeekFrom::Current(0) {
             self.inner.seek(pos)
         } else {
-            // clear leftover
-            self.leftover = None;
-
+            let read_ahead = match self.leftover {
+                #[cfg(feature = "bits")]
+                Some(Leftover::Bits(ref b)) if !b.is_empty() => 1,
+                Some(Leftover::Byte(_)) => 1,
+                _ => 0,
+            };
+            let pos = match pos {
+                SeekFrom::Current(x) => SeekFrom::Current(x - read_ahead),
+                absolute => {
+                    self.leftover = None;
+                    absolute
+                }
+            };
             let new_pos = self.inner.seek(pos)?;
+            // This will update to be on the current byte boundary. Note that this may need to be adjusted in case of leftover bits.
             self.bits_read = usize::try_from(new_pos)
                 .unwrap_or(usize::MAX)
                 .saturating_mul(8);
+
+            // We implicitly consumed that byte already by using the read_ahead during seek.
+            if let Some(Leftover::Byte(_)) = &mut self.leftover {
+                self.leftover = None;
+            }
+            #[cfg(feature = "bits")]
+            if let Some(Leftover::Bits(bits)) = &mut self.leftover {
+                let len_leftover = bits.len();
+                let mut read_byte = [0u8; 1];
+                // This will implicitly move the Cursor forward one byte again. So, same as before.
+                self.inner.read_exact(&mut read_byte)?;
+
+                *bits = (&read_byte.view_bits()[8 - len_leftover..]).into();
+                self.bits_read += 8 - len_leftover;
+            };
+
             Ok(new_pos)
         }
     }
@@ -187,6 +219,10 @@ impl<R: Read + Seek> Reader<R> {
         {
             #[cfg(feature = "logging")]
             log::trace!("skip_bits: {amt}");
+
+            if let Some(Leftover::Byte(byte)) = self.leftover {
+                self.leftover = Some(Leftover::Bits(BitArray::from([byte]).into()));
+            }
 
             if let Some(Leftover::Bits(bits)) = &self.leftover {
                 let mut buf = bitarr!(u8, Msb0; 0; 8);
@@ -989,5 +1025,163 @@ mod tests {
             second_bits,
             Some(bitvec![u8, Msb0; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
         );
+    }
+
+    #[cfg(feature = "alloc")]
+    fn __helper_read_bytes_and_assert(
+        reader: &mut Reader<Cursor<&[u8]>>,
+        expected_slice: &[u8],
+        expected_bytes_read: u64,
+        expected_bits_read: u64,
+    ) {
+        let mut target_buffer = [0u8; 10];
+        reader
+            .read_bytes(10, &mut target_buffer, Order::Msb0)
+            .unwrap();
+        let mut expected_position = expected_bytes_read;
+        if expected_bits_read != 0 {
+            expected_position += 1;
+        }
+
+        assert_eq!(&target_buffer[0..10], expected_slice, "Data mismatch.");
+        assert_eq!(
+            reader.bits_read,
+            (8 * expected_bytes_read + expected_bits_read) as usize,
+            "bits_read mismatch."
+        );
+        assert_eq!(
+            reader.inner.stream_position().unwrap(),
+            expected_position,
+            "Inner position mismatch."
+        );
+        assert_eq!(
+            reader.stream_position().unwrap(),
+            expected_position,
+            "Outer position mismatch."
+        );
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn test_seek_simple_cases() {
+        let input = (0..42).collect::<Vec<u8>>();
+        let mut reader = Reader::new(Cursor::new(&input[..]));
+
+        __helper_read_bytes_and_assert(&mut reader, &input[0..10], 10, 0);
+
+        // This is to check that the internal call to seek from calling stream_position did not screw things up.
+        __helper_read_bytes_and_assert(&mut reader, &input[10..20], 20, 0);
+
+        reader.seek(SeekFrom::Start(0)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[0..10], 10, 0);
+
+        reader.seek(SeekFrom::End(-12)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[30..40], 40, 0);
+
+        reader.seek(SeekFrom::Start(5)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[5..15], 15, 0);
+
+        reader.seek(SeekFrom::Current(10)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[25..35], 35, 0);
+
+        reader.seek(SeekFrom::Current(-10)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[25..35], 35, 0);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn test_seek_byte_leftover() {
+        let input = (0..42).collect::<Vec<u8>>();
+        let mut reader = Reader::new(Cursor::new(&input[..]));
+
+        fn __helper_make_leftover_byte(reader: &mut Reader<Cursor<&[u8]>>) {
+            let mut by = [0; 1];
+            reader.read_bytes(1, &mut by, Order::Msb0).unwrap();
+            reader.leftover = Some(Leftover::Byte(by[0]));
+            reader.bits_read -= 8;
+        }
+
+        __helper_make_leftover_byte(&mut reader);
+        __helper_read_bytes_and_assert(&mut reader, &input[0..10], 10, 0);
+
+        __helper_make_leftover_byte(&mut reader);
+        __helper_read_bytes_and_assert(&mut reader, &input[10..20], 20, 0);
+
+        __helper_make_leftover_byte(&mut reader);
+        reader.seek(SeekFrom::Start(0)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[0..10], 10, 0);
+
+        __helper_make_leftover_byte(&mut reader);
+        reader.seek(SeekFrom::End(-12)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[30..40], 40, 0);
+
+        __helper_make_leftover_byte(&mut reader);
+        reader.seek(SeekFrom::Start(5)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[5..15], 15, 0);
+
+        __helper_make_leftover_byte(&mut reader);
+        reader.seek(SeekFrom::Current(10)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[25..35], 35, 0);
+
+        __helper_make_leftover_byte(&mut reader);
+        reader.seek(SeekFrom::Current(-10)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[25..35], 35, 0);
+    }
+
+    #[cfg(all(feature = "alloc", feature = "bits"))]
+    #[test]
+    fn test_seek_bit_leftover() {
+        let input = (0..42).collect::<Vec<u8>>();
+        let mut reader = Reader::new(Cursor::new(&input[..]));
+
+        fn __helper_assert_leftover(reader: &Reader<Cursor<&[u8]>>, expected: Option<usize>) {
+            match &reader.leftover {
+                Some(Leftover::Byte(_)) => panic!("Unexpected leftover byte."),
+                Some(Leftover::Bits(x)) => assert_eq!(
+                    Some(x.len()),
+                    expected,
+                    "Unexpected number of leftover bits."
+                ),
+                None => assert_eq!(
+                    None, expected,
+                    "No leftover even though there should be one."
+                ),
+            }
+        }
+
+        // We read 2 bits in the beginning. This effectively means all other bytes will be "shifted"
+        // by 2 bits (at least as long as they're < 64, which the test input is).
+        // We then assert that there is still 6 leftover bits after every applicable read.
+        let input_x4 = input.iter().map(|x| x * 4).collect::<Vec<u8>>();
+
+        reader.read_bits(2, Order::Msb0).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input_x4[0..10], 10, 2);
+        __helper_assert_leftover(&reader, Some(6));
+
+        __helper_read_bytes_and_assert(&mut reader, &input_x4[10..20], 20, 2);
+        __helper_assert_leftover(&reader, Some(6));
+
+        reader.seek(SeekFrom::Start(0)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[0..10], 10, 0);
+        __helper_assert_leftover(&reader, None);
+
+        reader.read_bits(2, Order::Msb0).unwrap();
+        reader.seek(SeekFrom::End(-12)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[30..40], 40, 0);
+        __helper_assert_leftover(&reader, None);
+
+        reader.read_bits(2, Order::Msb0).unwrap();
+        reader.seek(SeekFrom::Start(5)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input[5..15], 15, 0);
+        __helper_assert_leftover(&reader, None);
+
+        reader.read_bits(2, Order::Msb0).unwrap();
+        reader.seek(SeekFrom::Current(10)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input_x4[25..35], 35, 2);
+        __helper_assert_leftover(&reader, Some(6));
+
+        reader.seek(SeekFrom::Current(-10)).unwrap();
+        __helper_read_bytes_and_assert(&mut reader, &input_x4[25..35], 35, 2);
+        __helper_assert_leftover(&reader, Some(6));
     }
 }

@@ -564,3 +564,36 @@ fn issue_656() {
     let serialized = <OuterSeek as DekuContainerWrite>::to_bytes(&expected).unwrap();
     assert_eq!(&serialized, &[0x00, 0x00, 0x02, 0x00, 0x00, 0x05]);
 }
+
+// https://github.com/sharksforarms/deku/issues/655
+#[test]
+fn issue_655() {
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(ctx = "_ctx: u8")]
+    struct Inner(u8);
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    #[deku(ctx = "id: u8", id = "id")]
+    enum Outer {
+        #[deku(id_pat = "_")]
+        A(#[deku(ctx = "id")] Inner),
+    }
+
+    #[derive(PartialEq, Debug, DekuRead, DekuWrite)]
+    struct Packet {
+        id: u8,
+        #[deku(ctx = "*id")]
+        outer: Outer,
+    }
+
+    let data = [0x01_u8, 0x02];
+    let packet = Packet::try_from(data.as_slice()).unwrap();
+    assert_eq!(
+        Packet {
+            id: 0x01,
+            outer: Outer::A(Inner(0x02)),
+        },
+        packet
+    );
+    assert_eq!(data.to_vec(), packet.to_bytes().unwrap());
+}

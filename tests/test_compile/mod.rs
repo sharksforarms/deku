@@ -1,4 +1,4 @@
-#[cfg(feature = "bits")]
+#[cfg(any(feature = "bits", feature = "std"))]
 use std::{env, fs, path::PathBuf};
 
 #[test]
@@ -13,12 +13,23 @@ fn test_compile() {
     t.compile_fail("tests/test_compile/cases/*.rs");
 }
 
-#[cfg(feature = "bits")]
+#[test]
+#[cfg(all(feature = "std", not(feature = "bits")))]
+#[cfg_attr(miri, ignore)]
+fn test_read_all_conflict_without_bits() {
+    let profile = env::var("DEKU_TRYBUILD_PROFILE").unwrap_or_else(|_| "stable".to_owned());
+    let _snapshots = install_snapshots(&profile);
+
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/test_compile/cases/read_all_count_conflict_no_bits.rs");
+}
+
+#[cfg(any(feature = "bits", feature = "std"))]
 struct SnapshotGuard {
     originals: Vec<(PathBuf, Vec<u8>)>,
 }
 
-#[cfg(feature = "bits")]
+#[cfg(any(feature = "bits", feature = "std"))]
 impl Drop for SnapshotGuard {
     fn drop(&mut self) {
         for (path, contents) in &self.originals {
@@ -27,7 +38,7 @@ impl Drop for SnapshotGuard {
     }
 }
 
-#[cfg(feature = "bits")]
+#[cfg(any(feature = "bits", feature = "std"))]
 fn install_snapshots(profile: &str) -> SnapshotGuard {
     let source_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/test_compile/cases");
     let mut originals = Vec::new();

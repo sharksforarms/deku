@@ -57,7 +57,6 @@ enum Id {
     Int(syn::LitInt),
     Bool(syn::LitBool),
 }
-
 impl Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.to_token_stream().to_string())
@@ -715,7 +714,7 @@ struct FieldData {
     /// a predicate to decide when to stop reading elements into the container
     until: Option<TokenStream>,
 
-    /// read until `reader.end()`
+    /// read until `reader.try_end()` returns `Ok(true)`
     read_all: bool,
 
     /// apply a function to the field after it's read
@@ -1006,11 +1005,21 @@ impl FieldData {
         }
 
         // Validate usage of read_all
-        #[cfg(feature = "bits")]
+        let bits_read_set = {
+            #[cfg(feature = "bits")]
+            {
+                data.bits_read.is_some()
+            }
+            #[cfg(not(feature = "bits"))]
+            {
+                false
+            }
+        };
         if data.read_all
             && (data.until.is_some()
                 || data.count.is_some()
-                || (data.bits_read.is_some() || data.bytes_read.is_some()))
+                || bits_read_set
+                || data.bytes_read.is_some())
         {
             return Err(cerror(
                 data.read_all.span(),
@@ -1306,7 +1315,7 @@ struct DekuFieldReceiver {
     #[darling(default = "default_res_opt", map = "map_litstr_as_tokenstream")]
     until: Result<Option<TokenStream>, ReplacementError>,
 
-    /// read until `reader.end()`
+    /// read until `reader.try_end()` returns `Ok(true)`
     #[darling(default)]
     read_all: bool,
 
@@ -1595,11 +1604,15 @@ pub fn deku_derive(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "bits")]
     use rstest::rstest;
+    #[cfg(feature = "bits")]
     use syn::parse_str;
 
+    #[cfg(feature = "bits")]
     use super::*;
 
+    #[cfg(feature = "bits")]
     #[rstest(input,
         // Valid struct
         case::struct_empty(r#"struct Test {}"#),

@@ -54,7 +54,7 @@ where
     let mut res = HashSet::with_capacity_and_hasher(capacity.unwrap_or(0), S::default());
 
     loop {
-        if reader.end() {
+        if reader.try_end()? {
             break;
         }
         let val = <T>::from_reader_with_ctx(reader, ctx)?;
@@ -155,7 +155,7 @@ where
                 )
             }
 
-            // Read until `reader.end()` is true
+            // Read until `reader.try_end()` returns `Ok(true)`
             Limit::End => from_reader_with_ctx_hashset_to_end(reader, None, inner_ctx),
         }
     }

@@ -106,7 +106,8 @@ pub enum Limit<T, Predicate: FnMut(&T) -> bool> {
     /// Read until a given quantity of bits have been read
     BitSize(BitSize),
 
-    /// Read until `reader.end()` is true. Used for `read_all` attribute.
+    /// Read until [`crate::reader::Reader::try_end`] returns `Ok(true)`. Errors from the end probe
+    /// propagate. Used for the `read_all` attribute.
     End,
 }
 
@@ -149,7 +150,8 @@ impl<T, Predicate: for<'a> FnMut(&'a T) -> bool> Limit<T, Predicate> {
 }
 
 impl<T> Limit<T, fn(&T) -> bool> {
-    /// Read until `reader.end()` is true
+    /// Construct a limit that reads until [`crate::reader::Reader::try_end`] returns `Ok(true)`.
+    /// Errors from the end probe propagate.
     #[inline]
     pub fn end() -> Self {
         Self::End

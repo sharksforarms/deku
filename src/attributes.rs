@@ -51,7 +51,7 @@ enum DekuEnum {
 | [bits_read](#bits_read) | field | Set the field representing the number of bits to read into a container
 | [bytes_read](#bytes_read) | field | Set the field representing the number of bytes to read into a container
 | [until](#until) | field | Set a predicate returning when to stop reading elements into a container
-| [read_all](#read_all) | field | Read until [reader.end()] returns `true`
+| [read_all](#read_all) | field | Read until [reader.try_end()] returns `Ok(true)`
 | [update](#update) | field | Apply code over the field when `.update()` is called
 | [temp](#temp) | field | Read the field but exclude it from the struct/enum
 | [temp_value](#temp_value) | field | Write the field but exclude it from the struct/enum
@@ -1149,7 +1149,9 @@ assert_eq!(
 ```
 # read_all
 
-Read values into the container until [reader.end()] returns `true`.
+Read values into the container until [reader.try_end()] returns `Ok(true)`. I/O errors from the
+end probe propagate. EOF before the next element ends the collection successfully. Errors while
+decoding an element, including EOF after only part of an element, propagate.
 
 Example:
 ```rust
@@ -2289,5 +2291,5 @@ assert_eq!(data, value);
 # fn main() {}
 ```
 
-[reader.end()]: crate::reader::Reader::end()
+[reader.try_end()]: crate::reader::Reader::try_end()
 */

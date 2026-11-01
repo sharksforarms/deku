@@ -2,7 +2,6 @@
 
 use core::convert::TryFrom;
 
-use deku::bitvec::Lsb0;
 use deku::prelude::*;
 
 #[derive(PartialEq, Debug, DekuRead, DekuWrite)]

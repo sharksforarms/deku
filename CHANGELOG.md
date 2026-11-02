@@ -6,6 +6,11 @@
 
 - Remove `Reader::end()` in favor of `Reader::try_end()`, which propagates I/O errors
 
+### Added
+
+- `bit_field` and `DekuBitField`: a flag enum can join the single read and write
+  of a run of adjacent bit fields
+
 ### Fixed
 
 - `Writer`: an `Lsb0` write that ends on a byte boundary no longer reorders the

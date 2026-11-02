@@ -81,6 +81,92 @@ pub struct Addresses {
     pub destination: [u8; 4],
 }
 
+/// A 1-bit flag typed as an enum, which is how a protocol crate models one.
+/// Every id is assigned so no input can fail.
+#[derive(Copy, Clone, Debug, PartialEq, DekuRead, DekuWrite, DekuBitField)]
+#[deku(
+    id_type = "u8",
+    bits = 1,
+    endian = "endian",
+    ctx = "endian: deku::ctx::Endian"
+)]
+pub enum Flag {
+    #[deku(id = 0b0)]
+    Off,
+    #[deku(id = 0b1)]
+    On,
+}
+
+/// A 2-bit field typed as an enum, again total over its id space.
+#[derive(Copy, Clone, Debug, PartialEq, DekuRead, DekuWrite, DekuBitField)]
+#[deku(
+    id_type = "u8",
+    bits = 2,
+    endian = "endian",
+    ctx = "endian: deku::ctx::Endian"
+)]
+pub enum SegmentLength {
+    #[deku(id = 0b00)]
+    Continuing,
+    #[deku(id = 0b01)]
+    First,
+    #[deku(id = 0b10)]
+    Last,
+    #[deku(id = 0b11)]
+    None,
+}
+
+/// The same 11 fields as [`TmPrimaryHeader`], with the five flags typed as
+/// enums. Declared twice from one macro so the batched and unbatched versions
+/// are provably the same struct, and only the `bit_field` attributes differ.
+macro_rules! tm_enum_header {
+    ($name:ident $(, $bf:ident)?) => {
+        #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+        #[deku(endian = "big")]
+        pub struct $name {
+            #[deku(bits = 2)]
+            pub tfvn: u8,
+            #[deku(bits = 10)]
+            pub scid: u16,
+            #[deku(bits = 3)]
+            pub vcid: u8,
+            $(#[deku($bf)])?
+            pub ocf: Flag,
+            pub mcfc: u8,
+            pub vcfc: u8,
+            $(#[deku($bf)])?
+            pub tfs: Flag,
+            $(#[deku($bf)])?
+            pub syn: Flag,
+            $(#[deku($bf)])?
+            pub po: Flag,
+            $(#[deku($bf)])?
+            pub sli: SegmentLength,
+            #[deku(bits = 11)]
+            pub fhp: u16,
+        }
+
+        impl $name {
+            /// Every field folded into one value, so no read can be dropped.
+            pub fn fold(&self) -> u64 {
+                u64::from(self.scid)
+                    ^ u64::from(self.fhp)
+                    ^ u64::from(self.mcfc)
+                    ^ u64::from(self.vcid)
+                    ^ u64::from(self.tfvn)
+                    ^ u64::from(self.ocf == Flag::On)
+                    ^ u64::from(self.tfs == Flag::On)
+                    ^ u64::from(self.syn == Flag::On)
+                    ^ u64::from(self.po == Flag::On)
+                    ^ u64::from(self.sli == SegmentLength::None)
+            }
+        }
+    };
+}
+
+tm_enum_header!(TmEnumHeader);
+tm_enum_header!(TmEnumHeaderBatched, bit_field);
+
 /// 8-octet items that fit in the same stream as the 6-octet frames.
 pub const ADDRS: usize = FRAMES * 6 / 8;
 
@@ -120,6 +206,16 @@ pub fn read<T: for<'a> DekuContainerRead<'a>>(mut reader: impl Read + Seek) -> T
 /// The header the write benches emit. Decoded from the bytes the read benches
 /// use, so that both sides measure the same field values.
 pub fn header() -> TmPrimaryHeader {
+    read(Cursor::new(&HEADER_BYTES[..]))
+}
+
+/// The enum-flag header the write benches emit, from the same bytes.
+pub fn enum_header() -> TmEnumHeader {
+    read(Cursor::new(&HEADER_BYTES[..]))
+}
+
+/// As [`enum_header`], for the batched struct.
+pub fn enum_header_batched() -> TmEnumHeaderBatched {
     read(Cursor::new(&HEADER_BYTES[..]))
 }
 

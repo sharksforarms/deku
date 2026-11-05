@@ -144,7 +144,6 @@ impl From<core::convert::Infallible> for DekuError {
     }
 }
 
-#[cfg(feature = "std")]
 impl core::fmt::Display for DekuError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
@@ -158,20 +157,13 @@ impl core::fmt::Display for DekuError {
             DekuError::InvalidParam(err) => write!(f, "Invalid param error: {err}"),
             DekuError::Assertion(err) => write!(f, "{err}"),
             DekuError::IdVariantNotFound => write!(f, "Could not resolve `id` for variant"),
-            DekuError::Io(e) => write!(f, "io errorr: {e:?}"),
+            DekuError::Io(e) => write!(f, "io error: {e:?}"),
         }
     }
 }
 
 #[cfg(not(feature = "std"))]
 impl core::error::Error for DekuError {}
-
-#[cfg(not(feature = "std"))]
-impl core::fmt::Display for DekuError {
-    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        Ok(())
-    }
-}
 
 #[cfg(not(feature = "std"))]
 impl From<DekuError> for no_std_io::io::Error {
@@ -217,5 +209,27 @@ impl From<DekuError> for std::io::Error {
 impl From<no_std_io::io::Error> for DekuError {
     fn from(value: no_std_io::io::Error) -> Self {
         DekuError::Io(value.kind())
+    }
+}
+
+#[cfg(all(test, feature = "alloc"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_includes_parse_error_details() {
+        #[cfg(feature = "descriptive-errors")]
+        let error = DekuError::Parse(alloc::borrow::Cow::Borrowed("details"));
+        #[cfg(not(feature = "descriptive-errors"))]
+        let error = DekuError::Parse("details");
+
+        assert_eq!(alloc::format!("{error}"), "Parse error: details");
+    }
+
+    #[test]
+    fn display_formats_io_errors_consistently() {
+        let error = DekuError::Io(ErrorKind::Other);
+
+        assert_eq!(alloc::format!("{error}"), "io error: Other");
     }
 }

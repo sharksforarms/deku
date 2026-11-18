@@ -41,7 +41,8 @@ fn get_crate_name() -> Ident {
 
 /// Generate enum initialization TokenStream
 /// Cases:
-/// - No fields: `MyEnum`
+/// - No (non-temp) fields: `MyEnum {}`
+///   Braced syntax is valid for unit (`Variant`), tuple (`Variant()`) and struct variants alike.
 /// - Named: `MyEnum { field_idents }`
 /// - Unnamed:  `MyEnum ( field_idents )`
 fn gen_enum_init<V: ToTokens, I: ToTokens>(
@@ -51,7 +52,7 @@ fn gen_enum_init<V: ToTokens, I: ToTokens>(
 ) -> TokenStream {
     let mut field_idents = field_idents.peekable();
     if field_idents.peek().is_none() {
-        return quote! { #enum_variant };
+        return quote! { #enum_variant {} };
     }
 
     if is_named {

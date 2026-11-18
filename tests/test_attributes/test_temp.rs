@@ -168,3 +168,31 @@ fn test_temp_enum_field_write() {
     let ret_write: Vec<u8> = TestEnum::VarB(0x10).to_bytes().unwrap();
     assert_eq!(test_data, ret_write);
 }
+
+#[test]
+#[cfg(feature = "alloc")]
+fn test_temp_enum_all_fields_temp() {
+    // Removing the temp fields leaves `VarA {}`, which the derived code must
+    // not refer to as the bare path `Self::VarA`.
+    #[deku_derive(DekuRead, DekuWrite)]
+    #[derive(PartialEq, Debug)]
+    #[deku(id_type = "u8")]
+    enum TestEnum {
+        #[deku(id = "0xAB")]
+        VarA {
+            #[deku(temp, temp_value = "0x01")]
+            field_a: u8,
+        },
+        #[deku(id = "0xBA")]
+        VarB(u8),
+    }
+
+    let test_data: Vec<u8> = [0xab, 0x01].to_vec();
+
+    let ret_read = TestEnum::try_from(test_data.as_slice()).unwrap();
+    assert_eq!(TestEnum::VarA {}, ret_read);
+    assert_eq!(0xab, ret_read.deku_id().unwrap());
+
+    let ret_write: Vec<u8> = ret_read.try_into().unwrap();
+    assert_eq!(test_data, ret_write);
+}

@@ -10,6 +10,8 @@
 
 - `Writer`: an `Lsb0` write that ends on a byte boundary no longer reorders the
   whole bytes of the `Msb0` write that follows it ([#677](https://github.com/sharksforarms/deku/pull/677))
+- `deku_derive`: an enum struct variant whose fields are all `temp` no longer
+  fails to compile with `E0533`
 
 ### Other
 

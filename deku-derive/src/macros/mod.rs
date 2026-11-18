@@ -40,6 +40,7 @@ fn get_crate_name() -> Ident {
 /// Generate enum initialization TokenStream
 /// Cases:
 /// - No fields: `MyEnum`
+/// - Named with no (non-temp) fields: `MyEnum {}`
 /// - Named: `MyEnum { field_idents }`
 /// - Unnamed:  `MyEnum ( field_idents )`
 fn gen_enum_init<V: ToTokens, I: ToTokens>(
@@ -49,7 +50,11 @@ fn gen_enum_init<V: ToTokens, I: ToTokens>(
 ) -> TokenStream {
     let mut field_idents = field_idents.peekable();
     if field_idents.peek().is_none() {
-        return quote! { #enum_variant };
+        return if is_named {
+            quote! { #enum_variant {} }
+        } else {
+            quote! { #enum_variant }
+        };
     }
 
     if is_named {

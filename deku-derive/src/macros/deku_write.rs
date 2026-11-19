@@ -726,11 +726,26 @@ fn emit_bit_run_write(
     }
 
     let assertions = run_write_assertions(fields, start, run.len(), object_prefix, &ident_str);
+    // A run of whole bytes on a writer at a byte boundary is plain bytes,
+    // which one write serves. The bit writer takes them one byte at a time.
+    let aligned_write = match run.iter().map(BitRunField::lit_span).sum::<Option<usize>>() {
+        Some(total) if total % 8 == 0 => {
+            let bytes = total / 8;
+            let skip = 8 - bytes;
+            quote! {
+                if __deku_writer.is_aligned() {
+                    __deku_writer.write_bytes(&__deku_bit_run.to_be_bytes()[#skip..])?;
+                } else
+            }
+        }
+        _ => quote! {},
+    };
     let batched = quote! {
         #traces
         #assertions
         #checks
         let __deku_bit_run: u64 = #(#terms)|*;
+        #aligned_write
         // A partial `Lsb0` leftover cannot be spliced onto in one go: the general
         // path reorders across a multi-byte write, so fall back per field.
         if __deku_writer.can_write_bits_uint_msb0() {

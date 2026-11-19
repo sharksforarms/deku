@@ -23,6 +23,10 @@
 - A run of adjacent integer fields of whole bytes, which share one `endian`, is
   read in one call rather than one per field. On input too short for the whole
   run, the run reports `Incomplete` for all of it
+- `skip_bits` skips the bits short of a byte, as `pad_bits_before` makes,
+  without a `BitSlice` copy in `Msb0`
+- A bit field with a literal `pad_bits_before` or `pad_bits_after` joins a run
+  of adjacent bit fields, which reads the padding with it
 - Bump MSRV to 1.88
 - Update syn to 3.0 and darling to 0.24
 - Added a note concerning `skip`/`cond` attributes and padding (doc)

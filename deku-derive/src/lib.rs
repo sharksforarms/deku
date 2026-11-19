@@ -931,6 +931,9 @@ impl FieldData {
     /// True if the field carries an attribute a batched read cannot reproduce:
     /// anything that moves the cursor, makes the read conditional, or depends on a
     /// value read earlier.
+    ///
+    /// Excuses `pad_bits_before` and `pad_bits_after`, which the run reads with
+    /// the field where their width is a literal: see `run_field`.
     #[cfg(feature = "bits")]
     pub fn any_field_set_incompatible_with_bit_run(&self) -> bool {
         Self {
@@ -939,6 +942,8 @@ impl FieldData {
             bit_order: None,
             update: None,
             bit_field: false,
+            pad_bits_before: None,
+            pad_bits_after: None,
             ..self.clone()
         }
         .any_field_set()

@@ -569,12 +569,29 @@ fn emit_field_reads(
     #[cfg(not(feature = "bits"))]
     let taken = |_: usize| None;
     let byte_runs = super::plan_byte_runs(input, fields, use_id, &taken);
+    #[cfg(feature = "bits")]
+    let lsb_runs = super::plan_lsb_runs(input, fields, use_id);
 
     let mut i = 0;
     while i < fields.len() {
         #[cfg(feature = "bits")]
         if let Some(run) = runs.get(&i) {
             let (idents, read) = emit_bit_run_read(input, fields, i, run, ident)?;
+            for field_ident in idents {
+                field_idents.push(FieldIdent {
+                    field_ident,
+                    is_temp: false,
+                });
+            }
+            field_reads.push(read);
+            i += run.len();
+            use_id = false;
+            continue;
+        }
+
+        #[cfg(feature = "bits")]
+        if let Some(run) = lsb_runs.get(&i) {
+            let (idents, read) = emit_lsb_run_read(input, fields, i, run, ident)?;
             for field_ident in idents {
                 field_idents.push(FieldIdent {
                     field_ident,
@@ -660,6 +677,62 @@ pub(crate) fn byte_array_len(input: &DekuData, f: &FieldData) -> Option<usize> {
     };
     let len = len.base10_parse::<usize>().ok()?;
     (len != 0).then_some(len)
+}
+
+/// A little-endian `Lsb0` run of whole bytes: where no bits are left over,
+/// one read of a little-endian integer, and each field from its bits, the
+/// first field lowest. Off a byte boundary, the fields' own reads.
+#[cfg(feature = "bits")]
+fn emit_lsb_run_read(
+    input: &DekuData,
+    fields: &Fields<&FieldData>,
+    start: usize,
+    run: &[super::LsbRunField],
+    ident: &TokenStream,
+) -> Result<(Vec<TokenStream>, TokenStream), syn::Error> {
+    let crate_ = super::get_crate_name();
+    let total: usize = run.iter().map(|field| field.bits).sum();
+    let bytes = total / 8;
+    let run_ident = quote::format_ident!("__deku_lsb_run_{}", start);
+
+    let mut idents = Vec::with_capacity(run.len());
+    let mut internals = Vec::with_capacity(run.len());
+    let mut extracts = Vec::with_capacity(run.len());
+    let mut fallback = TokenStream::new();
+    let mut shift = 0usize;
+    for (offset, field) in run.iter().enumerate() {
+        let f = fields.fields[start + offset];
+        let field_ident = f.get_ident(start + offset, true);
+        let internal = gen_internal_field_ident(&field_ident);
+        let ty = &field.ty;
+        let mask = super::low_mask(field.bits);
+        extracts.push(if is_bool(ty) {
+            quote! { ((#run_ident >> #shift) & 1) != 0 }
+        } else {
+            quote! { ((#run_ident >> #shift) & #mask) as #ty }
+        });
+        let (_, read) = emit_field_read(input, start + offset, f, ident, false)?;
+        fallback.extend(read);
+        idents.push(field_ident);
+        internals.push(internal);
+        shift += field.bits;
+    }
+    let read = quote! {
+        let (#(#internals,)*) = if __deku_reader.leftover.is_none() {
+            let mut __deku_lsb_bytes = [0u8; 8];
+            __deku_reader.read_bytes_const_into::<#bytes>(
+                (&mut __deku_lsb_bytes[..#bytes]).try_into().expect("a run of whole bytes"),
+                ::#crate_::ctx::Order::Lsb0,
+            )?;
+            let #run_ident = u64::from_le_bytes(__deku_lsb_bytes);
+            (#(#extracts,)*)
+        } else {
+            #fallback
+            (#(#internals,)*)
+        };
+        #(let #idents = &#internals;)*
+    };
+    Ok((idents, read))
 }
 
 /// One byte read for the whole run, then each field from its own bytes, in

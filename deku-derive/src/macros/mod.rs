@@ -774,6 +774,98 @@ pub(crate) fn const_id_bits(_: &DekuData) -> Option<usize> {
     None
 }
 
+/// One field of a little-endian `Lsb0` run: its width and its type.
+#[cfg(feature = "bits")]
+pub(crate) struct LsbRunField {
+    pub(crate) bits: usize,
+    pub(crate) ty: syn::Type,
+}
+
+/// A field a little-endian `Lsb0` run can serve: a literal `bits` on an
+/// unsigned primitive, or one bit of a `bool`, explicitly little-endian and
+/// `Lsb0`, carrying nothing else.
+#[cfg(feature = "bits")]
+fn lsb_run_field(input: &DekuData, f: &FieldData) -> Option<LsbRunField> {
+    if f.any_field_set_incompatible_with_bit_run()
+        || f.bit_field
+        || f.pad_bits_before.is_some()
+        || f.pad_bits_after.is_some()
+    {
+        return None;
+    }
+    let endian = f.endian.as_ref().or(input.endian.as_ref())?;
+    let order = f.bit_order.as_ref().or(input.bit_order.as_ref())?;
+    if endian.value() != "little" || order.value() != "lsb" {
+        return None;
+    }
+    let syn::Type::Path(p) = &f.ty else {
+        return None;
+    };
+    if p.qself.is_some() {
+        return None;
+    }
+    let name = p.path.get_ident()?.to_string();
+    let width = match name.as_str() {
+        "bool" => 1,
+        name => unsigned_width(name)?,
+    };
+    let bits = match f.bits.as_ref() {
+        Some(crate::Num::LitInt(lit)) => lit.base10_parse::<usize>().ok()?,
+        Some(crate::Num::TokenStream(_)) => return None,
+        None if name == "bool" => return None,
+        None => width,
+    };
+    (1..=width).contains(&bits).then(|| LsbRunField {
+        bits,
+        ty: f.ty.clone(),
+    })
+}
+
+/// Groups adjacent fields that a little-endian `Lsb0` run can serve, keyed
+/// by the index the run starts at. A run holds whole bytes, at most 64 bits,
+/// so that one read of a little-endian integer serves it; a run of more
+/// fields that ends inside a byte gives up fields from its end until it
+/// does not.
+#[cfg(feature = "bits")]
+pub(crate) fn plan_lsb_runs(
+    input: &DekuData,
+    fields: &Fields<&FieldData>,
+    use_id: bool,
+) -> std::collections::HashMap<usize, Vec<LsbRunField>> {
+    let mut runs = std::collections::HashMap::new();
+    let mut i = 0;
+    while i < fields.len() {
+        if i == 0 && use_id {
+            i = 1;
+            continue;
+        }
+        let mut run = Vec::new();
+        let mut total = 0;
+        while let Some(field) = fields
+            .fields
+            .get(i + run.len())
+            .and_then(|f| lsb_run_field(input, f))
+        {
+            if total + field.bits > u64::BITS as usize {
+                break;
+            }
+            total += field.bits;
+            run.push(field);
+        }
+        while total % 8 != 0 {
+            total -= run.pop().map_or(0, |field| field.bits);
+        }
+        if run.len() >= 2 {
+            let len = run.len();
+            runs.insert(i, run);
+            i += len;
+        } else {
+            i += 1;
+        }
+    }
+    runs
+}
+
 /// Groups adjacent run-eligible fields, keyed by the index the run starts at.
 ///
 /// A run is capped at 64 bits, the width the reader returns, and must hold at

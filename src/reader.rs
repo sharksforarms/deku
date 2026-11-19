@@ -1216,3 +1216,128 @@ mod tests {
         );
     }
 }
+
+/// A reader of a byte slice, as [`Cursor`](no_std_io::io::Cursor) over a
+/// slice is, whose reads of a length known at compile time copy with a
+/// load and a store.
+///
+/// `Cursor::read_exact` copies through `memcpy` for any length but one,
+/// which a struct of a few small fields calls for each field. A position
+/// past the end reads nothing, as with a `Cursor`.
+#[derive(Debug, Clone)]
+pub struct SliceReader<'a> {
+    bytes: &'a [u8],
+    position: usize,
+}
+
+impl<'a> SliceReader<'a> {
+    /// A reader at the start of `bytes`.
+    #[inline]
+    pub fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, position: 0 }
+    }
+
+    /// The bytes from the position on.
+    #[inline]
+    fn rest(&self) -> &'a [u8] {
+        self.bytes.get(self.position..).unwrap_or_default()
+    }
+}
+
+impl Read for SliceReader<'_> {
+    #[inline(always)]
+    fn read(&mut self, buf: &mut [u8]) -> no_std_io::io::Result<usize> {
+        let rest = self.rest();
+        let length = buf.len().min(rest.len());
+        buf[..length].copy_from_slice(&rest[..length]);
+        self.position += length;
+        Ok(length)
+    }
+
+    #[inline(always)]
+    fn read_exact(&mut self, buf: &mut [u8]) -> no_std_io::io::Result<()> {
+        match self.rest().get(..buf.len()) {
+            Some(bytes) => {
+                buf.copy_from_slice(bytes);
+                self.position += buf.len();
+                Ok(())
+            }
+            None => {
+                // As `Cursor` does, a read that fails leaves the position at
+                // the end.
+                self.position = self.bytes.len().max(self.position);
+                Err(ErrorKind::UnexpectedEof.into())
+            }
+        }
+    }
+}
+
+impl Seek for SliceReader<'_> {
+    fn seek(&mut self, position: SeekFrom) -> no_std_io::io::Result<u64> {
+        let (base, offset) = match position {
+            SeekFrom::Start(at) => {
+                self.position = usize::try_from(at).map_err(|_| ErrorKind::InvalidInput)?;
+                return Ok(at);
+            }
+            SeekFrom::End(offset) => (self.bytes.len(), offset),
+            SeekFrom::Current(offset) => (self.position, offset),
+        };
+        let base = i64::try_from(base).map_err(|_| ErrorKind::InvalidInput)?;
+        let at = base.checked_add(offset).ok_or(ErrorKind::InvalidInput)?;
+        self.position = usize::try_from(at).map_err(|_| ErrorKind::InvalidInput)?;
+        Ok(self.position as u64)
+    }
+}
+
+// The `Cursor` of `std` puts the position at the end on a failed `read_exact`,
+// as `SliceReader` does. The `Cursor` without `std` keeps the position.
+#[cfg(all(test, feature = "std"))]
+mod slice_reader_tests {
+    use super::*;
+    use no_std_io::io::Cursor;
+
+    /// Each step of reads and seeks gives what a `Cursor` gives.
+    #[test]
+    fn a_slice_reader_reads_and_seeks_as_a_cursor() {
+        let bytes: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let steps: [&Step; 9] = [
+            &|r| format!("{:?}", read_exact(r, 3)),
+            &|r| format!("{:?}", r.seek(SeekFrom::Current(-2)).ok()),
+            &|r| format!("{:?}", read_exact(r, 4)),
+            &|r| format!("{:?}", r.seek(SeekFrom::End(-1)).ok()),
+            &|r| format!("{:?}", read_exact(r, 2)),
+            &|r| format!("{:?}", r.seek(SeekFrom::Start(20)).ok()),
+            &|r| format!("{:?}", read(r, 4)),
+            &|r| format!("{:?}", r.seek(SeekFrom::Current(-30)).is_err()),
+            &|r| {
+                format!("{:?}", {
+                    r.seek(SeekFrom::Start(8)).ok();
+                    read(r, 4)
+                })
+            },
+        ];
+        let mut cursor = Cursor::new(&bytes[..]);
+        let mut slice = SliceReader::new(&bytes);
+        for (index, step) in steps.iter().enumerate() {
+            assert_eq!(step(&mut slice), step(&mut cursor), "step {index}");
+        }
+    }
+
+    /// One read or seek, and what it gave, as text.
+    type Step = dyn Fn(&mut dyn ReadSeek) -> String;
+
+    trait ReadSeek: Read + Seek {}
+    impl<T: Read + Seek> ReadSeek for T {}
+
+    fn read_exact(reader: &mut dyn ReadSeek, length: usize) -> Option<Vec<u8>> {
+        let mut buf = alloc::vec![0; length];
+        reader.read_exact(&mut buf).ok().map(|()| buf)
+    }
+
+    fn read(reader: &mut dyn ReadSeek, length: usize) -> Vec<u8> {
+        let mut buf = alloc::vec![0; length];
+        let read = reader.read(&mut buf).unwrap_or(0);
+        buf.truncate(read);
+        buf
+    }
+}

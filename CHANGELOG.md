@@ -47,6 +47,8 @@
   once it has read the field, and before it writes it, with the error of the
   field's own read or write. An assertion that reads `deku::bit_offset` or
   `deku::byte_offset` still keeps its field out
+- `reader::SliceReader`, a reader of a byte slice whose fixed-size reads copy
+  with a load and a store, serves `from_bytes` and `TryFrom<&[u8]>`
 - Bump MSRV to 1.88
 - Update syn to 3.0 and darling to 0.24
 - Added a note concerning `skip`/`cond` attributes and padding (doc)

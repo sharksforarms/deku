@@ -1,4 +1,3 @@
-#[cfg(feature = "bits")]
 use darling::ast::Fields;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, quote};
@@ -11,7 +10,6 @@ use syn::spanned::Spanned;
 use syn::token::Comma;
 
 use crate::Num;
-#[cfg(feature = "bits")]
 use crate::{DekuData, FieldData};
 
 #[cfg(feature = "bits")]
@@ -708,8 +706,8 @@ pub(crate) fn plan_bit_runs(
             run.push(field);
             j += 1;
         }
-        // A run of only whole-width fields is a stretch of plain bytes. The byte
-        // path already reads those in one call, whereas a run sends them through
+        // A run of only whole-width fields is a stretch of plain bytes. A byte
+        // run reads those in one call, whereas a bit run sends them through
         // the bit reader, which costs a `u64` accumulator and a shift and a mask
         // per field for no gain. Batch only when the run holds a packed field, or
         // a `bit_field` that may be one, which `batch_condition` then settles.
@@ -717,6 +715,134 @@ pub(crate) fn plan_bit_runs(
         if run.len() >= 2 && packed {
             let len = run.len();
             runs.insert(i, run);
+            i += len;
+        } else {
+            i += 1;
+        }
+    }
+    runs
+}
+
+/// One field of a run of adjacent whole-byte integers.
+pub(crate) struct ByteRunField {
+    pub(crate) bytes: usize,
+    pub(crate) ty: syn::Type,
+}
+
+/// A run of adjacent whole-byte integers that one byte read can serve, and
+/// the `endian` they share, which is the target's where it is `None`.
+pub(crate) struct ByteRun {
+    pub(crate) endian: Option<syn::LitStr>,
+    pub(crate) fields: Vec<ByteRunField>,
+}
+
+/// The most bytes one byte run reads. It bounds the buffer on the stack.
+const BYTE_RUN_MAX_BYTES: usize = 64;
+
+/// The width in bytes of an integer type that `from_le_bytes` and
+/// `from_be_bytes` read, as deku reads it with only an `Endian`.
+fn integer_bytes(ty: &syn::Type) -> Option<usize> {
+    let syn::Type::Path(p) = ty else { return None };
+    if p.qself.is_some() {
+        return None;
+    }
+    let bytes = match p.path.get_ident()?.to_string().as_str() {
+        "u8" | "i8" => 1,
+        "u16" | "i16" => 2,
+        "u32" | "i32" => 4,
+        "u64" | "i64" => 8,
+        "u128" | "i128" => 16,
+        _ => return None,
+    };
+    Some(bytes)
+}
+
+/// A field a byte run can serve, and the `endian` it reads in: an integer of
+/// whole bytes, `Msb0`, with no attribute that changes the bytes it reads or
+/// what they mean.
+fn byte_run_field<'a>(
+    input: &'a DekuData,
+    f: &'a FieldData,
+) -> Option<(ByteRunField, Option<&'a syn::LitStr>)> {
+    // The attributes a byte array excuses are the ones a byte run excuses:
+    // `endian`, `bit_order` and `update`. A `bits` or `bytes` width is a
+    // different read.
+    if f.any_field_set_incompatible_with_byte_array() {
+        return None;
+    }
+    // On an unaligned cursor `read_bytes_const_into` reverses the buffer for
+    // `Lsb0`, and a runtime order could be either.
+    #[cfg(feature = "bits")]
+    if let Some(order) = f.bit_order.as_ref().or(input.bit_order.as_ref())
+        && order.value() != "msb"
+    {
+        return None;
+    }
+    let bytes = integer_bytes(&f.ty)?;
+    let endian = f.endian.as_ref().or(input.endian.as_ref());
+    Some((
+        ByteRunField {
+            bytes,
+            ty: f.ty.clone(),
+        },
+        endian,
+    ))
+}
+
+/// Groups adjacent fields that a byte run can serve, keyed by the index the
+/// run starts at. The fields of a run share one `endian`, so one value of
+/// [`Endian`](deku::ctx::Endian) reads them all.
+///
+/// A run must hold at least two fields to save a read. The indexes in
+/// `taken` are bit runs already, which come first.
+pub(crate) fn plan_byte_runs(
+    input: &DekuData,
+    fields: &Fields<&FieldData>,
+    use_id: bool,
+    taken: &dyn Fn(usize) -> Option<usize>,
+) -> std::collections::HashMap<usize, ByteRun> {
+    let mut runs = std::collections::HashMap::new();
+    let mut i = 0;
+    while i < fields.len() {
+        // The first field can be the enum id storage, which is not a read at all.
+        if i == 0 && use_id {
+            i = 1;
+            continue;
+        }
+        if let Some(len) = taken(i) {
+            i += len;
+            continue;
+        }
+        let Some((first, endian)) = byte_run_field(input, fields.fields[i]) else {
+            i += 1;
+            continue;
+        };
+        let endian_value = endian.map(syn::LitStr::value);
+        let mut total = first.bytes;
+        let mut run = vec![first];
+        let mut j = i + 1;
+        while j < fields.len() && taken(j).is_none() {
+            let Some((field, field_endian)) = byte_run_field(input, fields.fields[j]) else {
+                break;
+            };
+            if field_endian.map(syn::LitStr::value) != endian_value
+                || total + field.bytes > BYTE_RUN_MAX_BYTES
+            {
+                break;
+            }
+            total += field.bytes;
+            run.push(field);
+            j += 1;
+        }
+        if run.len() >= 2 {
+            let len = run.len();
+            runs.insert(
+                i,
+                ByteRun {
+                    endian: endian.cloned(),
+                    fields: run,
+                },
+            );
             i += len;
         } else {
             i += 1;
@@ -1542,5 +1668,98 @@ mod tests {
         for code in [&read, &write] {
             assert_eq!(code.matches("if const").count(), 0);
         }
+    }
+}
+
+#[cfg(test)]
+mod byte_run_tests {
+    use super::*;
+
+    /// Every byte run the planner forms over a struct, by its start and the
+    /// width in bytes of each field.
+    fn plan(src: &str) -> Vec<(usize, Vec<usize>)> {
+        let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
+        let fields = data
+            .data
+            .as_ref()
+            .take_struct()
+            .expect("test input should be a struct");
+        let mut runs: Vec<(usize, Vec<usize>)> = plan_byte_runs(&data, &fields, false, &|_| None)
+            .into_iter()
+            .map(|(start, run)| (start, run.fields.iter().map(|f| f.bytes).collect()))
+            .collect();
+        runs.sort();
+        runs
+    }
+
+    #[test]
+    fn adjacent_integers_share_one_read() {
+        let src =
+            r#"#[deku(endian = "big")] struct Test { a: u8, b: i16, c: u32, d: u64, e: u128 }"#;
+        assert_eq!(plan(src), vec![(0, vec![1, 2, 4, 8, 16])]);
+    }
+
+    #[test]
+    fn a_lone_integer_is_not_a_run() {
+        let src = r#"#[deku(endian = "big")] struct Test { a: u32, b: [u8; 4], c: u16 }"#;
+        assert_eq!(plan(src), vec![]);
+    }
+
+    #[test]
+    fn a_field_of_another_type_or_attribute_splits_the_run() {
+        let src = r#"#[deku(endian = "big")] struct Test {
+            a: u16,
+            b: u16,
+            c: Other,
+            d: u16,
+            #[deku(assert_eq = "0")] e: u16,
+            f: u16,
+            g: u16,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![2, 2]), (5, vec![2, 2])]);
+    }
+
+    #[test]
+    fn a_field_of_another_endian_splits_the_run() {
+        let src = r#"#[deku(endian = "big")] struct Test {
+            a: u16,
+            b: u16,
+            #[deku(endian = "little")] c: u16,
+            #[deku(endian = "little")] d: u16,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![2, 2]), (2, vec![2, 2])]);
+    }
+
+    #[test]
+    fn a_run_is_capped_and_the_next_one_starts_there() {
+        let src = r#"struct Test { a: u128, b: u128, c: u128, d: u128, e: u64, f: u64 }"#;
+        assert_eq!(plan(src), vec![(0, vec![16, 16, 16, 16]), (4, vec![8, 8])]);
+    }
+
+    #[test]
+    fn a_field_with_a_width_is_no_byte_run() {
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bytes = 2)] a: u32,
+            #[deku(bytes = 2)] b: u32,
+        }"#;
+        assert_eq!(plan(src), vec![]);
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn an_lsb_order_is_no_byte_run() {
+        let src = r#"#[deku(endian = "little", bit_order = "lsb")] struct Test { a: u32, b: u32 }"#;
+        assert_eq!(plan(src), vec![]);
+    }
+
+    #[test]
+    fn fields_a_bit_run_takes_are_left_to_it() {
+        let src = r#"#[deku(endian = "big")] struct Test { a: u16, b: u16, c: u16, d: u16 }"#;
+        let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
+        let fields = data.data.as_ref().take_struct().expect("a struct");
+        let taken = |i: usize| (i == 0).then_some(2);
+        let runs = plan_byte_runs(&data, &fields, false, &taken);
+        let starts: Vec<usize> = runs.keys().copied().collect();
+        assert_eq!(starts, vec![2]);
     }
 }

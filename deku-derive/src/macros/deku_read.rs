@@ -558,6 +558,11 @@ fn emit_field_reads(
 
     #[cfg(feature = "bits")]
     let runs = super::plan_bit_runs(input, fields, use_id);
+    #[cfg(feature = "bits")]
+    let taken = |i: usize| runs.get(&i).map(Vec::len);
+    #[cfg(not(feature = "bits"))]
+    let taken = |_: usize| None;
+    let byte_runs = super::plan_byte_runs(input, fields, use_id, &taken);
 
     let mut i = 0;
     while i < fields.len() {
@@ -572,6 +577,20 @@ fn emit_field_reads(
             }
             field_reads.push(read);
             i += run.len();
+            use_id = false;
+            continue;
+        }
+
+        if let Some(run) = byte_runs.get(&i) {
+            let (idents, read) = emit_byte_run_read(fields, i, run, ident)?;
+            for field_ident in idents {
+                field_idents.push(FieldIdent {
+                    field_ident,
+                    is_temp: false,
+                });
+            }
+            field_reads.push(read);
+            i += run.fields.len();
             use_id = false;
             continue;
         }
@@ -635,6 +654,66 @@ pub(crate) fn byte_array_len(input: &DekuData, f: &FieldData) -> Option<usize> {
     };
     let len = len.base10_parse::<usize>().ok()?;
     (len != 0).then_some(len)
+}
+
+/// One byte read for the whole run, then each field from its own bytes, in
+/// the run's byte order. The bytes and the values are those the fields'
+/// own reads give, and the one difference is on input too short for the
+/// whole run: the run reports `Incomplete` for all of it, and reads none.
+fn emit_byte_run_read(
+    fields: &Fields<&FieldData>,
+    start: usize,
+    run: &super::ByteRun,
+    ident: &TokenStream,
+) -> Result<(Vec<TokenStream>, TokenStream), syn::Error> {
+    let crate_ = super::get_crate_name();
+    let total: usize = run.fields.iter().map(|f| f.bytes).sum();
+    let buffer = quote::format_ident!("__deku_byte_run_{}", start);
+    let endian = quote::format_ident!("__deku_byte_run_endian_{}", start);
+    let endian_value = match &run.endian {
+        Some(endian) => super::gen_endian_from_str(endian)?,
+        None => quote! { ::#crate_::ctx::Endian::default() },
+    };
+    let ident = ident.to_string();
+
+    let mut idents = Vec::with_capacity(run.fields.len());
+    let mut extracts = TokenStream::new();
+    let mut at = 0usize;
+    for (offset, field) in run.fields.iter().enumerate() {
+        let f = fields.fields[start + offset];
+        let field_ident = f.get_ident(start + offset, true);
+        let internal = gen_internal_field_ident(&field_ident);
+        let (ty, bytes, end) = (&field.ty, field.bytes, at + field.bytes);
+        let trace_field_log = if cfg!(feature = "logging") {
+            let field_ident_str = field_ident.to_string();
+            quote! { ::#crate_::log::trace!("Reading: {}.{}", #ident, #field_ident_str); }
+        } else {
+            quote! {}
+        };
+        extracts.extend(quote! {
+            #trace_field_log
+            let #internal = {
+                let __deku_bytes = <[u8; #bytes]>::try_from(&#buffer[#at..#end])
+                    .expect("a byte run holds the bytes of each of its fields");
+                if #endian.is_le() {
+                    <#ty>::from_le_bytes(__deku_bytes)
+                } else {
+                    <#ty>::from_be_bytes(__deku_bytes)
+                }
+            };
+            let #field_ident = &#internal;
+        });
+        idents.push(field_ident);
+        at = end;
+    }
+
+    let read = quote! {
+        let #endian: ::#crate_::ctx::Endian = #endian_value;
+        let mut #buffer = [0u8; #total];
+        __deku_reader.read_bytes_const_into::<#total>(&mut #buffer, ::#crate_::ctx::Order::default())?;
+        #extracts
+    };
+    Ok((idents, read))
 }
 
 /// One read for the whole run, then shift and mask each field out of it. This is

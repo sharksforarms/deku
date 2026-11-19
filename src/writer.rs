@@ -516,6 +516,13 @@ impl<W: Write + Seek> Writer<W> {
     pub fn finalize(&mut self) -> Result<(), DekuError> {
         #[cfg(feature = "bits")]
         {
+            // With no bits pending there is nothing to pad. The write of no
+            // bits below cost about 225 instructions, at the end of each
+            // `to_bytes` and `to_slice`.
+            if self.leftover.0.is_empty() {
+                self.leftover.1 = Order::Msb0;
+                return Ok(());
+            }
             let padded = bitarr!(u8, Msb0; 0; 8);
             debug_assert!(self.leftover.0.len() < 8);
             let len = (8 - self.leftover.0.len()) % 8;

@@ -469,6 +469,14 @@ impl<W: Write + Seek> Writer<W> {
         self.write_bits_order(bits, Order::Msb0)
     }
 
+    /// Whether no bits wait to be written, so that the next write starts on
+    /// a byte boundary.
+    #[inline]
+    #[cfg(feature = "bits")]
+    pub fn is_aligned(&self) -> bool {
+        self.leftover.0.is_empty()
+    }
+
     /// Write `buf` into `Writer`
     // The following inline(always) helps performance significantly
     #[inline(always)]

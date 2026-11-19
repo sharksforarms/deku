@@ -167,3 +167,30 @@ fn a_run_holds_whole_bytes() {
         );
     }
 }
+
+#[test]
+fn a_run_writes_the_bytes_its_fields_write_aligned_or_not() {
+    for seed in 1..5_000u32 {
+        let data = wire(3, seed);
+        let (_, batched) = AfterANibble::from_bytes((&data, 0)).unwrap();
+        let (_, plain) = AfterANibbleUnbatched::from_bytes((&data, 0)).unwrap();
+        assert_eq!(
+            batched.to_bytes().unwrap(),
+            plain.to_bytes().unwrap(),
+            "seed {seed}"
+        );
+        let (_, uneven) = Uneven::from_bytes((&data, 0)).unwrap();
+        assert_eq!(uneven.to_bytes().unwrap(), data, "seed {seed}");
+    }
+}
+
+#[test]
+fn a_value_too_wide_for_its_bits_is_refused_as_outside_a_run() {
+    let mut batched = Batched::from_bytes((&[0; 4], 0)).unwrap().1;
+    let mut plain = Unbatched::from_bytes((&[0; 4], 0)).unwrap().1;
+    batched.function_length = 0x800;
+    plain.function_length = 0x800;
+    let (batched, plain) = (batched.to_bytes(), plain.to_bytes());
+    assert!(batched.is_err(), "{batched:?}");
+    assert_eq!(format!("{batched:?}"), format!("{plain:?}"));
+}

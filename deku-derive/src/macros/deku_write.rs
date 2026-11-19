@@ -476,10 +476,27 @@ fn emit_field_writes(
 
     #[cfg(feature = "bits")]
     let runs = super::plan_bit_runs(input, fields, is_id_pat);
+    #[cfg(feature = "bits")]
+    let lsb_runs = super::plan_lsb_runs(input, fields, is_id_pat);
 
     let mut writes = Vec::with_capacity(fields.len());
     let mut i = 0;
     while i < fields.len() {
+        #[cfg(feature = "bits")]
+        if let Some(run) = lsb_runs.get(&i) {
+            writes.push(emit_lsb_run_write(
+                input,
+                fields,
+                i,
+                run,
+                &object_prefix,
+                ident,
+            )?);
+            i += run.len();
+            is_id_pat = false;
+            continue;
+        }
+
         #[cfg(feature = "bits")]
         if let Some(run) = runs.get(&i) {
             writes.push(emit_bit_run_write(
@@ -510,6 +527,59 @@ fn emit_field_writes(
     }
 
     Ok(writes)
+}
+
+/// A little-endian `Lsb0` run of whole bytes: where no bits wait to be
+/// written, each field's bits into one integer, the first field lowest,
+/// written as little-endian bytes in one call. Otherwise the fields' own
+/// writes.
+#[cfg(feature = "bits")]
+fn emit_lsb_run_write(
+    input: &DekuData,
+    fields: &Fields<&FieldData>,
+    start: usize,
+    run: &[super::LsbRunField],
+    object_prefix: &Option<TokenStream>,
+    ident: &TokenStream,
+) -> Result<TokenStream, syn::Error> {
+    let crate_ = super::get_crate_name();
+    let total: usize = run.iter().map(|field| field.bits).sum();
+    let bytes = total / 8;
+    let mut checks = TokenStream::new();
+    let mut terms = Vec::with_capacity(run.len());
+    let mut fallback = TokenStream::new();
+    let mut shift = 0usize;
+    for (offset, field) in run.iter().enumerate() {
+        let f = fields.fields[start + offset];
+        let field_ident = f.get_ident(start + offset, object_prefix.is_none());
+        let value = quote! { (*(#object_prefix #field_ident) as u64) };
+        let bits = field.bits;
+        let mask = super::low_mask(bits);
+        // Every field keeps the rejection its own write performs, in field
+        // order. A field that fills its type cannot fail it.
+        checks.extend(quote! {
+            ::#crate_::writer::check_bit_size::<true>(#value, #bits)?;
+        });
+        terms.push(quote! { ((#value & #mask) << #shift) });
+        fallback.extend(emit_field_write(
+            input,
+            start + offset,
+            f,
+            object_prefix,
+            ident,
+            &mut false,
+        )?);
+        shift += bits;
+    }
+    Ok(quote! {
+        if __deku_writer.is_aligned() {
+            #checks
+            let __deku_lsb_run: u64 = #(#terms)|*;
+            __deku_writer.write_bytes(&__deku_lsb_run.to_le_bytes()[..#bytes])?;
+        } else {
+            #fallback
+        }
+    })
 }
 
 /// Composes a run of adjacent fields into one integer and writes it once, the

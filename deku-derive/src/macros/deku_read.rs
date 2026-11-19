@@ -379,6 +379,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         quote! {
             let __deku_variant_id = (#id);
         }
+    } else if let Some(bits) = super::const_id_bits(input) {
+        // The read `(Endian, BitSize)` makes of a big-endian unsigned id, with
+        // the width a constant, as a bit run reads.
+        quote! {
+            let __deku_variant_id = __deku_reader.read_bits_uint_msb0_const::<#bits>()? as #id_type;
+        }
     } else if id_type.is_some() {
         quote! {
             let __deku_variant_id = <#id_type>::from_reader_with_ctx(__deku_reader,  (#id_args))?;

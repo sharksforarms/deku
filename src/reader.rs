@@ -70,6 +70,62 @@ impl<R: Read + Seek> AsMut<R> for Reader<R> {
     }
 }
 
+/// The body of [`Reader::read_bits_uint_msb0`] for at most [`NARROW_BITS`],
+/// for its two entries to share.
+#[cfg(feature = "bits")]
+macro_rules! narrow_read {
+    ($self:ident, $amt:ident) => {{
+        let (reader, amt) = (&mut *$self, $amt);
+        let mut acc: u64 = 0;
+        let mut have: usize = 0;
+        match reader.leftover.take() {
+            Some(Leftover::Byte(byte)) => {
+                acc = u64::from(byte);
+                have = 8;
+            }
+            Some(Leftover::Bits(bits)) => {
+                let (byte, size) = bits.as_msb0_byte();
+                if size != 0 {
+                    acc = u64::from(byte >> (8 - size));
+                    have = size;
+                }
+            }
+            None => {}
+        }
+
+        // One byte at a time, for the reasons `read_bits_uint_msb0_wide` gives.
+        while have < amt {
+            let mut buf = [0u8; 1];
+            if let Err(e) = reader.inner.read_exact(&mut buf) {
+                if e.kind() == ErrorKind::UnexpectedEof {
+                    return Err(DekuError::Incomplete(NeedSize::new(amt)));
+                }
+                return Err(DekuError::Io(e.kind()));
+            }
+            acc = (acc << 8) | u64::from(buf[0]);
+            have += 8;
+        }
+
+        let rest = have - amt;
+        let value = (acc >> rest) & ((1u64 << amt) - 1);
+        if rest != 0 {
+            let tail = (acc & ((1u64 << rest) - 1)) as u8;
+            reader.leftover = Some(Leftover::Bits(crate::BoundedBitVec::from_msb0_byte(
+                tail << (8 - rest),
+                rest,
+            )));
+        }
+
+        reader.bits_read += amt;
+        Ok(value)
+    }};
+}
+
+/// The widest read of [`Reader::read_bits_uint_msb0`] whose bits, with up to a
+/// byte of leftover, fit a `u64`.
+#[cfg(feature = "bits")]
+const NARROW_BITS: usize = 56;
+
 impl<R: Read + Seek> Reader<R> {
     /// Create a new `Reader`
     #[inline]
@@ -431,7 +487,57 @@ impl<R: Read + Seek> Reader<R> {
     #[cfg(feature = "bits")]
     pub fn read_bits_uint_msb0(&mut self, amt: usize) -> Result<u64, DekuError> {
         debug_assert!((1..=64).contains(&amt));
+        if amt <= NARROW_BITS {
+            self.read_bits_uint_msb0_narrow(amt)
+        } else {
+            self.read_bits_uint_msb0_wide(amt)
+        }
+    }
 
+    /// [`read_bits_uint_msb0`](Self::read_bits_uint_msb0) of `N` bits, a width
+    /// known at compile time, as the derive reads an enum id of a literal
+    /// `bits`.
+    ///
+    /// It is always inlined, so the masks and shifts of a narrow read fold to
+    /// constants. The runtime-width read stays small enough for a caller's
+    /// loop to inline it. A bit run keeps the runtime-width read: inlining
+    /// this one into each run took 2 to 8 percent more instructions in the
+    /// `bebits` benchmarks.
+    #[inline(always)]
+    #[cfg(feature = "bits")]
+    pub fn read_bits_uint_msb0_const<const N: usize>(&mut self) -> Result<u64, DekuError> {
+        const { assert!(N >= 1 && N <= 64) };
+        if N <= NARROW_BITS {
+            self.read_bits_uint_msb0_narrow_inlined(N)
+        } else {
+            self.read_bits_uint_msb0_wide(N)
+        }
+    }
+
+    /// [`read_bits_uint_msb0`](Self::read_bits_uint_msb0) of at most
+    /// [`NARROW_BITS`], whose leftover and read bits fit a `u64`. A shift of a
+    /// `u128` takes several instructions where one of a `u64` takes one, and
+    /// most bit fields are this narrow.
+    #[inline]
+    #[cfg(feature = "bits")]
+    fn read_bits_uint_msb0_narrow(&mut self, amt: usize) -> Result<u64, DekuError> {
+        narrow_read!(self, amt)
+    }
+
+    /// The narrow read, always inlined, for
+    /// [`read_bits_uint_msb0_const`](Self::read_bits_uint_msb0_const). The
+    /// runtime-width entry keeps its own copy: one that calls an inlined
+    /// body is costed as larger, and a caller's loop then stops inlining it.
+    #[inline(always)]
+    #[cfg(feature = "bits")]
+    fn read_bits_uint_msb0_narrow_inlined(&mut self, amt: usize) -> Result<u64, DekuError> {
+        narrow_read!(self, amt)
+    }
+
+    /// [`read_bits_uint_msb0`](Self::read_bits_uint_msb0) of any width.
+    #[inline]
+    #[cfg(feature = "bits")]
+    fn read_bits_uint_msb0_wide(&mut self, amt: usize) -> Result<u64, DekuError> {
         // Up to 7 leftover bits plus 64 requested does not fit a u64.
         let mut acc: u128 = 0;
         let mut have: usize = 0;

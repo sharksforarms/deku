@@ -724,3 +724,123 @@ mod tests {
         assert_eq!(target, [0xFF]);
     }
 }
+
+/// A writer into a byte slice, as [`Cursor`](no_std_io::io::Cursor) over a
+/// slice is, whose writes of a length known at compile time copy with a
+/// load and a store.
+///
+/// `Cursor::write_all` copies through `memcpy` for any length, which
+/// `to_slice` of a struct of a few fields calls for each run of them.
+#[derive(Debug)]
+pub struct SliceWriter<'a> {
+    bytes: &'a mut [u8],
+    position: usize,
+}
+
+impl<'a> SliceWriter<'a> {
+    /// A writer at the start of `bytes`.
+    #[inline]
+    pub fn new(bytes: &'a mut [u8]) -> Self {
+        Self { bytes, position: 0 }
+    }
+}
+
+impl no_std_io::io::Write for SliceWriter<'_> {
+    #[inline(always)]
+    fn write(&mut self, buf: &[u8]) -> no_std_io::io::Result<usize> {
+        let start = self.position.min(self.bytes.len());
+        let length = buf.len().min(self.bytes.len() - start);
+        self.bytes[start..start + length].copy_from_slice(&buf[..length]);
+        self.position = start + length;
+        Ok(length)
+    }
+
+    #[inline(always)]
+    fn write_all(&mut self, buf: &[u8]) -> no_std_io::io::Result<()> {
+        let start = self.position;
+        match self
+            .bytes
+            .get_mut(start..)
+            .and_then(|rest| rest.get_mut(..buf.len()))
+        {
+            Some(slot) => {
+                slot.copy_from_slice(buf);
+                self.position = start + buf.len();
+                Ok(())
+            }
+            // As `Cursor` does, a write that does not fit fills what it can.
+            None => self.write_all_cut(buf),
+        }
+    }
+
+    #[inline]
+    fn flush(&mut self) -> no_std_io::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl SliceWriter<'_> {
+    /// The rest of [`write_all`](no_std_io::io::Write::write_all) where `buf`
+    /// does not fit: what fits is written, then the error `Cursor` gives.
+    #[cold]
+    fn write_all_cut(&mut self, buf: &[u8]) -> no_std_io::io::Result<()> {
+        use no_std_io::io::Write;
+        let written = self.write(buf)?;
+        debug_assert!(written < buf.len());
+        Err(no_std_io::io::ErrorKind::WriteZero.into())
+    }
+}
+
+impl no_std_io::io::Seek for SliceWriter<'_> {
+    fn seek(&mut self, position: no_std_io::io::SeekFrom) -> no_std_io::io::Result<u64> {
+        use no_std_io::io::{ErrorKind, SeekFrom};
+        let (base, offset) = match position {
+            SeekFrom::Start(at) => {
+                self.position = usize::try_from(at).map_err(|_| ErrorKind::InvalidInput)?;
+                return Ok(at);
+            }
+            SeekFrom::End(offset) => (self.bytes.len(), offset),
+            SeekFrom::Current(offset) => (self.position, offset),
+        };
+        let base = i64::try_from(base).map_err(|_| ErrorKind::InvalidInput)?;
+        let at = base.checked_add(offset).ok_or(ErrorKind::InvalidInput)?;
+        self.position = usize::try_from(at).map_err(|_| ErrorKind::InvalidInput)?;
+        Ok(self.position as u64)
+    }
+}
+
+#[cfg(all(feature = "std", test))]
+mod slice_writer_tests {
+    use super::*;
+    use no_std_io::io::{Cursor, Seek, SeekFrom, Write};
+
+    /// Each step of writes and seeks leaves the bytes and the position a
+    /// `Cursor` does, and gives what it gives.
+    #[test]
+    fn a_slice_writer_writes_and_seeks_as_a_cursor() {
+        type Step = dyn Fn(&mut dyn WriteSeek) -> String;
+        let steps: [&Step; 9] = [
+            &|w| format!("{:?}", w.write_all(&[1, 2, 3]).is_ok()),
+            &|w| format!("{:?}", w.seek(SeekFrom::Current(-1)).ok()),
+            &|w| format!("{:?}", w.write(&[9, 9]).ok()),
+            &|w| format!("{:?}", w.seek(SeekFrom::End(-2)).ok()),
+            &|w| format!("{:?}", w.write_all(&[7, 7, 7]).is_ok()),
+            &|w| format!("{:?}", w.stream_position().ok()),
+            &|w| format!("{:?}", w.seek(SeekFrom::Start(20)).ok()),
+            &|w| format!("{:?}", w.write(&[5]).ok()),
+            &|w| format!("{:?}", w.seek(SeekFrom::Current(-30)).is_err()),
+        ];
+        let (mut a, mut b) = ([0u8; 8], [0u8; 8]);
+        {
+            let mut cursor = Cursor::new(&mut a[..]);
+            let mut slice = SliceWriter::new(&mut b);
+            for (index, step) in steps.iter().enumerate() {
+                assert_eq!(step(&mut slice), step(&mut cursor), "step {index}");
+            }
+        }
+        assert_eq!(a, b);
+    }
+
+    trait WriteSeek: Write + Seek {}
+    impl<T: Write + Seek> WriteSeek for T {}
+}

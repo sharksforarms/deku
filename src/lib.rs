@@ -738,7 +738,7 @@ pub trait DekuContainerWrite: DekuWriter<()> {
     /// ````
     #[inline(always)]
     fn to_slice(&self, buf: &mut [u8]) -> Result<usize, DekuError> {
-        let mut cursor = no_std_io::Cursor::new(buf);
+        let mut cursor = writer::SliceWriter::new(buf);
         let mut writer = Writer::new(&mut cursor);
         DekuWriter::to_writer(self, &mut writer, ())?;
         writer.finalize()?;

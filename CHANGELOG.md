@@ -37,6 +37,9 @@
   seven fields reads about 3000 times faster than through its fields, and is
   written as one integer where no bits wait to be written
 - `Writer::is_aligned`, whether the next write starts on a byte boundary
+- A bit run of whole bytes on a writer at a byte boundary is written with one
+  call, and `to_slice` writes through `writer::SliceWriter`, whose fixed-size
+  writes copy with a load and a store
 - `Writer::finalize` with no bits pending writes nothing, where it wrote an
   empty `BitSlice`: `to_bytes` of a struct of a few fields takes about half
   the instructions

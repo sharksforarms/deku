@@ -30,6 +30,8 @@
 - A bit read of at most 56 bits shifts a `u64` rather than a `u128`, and an
   enum id of a literal `bits`, big-endian, is read with a width known at
   compile time
+- A bit run of whole bytes on a cursor at a byte boundary is read with one
+  fixed-size read in place of one read per byte
 - Bump MSRV to 1.88
 - Update syn to 3.0 and darling to 0.24
 - Added a note concerning `skip`/`cond` attributes and padding (doc)

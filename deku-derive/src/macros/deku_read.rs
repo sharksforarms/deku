@@ -801,8 +801,32 @@ fn emit_bit_run_read(
         internals.push(internal);
     }
 
+    // A run of whole bytes on a cursor at a byte boundary is plain bytes,
+    // which one fixed-size read serves. The bit reader takes them one byte
+    // at a time. A run with a `bit_field` has no literal width, so it stays
+    // on the bit reader.
+    let lit_total: Option<usize> = run.iter().map(BitRunField::lit_span).sum();
+    let read_run = match lit_total {
+        Some(total) if total % 8 == 0 => {
+            let bytes = total / 8;
+            let skip = 8 - bytes;
+            quote! {
+                if __deku_reader.leftover.is_none() {
+                    let mut __deku_run_bytes = [0u8; 8];
+                    __deku_reader.read_bytes_const_into::<#bytes>(
+                        (&mut __deku_run_bytes[#skip..]).try_into().expect("a run of whole bytes"),
+                        ::#crate_::ctx::Order::Msb0,
+                    )?;
+                    u64::from_be_bytes(__deku_run_bytes)
+                } else {
+                    __deku_reader.read_bits_uint_msb0(#total)?
+                }
+            }
+        }
+        _ => quote! { __deku_reader.read_bits_uint_msb0(#total)? },
+    };
     let batched = quote! {
-        let #run_ident: u64 = __deku_reader.read_bits_uint_msb0(#total)?;
+        let #run_ident: u64 = #read_run;
         #extracts
     };
 

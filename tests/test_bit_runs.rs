@@ -775,3 +775,58 @@ fn a_byte_aligned_lsb0_parent_before_a_run() {
         assert_eq!(bb, data, "round-trip, seed {seed}");
     }
 }
+
+/// A run of whole bytes reads with one fixed-size read where the cursor is
+/// at a byte boundary, and with the bit reader where it is not. Both must
+/// give the fields the unbatched struct does.
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(
+    endian = "big",
+    ctx = "_: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Big"
+)]
+struct WordForm {
+    #[deku(bits = 6)]
+    opcode: u8,
+    #[deku(bits = 5)]
+    rt: u8,
+    #[deku(bits = 5)]
+    ra: u8,
+    #[deku(bits = 16)]
+    d: u16,
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "big")]
+struct AfterANibble {
+    #[deku(bits = 4)]
+    lead: u8,
+    form: WordForm,
+    #[deku(bits = 4)]
+    tail: u8,
+}
+
+#[test]
+fn a_run_of_whole_bytes_reads_the_same_aligned_or_not() {
+    for seed in 1..5_000u32 {
+        let data = wire(5, seed);
+        let word = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+        let (_, aligned) = WordForm::from_bytes((&data, 0)).unwrap();
+        let expected = WordForm {
+            opcode: (word >> 26) as u8,
+            rt: (word >> 21 & 0x1f) as u8,
+            ra: (word >> 16 & 0x1f) as u8,
+            d: word as u16,
+        };
+        assert_eq!(aligned, expected, "seed {seed}");
+
+        let shifted = u64::from_be_bytes([0, 0, 0, data[0], data[1], data[2], data[3], data[4]]);
+        let (_, after) = AfterANibble::from_bytes((&data, 0)).unwrap();
+        let inner = (shifted >> 4) as u32;
+        assert_eq!(after.lead, (shifted >> 36) as u8, "seed {seed}");
+        assert_eq!(after.form.d, inner as u16, "seed {seed}");
+        assert_eq!(after.form.opcode, (inner >> 26) as u8, "seed {seed}");
+        assert_eq!(after.tail, (shifted & 0xf) as u8, "seed {seed}");
+        assert_eq!(after.to_bytes().unwrap(), data, "seed {seed}");
+    }
+}

@@ -1881,3 +1881,36 @@ mod byte_run_tests {
         assert_eq!(starts, vec![2]);
     }
 }
+
+#[cfg(test)]
+#[cfg(feature = "bits")]
+mod const_id_tests {
+    use super::*;
+
+    fn id_bits(src: &str) -> Option<usize> {
+        const_id_bits(&DekuData::from_input(src.parse().unwrap()).expect("input should parse"))
+    }
+
+    #[test]
+    fn a_literal_big_endian_id_reads_as_a_constant() {
+        let src =
+            r#"#[deku(id_type = "u8", bits = 5, endian = "big")] enum T { #[deku(id = 1)] A }"#;
+        assert_eq!(id_bits(src), Some(5));
+        let src = r#"#[deku(id_type = "u16", bits = 12, id_endian = "big")] enum T { #[deku(id = 1)] A }"#;
+        assert_eq!(id_bits(src), Some(12));
+    }
+
+    #[test]
+    fn any_other_id_keeps_its_own_read() {
+        for src in [
+            r#"#[deku(id_type = "u8", bits = 5)] enum T { #[deku(id = 1)] A }"#,
+            r#"#[deku(id_type = "u8", bits = 5, endian = "little")] enum T { #[deku(id = 1)] A }"#,
+            r#"#[deku(id_type = "u8", bits = 5, endian = "e", ctx = "e: deku::ctx::Endian")] enum T { #[deku(id = 1)] A }"#,
+            r#"#[deku(id_type = "u8", bits = 5, endian = "big", bit_order = "lsb")] enum T { #[deku(id = 1)] A }"#,
+            r#"#[deku(id_type = "i8", bits = 5, endian = "big")] enum T { #[deku(id = 1)] A }"#,
+            r#"#[deku(id_type = "u8", endian = "big")] enum T { #[deku(id = 1)] A }"#,
+        ] {
+            assert_eq!(id_bits(src), None, "{src}");
+        }
+    }
+}

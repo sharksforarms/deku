@@ -529,6 +529,59 @@ fn emit_field_writes(
     Ok(writes)
 }
 
+/// The `assert` and the `assert_eq` of the field `f` at `i`, as its write
+/// checks them before it writes.
+fn write_assertions(
+    f: &FieldData,
+    i: usize,
+    object_prefix: &Option<TokenStream>,
+    ident: &str,
+) -> (Option<TokenStream>, Option<TokenStream>) {
+    let field_ident = f.get_ident(i, object_prefix.is_none());
+    let field_ident_str = field_ident.to_string();
+    let field_assert = f.assert.as_ref().map(|v| {
+        let return_error = assertion_failed(v, ident, &field_ident_str, None);
+        quote! {
+            if (!(#v)) {
+                #return_error
+            } else {
+                // do nothing
+            }
+        }
+    });
+    let field_assert_eq = f.assert_eq.as_ref().map(|v| {
+        let return_error = assertion_failed(v, ident, &field_ident_str, Some(&field_ident));
+        quote! {
+            if (!(*(#field_ident) == (#v))) {
+                #return_error
+            } else {
+                // do nothing
+            }
+        }
+    });
+    (field_assert, field_assert_eq)
+}
+
+/// The assertions of the fields of a run that starts at `start`, checked
+/// in field order before the run writes, as each field's own write would.
+#[cfg(feature = "bits")]
+fn run_write_assertions(
+    fields: &Fields<&FieldData>,
+    start: usize,
+    len: usize,
+    object_prefix: &Option<TokenStream>,
+    ident: &str,
+) -> TokenStream {
+    let mut checks = TokenStream::new();
+    for offset in 0..len {
+        let f = fields.fields[start + offset];
+        let (assert, assert_eq) = write_assertions(f, start + offset, object_prefix, ident);
+        checks.extend(assert);
+        checks.extend(assert_eq);
+    }
+    checks
+}
+
 /// A little-endian `Lsb0` run of whole bytes: where no bits wait to be
 /// written, each field's bits into one integer, the first field lowest,
 /// written as little-endian bytes in one call. Otherwise the fields' own
@@ -571,8 +624,11 @@ fn emit_lsb_run_write(
         )?);
         shift += bits;
     }
+    let assertions =
+        run_write_assertions(fields, start, run.len(), object_prefix, &ident.to_string());
     Ok(quote! {
         if __deku_writer.is_aligned() {
+            #assertions
             #checks
             let __deku_lsb_run: u64 = #(#terms)|*;
             __deku_writer.write_bytes(&__deku_lsb_run.to_le_bytes()[..#bytes])?;
@@ -669,8 +725,10 @@ fn emit_bit_run_write(
         }
     }
 
+    let assertions = run_write_assertions(fields, start, run.len(), object_prefix, &ident_str);
     let batched = quote! {
         #traces
+        #assertions
         #checks
         let __deku_bit_run: u64 = #(#terms)|*;
         // A partial `Lsb0` leftover cannot be spliced onto in one go: the general
@@ -939,27 +997,7 @@ fn emit_field_write(
     let field_ident = f.get_ident(i, object_prefix.is_none());
     let field_ident_str = field_ident.to_string();
 
-    let field_assert = f.assert.as_ref().map(|v| {
-        let return_error = assertion_failed(v, ident, &field_ident_str, None);
-        quote! {
-            if (!(#v)) {
-                #return_error
-            } else {
-                // do nothing
-            }
-        }
-    });
-
-    let field_assert_eq = f.assert_eq.as_ref().map(|v| {
-        let return_error = assertion_failed(v, ident, &field_ident_str, Some(&field_ident));
-        quote! {
-            if (!(*(#field_ident) == (#v))) {
-                #return_error
-            } else {
-                // do nothing
-            }
-        }
-    });
+    let (field_assert, field_assert_eq) = write_assertions(f, i, object_prefix, ident);
 
     let trace_field_log = if cfg!(feature = "logging") {
         quote! {

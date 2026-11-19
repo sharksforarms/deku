@@ -694,6 +694,7 @@ fn emit_lsb_run_read(
     let total: usize = run.iter().map(|field| field.bits).sum();
     let bytes = total / 8;
     let run_ident = quote::format_ident!("__deku_lsb_run_{}", start);
+    let assertions = run_assertions(fields, start, run.len(), &ident.to_string());
 
     let mut idents = Vec::with_capacity(run.len());
     let mut internals = Vec::with_capacity(run.len());
@@ -731,6 +732,7 @@ fn emit_lsb_run_read(
             (#(#internals,)*)
         };
         #(let #idents = &#internals;)*
+        #assertions
     };
     Ok((idents, read))
 }
@@ -753,6 +755,7 @@ fn emit_byte_run_read(
         Some(endian) => super::gen_endian_from_str(endian)?,
         None => quote! { ::#crate_::ctx::Endian::default() },
     };
+    let assertions = run_assertions(fields, start, run.fields.len(), &ident.to_string());
     let ident = ident.to_string();
 
     let mut idents = Vec::with_capacity(run.fields.len());
@@ -791,6 +794,7 @@ fn emit_byte_run_read(
         let mut #buffer = [0u8; #total];
         __deku_reader.read_bytes_const_into::<#total>(&mut #buffer, ::#crate_::ctx::Order::default())?;
         #extracts
+        #assertions
     };
     Ok((idents, read))
 }
@@ -898,13 +902,15 @@ fn emit_bit_run_read(
         }
         _ => quote! { __deku_reader.read_bits_uint_msb0(#total)? },
     };
+    let ident_str_of_run = ident.to_string();
+    let assertions = run_assertions(fields, start, run.len(), &ident_str_of_run);
     let batched = quote! {
         let #run_ident: u64 = #read_run;
         #extracts
     };
 
     if !fallback {
-        return Ok((idents, batched));
+        return Ok((idents, quote! { #batched #assertions }));
     }
 
     // The field reads the run replaces, for when it turns out not to fit. Both
@@ -925,6 +931,7 @@ fn emit_bit_run_read(
     let read = quote! {
         let (#(#internals,)*) = if const { #batch } {
             #batched
+            #assertions
             (#(#internals,)*)
         } else {
             #fallback
@@ -1012,6 +1019,56 @@ fn emit_padding_bytes(bit_size: &TokenStream) -> TokenStream {
             }
         }
     }
+}
+
+/// The `assert` and the `assert_eq` of the field `f` at `i`, as its read
+/// checks them once the field is read.
+fn read_assertions(
+    f: &FieldData,
+    i: usize,
+    ident: &str,
+) -> (Option<TokenStream>, Option<TokenStream>) {
+    let field_ident = f.get_ident(i, true);
+    let field_ident_str = field_ident.to_string();
+    let internal_field_ident = gen_internal_field_ident(&field_ident);
+    let field_assert = f.assert.as_ref().map(|v| {
+        let return_error = assertion_failed(v, ident, &field_ident_str, None);
+        quote! {
+            if (!(#v)) {
+                #return_error
+            }
+        }
+    });
+    let field_assert_eq = f.assert_eq.as_ref().map(|v| {
+        let return_error = assertion_failed(v, ident, &field_ident_str, Some(&field_ident));
+        quote! {
+            if (!(#internal_field_ident == (#v))) {
+                #return_error
+            } else {
+                // do nothing
+            }
+        }
+    });
+    (field_assert, field_assert_eq)
+}
+
+/// The assertions of the fields of a run that starts at `start`, checked
+/// in field order once the whole run is read, as each field's own read
+/// would have checked them.
+pub(crate) fn run_assertions(
+    fields: &Fields<&FieldData>,
+    start: usize,
+    len: usize,
+    ident: &str,
+) -> TokenStream {
+    let mut checks = TokenStream::new();
+    for offset in 0..len {
+        let (assert, assert_eq) =
+            read_assertions(fields.fields[start + offset], start + offset, ident);
+        checks.extend(assert);
+        checks.extend(assert_eq);
+    }
+    checks
 }
 
 fn emit_field_read(
@@ -1103,25 +1160,7 @@ fn emit_field_read(
     let field_ident_str = field_ident.to_string();
     let internal_field_ident = gen_internal_field_ident(&field_ident);
 
-    let field_assert = f.assert.as_ref().map(|v| {
-        let return_error = assertion_failed(v, &ident, &field_ident_str, None);
-        quote! {
-            if (!(#v)) {
-                #return_error
-            }
-        }
-    });
-
-    let field_assert_eq = f.assert_eq.as_ref().map(|v| {
-        let return_error = assertion_failed(v, &ident, &field_ident_str, Some(&field_ident));
-        quote! {
-            if (!(#internal_field_ident == (#v))) {
-                #return_error
-            } else {
-                // do nothing
-            }
-        }
-    });
+    let (field_assert, field_assert_eq) = read_assertions(f, i, &ident);
 
     let trace_field_log = if cfg!(feature = "logging") {
         quote! {

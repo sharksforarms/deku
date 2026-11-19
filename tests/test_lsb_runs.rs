@@ -1,6 +1,6 @@
 //! Adjacent little-endian `Lsb0` bit fields, which one read of a
 //! little-endian integer serves where the cursor is at a byte boundary.
-//! `assert = "true"` is the control: it keeps a field out of a run.
+//! `seek_from_current = "0"` is the control: it keeps a field out of a run.
 #![cfg(all(feature = "alloc", feature = "bits"))]
 
 use deku::prelude::*;
@@ -30,7 +30,7 @@ macro_rules! packed {
 }
 
 packed!(Batched,);
-packed!(Unbatched, , assert = "true");
+packed!(Unbatched, , seek_from_current = "0");
 
 fn wire(len: usize, seed: u32) -> Vec<u8> {
     let mut x = seed;
@@ -98,26 +98,26 @@ fn a_run_cut_short_is_incomplete() {
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "little", bit_order = "lsb")]
 struct AfterANibble {
-    #[deku(bits = 4, assert = "true")]
+    #[deku(bits = 4, seek_from_current = "0")]
     lead: u8,
     #[deku(bits = 6)]
     a: u8,
     #[deku(bits = 10)]
     b: u16,
-    #[deku(bits = 4, assert = "true")]
+    #[deku(bits = 4, seek_from_current = "0")]
     tail: u8,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "little", bit_order = "lsb")]
 struct AfterANibbleUnbatched {
-    #[deku(bits = 4, assert = "true")]
+    #[deku(bits = 4, seek_from_current = "0")]
     lead: u8,
-    #[deku(bits = 6, assert = "true")]
+    #[deku(bits = 6, seek_from_current = "0")]
     a: u8,
-    #[deku(bits = 10, assert = "true")]
+    #[deku(bits = 10, seek_from_current = "0")]
     b: u16,
-    #[deku(bits = 4, assert = "true")]
+    #[deku(bits = 4, seek_from_current = "0")]
     tail: u8,
 }
 

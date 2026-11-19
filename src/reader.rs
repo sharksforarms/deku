@@ -196,10 +196,9 @@ impl<R: Read + Seek> Reader<R> {
             log::trace!("skip_bits: {amt}");
 
             if let Some(Leftover::Bits(bits)) = &self.leftover {
-                let mut buf = bitarr!(u8, Msb0; 0; 8);
                 let needed = core::cmp::min(amt, bits.len());
                 amt -= needed;
-                self.read_bits_into(&mut buf[..needed], _order)?;
+                self.skip_few_bits(needed, _order)?;
             }
 
             let bytes_amt = amt / 8;
@@ -216,8 +215,7 @@ impl<R: Read + Seek> Reader<R> {
 
             // Save, and keep the leftover bits since the read will most likely be less than a byte
             // Note that the leftover bits are kept in self.leftover
-            let mut buf = bitarr!(u8, Msb0; 0; 8);
-            self.read_bits_into(&mut buf[..bits_amt], _order)?;
+            self.skip_few_bits(bits_amt, _order)?;
         }
 
         #[cfg(not(feature = "bits"))]
@@ -230,6 +228,28 @@ impl<R: Read + Seek> Reader<R> {
             }
         }
         Ok(())
+    }
+
+    /// Skip `amt` bits, fewer than a byte, as `skip_bits` skips what does not
+    /// make a whole byte.
+    ///
+    /// An `Msb0` skip reads the bits as an integer, which consumes the same
+    /// input and leaves the same leftover as `read_bits_into`. Through
+    /// `read_bits_into`, a skip of a few bits cost about 800 instructions, as
+    /// its `BitSlice` copies one bit at a time.
+    #[inline]
+    #[cfg(feature = "bits")]
+    fn skip_few_bits(&mut self, amt: usize, order: Order) -> Result<(), DekuError> {
+        debug_assert!(amt < 8);
+        if amt == 0 {
+            return Ok(());
+        }
+        if order == Order::Msb0 {
+            self.read_bits_uint_msb0(amt)?;
+            return Ok(());
+        }
+        let mut buf = bitarr!(u8, Msb0; 0; 8);
+        self.read_bits_into(&mut buf[..amt], order)
     }
 
     /// Attempt to read bits from `Reader`. If enough bits are already "Read",

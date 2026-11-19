@@ -743,7 +743,7 @@ fn emit_bit_run_read(
         let field_ident = f.get_ident(start + offset, true);
         let internal = gen_internal_field_ident(&field_ident);
         // How many bits of the run sit below this field.
-        let shift = sum_bits(&refs[offset + 1..], &crate_);
+        let shift = super::shift_of(&refs, offset, &crate_);
         let extract = match field {
             BitRunField::Primitive { bits, ty, .. } => {
                 let mask = field.mask(&crate_);

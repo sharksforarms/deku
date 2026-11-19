@@ -479,10 +479,14 @@ pub(crate) enum BitRunField {
         ordered: bool,
         /// Whether a value can exceed `bits` at all. If not, no check is emitted.
         can_overflow: bool,
-        /// Whether the field takes its type's whole width, so it is a plain byte
-        /// field rather than a packed one. A run of only these is already served
-        /// by the byte path.
+        /// Whether the field takes its type's whole width, with no padding, so
+        /// it is a plain byte field rather than a packed one. A run of only
+        /// these is already served by the byte path.
         whole_width: bool,
+        /// The bits of `pad_bits_before`, which the run reads and drops.
+        pad_before: usize,
+        /// The bits of `pad_bits_after`, which the run reads and drops.
+        pad_after: usize,
     },
     /// A `bit_field` field, whose type implements `DekuBitField`. Only the
     /// compiler knows the width, and the bits become a value through the trait.
@@ -505,6 +509,35 @@ impl BitRunField {
         match self {
             Self::Primitive { bits, .. } => quote! { #bits },
             Self::BitField { ty } => quote! { <#ty as ::#crate_::DekuBitField>::BITS },
+        }
+    }
+
+    /// The bits of padding before and after the field.
+    pub(crate) fn padding(&self) -> (usize, usize) {
+        match self {
+            Self::Primitive {
+                pad_before,
+                pad_after,
+                ..
+            } => (*pad_before, *pad_after),
+            Self::BitField { .. } => (0, 0),
+        }
+    }
+
+    /// The bits the field takes in its run, with its padding, as a literal
+    /// where the width is known here.
+    pub(crate) fn lit_span(&self) -> Option<usize> {
+        let (before, after) = self.padding();
+        Some(before + self.lit_bits()? + after)
+    }
+
+    /// The bits the field takes in its run, with its padding.
+    pub(crate) fn span(&self, crate_: &Ident) -> TokenStream {
+        let (before, after) = self.padding();
+        let bits = self.bits(crate_);
+        match before + after {
+            0 => bits,
+            padding => quote! { (#bits + #padding) },
         }
     }
 
@@ -539,15 +572,26 @@ impl BitRunField {
 #[cfg(feature = "bits")]
 pub(crate) type BitRun = Vec<BitRunField>;
 
-/// Sums the widths of `fields`, as a literal where every width is known here and
-/// as a constant expression otherwise.
+/// Sums the spans of `fields`, padding included, as a literal where every
+/// width is known here and as a constant expression otherwise.
 #[cfg(feature = "bits")]
 pub(crate) fn sum_bits(fields: &[&BitRunField], crate_: &Ident) -> TokenStream {
-    if let Some(total) = fields.iter().map(|f| f.lit_bits()).sum::<Option<usize>>() {
+    if let Some(total) = fields.iter().map(|f| f.lit_span()).sum::<Option<usize>>() {
         return quote! { #total };
     }
-    let terms = fields.iter().map(|f| f.bits(crate_));
+    let terms = fields.iter().map(|f| f.span(crate_));
     quote! { (#(#terms)+*) }
+}
+
+/// The bits of the run below the field at `offset`: the spans of the fields
+/// after it, and its own `pad_bits_after`.
+#[cfg(feature = "bits")]
+pub(crate) fn shift_of(fields: &[&BitRunField], offset: usize, crate_: &Ident) -> TokenStream {
+    let after = sum_bits(&fields[offset + 1..], crate_);
+    match fields[offset].padding().1 {
+        0 => after,
+        pad => quote! { (#after + #pad) },
+    }
 }
 
 /// Requires the trait of a `bit_field` outside a run too, so a wrong attribute
@@ -595,6 +639,19 @@ pub(crate) fn batch_condition(run: &BitRun, crate_: &Ident) -> TokenStream {
     quote! { #(#widths != 0 && #widths <= 64 &&)* #total <= 64 #packed }
 }
 
+/// The width of a padding attribute, where it is a literal, and 0 where the
+/// field has none. `None` for a width only known at run time.
+#[cfg(feature = "bits")]
+fn literal_padding(pad: Option<&TokenStream>) -> Option<usize> {
+    match pad {
+        None => Some(0),
+        Some(tokens) => syn::parse2::<syn::LitInt>(tokens.clone())
+            .ok()?
+            .base10_parse()
+            .ok(),
+    }
+}
+
 /// A plain `bool`, which a run compares rather than casts.
 #[cfg(feature = "bits")]
 fn is_bool(ty: &syn::Type) -> bool {
@@ -629,10 +686,17 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
     // Which overflow wording this field's own write would have used.
     let ordered = explicit_order.is_some();
 
+    // Padding of a literal width is bits like any other in the run, which the
+    // read drops and the write leaves zero, as `skip_bits` and the padding
+    // write do.
+    let pad_before = literal_padding(f.pad_bits_before.as_ref())?;
+    let pad_after = literal_padding(f.pad_bits_after.as_ref())?;
+
     // The width lives on the trait. `FieldData::validate` rejects a `bits`
-    // alongside it.
+    // alongside it. Its padding keeps it out of a run.
     if f.bit_field {
-        return Some(BitRunField::BitField { ty: f.ty.clone() });
+        return (pad_before == 0 && pad_after == 0)
+            .then(|| BitRunField::BitField { ty: f.ty.clone() });
     }
 
     let width = match &f.ty {
@@ -666,7 +730,9 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
         ty: f.ty.clone(),
         ordered,
         can_overflow,
-        whole_width: bits == width,
+        whole_width: bits == width && pad_before == 0 && pad_after == 0,
+        pad_before,
+        pad_after,
     })
 }
 
@@ -698,7 +764,7 @@ pub(crate) fn plan_bit_runs(
             let Some(field) = run_field(input, fields.fields[j]) else {
                 break;
             };
-            let bits = field.lit_bits().unwrap_or(1);
+            let bits = field.lit_span().unwrap_or(1);
             if floor + bits > u64::BITS as usize {
                 break;
             }
@@ -1154,6 +1220,20 @@ mod tests {
     }
 
     #[test]
+    fn literal_bit_padding_joins_the_run_with_its_field() {
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(pad_bits_before = "5", bits = 3)] a: u8,
+            #[deku(bits = 4, pad_bits_after = "2")] b: u8,
+            #[deku(bits = 2)] c: u8,
+        }"#;
+        let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
+        let fields = data.data.as_ref().take_struct().expect("a struct");
+        let runs = plan_bit_runs(&data, &fields, false);
+        let spans: Vec<Option<usize>> = runs[&0].iter().map(BitRunField::lit_span).collect();
+        assert_eq!(spans, vec![Some(8), Some(6), Some(2)]);
+    }
+
+    #[test]
     fn bits_must_be_a_literal_and_fit_the_type() {
         // A non-literal width is not known at expansion time.
         let src = r#"#[deku(endian = "big", ctx = "n: usize")] struct Test {
@@ -1174,9 +1254,9 @@ mod tests {
     /// otherwise batch, with the attribute on the first.
     #[rstest]
     #[case::bytes("bytes = 1")]
-    #[case::pad_bits_before("pad_bits_before = \"1\"")]
     #[case::pad_bytes_before("pad_bytes_before = \"1\"")]
-    #[case::pad_bits_after("pad_bits_after = \"1\"")]
+    #[case::pad_bits_before_of_run_time("pad_bits_before = \"n\"")]
+    #[case::pad_bits_after_of_run_time("pad_bits_after = \"n\"")]
     #[case::pad_bytes_after("pad_bytes_after = \"1\"")]
     #[case::cond("cond = \"true\"")]
     #[case::assert("assert = \"true\"")]

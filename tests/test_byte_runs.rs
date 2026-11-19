@@ -1,8 +1,8 @@
 //! Adjacent whole-byte integer fields served by one byte read.
 //!
 //! Batching must be invisible: the same values and the same rejections as an
-//! unbatched struct. `assert = "true"` is the control, since it disqualifies a
-//! field from a run while being a no-op.
+//! unbatched struct. `seek_from_current = "0"` is the control, since it keeps a field out
+//! of a run while being a no-op.
 #![cfg(feature = "alloc")]
 
 use deku::ctx::Endian;
@@ -32,9 +32,9 @@ macro_rules! header {
 }
 
 header!(BigBatched, "big",);
-header!(BigUnbatched, "big", assert = "true");
+header!(BigUnbatched, "big", seek_from_current = "0");
 header!(LittleBatched, "little",);
-header!(LittleUnbatched, "little", assert = "true");
+header!(LittleUnbatched, "little", seek_from_current = "0");
 
 /// The number of bytes the header takes.
 const HEADER_BYTES: usize = 1 + 2 + 4 + 8 + 1 + 16;
@@ -156,9 +156,9 @@ struct TargetOrder {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 struct TargetOrderUnbatched {
-    #[deku(assert = "true")]
+    #[deku(seek_from_current = "0")]
     first: u16,
-    #[deku(assert = "true")]
+    #[deku(seek_from_current = "0")]
     second: u32,
 }
 
@@ -216,9 +216,9 @@ struct Unaligned {
 struct UnalignedUnbatched {
     #[deku(bits = 4)]
     flags: u8,
-    #[deku(assert = "true")]
+    #[deku(seek_from_current = "0")]
     first: u16,
-    #[deku(assert = "true")]
+    #[deku(seek_from_current = "0")]
     second: u8,
     #[deku(bits = 4)]
     tail: u8,

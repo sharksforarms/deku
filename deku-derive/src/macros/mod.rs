@@ -963,7 +963,7 @@ fn byte_run_field<'a>(
     // The attributes a byte array excuses are the ones a byte run excuses:
     // `endian`, `bit_order` and `update`. A `bits` or `bytes` width is a
     // different read.
-    if f.any_field_set_incompatible_with_byte_array() {
+    if f.any_field_set_incompatible_with_byte_run() {
         return None;
     }
     // On an unaligned cursor `read_bytes_const_into` reverses the buffer for
@@ -1380,6 +1380,15 @@ mod tests {
         assert_eq!(plan(src), vec![]);
     }
 
+    #[test]
+    fn an_asserted_field_joins_a_run() {
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(assert_eq = "1")] a: u8,
+            #[deku(bits = 4, assert = "*b < 9")] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 4])]);
+    }
+
     /// Every attribute that must keep a field out of a run. Two fields that would
     /// otherwise batch, with the attribute on the first.
     #[rstest]
@@ -1389,8 +1398,7 @@ mod tests {
     #[case::pad_bits_after_of_run_time("pad_bits_after = \"n\"")]
     #[case::pad_bytes_after("pad_bytes_after = \"1\"")]
     #[case::cond("cond = \"true\"")]
-    #[case::assert("assert = \"true\"")]
-    #[case::assert_eq("assert_eq = \"0\"")]
+    #[case::assert_of_an_offset("assert = \"deku::bit_offset == 0\"")]
     #[case::map("map = \"|v: u8| -> Result<_, DekuError> { Ok(v) }\"")]
     #[case::reader("reader = \"read_it()\"")]
     #[case::writer("writer = \"write_it()\"")]
@@ -1799,7 +1807,7 @@ mod tests {
         r#"#[deku(endian = "big", bit_order = "lsb")] struct Test { #[deku(bits = 4)] a: u8, #[deku(bit_field)] f: Flag }"#
     )]
     #[case::other_attribute(
-        r#"#[deku(endian = "big")] struct Test { #[deku(bits = 4)] a: u8, #[deku(bit_field, assert = "true")] f: Flag }"#
+        r#"#[deku(endian = "big")] struct Test { #[deku(bits = 4)] a: u8, #[deku(bit_field, seek_from_current = "0")] f: Flag }"#
     )]
     fn a_bit_field_follows_the_rules_of_any_run_field(#[case] src: &str) {
         assert_eq!(plan_bit_fields(src), vec![]);
@@ -1922,11 +1930,20 @@ mod byte_run_tests {
             b: u16,
             c: Other,
             d: u16,
-            #[deku(assert_eq = "0")] e: u16,
+            #[deku(seek_from_current = "0")] e: u16,
             f: u16,
             g: u16,
         }"#;
         assert_eq!(plan(src), vec![(0, vec![2, 2]), (5, vec![2, 2])]);
+    }
+
+    #[test]
+    fn an_asserted_field_joins_the_run() {
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(assert_eq = "7")] a: u16,
+            #[deku(assert = "*b < 10")] b: u16,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![2, 2])]);
     }
 
     #[test]

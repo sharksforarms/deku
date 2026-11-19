@@ -37,6 +37,10 @@
   seven fields reads about 3000 times faster than through its fields, and is
   written as one integer where no bits wait to be written
 - `Writer::is_aligned`, whether the next write starts on a byte boundary
+- A field with `assert` or `assert_eq` joins a run, which checks the assertion
+  once it has read the field, and before it writes it, with the error of the
+  field's own read or write. An assertion that reads `deku::bit_offset` or
+  `deku::byte_offset` still keeps its field out
 - Bump MSRV to 1.88
 - Update syn to 3.0 and darling to 0.24
 - Added a note concerning `skip`/`cond` attributes and padding (doc)

@@ -736,6 +736,44 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
     })
 }
 
+/// The literal `bits` of an enum id that one constant-width read can serve:
+/// an unsigned primitive, explicitly big-endian, `Msb0`, as `run_field` asks
+/// of a field. `None` for anything else, which keeps its own read.
+#[cfg(feature = "bits")]
+pub(crate) fn const_id_bits(input: &DekuData) -> Option<usize> {
+    let id_type = syn::parse2::<syn::Ident>(input.id_type.clone()?).ok()?;
+    let width = match id_type.to_string().as_str() {
+        "u8" => u8::BITS as usize,
+        "u16" => u16::BITS as usize,
+        "u32" => u32::BITS as usize,
+        "u64" => u64::BITS as usize,
+        _ => return None,
+    };
+    if input.bytes.is_some() {
+        return None;
+    }
+    let endian = input.id_endian.as_ref().or(input.endian.as_ref())?;
+    if endian.value() != "big" {
+        return None;
+    }
+    if let Some(order) = input.bit_order.as_ref()
+        && order.value() != "msb"
+    {
+        return None;
+    }
+    let bits = match input.bits.as_ref()? {
+        crate::Num::LitInt(lit) => lit.base10_parse::<usize>().ok()?,
+        crate::Num::TokenStream(_) => return None,
+    };
+    (1..=width).contains(&bits).then_some(bits)
+}
+
+/// A build with no `bits` feature reads no id narrower than its type.
+#[cfg(not(feature = "bits"))]
+pub(crate) fn const_id_bits(_: &DekuData) -> Option<usize> {
+    None
+}
+
 /// Groups adjacent run-eligible fields, keyed by the index the run starts at.
 ///
 /// A run is capped at 64 bits, the width the reader returns, and must hold at

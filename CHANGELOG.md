@@ -27,6 +27,9 @@
   without a `BitSlice` copy in `Msb0`
 - A bit field with a literal `pad_bits_before` or `pad_bits_after` joins a run
   of adjacent bit fields, which reads the padding with it
+- A bit read of at most 56 bits shifts a `u64` rather than a `u128`, and an
+  enum id of a literal `bits`, big-endian, is read with a width known at
+  compile time
 - Bump MSRV to 1.88
 - Update syn to 3.0 and darling to 0.24
 - Added a note concerning `skip`/`cond` attributes and padding (doc)

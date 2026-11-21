@@ -14,6 +14,8 @@ use crate::Num;
 #[cfg(feature = "bits")]
 use crate::{DekuData, FieldData};
 
+#[cfg(feature = "bits")]
+pub(crate) mod deku_bit_field;
 pub(crate) mod deku_read;
 pub(crate) mod deku_size;
 pub(crate) mod deku_write;
@@ -428,25 +430,172 @@ fn assertion_failed(
     }
 }
 
+/// The error for an enum id matching no variant, shared by the enum reader and
+/// a derived `DekuBitField` so that both report it alike.
+pub(crate) fn no_variant_error(crate_: &Ident, ident_as_string: &str) -> TokenStream {
+    quote! {
+        ::#crate_::deku_error!(
+            ::#crate_::DekuError::Parse,
+            "Could not match enum variant",
+            "ID {:?} not found on {}",
+            __deku_variant_id,
+            #ident_as_string
+        )
+    }
+}
+
+/// The width of the unsigned primitive named `name`, the integers a run and a
+/// `DekuBitField` id can hold.
+#[cfg(feature = "bits")]
+pub(crate) fn unsigned_width(name: &str) -> Option<usize> {
+    let bits = match name {
+        "u8" => u8::BITS,
+        "u16" => u16::BITS,
+        "u32" => u32::BITS,
+        "u64" => u64::BITS,
+        _ => return None,
+    };
+    Some(bits as usize)
+}
+
+/// A mask of the low `bits` bits, up to all 64.
+#[cfg(feature = "bits")]
+pub(crate) fn low_mask(bits: usize) -> u64 {
+    if bits == u64::BITS as usize {
+        u64::MAX
+    } else {
+        (1u64 << bits) - 1
+    }
+}
+
 /// One field of a contiguous big-endian `Msb0` bit-field run.
 #[cfg(feature = "bits")]
-pub(crate) struct BitRunField {
-    pub(crate) bits: usize,
-    pub(crate) ty: syn::Type,
-    /// Field takes the `Order`-carrying write impl, which words overflow
-    /// differently.
-    pub(crate) ordered: bool,
-    /// Whether a value can exceed `bits` at all. If not, no check is emitted.
-    pub(crate) can_overflow: bool,
-    /// Whether the field takes its type's whole width, so it is a plain byte
-    /// field rather than a packed one. A run of only these is already served by
-    /// the byte path.
-    pub(crate) whole_width: bool,
+pub(crate) enum BitRunField {
+    /// A plain unsigned primitive or `bool`: the width is known here, and the
+    /// bits become a value with a shift, a mask and a cast.
+    Primitive {
+        bits: usize,
+        ty: syn::Type,
+        /// Field takes the `Order`-carrying write impl, which words overflow
+        /// differently.
+        ordered: bool,
+        /// Whether a value can exceed `bits` at all. If not, no check is emitted.
+        can_overflow: bool,
+        /// Whether the field takes its type's whole width, so it is a plain byte
+        /// field rather than a packed one. A run of only these is already served
+        /// by the byte path.
+        whole_width: bool,
+    },
+    /// A `bit_field` field, whose type implements `DekuBitField`. Only the
+    /// compiler knows the width, and the bits become a value through the trait.
+    BitField { ty: syn::Type },
+}
+
+#[cfg(feature = "bits")]
+impl BitRunField {
+    /// The width as a literal, for the fields whose width is known here.
+    pub(crate) fn lit_bits(&self) -> Option<usize> {
+        match self {
+            Self::Primitive { bits, .. } => Some(*bits),
+            Self::BitField { .. } => None,
+        }
+    }
+
+    /// The width as an expression, which for a `DekuBitField` defers to the
+    /// associated constant.
+    pub(crate) fn bits(&self, crate_: &Ident) -> TokenStream {
+        match self {
+            Self::Primitive { bits, .. } => quote! { #bits },
+            Self::BitField { ty } => quote! { <#ty as ::#crate_::DekuBitField>::BITS },
+        }
+    }
+
+    /// A mask of the field's low `bits` bits.
+    pub(crate) fn mask(&self, crate_: &Ident) -> TokenStream {
+        match self {
+            Self::Primitive { bits, .. } => {
+                let mask = low_mask(*bits);
+                quote! { #mask }
+            }
+            // Via `u128` so that a full 64-bit width does not overflow the shift.
+            Self::BitField { ty } => quote! {
+                (((1u128 << <#ty as ::#crate_::DekuBitField>::BITS) - 1) as u64)
+            },
+        }
+    }
+
+    /// A plain byte field: a primitive filling its type. A `bit_field` is not
+    /// known to be one here; `batch_condition` settles it from the trait width.
+    fn whole_width(&self) -> bool {
+        matches!(
+            self,
+            Self::Primitive {
+                whole_width: true,
+                ..
+            }
+        )
+    }
 }
 
 /// Widths of a run of adjacent fields that one read can serve.
 #[cfg(feature = "bits")]
 pub(crate) type BitRun = Vec<BitRunField>;
+
+/// Sums the widths of `fields`, as a literal where every width is known here and
+/// as a constant expression otherwise.
+#[cfg(feature = "bits")]
+pub(crate) fn sum_bits(fields: &[&BitRunField], crate_: &Ident) -> TokenStream {
+    if let Some(total) = fields.iter().map(|f| f.lit_bits()).sum::<Option<usize>>() {
+        return quote! { #total };
+    }
+    let terms = fields.iter().map(|f| f.bits(crate_));
+    quote! { (#(#terms)+*) }
+}
+
+/// Requires the trait of a `bit_field` outside a run too, so a wrong attribute
+/// cannot hide until a neighbour changes.
+#[cfg(feature = "bits")]
+pub(crate) fn bit_field_bound(f: &FieldData) -> TokenStream {
+    if !f.bit_field {
+        return TokenStream::new();
+    }
+    let crate_ = get_crate_name();
+    let ty = &f.ty;
+    quote! { let _ = <#ty as ::#crate_::DekuBitField>::BITS; }
+}
+
+/// True for a run whose widths are not all known here, which is emitted with a
+/// fallback to the individual reads or writes.
+#[cfg(feature = "bits")]
+pub(crate) fn needs_fallback(run: &BitRun) -> bool {
+    run.iter().any(|f| f.lit_bits().is_none())
+}
+
+/// The constant condition choosing a run's batched path over its fallback: each
+/// trait width is from 1 to 64, the run fits one 64-bit read, and it holds a
+/// packed field. A run of only whole bytes keeps the individual reads, as
+/// `plan_bit_runs` decides for primitives.
+#[cfg(feature = "bits")]
+pub(crate) fn batch_condition(run: &BitRun, crate_: &Ident) -> TokenStream {
+    let refs: Vec<&BitRunField> = run.iter().collect();
+    let total = sum_bits(&refs, crate_);
+    let widths: Vec<TokenStream> = run
+        .iter()
+        .filter(|f| f.lit_bits().is_none())
+        .map(|f| f.bits(crate_))
+        .collect();
+    let packed_primitive = run
+        .iter()
+        .any(|f| f.lit_bits().is_some() && !f.whole_width());
+    let packed = if packed_primitive {
+        TokenStream::new()
+    } else {
+        quote! { && (#(#widths % 8 != 0)||*) }
+    };
+    // Each width is bounded before the total is summed, so an absurd `BITS`
+    // short-circuits to the fallback instead of overflowing the sum.
+    quote! { #(#widths != 0 && #widths <= 64 &&)* #total <= 64 #packed }
+}
 
 /// A plain `bool`, which a run compares rather than casts.
 #[cfg(feature = "bits")]
@@ -455,8 +604,8 @@ fn is_bool(ty: &syn::Type) -> bool {
 }
 
 /// A field a run can serve: a literal `bits` on an unsigned primitive or `bool`,
-/// explicitly big-endian, `Msb0`, carrying nothing else. Anything else keeps its
-/// own read.
+/// or a `bit_field`, explicitly big-endian, `Msb0`, carrying nothing else.
+/// Anything else keeps its own read.
 #[cfg(feature = "bits")]
 pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> {
     if f.any_field_set_incompatible_with_bit_run() {
@@ -482,16 +631,18 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
     // Which overflow wording this field's own write would have used.
     let ordered = explicit_order.is_some();
 
+    // The width lives on the trait. `FieldData::validate` rejects a `bits`
+    // alongside it.
+    if f.bit_field {
+        return Some(BitRunField::BitField { ty: f.ty.clone() });
+    }
+
     let width = match &f.ty {
         syn::Type::Path(p) if p.qself.is_none() => match p.path.get_ident()?.to_string().as_str() {
-            "u8" => u8::BITS as usize,
-            "u16" => u16::BITS as usize,
-            "u32" => u32::BITS as usize,
-            "u64" => u64::BITS as usize,
             // `impls::bool` delegates to `u8`, so a bool is a byte unless
             // `bits` narrows it. Flags in a packed header are usually `bits = 1`.
             "bool" => u8::BITS as usize,
-            _ => return None,
+            name => unsigned_width(name)?,
         },
         _ => return None,
     };
@@ -512,7 +663,7 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
     // Neither a value filling its type nor a bool can exceed its width.
     let can_overflow = bits < width && !is_bool(&f.ty);
 
-    Some(BitRunField {
+    Some(BitRunField::Primitive {
         bits,
         ty: f.ty.clone(),
         ordered,
@@ -540,24 +691,29 @@ pub(crate) fn plan_bit_runs(
             continue;
         }
         let mut run: BitRun = Vec::new();
-        let mut total = 0usize;
+        // Widths known here, plus a floor of one bit for each width that is not.
+        // A run that still turns out too wide falls back to individual reads, see
+        // `batch_condition`.
+        let mut floor = 0usize;
         let mut j = i;
         while j < fields.len() {
             let Some(field) = run_field(input, fields.fields[j]) else {
                 break;
             };
-            if total + field.bits > u64::BITS as usize {
+            let bits = field.lit_bits().unwrap_or(1);
+            if floor + bits > u64::BITS as usize {
                 break;
             }
-            total += field.bits;
+            floor += bits;
             run.push(field);
             j += 1;
         }
         // A run of only whole-width fields is a stretch of plain bytes. The byte
         // path already reads those in one call, whereas a run sends them through
         // the bit reader, which costs a `u64` accumulator and a shift and a mask
-        // per field for no gain. Batch only when the run holds a packed field.
-        let packed = run.iter().any(|f| !f.whole_width);
+        // per field for no gain. Batch only when the run holds a packed field, or
+        // a `bit_field` that may be one, which `batch_condition` then settles.
+        let packed = run.iter().any(|f| !f.whole_width());
         if run.len() >= 2 && packed {
             let len = run.len();
             runs.insert(i, run);
@@ -582,7 +738,15 @@ mod tests {
     fn sorted(runs: std::collections::HashMap<usize, BitRun>) -> Vec<(usize, Vec<usize>)> {
         let mut runs: Vec<_> = runs
             .into_iter()
-            .map(|(start, run)| (start, run.iter().map(|f| f.bits).collect::<Vec<_>>()))
+            .map(|(start, run)| {
+                let widths = run
+                    .iter()
+                    // Every field these tests plan is a primitive, so each width
+                    // is known here.
+                    .map(|f| f.lit_bits().expect("a primitive width"))
+                    .collect::<Vec<_>>();
+                (start, widths)
+            })
             .collect();
         runs.sort_by_key(|(start, _)| *start);
         runs
@@ -622,7 +786,7 @@ mod tests {
             .map(|(start, run)| {
                 (
                     start,
-                    run.iter().map(|f| f.whole_width).collect::<Vec<bool>>(),
+                    run.iter().map(|f| f.whole_width()).collect::<Vec<bool>>(),
                 )
             })
             .collect();
@@ -798,7 +962,12 @@ mod tests {
         let runs = plan_bit_runs(&data, &fields, false);
         let run = runs.get(&0).expect("both fields should batch");
         assert_eq!(
-            run.iter().map(|f| f.ordered).collect::<Vec<_>>(),
+            run.iter()
+                .map(|f| match f {
+                    BitRunField::Primitive { ordered, .. } => *ordered,
+                    BitRunField::BitField { .. } => unreachable!("no bit_field here"),
+                })
+                .collect::<Vec<_>>(),
             vec![true, false]
         );
 
@@ -1010,7 +1179,7 @@ mod tests {
             .map(|f| {
                 run_field(&data, f)
                     .expect("every field should qualify for a run")
-                    .whole_width
+                    .whole_width()
             })
             .collect();
         // `bits` equal to the width is whole, as is its absence. A narrowed field
@@ -1037,7 +1206,7 @@ mod tests {
                 let field = run_field(&data, f).unwrap_or_else(|| {
                     panic!("field {i} should qualify, leaving only the whole-width rule")
                 });
-                assert!(field.whole_width, "field {i} should be whole-width");
+                assert!(field.whole_width(), "field {i} should be whole-width");
             }
             assert_eq!(plan(src), vec![], "a whole-width run must not batch");
         }
@@ -1151,7 +1320,7 @@ mod tests {
             assert!(
                 run_field(&data, fields.fields[i])
                     .expect("the plain half should still be eligible")
-                    .whole_width
+                    .whole_width()
             );
         }
         assert_eq!(plan_whole_width(src), vec![(3, vec![false, false])]);
@@ -1243,5 +1412,135 @@ mod tests {
         assert_eq!(plan_variant(src, 0, true), vec![(1, vec![4, 8])]);
         // Without the id the same fields batch from 0, which is the contrast.
         assert_eq!(plan_variant(src, 0, false), vec![(0, vec![8, 4, 8])]);
+    }
+
+    /// As `plan`, with `None` for a `bit_field`, whose width only the trait knows.
+    fn plan_bit_fields(src: &str) -> Vec<(usize, Vec<Option<usize>>)> {
+        let data = DekuData::from_input(src.parse().unwrap()).expect("input should parse");
+        let fields = data
+            .data
+            .as_ref()
+            .take_struct()
+            .expect("test input should be a struct");
+
+        let mut runs: Vec<_> = plan_bit_runs(&data, &fields, false)
+            .into_iter()
+            .map(|(start, run)| (start, run.iter().map(|f| f.lit_bits()).collect()))
+            .collect();
+        runs.sort_by_key(|(start, _)| *start);
+        runs
+    }
+
+    #[test]
+    fn a_bit_field_joins_a_run() {
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 3)] a: u8,
+            #[deku(bit_field)] flag: Flag,
+            #[deku(bits = 4)] b: u8,
+        }"#;
+        assert_eq!(
+            plan_bit_fields(src),
+            vec![(0, vec![Some(3), None, Some(4)])]
+        );
+
+        // Without the attribute the same type splits the run, as any other type does.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 3)] a: u8,
+            flag: Flag,
+            #[deku(bits = 4)] b: u8,
+        }"#;
+        assert_eq!(plan_bit_fields(src), vec![]);
+    }
+
+    #[rstest]
+    #[case::implicit_endian(
+        r#"struct Test { #[deku(bits = 4)] a: u8, #[deku(bit_field)] f: Flag }"#
+    )]
+    #[case::little_endian(
+        r#"#[deku(endian = "little")] struct Test { #[deku(bits = 4)] a: u8, #[deku(bit_field)] f: Flag }"#
+    )]
+    #[case::lsb(
+        r#"#[deku(endian = "big", bit_order = "lsb")] struct Test { #[deku(bits = 4)] a: u8, #[deku(bit_field)] f: Flag }"#
+    )]
+    #[case::other_attribute(
+        r#"#[deku(endian = "big")] struct Test { #[deku(bits = 4)] a: u8, #[deku(bit_field, assert = "true")] f: Flag }"#
+    )]
+    fn a_bit_field_follows_the_rules_of_any_run_field(#[case] src: &str) {
+        assert_eq!(plan_bit_fields(src), vec![]);
+    }
+
+    #[test]
+    fn an_unknown_width_counts_one_bit_when_grouping() {
+        // 40 + 23 + at least 1 fills the 64 bits, so the last field starts no run
+        // of its own: alone it is not one.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(bits = 40)] a: u64,
+            #[deku(bits = 23)] b: u32,
+            #[deku(bit_field)] flag: Flag,
+            #[deku(bits = 1)] c: u8,
+        }"#;
+        assert_eq!(
+            plan_bit_fields(src),
+            vec![(0, vec![Some(40), Some(23), None])]
+        );
+    }
+
+    #[test]
+    fn a_run_of_bit_fields_beside_whole_bytes_is_left_to_the_batch_condition() {
+        // Whether this is a stretch of bytes depends on the trait width, so the
+        // planner keeps the run and `batch_condition` decides.
+        let src = r#"#[deku(endian = "big")] struct Test {
+            a: u8,
+            #[deku(bit_field)] kind: Kind,
+            b: u8,
+        }"#;
+        assert_eq!(
+            plan_bit_fields(src),
+            vec![(0, vec![Some(8), None, Some(8)])]
+        );
+    }
+
+    #[test]
+    fn the_batch_condition_applies_the_byte_path_rule_without_a_packed_primitive() {
+        // The trait width tested for whole bytes, as `batch_condition` spells it.
+        const BYTE_PATH_RULE: &str = "DekuBitField > :: BITS % 8 != 0";
+        let emitted = |src: &str| {
+            let data = DekuData::from_input(src.parse().unwrap()).unwrap();
+            let read = emit_deku_read(&data).unwrap().to_string();
+            let write = crate::macros::deku_write::emit_deku_write(&data)
+                .unwrap()
+                .to_string();
+            (read, write)
+        };
+
+        // Only whole bytes besides the trait width: the rule hangs on it.
+        let (read, write) = emitted(
+            r#"#[deku(endian = "big")] struct Test { a: u8, #[deku(bit_field)] kind: Kind, b: u8 }"#,
+        );
+        for code in [&read, &write] {
+            assert_eq!(code.matches("if const").count(), 1);
+            assert!(
+                code.contains(BYTE_PATH_RULE),
+                "expected the byte-path rule in {code}"
+            );
+        }
+
+        // A packed primitive settles it here, so the condition is only the fit.
+        let (read, write) = emitted(
+            r#"#[deku(endian = "big")] struct Test { #[deku(bits = 4)] a: u8, #[deku(bit_field)] kind: Kind, #[deku(bits = 4)] b: u8 }"#,
+        );
+        for code in [&read, &write] {
+            assert_eq!(code.matches("if const").count(), 1);
+            assert!(
+                !code.contains(BYTE_PATH_RULE),
+                "unexpected byte-path rule in {code}"
+            );
+        }
+
+        // And a run of primitives alone needs no condition at all.
+        let (read, write) = emitted(&be_struct(&[2, 3, 3]));
+        for code in [&read, &write] {
+            assert_eq!(code.matches("if const").count(), 0);
+        }
     }
 }

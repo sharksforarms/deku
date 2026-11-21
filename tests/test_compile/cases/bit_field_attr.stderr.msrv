@@ -1,0 +1,29 @@
+error: conflicting: both `bit_field` and `bits` specified on field
+  --> tests/test_compile/cases/bit_field_attr.rs:17:30
+   |
+17 |     #[deku(bit_field, bits = 1)]
+   |                              ^
+
+error[E0308]: mismatched types
+  --> tests/test_compile/cases/bit_field_attr.rs:23:10
+   |
+23 | #[derive(DekuRead)]
+   |          ^^^^^^^^
+   |          |
+   |          expected `u8`, found `Endian`
+   |          arguments to this function are incorrect
+   |
+note: associated function defined here
+  --> src/lib.rs
+   |
+   |     fn from_reader_with_ctx<R: no_std_io::Read + no_std_io::Seek>(
+   |        ^^^^^^^^^^^^^^^^^^^^
+   = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `u16: deku::DekuBitField` is not satisfied
+  --> tests/test_compile/cases/bit_field_attr.rs:37:8
+   |
+37 |     a: u16,
+   |        ^^^ the trait `deku::DekuBitField` is not implemented for `u16`
+   |
+   = help: the trait `deku::DekuBitField` is implemented for `NeedsCtx`

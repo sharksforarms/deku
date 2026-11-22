@@ -895,6 +895,137 @@ impl<R: Read + Seek> Reader<R> {
     }
 }
 
+/// A reader of a byte slice, as [`Cursor`](no_std_io::io::Cursor) over a
+/// slice is, whose reads of a length known at compile time copy with a
+/// load and a store.
+///
+/// `Cursor::read_exact` copies through `memcpy` for any length, which a
+/// read of a few bytes calls for each run of fields. A type read from a
+/// word of two or four bytes spends more in that call than in its fields.
+#[derive(Debug, Clone)]
+pub struct SliceReader<'a> {
+    bytes: &'a [u8],
+    position: usize,
+}
+
+impl<'a> SliceReader<'a> {
+    /// A reader at the start of `bytes`.
+    #[inline]
+    pub fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, position: 0 }
+    }
+
+    /// The bytes after the position, empty where it is past the end.
+    #[inline]
+    fn rest(&self) -> &'a [u8] {
+        self.bytes.get(self.position..).unwrap_or_default()
+    }
+}
+
+impl Read for SliceReader<'_> {
+    #[inline(always)]
+    fn read(&mut self, buf: &mut [u8]) -> no_std_io::io::Result<usize> {
+        let rest = self.rest();
+        let length = buf.len().min(rest.len());
+        buf[..length].copy_from_slice(&rest[..length]);
+        self.position += length;
+        Ok(length)
+    }
+
+    #[inline(always)]
+    fn read_exact(&mut self, buf: &mut [u8]) -> no_std_io::io::Result<()> {
+        match self.rest().get(..buf.len()) {
+            Some(head) => {
+                buf.copy_from_slice(head);
+                self.position += buf.len();
+                Ok(())
+            }
+            None => Err(self.read_exact_short()),
+        }
+    }
+}
+
+impl SliceReader<'_> {
+    /// The rest of [`read_exact`](Read::read_exact) where the slice is too
+    /// short: the position moves to the end, as `Cursor`'s does.
+    #[cold]
+    fn read_exact_short(&mut self) -> no_std_io::io::Error {
+        self.position = self.bytes.len();
+        ErrorKind::UnexpectedEof.into()
+    }
+}
+
+impl Seek for SliceReader<'_> {
+    fn seek(&mut self, position: SeekFrom) -> no_std_io::io::Result<u64> {
+        let (base, offset) = match position {
+            SeekFrom::Start(at) => {
+                self.position = usize::try_from(at).map_err(|_| ErrorKind::InvalidInput)?;
+                return Ok(at);
+            }
+            SeekFrom::End(offset) => (self.bytes.len(), offset),
+            SeekFrom::Current(offset) => (self.position, offset),
+        };
+        let base = i64::try_from(base).map_err(|_| ErrorKind::InvalidInput)?;
+        let at = base.checked_add(offset).ok_or(ErrorKind::InvalidInput)?;
+        self.position = usize::try_from(at).map_err(|_| ErrorKind::InvalidInput)?;
+        Ok(self.position as u64)
+    }
+}
+
+#[cfg(all(feature = "std", test))]
+mod slice_reader_tests {
+    use super::*;
+    use no_std_io::io::Cursor;
+
+    /// Each step of reads and seeks leaves the position a `Cursor` does, and
+    /// gives what it gives.
+    #[test]
+    fn a_slice_reader_reads_and_seeks_as_a_cursor() {
+        trait ReadSeek: Read + Seek {}
+        impl<T: Read + Seek> ReadSeek for T {}
+        type Step = dyn Fn(&mut dyn ReadSeek) -> String;
+        let steps: [&Step; 11] = [
+            &|r| {
+                let mut buf = [0; 3];
+                format!("{:?} {buf:?}", r.read_exact(&mut buf).is_ok())
+            },
+            &|r| format!("{:?}", r.seek(SeekFrom::Current(-1)).ok()),
+            &|r| {
+                let mut buf = [0; 2];
+                format!("{:?} {buf:?}", r.read(&mut buf).ok())
+            },
+            &|r| format!("{:?}", r.seek(SeekFrom::End(-2)).ok()),
+            &|r| {
+                let mut buf = [0; 3];
+                format!("{:?}", r.read_exact(&mut buf).is_ok())
+            },
+            &|r| format!("{:?}", r.stream_position().ok()),
+            &|r| format!("{:?}", r.seek(SeekFrom::Start(20)).ok()),
+            &|r| {
+                let mut buf = [0; 1];
+                format!("{:?} {buf:?}", r.read(&mut buf).ok())
+            },
+            &|r| format!("{:?}", r.seek(SeekFrom::Current(-30)).is_ok()),
+            &|r| format!("{:?}", r.seek(SeekFrom::Start(1)).ok()),
+            &|r| {
+                let mut buf = [0; 4];
+                format!("{:?} {buf:?}", r.read_exact(&mut buf).is_ok())
+            },
+        ];
+        let bytes = [1u8, 2, 3, 4, 5, 6];
+        let mut cursor = Cursor::new(&bytes[..]);
+        let mut slice = SliceReader::new(&bytes);
+        for (index, step) in steps.iter().enumerate() {
+            assert_eq!(step(&mut slice), step(&mut cursor), "step {index}");
+            assert_eq!(
+                slice.stream_position().ok(),
+                cursor.stream_position().ok(),
+                "position after step {index}"
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

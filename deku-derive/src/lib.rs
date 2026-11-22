@@ -1189,8 +1189,9 @@ struct VariantData {
 
 impl VariantData {
     /// True if the variant carries something a `DekuBitField` impl cannot
-    /// reproduce. `from_bit_run` matches a literal id out of a `u64`: no reader
-    /// for a custom `reader`, no fields to populate.
+    /// reproduce. `from_bit_run` matches a literal id out of a `u64`, then
+    /// takes the fields from the bits below it: no reader for a custom
+    /// `reader`. Each field is checked as a struct field is.
     #[cfg(feature = "bits")]
     pub fn any_variant_set_incompatible_with_bit_field(&self) -> bool {
         // Exhaustive on purpose: a new variant attribute fails to compile here
@@ -1203,18 +1204,16 @@ impl VariantData {
             // Only reachable with `id` unset, which the caller rejects.
             discriminant: _,
 
-            fields,
+            // Checked one at a time by the caller.
+            fields: _,
+
             id_pat,
             reader,
             writer,
             default,
         } = self;
 
-        !fields.is_empty()
-            || id_pat.is_some()
-            || reader.is_some()
-            || writer.is_some()
-            || default.unwrap_or(false)
+        id_pat.is_some() || reader.is_some() || writer.is_some() || default.unwrap_or(false)
     }
 
     fn from_receiver(receiver: DekuVariantReceiver) -> Result<Self, TokenStream> {

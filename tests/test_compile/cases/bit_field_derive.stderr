@@ -1,29 +1,41 @@
-error: DekuBitField: only enums are supported
- --> tests/test_compile/cases/bit_field_derive.rs:4:8
+error: DekuBitField: every field needs a literal `bits` on an unsigned integer or `bool`, or `bit_field`, in big-endian `Msb0`, with nothing else but literal padding
+ --> tests/test_compile/cases/bit_field_derive.rs:7:8
   |
-4 | struct NotAnEnum {
-  |        ^^^^^^^^^
+7 |     a: u8,
+  |        ^^
 
-error: DekuBitField: every variant must be a unit variant, without `id_pat`, `reader`, `writer` or `default`
-  --> tests/test_compile/cases/bit_field_derive.rs:14:5
+error: DekuBitField: every field needs a literal `bits` on an unsigned integer or `bool`, or `bit_field`, in big-endian `Msb0`, with nothing else but literal padding
+  --> tests/test_compile/cases/bit_field_derive.rs:14:8
    |
-14 |     Other,
+14 |     a: Vec<u8>,
+   |        ^^^
+
+error: DekuBitField: every variant must have the same bits, but this one has 4 and the first has 3
+  --> tests/test_compile/cases/bit_field_derive.rs:23:5
+   |
+23 |     B(#[deku(bits = 4)] u8),
+   |     ^
+
+error: DekuBitField: every variant needs a literal `id`, without `id_pat`, `reader`, `writer` or `default`
+  --> tests/test_compile/cases/bit_field_derive.rs:32:5
+   |
+32 |     Other,
    |     ^^^^^
 
 error: DekuBitField: `id` 0b101 does not fit in 2 bits
-  --> tests/test_compile/cases/bit_field_derive.rs:22:17
+  --> tests/test_compile/cases/bit_field_derive.rs:40:17
    |
-22 |     #[deku(id = 0b101)]
+40 |     #[deku(id = 0b101)]
    |                 ^^^^^
 
 error: DekuBitField: an id wider than 8 bits must be big-endian, or take its endian from context
-  --> tests/test_compile/cases/bit_field_derive.rs:28:6
+  --> tests/test_compile/cases/bit_field_derive.rs:46:6
    |
-28 | enum LittleEndian {
+46 | enum LittleEndian {
    |      ^^^^^^^^^^^^
 
 error: DekuBitField: `id_type` must be `u8`, `u16`, `u32` or `u64`
-  --> tests/test_compile/cases/bit_field_derive.rs:34:18
+  --> tests/test_compile/cases/bit_field_derive.rs:52:18
    |
-34 | #[deku(id_type = "i8")]
+52 | #[deku(id_type = "i8")]
    |                  ^^^^

@@ -130,7 +130,7 @@ fn emit_struct(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let from_bytes_body = quote! {
             use core::convert::TryFrom;
             use ::#crate_::DekuReader as _;
-            let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
+            let mut __deku_cursor = ::#crate_::reader::SliceReader::new(__deku_input.0);
             let mut __deku_reader = &mut ::#crate_::reader::Reader::new(&mut __deku_cursor);
             if __deku_input.1 != 0 {
                 __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;
@@ -445,7 +445,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let from_bytes_body = quote! {
             use core::convert::TryFrom;
             use ::#crate_::DekuReader as _;
-            let mut __deku_cursor = #crate_::no_std_io::Cursor::new(__deku_input.0);
+            let mut __deku_cursor = ::#crate_::reader::SliceReader::new(__deku_input.0);
             let mut __deku_reader = &mut ::#crate_::reader::Reader::new(&mut __deku_cursor);
             if __deku_input.1 != 0 {
                 __deku_reader.skip_bits(__deku_input.1, ::#crate_::ctx::Order::default())?;

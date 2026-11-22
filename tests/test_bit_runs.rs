@@ -1,8 +1,8 @@
 //! Adjacent big-endian `Msb0` bit fields served by one read and one write.
 //!
 //! Batching must be invisible: same values, same rejections, same bytes as an
-//! unbatched struct. `assert = "true"` is the control, since it disqualifies a
-//! field from a run while being a no-op.
+//! unbatched struct. `seek_from_current = "0"` is the control, since it keeps a field out
+//! of a run while being a no-op.
 #![cfg(all(feature = "alloc", feature = "bits"))]
 
 use deku::prelude::*;
@@ -31,7 +31,7 @@ macro_rules! header {
 // One run of 48 bits.
 header!(Batched,);
 // Every field disqualified, so five separate reads and writes.
-header!(Unbatched, , assert = "true");
+header!(Unbatched, , seek_from_current = "0");
 
 /// Deterministic pseudo-random bytes, so a failure is reproducible.
 fn wire(len: usize, seed: u32) -> Vec<u8> {
@@ -292,7 +292,7 @@ macro_rules! flags_header {
 }
 
 flags_header!(FlagsBatched,);
-flags_header!(FlagsUnbatched, , assert = "true");
+flags_header!(FlagsUnbatched, , seek_from_current = "0");
 
 /// A one-bit bool has no invalid value, so every wire must agree with unbatched.
 #[test]
@@ -347,7 +347,7 @@ fn a_byte_wide_bool_in_a_run_rejects_a_non_boolean_value() {
     #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
     #[deku(endian = "big")]
     struct Unbatched {
-        #[deku(assert = "true")]
+        #[deku(seek_from_current = "0")]
         flag: bool,
         other: u8,
     }
@@ -397,7 +397,7 @@ fn an_explicit_msb_bit_order_batches() {
     }
 
     ordered_header!(OrderedBatched,);
-    ordered_header!(OrderedUnbatched, , assert = "true");
+    ordered_header!(OrderedUnbatched, , seek_from_current = "0");
 
     for seed in 1..2_000u32 {
         let data = wire(2, seed);
@@ -536,7 +536,7 @@ fn from_bytes_reports_the_same_rest_and_offset() {
         };
     }
     h!(RestBatched,);
-    h!(RestUnbatched, , assert = "true");
+    h!(RestUnbatched, , seek_from_current = "0");
 
     let data = [0xABu8, 0xCD, 0xEF];
     let ((rb, ob), _) = RestBatched::from_bytes((&data, 0)).unwrap();
@@ -557,7 +557,7 @@ fn a_run_starting_mid_byte() {
             #[deku(endian = "big")]
             struct $name {
                 // Disqualified, so the run starts at bit 3.
-                #[deku(bits = 3, assert = "true")]
+                #[deku(bits = 3, seek_from_current = "0")]
                 head: u8,
                 #[deku(bits = 5 $($extra)*)]
                 a: u8,
@@ -567,7 +567,7 @@ fn a_run_starting_mid_byte() {
         };
     }
     h!(MidBatched,);
-    h!(MidUnbatched, , assert = "true");
+    h!(MidUnbatched, , seek_from_current = "0");
 
     for seed in 1..2_000u32 {
         let data = wire(2, seed);
@@ -595,7 +595,7 @@ fn a_run_at_every_starting_bit_offset() {
         };
     }
     h!(OffBatched,);
-    h!(OffUnbatched, , assert = "true");
+    h!(OffUnbatched, , seek_from_current = "0");
 
     for off in 0..8usize {
         for seed in 1..200u32 {
@@ -627,9 +627,9 @@ fn a_run_after_a_bit_packed_enum_id() {
     enum Unbatched {
         #[deku(id = 1)]
         A {
-            #[deku(bits = 4, assert = "true")]
+            #[deku(bits = 4, seek_from_current = "0")]
             a: u8,
-            #[deku(bits = 8, assert = "true")]
+            #[deku(bits = 8, seek_from_current = "0")]
             b: u8,
         },
     }
@@ -691,7 +691,7 @@ fn a_run_after_a_partial_lsb0_leftover() {
         };
     }
     kid!(KidBatched,);
-    kid!(KidPlain, , assert = "true");
+    kid!(KidPlain, , seek_from_current = "0");
 
     macro_rules! parent {
         ($name:ident, $kid:ident) => {
@@ -743,7 +743,7 @@ fn a_byte_aligned_lsb0_parent_before_a_run() {
         };
     }
     kid!(KidBatched,);
-    kid!(KidPlain, , assert = "true");
+    kid!(KidPlain, , seek_from_current = "0");
 
     macro_rules! parent {
         ($name:ident, $kid:ident) => {

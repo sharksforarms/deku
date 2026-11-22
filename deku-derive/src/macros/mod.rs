@@ -774,6 +774,98 @@ pub(crate) fn const_id_bits(_: &DekuData) -> Option<usize> {
     None
 }
 
+/// One field of a little-endian `Lsb0` run: its width and its type.
+#[cfg(feature = "bits")]
+pub(crate) struct LsbRunField {
+    pub(crate) bits: usize,
+    pub(crate) ty: syn::Type,
+}
+
+/// A field a little-endian `Lsb0` run can serve: a literal `bits` on an
+/// unsigned primitive, or one bit of a `bool`, explicitly little-endian and
+/// `Lsb0`, carrying nothing else.
+#[cfg(feature = "bits")]
+fn lsb_run_field(input: &DekuData, f: &FieldData) -> Option<LsbRunField> {
+    if f.any_field_set_incompatible_with_bit_run()
+        || f.bit_field
+        || f.pad_bits_before.is_some()
+        || f.pad_bits_after.is_some()
+    {
+        return None;
+    }
+    let endian = f.endian.as_ref().or(input.endian.as_ref())?;
+    let order = f.bit_order.as_ref().or(input.bit_order.as_ref())?;
+    if endian.value() != "little" || order.value() != "lsb" {
+        return None;
+    }
+    let syn::Type::Path(p) = &f.ty else {
+        return None;
+    };
+    if p.qself.is_some() {
+        return None;
+    }
+    let name = p.path.get_ident()?.to_string();
+    let width = match name.as_str() {
+        "bool" => 1,
+        name => unsigned_width(name)?,
+    };
+    let bits = match f.bits.as_ref() {
+        Some(crate::Num::LitInt(lit)) => lit.base10_parse::<usize>().ok()?,
+        Some(crate::Num::TokenStream(_)) => return None,
+        None if name == "bool" => return None,
+        None => width,
+    };
+    (1..=width).contains(&bits).then(|| LsbRunField {
+        bits,
+        ty: f.ty.clone(),
+    })
+}
+
+/// Groups adjacent fields that a little-endian `Lsb0` run can serve, keyed
+/// by the index the run starts at. A run holds whole bytes, at most 64 bits,
+/// so that one read of a little-endian integer serves it; a run of more
+/// fields that ends inside a byte gives up fields from its end until it
+/// does not.
+#[cfg(feature = "bits")]
+pub(crate) fn plan_lsb_runs(
+    input: &DekuData,
+    fields: &Fields<&FieldData>,
+    use_id: bool,
+) -> std::collections::HashMap<usize, Vec<LsbRunField>> {
+    let mut runs = std::collections::HashMap::new();
+    let mut i = 0;
+    while i < fields.len() {
+        if i == 0 && use_id {
+            i = 1;
+            continue;
+        }
+        let mut run = Vec::new();
+        let mut total = 0;
+        while let Some(field) = fields
+            .fields
+            .get(i + run.len())
+            .and_then(|f| lsb_run_field(input, f))
+        {
+            if total + field.bits > u64::BITS as usize {
+                break;
+            }
+            total += field.bits;
+            run.push(field);
+        }
+        while total % 8 != 0 {
+            total -= run.pop().map_or(0, |field| field.bits);
+        }
+        if run.len() >= 2 {
+            let len = run.len();
+            runs.insert(i, run);
+            i += len;
+        } else {
+            i += 1;
+        }
+    }
+    runs
+}
+
 /// Groups adjacent run-eligible fields, keyed by the index the run starts at.
 ///
 /// A run is capped at 64 bits, the width the reader returns, and must hold at
@@ -871,7 +963,7 @@ fn byte_run_field<'a>(
     // The attributes a byte array excuses are the ones a byte run excuses:
     // `endian`, `bit_order` and `update`. A `bits` or `bytes` width is a
     // different read.
-    if f.any_field_set_incompatible_with_byte_array() {
+    if f.any_field_set_incompatible_with_byte_run() {
         return None;
     }
     // On an unaligned cursor `read_bytes_const_into` reverses the buffer for
@@ -1288,6 +1380,15 @@ mod tests {
         assert_eq!(plan(src), vec![]);
     }
 
+    #[test]
+    fn an_asserted_field_joins_a_run() {
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(assert_eq = "1")] a: u8,
+            #[deku(bits = 4, assert = "*b < 9")] b: u8,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![8, 4])]);
+    }
+
     /// Every attribute that must keep a field out of a run. Two fields that would
     /// otherwise batch, with the attribute on the first.
     #[rstest]
@@ -1297,8 +1398,7 @@ mod tests {
     #[case::pad_bits_after_of_run_time("pad_bits_after = \"n\"")]
     #[case::pad_bytes_after("pad_bytes_after = \"1\"")]
     #[case::cond("cond = \"true\"")]
-    #[case::assert("assert = \"true\"")]
-    #[case::assert_eq("assert_eq = \"0\"")]
+    #[case::assert_of_an_offset("assert = \"deku::bit_offset == 0\"")]
     #[case::map("map = \"|v: u8| -> Result<_, DekuError> { Ok(v) }\"")]
     #[case::reader("reader = \"read_it()\"")]
     #[case::writer("writer = \"write_it()\"")]
@@ -1707,7 +1807,7 @@ mod tests {
         r#"#[deku(endian = "big", bit_order = "lsb")] struct Test { #[deku(bits = 4)] a: u8, #[deku(bit_field)] f: Flag }"#
     )]
     #[case::other_attribute(
-        r#"#[deku(endian = "big")] struct Test { #[deku(bits = 4)] a: u8, #[deku(bit_field, assert = "true")] f: Flag }"#
+        r#"#[deku(endian = "big")] struct Test { #[deku(bits = 4)] a: u8, #[deku(bit_field, seek_from_current = "0")] f: Flag }"#
     )]
     fn a_bit_field_follows_the_rules_of_any_run_field(#[case] src: &str) {
         assert_eq!(plan_bit_fields(src), vec![]);
@@ -1830,11 +1930,20 @@ mod byte_run_tests {
             b: u16,
             c: Other,
             d: u16,
-            #[deku(assert_eq = "0")] e: u16,
+            #[deku(seek_from_current = "0")] e: u16,
             f: u16,
             g: u16,
         }"#;
         assert_eq!(plan(src), vec![(0, vec![2, 2]), (5, vec![2, 2])]);
+    }
+
+    #[test]
+    fn an_asserted_field_joins_the_run() {
+        let src = r#"#[deku(endian = "big")] struct Test {
+            #[deku(assert_eq = "7")] a: u16,
+            #[deku(assert = "*b < 10")] b: u16,
+        }"#;
+        assert_eq!(plan(src), vec![(0, vec![2, 2])]);
     }
 
     #[test]

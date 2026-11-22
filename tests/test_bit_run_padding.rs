@@ -21,7 +21,7 @@ macro_rules! padded {
 }
 
 padded!(Batched,);
-padded!(Unbatched, , assert = "true");
+padded!(Unbatched, , seek_from_current = "0");
 
 /// The bits that the padding takes, which a write leaves zero.
 const PAD_MASK: [u8; 4] = [0b1111_1000, 0b0000_0011, 0b1000_0000, 0];
@@ -77,7 +77,7 @@ fn short_input_is_incomplete() {
 struct Unaligned {
     #[deku(bits = 3)]
     lead: u8,
-    #[deku(bits = 4, assert = "true")]
+    #[deku(bits = 4, seek_from_current = "0")]
     split: u8,
     #[deku(pad_bits_before = "2", bits = 1)]
     flag: u8,
@@ -90,11 +90,11 @@ struct Unaligned {
 struct UnalignedUnbatched {
     #[deku(bits = 3)]
     lead: u8,
-    #[deku(bits = 4, assert = "true")]
+    #[deku(bits = 4, seek_from_current = "0")]
     split: u8,
-    #[deku(pad_bits_before = "2", bits = 1, assert = "true")]
+    #[deku(pad_bits_before = "2", bits = 1, seek_from_current = "0")]
     flag: u8,
-    #[deku(bits = 3, pad_bits_after = "3", assert = "true")]
+    #[deku(bits = 3, pad_bits_after = "3", seek_from_current = "0")]
     tail: u8,
 }
 
@@ -124,9 +124,9 @@ fn a_padded_run_on_an_unaligned_cursor_reads_the_same_bits() {
 struct Skips {
     #[deku(bits = 3)]
     lead: u8,
-    #[deku(pad_bits_before = "3", assert = "true")]
+    #[deku(pad_bits_before = "3", seek_from_current = "0")]
     byte: u8,
-    #[deku(pad_bits_before = "8", bits = 2, assert = "true")]
+    #[deku(pad_bits_before = "8", bits = 2, seek_from_current = "0")]
     tail: u8,
 }
 

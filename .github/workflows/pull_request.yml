@@ -22,6 +22,7 @@ jobs:
           - deku_callgrind
           - bebits_callgrind
           - protocol_pipeline_callgrind
+          - forms_callgrind
     steps:
       - uses: actions/checkout@v7
         with:

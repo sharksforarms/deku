@@ -944,9 +944,12 @@ impl FieldData {
             bit_field: false,
             pad_bits_before: None,
             pad_bits_after: None,
+            assert: None,
+            assert_eq: None,
             ..self.clone()
         }
         .any_field_set()
+            || self.assertion_reads_an_offset()
     }
 
     /// True if the field carries an attribute the one-call byte-array path
@@ -955,6 +958,36 @@ impl FieldData {
     /// Excuses the three attributes a bit run excuses that do not change the
     /// bytes, but not `bits` (a width on a byte array is a different read) or
     /// `bit_field` (a byte array is not one).
+    /// True if the field carries an attribute a byte run cannot reproduce.
+    ///
+    /// Excuses what a byte array excuses, and the assertions, which the run
+    /// checks once it has read each field.
+    pub fn any_field_set_incompatible_with_byte_run(&self) -> bool {
+        Self {
+            endian: None,
+            #[cfg(feature = "bits")]
+            bit_order: None,
+            update: None,
+            assert: None,
+            assert_eq: None,
+            ..self.clone()
+        }
+        .any_field_set()
+            || self.assertion_reads_an_offset()
+    }
+
+    /// True if an assertion reads `__deku_bit_offset` or `__deku_byte_offset`,
+    /// which a run, read in one call, has none of for each field.
+    fn assertion_reads_an_offset(&self) -> bool {
+        [&self.assert, &self.assert_eq]
+            .into_iter()
+            .flatten()
+            .any(|tokens| {
+                let text = tokens.to_string();
+                text.contains("__deku_bit_offset") || text.contains("__deku_byte_offset")
+            })
+    }
+
     pub fn any_field_set_incompatible_with_byte_array(&self) -> bool {
         Self {
             endian: None,

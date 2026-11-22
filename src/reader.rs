@@ -799,7 +799,7 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// # Params
     /// `buf` - result bytes
-    #[inline]
+    #[inline(always)]
     pub fn read_bytes_const_into<const N: usize>(
         &mut self,
         buf: &mut [u8; N],

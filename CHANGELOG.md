@@ -25,6 +25,8 @@
 
 ### Other
 
+- A read of a fixed number of whole bytes, as a run of whole bytes or a
+  `[u8; N]` makes, is always inlined
 - A plain `[u8; N]` field is read and written in one call rather than one per
   element, except where a partial `Lsb0` remainder precedes it
 - A run of adjacent integer fields of whole bytes, which share one `endian`, is

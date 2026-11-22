@@ -18,7 +18,9 @@ use crate::macros::{
 use crate::{DekuData, DekuDataEnum, DekuDataStruct, FieldData, Id, from_token};
 
 #[cfg(feature = "bits")]
-use super::{BitRunField, batch_condition, bit_field_bound, is_bool, needs_fallback, sum_bits};
+use super::{
+    BitRunField, batch_condition, bit_field_bound, is_bool, needs_fallback, run_field, sum_bits,
+};
 use super::{gen_internal_field_ident, gen_type_from_ctx_id};
 
 pub(crate) fn emit_deku_read(input: &DekuData) -> Result<TokenStream, syn::Error> {
@@ -394,7 +396,7 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         unreachable!();
     };
 
-    let variant_read = quote! {
+    let unbatched = quote! {
         #variant_id_read
 
         #(#pre_match_tokens)*
@@ -402,6 +404,27 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         let __deku_value = match &__deku_variant_id {
             #(#variant_matches),*
         };
+    };
+    #[cfg(feature = "bits")]
+    let fused = if has_discriminant {
+        None
+    } else {
+        emit_fused_enum_read(input)
+    };
+    #[cfg(not(feature = "bits"))]
+    let fused: Option<()> = None;
+    let variant_read = match fused {
+        #[cfg(feature = "bits")]
+        Some(FusedEnumRead { consts, read }) => quote! {
+            #consts
+            let __deku_value = if __DEKU_FUSED {
+                #read
+            } else {
+                #unbatched
+                __deku_value
+            };
+        },
+        _ => unbatched,
     };
 
     // Implement `DekuContainerRead` for types that don't need a context
@@ -827,40 +850,7 @@ fn emit_bit_run_read(
         let internal = gen_internal_field_ident(&field_ident);
         // How many bits of the run sit below this field.
         let shift = super::shift_of(&refs, offset, &crate_);
-        let extract = match field {
-            BitRunField::Primitive { bits, ty, .. } => {
-                let mask = field.mask(&crate_);
-                // `as` cannot produce a bool, so a bool field is compared rather
-                // than cast.
-                if is_bool(ty) {
-                    if *bits == 1 {
-                        // One bit is 0 or 1: nothing to reject.
-                        quote! { ((#run_ident >> #shift) & 1) != 0 }
-                    } else {
-                        // Wider bools reject anything but 0 and 1, as `impls::bool` does.
-                        quote! {
-                            match (#run_ident >> #shift) & #mask {
-                                0 => false,
-                                1 => true,
-                                __deku_bool => return Err(::#crate_::deku_error!(
-                                    ::#crate_::DekuError::Parse,
-                                    "cannot parse bool value",
-                                    "{}",
-                                    __deku_bool as u8
-                                )),
-                            }
-                        }
-                    }
-                } else {
-                    quote! { ((#run_ident >> #shift) & #mask) as #ty }
-                }
-            }
-            // `from_bit_run` masks off the bits above its own, so the shift is
-            // all this side owes it.
-            BitRunField::BitField { ty } => quote! {
-                <#ty as ::#crate_::DekuBitField>::from_bit_run(#run_ident >> #shift)?
-            },
-        };
+        let extract = super::extract_run_field(field, &quote! { #run_ident }, &shift, &crate_);
         let trace_field_log = if cfg!(feature = "logging") {
             let field_ident_str = field_ident.to_string();
             quote! { ::#crate_::log::trace!("Reading: {}.{}", #ident_str, #field_ident_str); }
@@ -899,6 +889,30 @@ fn emit_bit_run_read(
                     __deku_reader.read_bits_uint_msb0(#total)?
                 }
             }
+        }
+        // The same, where a `bit_field` makes the width a constant of a trait.
+        // A generic type could make that width depend on a parameter, which
+        // an array length cannot.
+        //
+        // The width is summed only for a run that passes its own checks, so
+        // an absurd `BITS` does not overflow the sum.
+        None if input.generics.params.is_empty() => {
+            let batch = batch_condition(run, &crate_);
+            quote! {{
+            const __DEKU_RUN_BITS: usize = if #batch { #total } else { 0 };
+            const __DEKU_RUN_BYTES: usize = if __DEKU_RUN_BITS % 8 == 0 { __DEKU_RUN_BITS / 8 } else { 0 };
+            if __DEKU_RUN_BYTES != 0 && __deku_reader.leftover.is_none() {
+                let mut __deku_run_bytes = [0u8; __DEKU_RUN_BYTES];
+                __deku_reader.read_bytes_const_into(&mut __deku_run_bytes, ::#crate_::ctx::Order::Msb0)?;
+                let mut __deku_run = 0u64;
+                for __deku_byte in __deku_run_bytes {
+                    __deku_run = (__deku_run << 8) | u64::from(__deku_byte);
+                }
+                __deku_run
+            } else {
+                __deku_reader.read_bits_uint_msb0(#total)?
+            }
+            }}
         }
         _ => quote! { __deku_reader.read_bits_uint_msb0(#total)? },
     };
@@ -1484,4 +1498,231 @@ pub fn emit_try_from(
             }
         }
     }
+}
+
+/// The read of an enum whose id and every variant are bits of a run: one
+/// read of the id with as many bits after it as the narrowest variant
+/// holds, then, for a wider variant, one read of the bits it has left.
+/// The fields come out of those bits as out of a struct's run, so the enum
+/// costs one or two reads where its id and its fields cost one each.
+///
+/// The constants of the fused read come apart from the read itself, so
+/// that the caller can choose between it and the unbatched reads with
+/// `__DEKU_FUSED`.
+///
+/// `None` where the enum does not qualify: an id that is not a literal
+/// width in big-endian `Msb0`, an id from context, a `magic`, a variant
+/// with a `reader`, a `default` or a field that no run can serve, or no
+/// bits after the id in some variant. Those keep the reads of the id and
+/// fields one at a time.
+///
+/// As for the run of a struct, input too short for the first read is
+/// `Incomplete` even where the id alone would be unassigned.
+#[cfg(feature = "bits")]
+pub(crate) fn emit_fused_enum_read(input: &DekuData) -> Option<FusedEnumRead> {
+    let crate_ = super::get_crate_name();
+    let id_bits = super::const_id_bits(input)?;
+    if input.id.is_some() || input.magic.is_some() || !input.generics.params.is_empty() {
+        return None;
+    }
+    let id_type = input.id_type.as_ref()?;
+    let Data::Enum(variants) = &input.data else {
+        return None;
+    };
+    if variants.is_empty() {
+        return None;
+    }
+
+    /// One variant: its id pattern, the run of its fields, and whether its
+    /// first field stores the id.
+    struct Plan<'a> {
+        variant: &'a crate::VariantData,
+        pattern: TokenStream,
+        stores_id: bool,
+        run: Vec<BitRunField>,
+    }
+
+    let mut plans = Vec::with_capacity(variants.len());
+    for variant in variants {
+        if variant.reader.is_some() || variant.default.unwrap_or(false) {
+            return None;
+        }
+        let (pattern, stores_id) = match (&variant.id, &variant.id_pat) {
+            (Some(Id::Int(id)), _) => (id.to_token_stream(), false),
+            // As the unbatched match does, a token id matches by reference.
+            (Some(Id::TokenStream(id)), _) => (quote! { &#id }, false),
+            (Some(_), _) => return None,
+            // Without an `id` of the enum, the first field of an `id_pat`
+            // variant holds the id, as its unbatched read stores it.
+            (None, Some(pat)) => (pat.clone(), !variant.fields.is_empty()),
+            (None, None) => return None,
+        };
+        let fields = &variant.fields.fields;
+        let run_fields = if stores_id {
+            if fields[0].any_field_set() {
+                return None;
+            }
+            &fields[1..]
+        } else {
+            &fields[..]
+        };
+        let run = run_fields
+            .iter()
+            .map(|f| run_field(input, f))
+            .collect::<Option<Vec<_>>>()?;
+        plans.push(Plan {
+            variant,
+            pattern,
+            stores_id,
+            run,
+        });
+    }
+
+    // The bits of each variant after the id, as a constant expression, and
+    // the checks that make each a valid run.
+    let widths: Vec<TokenStream> = plans
+        .iter()
+        .map(|plan| {
+            if plan.run.is_empty() {
+                quote! { 0usize }
+            } else {
+                let refs: Vec<&BitRunField> = plan.run.iter().collect();
+                sum_bits(&refs, &crate_)
+            }
+        })
+        .collect();
+    let lit_widths: Option<Vec<usize>> = plans
+        .iter()
+        .map(|plan| plan.run.iter().map(BitRunField::lit_span).sum())
+        .collect();
+    // A variant with no bits after the id leaves nothing to read with it.
+    if let Some(lit) = &lit_widths
+        && (lit.contains(&0) || lit.iter().any(|w| id_bits + w > 64))
+    {
+        return None;
+    }
+    let trait_checks: Vec<TokenStream> = plans
+        .iter()
+        .flat_map(|plan| plan.run.iter())
+        .filter(|f| f.lit_bits().is_none())
+        .map(|f| {
+            let bits = f.bits(&crate_);
+            quote! { (#bits != 0 && #bits <= 64) }
+        })
+        .collect();
+    // Each width is bounded before any sum, so that an absurd `BITS` falls
+    // back where it would otherwise overflow.
+    let fits = quote! { #(#trait_checks &&)* true };
+    let width_checks = widths
+        .iter()
+        .map(|w| quote! { (#w >= 1 && #w + #id_bits <= 64) });
+    let fused = quote! { #fits && #(#width_checks)&&* };
+    let narrowest = widths.iter().skip(1).fold(widths[0].clone(), |acc, w| {
+        quote! { { let __deku_a = #acc; let __deku_b = #w; if __deku_b < __deku_a { __deku_b } else { __deku_a } } }
+    });
+
+    let mut arms = Vec::with_capacity(plans.len());
+    for (plan, width) in plans.iter().zip(&widths) {
+        let fields = plan.variant.fields.as_ref();
+        let named = fields.style.is_struct();
+        let refs: Vec<&BitRunField> = plan.run.iter().collect();
+        let raw = quote! { __deku_raw };
+        let mut binds = TokenStream::new();
+        let mut idents = Vec::with_capacity(fields.len());
+        for (index, f) in fields.fields.iter().enumerate() {
+            let field_ident = f.get_ident(index, true);
+            let internal = gen_internal_field_ident(&field_ident);
+            if plan.stores_id && index == 0 {
+                binds.extend(quote! { let #internal = __deku_variant_id; });
+            } else {
+                let offset = index - usize::from(plan.stores_id);
+                let shift = super::shift_of(&refs, offset, &crate_);
+                let extract = super::extract_run_field(&plan.run[offset], &raw, &shift, &crate_);
+                binds.extend(quote! { let #internal = #extract; });
+            }
+            if !f.temp {
+                idents.push(field_ident);
+            }
+        }
+        let variant_ident = &plan.variant.ident;
+        let init = super::gen_enum_init(
+            named,
+            quote! { Self::#variant_ident },
+            gen_internal_field_idents(named, idents.iter()),
+        );
+        let rest = read_bits(&quote! { __DEKU_REST_BITS }, &crate_);
+        let assertions = run_assertions(
+            &fields,
+            usize::from(plan.stores_id),
+            plan.run.len(),
+            &input.ident.to_string(),
+        );
+        let pattern = &plan.pattern;
+        arms.push(quote! {
+            #pattern => {
+                const __DEKU_REST_BITS: usize =
+                    if __DEKU_FUSED { #width - __DEKU_HEAD_PAYLOAD_BITS } else { 0 };
+                let __deku_raw: u64 = if __DEKU_REST_BITS == 0 {
+                    __deku_head
+                } else {
+                    (__deku_head << __DEKU_REST_BITS) | #rest
+                };
+                #binds
+                #assertions
+                #init
+            }
+        });
+    }
+    let has_catch_all = plans.iter().any(|plan| plan.pattern.to_string() == "_");
+    let no_variant = super::no_variant_error(&crate_, &input.ident.to_string());
+    let catch_all = (!has_catch_all).then(|| quote! { _ => return Err(#no_variant), });
+    let head = read_bits(&quote! { __DEKU_HEAD_BITS }, &crate_);
+    let id_mask = super::low_mask(id_bits);
+
+    Some(FusedEnumRead {
+        consts: quote! {
+            const __DEKU_FUSED: bool = #fused;
+            const __DEKU_HEAD_PAYLOAD_BITS: usize = if __DEKU_FUSED { #narrowest } else { 0 };
+            const __DEKU_HEAD_BITS: usize = #id_bits + __DEKU_HEAD_PAYLOAD_BITS;
+        },
+        read: quote! {{
+            let __deku_head: u64 = #head;
+            let __deku_variant_id = ((__deku_head >> __DEKU_HEAD_PAYLOAD_BITS) & #id_mask) as #id_type;
+            let __deku_head = __deku_head & ((1u64 << __DEKU_HEAD_PAYLOAD_BITS) - 1);
+            match &__deku_variant_id {
+                #(#arms)*
+                #catch_all
+            }
+        }},
+    })
+}
+
+/// The parts of [`emit_fused_enum_read`].
+#[cfg(feature = "bits")]
+pub(crate) struct FusedEnumRead {
+    /// Constant items, `__DEKU_FUSED` among them, for the scope of the read.
+    consts: TokenStream,
+    /// An expression of the enum's value, for where `__DEKU_FUSED` holds.
+    read: TokenStream,
+}
+
+/// `bits` bits, a constant, as a `u64`: one fixed-size read of whole bytes
+/// on a byte boundary, and the bit reader otherwise.
+#[cfg(feature = "bits")]
+fn read_bits(bits: &TokenStream, crate_: &Ident) -> TokenStream {
+    quote! {{
+        const __DEKU_READ_BYTES: usize =
+            if #bits % 8 == 0 && #bits <= 64 { #bits / 8 } else { 0 };
+        if __DEKU_READ_BYTES != 0 && __deku_reader.leftover.is_none() {
+            let mut __deku_bytes = [0u8; __DEKU_READ_BYTES];
+            __deku_reader.read_bytes_const_into(&mut __deku_bytes, ::#crate_::ctx::Order::Msb0)?;
+            let mut __deku_bits = 0u64;
+            for __deku_byte in __deku_bytes {
+                __deku_bits = (__deku_bits << 8) | u64::from(__deku_byte);
+            }
+            __deku_bits
+        } else {
+            __deku_reader.read_bits_uint_msb0(#bits)?
+        }
+    }}
 }

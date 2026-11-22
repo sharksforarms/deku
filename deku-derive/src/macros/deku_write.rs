@@ -696,7 +696,7 @@ fn emit_bit_run_write(
             // The type owns the "does this fit" question, so `to_bit_run` is
             // both value and check. Called in field order among the checks, so
             // the first failing field is the one reported, as unbatched.
-            BitRunField::BitField { ty } => {
+            BitRunField::BitField { ty, .. } => {
                 let value = quote::format_ident!("__deku_bit_field_{}", start + offset);
                 checks.extend(quote! {
                     let #value: u64 =

@@ -1316,9 +1316,9 @@ mod tests {
         // `a` and `b` are eligible and whole, so only the rule kept them out.
         let data = DekuData::from_input(src.parse().unwrap()).unwrap();
         let fields = data.data.as_ref().take_struct().unwrap();
-        for i in 0..2 {
+        for field in fields.fields.iter().take(2) {
             assert!(
-                run_field(&data, fields.fields[i])
+                run_field(&data, field)
                     .expect("the plain half should still be eligible")
                     .whole_width()
             );

@@ -13,7 +13,7 @@
 - `DekuBitField` derives for a struct of bit fields, and for an enum whose
   variants hold bit fields of the same width, so that these too join a run
 - A `bit_field` with a literal `pad_bits_before` or `pad_bits_after` joins a
-  run with its padding
+  run with its padding, alone or with other fields
 - An enum whose id is a literal `bits` and whose variants hold only bit
   fields reads its id and the bits of its narrowest variant in one read,
   then the bits a wider variant has left in a second

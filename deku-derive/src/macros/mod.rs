@@ -970,10 +970,14 @@ pub(crate) fn plan_bit_runs(
         // the bit reader, which costs a `u64` accumulator and a shift and a mask
         // per field for no gain. Batch only when the run holds a packed field, or
         // a `bit_field` that may be one, which `batch_condition` then settles.
-        // One field with padding is a run too: alone, the padding is a read of
-        // its own.
+        // A `bit_field` with padding is a run of its own: its type can only
+        // join a run, and the padding goes with it. A primitive alone keeps
+        // its own read and skip, which the bit reader does in fewer steps.
         let packed = run.iter().any(|f| !f.whole_width());
-        let worth_a_read = run.len() >= 2 || run.first().is_some_and(|f| f.padding() != (0, 0));
+        let worth_a_read = run.len() >= 2
+            || run.first().is_some_and(|f| {
+                matches!(f, BitRunField::BitField { .. }) && f.padding() != (0, 0)
+            });
         if worth_a_read && packed {
             let len = run.len();
             runs.insert(i, run);

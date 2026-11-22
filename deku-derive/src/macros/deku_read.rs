@@ -827,40 +827,7 @@ fn emit_bit_run_read(
         let internal = gen_internal_field_ident(&field_ident);
         // How many bits of the run sit below this field.
         let shift = super::shift_of(&refs, offset, &crate_);
-        let extract = match field {
-            BitRunField::Primitive { bits, ty, .. } => {
-                let mask = field.mask(&crate_);
-                // `as` cannot produce a bool, so a bool field is compared rather
-                // than cast.
-                if is_bool(ty) {
-                    if *bits == 1 {
-                        // One bit is 0 or 1: nothing to reject.
-                        quote! { ((#run_ident >> #shift) & 1) != 0 }
-                    } else {
-                        // Wider bools reject anything but 0 and 1, as `impls::bool` does.
-                        quote! {
-                            match (#run_ident >> #shift) & #mask {
-                                0 => false,
-                                1 => true,
-                                __deku_bool => return Err(::#crate_::deku_error!(
-                                    ::#crate_::DekuError::Parse,
-                                    "cannot parse bool value",
-                                    "{}",
-                                    __deku_bool as u8
-                                )),
-                            }
-                        }
-                    }
-                } else {
-                    quote! { ((#run_ident >> #shift) & #mask) as #ty }
-                }
-            }
-            // `from_bit_run` masks off the bits above its own, so the shift is
-            // all this side owes it.
-            BitRunField::BitField { ty } => quote! {
-                <#ty as ::#crate_::DekuBitField>::from_bit_run(#run_ident >> #shift)?
-            },
-        };
+        let extract = super::extract_run_field(field, &quote! { #run_ident }, &shift, &crate_);
         let trace_field_log = if cfg!(feature = "logging") {
             let field_ident_str = field_ident.to_string();
             quote! { ::#crate_::log::trace!("Reading: {}.{}", #ident_str, #field_ident_str); }
@@ -899,6 +866,30 @@ fn emit_bit_run_read(
                     __deku_reader.read_bits_uint_msb0(#total)?
                 }
             }
+        }
+        // The same, where a `bit_field` makes the width a constant of a trait.
+        // A generic type could make that width depend on a parameter, which
+        // an array length cannot.
+        //
+        // The width is summed only for a run that passes its own checks, so
+        // an absurd `BITS` does not overflow the sum.
+        None if input.generics.params.is_empty() => {
+            let batch = batch_condition(run, &crate_);
+            quote! {{
+            const __DEKU_RUN_BITS: usize = if #batch { #total } else { 0 };
+            const __DEKU_RUN_BYTES: usize = if __DEKU_RUN_BITS % 8 == 0 { __DEKU_RUN_BITS / 8 } else { 0 };
+            if __DEKU_RUN_BYTES != 0 && __deku_reader.leftover.is_none() {
+                let mut __deku_run_bytes = [0u8; __DEKU_RUN_BYTES];
+                __deku_reader.read_bytes_const_into(&mut __deku_run_bytes, ::#crate_::ctx::Order::Msb0)?;
+                let mut __deku_run = 0u64;
+                for __deku_byte in __deku_run_bytes {
+                    __deku_run = (__deku_run << 8) | u64::from(__deku_byte);
+                }
+                __deku_run
+            } else {
+                __deku_reader.read_bits_uint_msb0(#total)?
+            }
+            }}
         }
         _ => quote! { __deku_reader.read_bits_uint_msb0(#total)? },
     };

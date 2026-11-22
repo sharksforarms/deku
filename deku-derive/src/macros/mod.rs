@@ -13,6 +13,7 @@ use crate::Num;
 use crate::{DekuData, FieldData};
 
 #[cfg(feature = "bits")]
+#[cfg(feature = "bits")]
 pub(crate) mod deku_bit_field;
 pub(crate) mod deku_read;
 pub(crate) mod deku_size;
@@ -490,7 +491,13 @@ pub(crate) enum BitRunField {
     },
     /// A `bit_field` field, whose type implements `DekuBitField`. Only the
     /// compiler knows the width, and the bits become a value through the trait.
-    BitField { ty: syn::Type },
+    BitField {
+        ty: syn::Type,
+        /// The bits of `pad_bits_before`, which the run reads and drops.
+        pad_before: usize,
+        /// The bits of `pad_bits_after`, which the run reads and drops.
+        pad_after: usize,
+    },
 }
 
 #[cfg(feature = "bits")]
@@ -508,7 +515,7 @@ impl BitRunField {
     pub(crate) fn bits(&self, crate_: &Ident) -> TokenStream {
         match self {
             Self::Primitive { bits, .. } => quote! { #bits },
-            Self::BitField { ty } => quote! { <#ty as ::#crate_::DekuBitField>::BITS },
+            Self::BitField { ty, .. } => quote! { <#ty as ::#crate_::DekuBitField>::BITS },
         }
     }
 
@@ -520,7 +527,11 @@ impl BitRunField {
                 pad_after,
                 ..
             } => (*pad_before, *pad_after),
-            Self::BitField { .. } => (0, 0),
+            Self::BitField {
+                pad_before,
+                pad_after,
+                ..
+            } => (*pad_before, *pad_after),
         }
     }
 
@@ -549,7 +560,7 @@ impl BitRunField {
                 quote! { #mask }
             }
             // Via `u128` so that a full 64-bit width does not overflow the shift.
-            Self::BitField { ty } => quote! {
+            Self::BitField { ty, .. } => quote! {
                 (((1u128 << <#ty as ::#crate_::DekuBitField>::BITS) - 1) as u64)
             },
         }
@@ -594,6 +605,51 @@ pub(crate) fn shift_of(fields: &[&BitRunField], offset: usize, crate_: &Ident) -
     }
 }
 
+/// The value of `field` out of the run `run`, where `shift` bits of the run
+/// sit below it.
+#[cfg(feature = "bits")]
+pub(crate) fn extract_run_field(
+    field: &BitRunField,
+    run: &TokenStream,
+    shift: &TokenStream,
+    crate_: &Ident,
+) -> TokenStream {
+    match field {
+        BitRunField::Primitive { bits, ty, .. } => {
+            let mask = field.mask(crate_);
+            // `as` cannot produce a bool, so a bool field is compared rather
+            // than cast.
+            if is_bool(ty) {
+                if *bits == 1 {
+                    // One bit is 0 or 1: nothing to reject.
+                    quote! { ((#run >> #shift) & 1) != 0 }
+                } else {
+                    // Wider bools reject anything but 0 and 1, as `impls::bool` does.
+                    quote! {
+                        match (#run >> #shift) & #mask {
+                            0 => false,
+                            1 => true,
+                            __deku_bool => return Err(::#crate_::deku_error!(
+                                ::#crate_::DekuError::Parse,
+                                "cannot parse bool value",
+                                "{}",
+                                __deku_bool as u8
+                            )),
+                        }
+                    }
+                }
+            } else {
+                quote! { ((#run >> #shift) & #mask) as #ty }
+            }
+        }
+        // `from_bit_run` masks off the bits above its own, so the shift is
+        // all this side owes it.
+        BitRunField::BitField { ty, .. } => quote! {
+            <#ty as ::#crate_::DekuBitField>::from_bit_run(#run >> #shift)?
+        },
+    }
+}
+
 /// Requires the trait of a `bit_field` outside a run too, so a wrong attribute
 /// cannot hide until a neighbour changes.
 #[cfg(feature = "bits")]
@@ -629,7 +685,8 @@ pub(crate) fn batch_condition(run: &BitRun, crate_: &Ident) -> TokenStream {
     let packed_primitive = run
         .iter()
         .any(|f| f.lit_bits().is_some() && !f.whole_width());
-    let packed = if packed_primitive {
+    let padded = run.iter().any(|f| f.padding() != (0, 0));
+    let packed = if packed_primitive || padded {
         TokenStream::new()
     } else {
         quote! { && (#(#widths % 8 != 0)||*) }
@@ -693,10 +750,13 @@ pub(crate) fn run_field(input: &DekuData, f: &FieldData) -> Option<BitRunField> 
     let pad_after = literal_padding(f.pad_bits_after.as_ref())?;
 
     // The width lives on the trait. `FieldData::validate` rejects a `bits`
-    // alongside it. Its padding keeps it out of a run.
+    // alongside it.
     if f.bit_field {
-        return (pad_before == 0 && pad_after == 0)
-            .then(|| BitRunField::BitField { ty: f.ty.clone() });
+        return Some(BitRunField::BitField {
+            ty: f.ty.clone(),
+            pad_before,
+            pad_after,
+        });
     }
 
     let width = match &f.ty {
@@ -894,7 +954,10 @@ pub(crate) fn plan_bit_runs(
             let Some(field) = run_field(input, fields.fields[j]) else {
                 break;
             };
-            let bits = field.lit_span().unwrap_or(1);
+            let bits = field.lit_span().unwrap_or_else(|| {
+                let (before, after) = field.padding();
+                before + 1 + after
+            });
             if floor + bits > u64::BITS as usize {
                 break;
             }
@@ -907,8 +970,11 @@ pub(crate) fn plan_bit_runs(
         // the bit reader, which costs a `u64` accumulator and a shift and a mask
         // per field for no gain. Batch only when the run holds a packed field, or
         // a `bit_field` that may be one, which `batch_condition` then settles.
+        // One field with padding is a run too: alone, the padding is a read of
+        // its own.
         let packed = run.iter().any(|f| !f.whole_width());
-        if run.len() >= 2 && packed {
+        let worth_a_read = run.len() >= 2 || run.first().is_some_and(|f| f.padding() != (0, 0));
+        if worth_a_read && packed {
             let len = run.len();
             runs.insert(i, run);
             i += len;

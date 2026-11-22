@@ -10,6 +10,10 @@
 
 - `bit_field` and `DekuBitField`: a flag enum can join the single read and write
   of a run of adjacent bit fields
+- `DekuBitField` derives for a struct of bit fields, and for an enum whose
+  variants hold bit fields of the same width, so that these too join a run
+- A `bit_field` with a literal `pad_bits_before` or `pad_bits_after` joins a
+  run with its padding
 
 ### Fixed
 

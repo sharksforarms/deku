@@ -16,8 +16,15 @@ error[E0308]: mismatched types
 note: associated function defined here
   --> src/lib.rs
    |
+   | pub trait DekuReader<'a, Ctx = ()> {
+...
    |     fn from_reader_with_ctx<R: no_std_io::Read + no_std_io::Seek>(
    |        ^^^^^^^^^^^^^^^^^^^^
+note: associated function provided through this `impl`
+  --> tests/test_compile/cases/bit_field_attr.rs:3:10
+   |
+ 3 | #[derive(DekuRead, DekuWrite, DekuBitField)]
+   |          ^^^^^^^^
    = note: this error originates in the derive macro `DekuRead` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: the trait bound `u16: deku::DekuBitField` is not satisfied

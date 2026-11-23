@@ -100,8 +100,11 @@ coverage:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # Discard stale execution data while retaining instrumented build artifacts.
-    cargo +{{stable}} llvm-cov clean --profraw-only
+    # Remove the instrumented builds of the workspace, as well as their
+    # execution data. The report reads each instrumented binary in the target
+    # directory, and a binary from a cache of another toolchain or commit adds
+    # its regions as lines that never ran.
+    cargo +{{stable}} llvm-cov clean --workspace
 
     cargo +{{stable}} llvm-cov --workspace --no-report
     cargo +{{stable}} llvm-cov --workspace --all-features --no-report

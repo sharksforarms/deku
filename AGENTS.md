@@ -20,5 +20,12 @@ Formatting and Clippy checks use stable Rust:
 docker compose run --rm build just lint
 ```
 
+CI also runs these jobs. Run them all before you say a change passes CI:
+
+```sh
+docker compose run --rm build just ci-msrv
+docker compose run --rm build just ci-beta
+```
+
 If Docker or Just is unavailable, run the corresponding build and test steps
 from the `Justfile` directly.

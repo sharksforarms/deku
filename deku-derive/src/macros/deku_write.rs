@@ -539,7 +539,7 @@ fn emit_bit_run_write(
         let f = fields.fields[start + offset];
         let field_ident = f.get_ident(start + offset, object_prefix.is_none());
         // How many bits of the run sit below this field.
-        let shift = sum_bits(&refs[offset + 1..], &crate_);
+        let shift = super::shift_of(&refs, offset, &crate_);
         let mask = field.mask(&crate_);
 
         if cfg!(feature = "logging") {
@@ -587,7 +587,16 @@ fn emit_bit_run_write(
         };
 
         terms.push(quote! { ((#value & #mask) << #shift) });
+        // Padding goes out as zero bits of its own width, as the padding write
+        // of a field outside a run does.
+        let (pad_before, pad_after) = field.padding();
+        if pad_before != 0 {
+            widths.push(quote! { #pad_before });
+        }
         widths.push(field.bits(&crate_));
+        if pad_after != 0 {
+            widths.push(quote! { #pad_after });
+        }
     }
 
     let batched = quote! {

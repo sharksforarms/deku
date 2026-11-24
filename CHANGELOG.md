@@ -22,6 +22,18 @@
 
 - A plain `[u8; N]` field is read and written in one call rather than one per
   element, except where a partial `Lsb0` remainder precedes it
+- A run of adjacent integer fields of whole bytes, which share one `endian`, is
+  read in one call rather than one per field. On input too short for the whole
+  run, the run reports `Incomplete` for all of it
+- `skip_bits` skips the bits short of a byte, as `pad_bits_before` makes,
+  without a `BitSlice` copy in `Msb0`
+- A bit field with a literal `pad_bits_before` or `pad_bits_after` joins a run
+  of adjacent bit fields, which reads the padding with it
+- A bit read of at most 56 bits shifts a `u64` rather than a `u128`, and an
+  enum id of a literal `bits`, big-endian, is read with a width known at
+  compile time
+- A bit run of whole bytes on a cursor at a byte boundary is read with one
+  fixed-size read in place of one read per byte
 - Bump MSRV to 1.88
 - Update syn to 3.0 and darling to 0.24
 - Added a note concerning `skip`/`cond` attributes and padding (doc)

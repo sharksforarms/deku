@@ -125,3 +125,4 @@ bench-ci:
     cargo +{{toolchain}} bench --all-features --bench deku_callgrind
     cargo +{{toolchain}} bench --all-features --bench bebits_callgrind
     cargo +{{toolchain}} bench --all-features --bench protocol_pipeline_callgrind
+    cargo +{{toolchain}} bench --all-features --bench forms_callgrind

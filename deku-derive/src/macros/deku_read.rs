@@ -379,6 +379,12 @@ fn emit_enum(input: &DekuData) -> Result<TokenStream, syn::Error> {
         quote! {
             let __deku_variant_id = (#id);
         }
+    } else if let Some(bits) = super::const_id_bits(input) {
+        // The read `(Endian, BitSize)` makes of a big-endian unsigned id, with
+        // the width a constant, as a bit run reads.
+        quote! {
+            let __deku_variant_id = __deku_reader.read_bits_uint_msb0_const::<#bits>()? as #id_type;
+        }
     } else if id_type.is_some() {
         quote! {
             let __deku_variant_id = <#id_type>::from_reader_with_ctx(__deku_reader,  (#id_args))?;
@@ -558,6 +564,11 @@ fn emit_field_reads(
 
     #[cfg(feature = "bits")]
     let runs = super::plan_bit_runs(input, fields, use_id);
+    #[cfg(feature = "bits")]
+    let taken = |i: usize| runs.get(&i).map(Vec::len);
+    #[cfg(not(feature = "bits"))]
+    let taken = |_: usize| None;
+    let byte_runs = super::plan_byte_runs(input, fields, use_id, &taken);
 
     let mut i = 0;
     while i < fields.len() {
@@ -572,6 +583,20 @@ fn emit_field_reads(
             }
             field_reads.push(read);
             i += run.len();
+            use_id = false;
+            continue;
+        }
+
+        if let Some(run) = byte_runs.get(&i) {
+            let (idents, read) = emit_byte_run_read(fields, i, run, ident)?;
+            for field_ident in idents {
+                field_idents.push(FieldIdent {
+                    field_ident,
+                    is_temp: false,
+                });
+            }
+            field_reads.push(read);
+            i += run.fields.len();
             use_id = false;
             continue;
         }
@@ -637,6 +662,66 @@ pub(crate) fn byte_array_len(input: &DekuData, f: &FieldData) -> Option<usize> {
     (len != 0).then_some(len)
 }
 
+/// One byte read for the whole run, then each field from its own bytes, in
+/// the run's byte order. The bytes and the values are those the fields'
+/// own reads give, and the one difference is on input too short for the
+/// whole run: the run reports `Incomplete` for all of it, and reads none.
+fn emit_byte_run_read(
+    fields: &Fields<&FieldData>,
+    start: usize,
+    run: &super::ByteRun,
+    ident: &TokenStream,
+) -> Result<(Vec<TokenStream>, TokenStream), syn::Error> {
+    let crate_ = super::get_crate_name();
+    let total: usize = run.fields.iter().map(|f| f.bytes).sum();
+    let buffer = quote::format_ident!("__deku_byte_run_{}", start);
+    let endian = quote::format_ident!("__deku_byte_run_endian_{}", start);
+    let endian_value = match &run.endian {
+        Some(endian) => super::gen_endian_from_str(endian)?,
+        None => quote! { ::#crate_::ctx::Endian::default() },
+    };
+    let ident = ident.to_string();
+
+    let mut idents = Vec::with_capacity(run.fields.len());
+    let mut extracts = TokenStream::new();
+    let mut at = 0usize;
+    for (offset, field) in run.fields.iter().enumerate() {
+        let f = fields.fields[start + offset];
+        let field_ident = f.get_ident(start + offset, true);
+        let internal = gen_internal_field_ident(&field_ident);
+        let (ty, bytes, end) = (&field.ty, field.bytes, at + field.bytes);
+        let trace_field_log = if cfg!(feature = "logging") {
+            let field_ident_str = field_ident.to_string();
+            quote! { ::#crate_::log::trace!("Reading: {}.{}", #ident, #field_ident_str); }
+        } else {
+            quote! {}
+        };
+        extracts.extend(quote! {
+            #trace_field_log
+            let #internal = {
+                let __deku_bytes = <[u8; #bytes]>::try_from(&#buffer[#at..#end])
+                    .expect("a byte run holds the bytes of each of its fields");
+                if #endian.is_le() {
+                    <#ty>::from_le_bytes(__deku_bytes)
+                } else {
+                    <#ty>::from_be_bytes(__deku_bytes)
+                }
+            };
+            let #field_ident = &#internal;
+        });
+        idents.push(field_ident);
+        at = end;
+    }
+
+    let read = quote! {
+        let #endian: ::#crate_::ctx::Endian = #endian_value;
+        let mut #buffer = [0u8; #total];
+        __deku_reader.read_bytes_const_into::<#total>(&mut #buffer, ::#crate_::ctx::Order::default())?;
+        #extracts
+    };
+    Ok((idents, read))
+}
+
 /// One read for the whole run, then shift and mask each field out of it. This is
 /// what a hand-written parser does, and it replaces one `DekuReader` call plus one
 /// bit-cursor update per field with one of each per run.
@@ -664,7 +749,7 @@ fn emit_bit_run_read(
         let field_ident = f.get_ident(start + offset, true);
         let internal = gen_internal_field_ident(&field_ident);
         // How many bits of the run sit below this field.
-        let shift = sum_bits(&refs[offset + 1..], &crate_);
+        let shift = super::shift_of(&refs, offset, &crate_);
         let extract = match field {
             BitRunField::Primitive { bits, ty, .. } => {
                 let mask = field.mask(&crate_);
@@ -716,8 +801,32 @@ fn emit_bit_run_read(
         internals.push(internal);
     }
 
+    // A run of whole bytes on a cursor at a byte boundary is plain bytes,
+    // which one fixed-size read serves. The bit reader takes them one byte
+    // at a time. A run with a `bit_field` has no literal width, so it stays
+    // on the bit reader.
+    let lit_total: Option<usize> = run.iter().map(BitRunField::lit_span).sum();
+    let read_run = match lit_total {
+        Some(total) if total % 8 == 0 => {
+            let bytes = total / 8;
+            let skip = 8 - bytes;
+            quote! {
+                if __deku_reader.leftover.is_none() {
+                    let mut __deku_run_bytes = [0u8; 8];
+                    __deku_reader.read_bytes_const_into::<#bytes>(
+                        (&mut __deku_run_bytes[#skip..]).try_into().expect("a run of whole bytes"),
+                        ::#crate_::ctx::Order::Msb0,
+                    )?;
+                    u64::from_be_bytes(__deku_run_bytes)
+                } else {
+                    __deku_reader.read_bits_uint_msb0(#total)?
+                }
+            }
+        }
+        _ => quote! { __deku_reader.read_bits_uint_msb0(#total)? },
+    };
     let batched = quote! {
-        let #run_ident: u64 = __deku_reader.read_bits_uint_msb0(#total)?;
+        let #run_ident: u64 = #read_run;
         #extracts
     };
 

@@ -1662,6 +1662,271 @@ mod tests {
     }
 
     #[cfg(feature = "bits")]
+    #[rstest(
+        endian,
+        order,
+        bit_size,
+        value,
+        expected,
+        case::little_lsb_short(Endian::Little, Order::Lsb0, 5, 0x0b_u16, vec![0x0b]),
+        case::little_msb_short(Endian::Little, Order::Msb0, 5, 0x0b_u16, vec![0x58]),
+        case::big_lsb_short(Endian::Big, Order::Lsb0, 5, 0x0b_u16, vec![0x0b]),
+        case::big_msb_short(Endian::Big, Order::Msb0, 5, 0x0b_u16, vec![0x58]),
+        case::little_lsb_unaligned(
+            Endian::Little,
+            Order::Lsb0,
+            12,
+            0x0abc_u16,
+            vec![0xbc, 0x0a]
+        ),
+        case::little_msb_unaligned(
+            Endian::Little,
+            Order::Msb0,
+            12,
+            0x0abc_u16,
+            vec![0xbc, 0xa0]
+        ),
+        case::big_lsb_unaligned(Endian::Big, Order::Lsb0, 13, 0x1001_u16, vec![0x10, 0x01]),
+        case::big_msb_unaligned(Endian::Big, Order::Msb0, 12, 0x0abc_u16, vec![0xab, 0xc0]),
+        case::little_lsb_full(Endian::Little, Order::Lsb0, 16, 0xabcd_u16, vec![0xcd, 0xab]),
+        case::little_msb_full(Endian::Little, Order::Msb0, 16, 0xabcd_u16, vec![0xcd, 0xab]),
+        case::big_lsb_full(Endian::Big, Order::Lsb0, 16, 0xabcd_u16, vec![0xab, 0xcd]),
+        case::big_msb_full(Endian::Big, Order::Msb0, 16, 0xabcd_u16, vec![0xab, 0xcd]),
+        case::big_msb_zero(Endian::Big, Order::Msb0, 5, 0_u16, vec![0x00])
+    )]
+    fn test_bit_read_write_orders(
+        endian: Endian,
+        order: Order,
+        bit_size: usize,
+        value: u16,
+        expected: Vec<u8>,
+    ) {
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        value
+            .to_writer(&mut writer, (endian, BitSize(bit_size), order))
+            .unwrap();
+        writer.finalize().unwrap();
+        let encoded = writer.inner.into_inner();
+        assert_eq!(expected, encoded);
+
+        let mut reader = Reader::new(Cursor::new(encoded));
+        let decoded =
+            u16::from_reader_with_ctx(&mut reader, (endian, BitSize(bit_size), order)).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_bit_size_order_forwarder_roundtrip() {
+        let value = 0x1234_u16;
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        value
+            .to_writer(&mut writer, (BitSize(16), Order::Msb0))
+            .unwrap();
+        writer.finalize().unwrap();
+
+        let encoded = writer.inner.into_inner();
+        let expected = if cfg!(target_endian = "little") {
+            [0x34, 0x12]
+        } else {
+            [0x12, 0x34]
+        };
+        assert_eq!(encoded, expected);
+        let mut reader = Reader::new(Cursor::new(encoded));
+        let decoded = u16::from_reader_with_ctx(&mut reader, (BitSize(16), Order::Msb0)).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_ordered_unsigned_big_msb_after_lsb0_leftover() {
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        0b101_u8
+            .to_writer(&mut writer, (Endian::Little, BitSize(3), Order::Lsb0))
+            .unwrap();
+        0x1a_u16
+            .to_writer(&mut writer, (Endian::Big, BitSize(5), Order::Msb0))
+            .unwrap();
+        writer.finalize().unwrap();
+
+        let encoded = writer.inner.into_inner();
+        assert_eq!(encoded, [0xd5]);
+        let mut reader = Reader::new(Cursor::new(encoded));
+        assert_eq!(
+            u8::from_reader_with_ctx(&mut reader, (Endian::Little, BitSize(3), Order::Lsb0))
+                .unwrap(),
+            0b101
+        );
+        assert_eq!(
+            u16::from_reader_with_ctx(&mut reader, (Endian::Big, BitSize(5), Order::Msb0)).unwrap(),
+            0x1a
+        );
+    }
+
+    #[cfg(feature = "bits")]
+    #[rstest(
+        endian,
+        value,
+        bit_size,
+        expected,
+        case::little_negative(Endian::Little, -11_i16, 5, vec![0xa8]),
+        case::big_negative(Endian::Big, -11_i16, 5, vec![0xa8]),
+        case::little_positive(Endian::Little, 11_i16, 5, vec![0x58]),
+        case::big_positive(Endian::Big, 11_i16, 5, vec![0x58]),
+        case::little_full(Endian::Little, -100_i16, 16, vec![0x9c, 0xff]),
+        case::big_full(Endian::Big, -100_i16, 16, vec![0xff, 0x9c]),
+    )]
+    fn test_signed_bit_read_write(endian: Endian, value: i16, bit_size: usize, expected: Vec<u8>) {
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        value
+            .to_writer(&mut writer, (endian, BitSize(bit_size)))
+            .unwrap();
+        writer.finalize().unwrap();
+        let encoded = writer.inner.into_inner();
+        assert_eq!(expected, encoded);
+
+        let mut reader = Reader::new(Cursor::new(encoded));
+        let decoded = i16::from_reader_with_ctx(&mut reader, (endian, BitSize(bit_size))).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[cfg(feature = "bits")]
+    #[rstest(
+        endian,
+        order,
+        value,
+        bit_size,
+        expected,
+        case::little_lsb_short(Endian::Little, Order::Lsb0, 11_i16, 5, vec![0x0b]),
+        case::little_msb_short(Endian::Little, Order::Msb0, 11_i16, 5, vec![0x58]),
+        case::big_lsb_short(Endian::Big, Order::Lsb0, 11_i16, 5, vec![0x0b]),
+        case::big_msb_short(Endian::Big, Order::Msb0, 11_i16, 5, vec![0x58]),
+        case::big_msb_full(Endian::Big, Order::Msb0, -100_i16, 16, vec![0xff, 0x9c])
+    )]
+    fn test_ordered_signed_bit_read_write(
+        endian: Endian,
+        order: Order,
+        value: i16,
+        bit_size: usize,
+        expected: Vec<u8>,
+    ) {
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        value
+            .to_writer(&mut writer, (endian, BitSize(bit_size), order))
+            .unwrap();
+        writer.finalize().unwrap();
+        let encoded = writer.inner.into_inner();
+        assert_eq!(expected, encoded);
+
+        let mut reader = Reader::new(Cursor::new(encoded));
+        let decoded =
+            i16::from_reader_with_ctx(&mut reader, (endian, BitSize(bit_size), order)).unwrap();
+        assert_eq!(value, decoded);
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_ordered_signed_short_read_sign_extends() {
+        let mut reader = Reader::new(Cursor::new([0xa8]));
+        let decoded =
+            i16::from_reader_with_ctx(&mut reader, (Endian::Big, BitSize(5), Order::Msb0)).unwrap();
+        assert_eq!(decoded, -11);
+    }
+
+    #[cfg(feature = "bits")]
+    #[test]
+    fn test_ordered_unsigned_bit_reader_rejects_oversized_size() {
+        let mut reader = Reader::new(Cursor::new([]));
+        let result =
+            u32::from_reader_with_ctx(&mut reader, (Endian::Big, BitSize(33), Order::Msb0));
+        assert!(matches!(result, Err(DekuError::Parse(_))));
+    }
+
+    #[test]
+    fn test_ordered_signed_byte_reader_rejects_oversized_size() {
+        let mut reader = Reader::new(Cursor::new([]));
+        let result =
+            i32::from_reader_with_ctx(&mut reader, (Endian::Big, ByteSize(5), Order::Lsb0));
+        assert!(matches!(result, Err(DekuError::Parse(_))));
+    }
+
+    #[cfg(feature = "bits")]
+    #[rstest(
+        value,
+        endian,
+        bit_size,
+        order,
+        case::big_msb_value_exceeds_size(0x08_u8, Endian::Big, 3, Order::Msb0),
+        case::bit_size_exceeds_type(0x00_u8, Endian::Little, 9, Order::Lsb0),
+        case::little_lsb_value_exceeds_size(0x08_u8, Endian::Little, 3, Order::Lsb0)
+    )]
+    fn test_u8_bit_writer_rejects_invalid_bit_sizes(
+        value: u8,
+        endian: Endian,
+        bit_size: usize,
+        order: Order,
+    ) {
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        let result = value.to_writer(&mut writer, (endian, BitSize(bit_size), order));
+        assert!(matches!(result, Err(DekuError::InvalidParam(_))));
+    }
+
+    #[cfg(feature = "bits")]
+    #[rstest(
+        value,
+        endian,
+        bit_size,
+        order,
+        case::bit_size_exceeds_type(0_u32, Endian::Little, 33, Order::Lsb0),
+        case::little_lsb_value_exceeds_size(0x10_u32, Endian::Little, 4, Order::Lsb0),
+        case::big_lsb_value_exceeds_size(0x10_u32, Endian::Big, 4, Order::Lsb0),
+        case::big_msb_value_exceeds_size(0x10_u32, Endian::Big, 4, Order::Msb0)
+    )]
+    fn test_ordered_unsigned_bit_writer_rejects_invalid_bit_sizes(
+        value: u32,
+        endian: Endian,
+        bit_size: usize,
+        order: Order,
+    ) {
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        let result = value.to_writer(&mut writer, (endian, BitSize(bit_size), order));
+        assert!(matches!(result, Err(DekuError::InvalidParam(_))));
+    }
+
+    #[cfg(feature = "bits")]
+    #[rstest(value, endian, bit_size,
+        case::bit_size_exceeds_type(0_i32, Endian::Little, 33),
+        case::little_positive(8_i32, Endian::Little, 3),
+        case::little_negative(-8_i32, Endian::Little, 3),
+        case::big_positive(8_i32, Endian::Big, 3),
+        case::big_negative(-8_i32, Endian::Big, 3),
+    )]
+    fn test_signed_bit_writer_rejects_invalid_bit_sizes(
+        value: i32,
+        endian: Endian,
+        bit_size: usize,
+    ) {
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        let result = value.to_writer(&mut writer, (endian, BitSize(bit_size)));
+        assert!(matches!(result, Err(DekuError::InvalidParam(_))));
+    }
+
+    #[test]
+    fn test_u8_byte_size_writer_forwarders() {
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        0xab_u8
+            .to_writer(&mut writer, (Endian::Little, ByteSize(1)))
+            .unwrap();
+        assert_eq!(writer.inner.into_inner(), [0xab]);
+
+        let mut writer = Writer::new(Cursor::new(vec![]));
+        0xcd_u8
+            .to_writer(&mut writer, (Endian::Big, ByteSize(1), Order::Lsb0))
+            .unwrap();
+        assert_eq!(writer.inner.into_inner(), [0xcd]);
+    }
+
+    #[cfg(feature = "bits")]
     macro_rules! TestSignExtending {
         ($test_name:ident, $typ:ty) => {
             #[test]
@@ -1726,7 +1991,6 @@ mod tests {
     TestSignExtendingPanic!(test_sign_extend_i128_panic, i128, 128);
 
     // Regression: sub-width byte-aligned signed reads must sign-extend (ByteSize path).
-    #[cfg(feature = "bits")]
     #[test]
     fn test_sign_extend_bytesize_i32_negative() {
         // 3-byte LE encoding of -100
@@ -1746,7 +2010,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "bits")]
     #[test]
     fn test_sign_extend_bytesize_i32_min() {
         // 3-byte LE encoding of -8388608 (0x800000 sign-extended)

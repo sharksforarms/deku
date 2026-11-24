@@ -772,14 +772,29 @@ impl<R: Read + Seek> Reader<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(feature = "alloc", feature = "bits"))]
+    use alloc::vec;
+    #[cfg(feature = "bits")]
+    use bitvec::prelude::{Msb0, bitarr};
     use hexlit::hex;
-    use no_std_io::io::{Cursor, Read, Seek, SeekFrom};
+    use no_std_io::io::{Cursor, Error, ErrorKind, Read, Seek, SeekFrom};
+    #[cfg(feature = "bits")]
+    use rstest::rstest;
 
-    struct ErrorReader;
+    struct ErrorReader {
+        kind: ErrorKind,
+    }
+
+    fn assert_need_eight<T>(result: Result<T, DekuError>) {
+        assert!(matches!(
+            result,
+            Err(DekuError::Incomplete(size)) if size == NeedSize::new(8)
+        ));
+    }
 
     impl Read for ErrorReader {
         fn read(&mut self, _buf: &mut [u8]) -> no_std_io::io::Result<usize> {
-            Err(ErrorKind::Other.into())
+            Err(Error::new(self.kind, "test read error"))
         }
     }
 
@@ -791,7 +806,9 @@ mod tests {
 
     #[test]
     fn try_end_propagates_arbitrary_io_errors() {
-        let mut reader = Reader::new(ErrorReader);
+        let mut reader = Reader::new(ErrorReader {
+            kind: ErrorKind::Other,
+        });
 
         assert_eq!(reader.try_end(), Err(DekuError::Io(ErrorKind::Other)));
         assert!(reader.leftover.is_none());
@@ -835,12 +852,22 @@ mod tests {
     #[cfg(feature = "bits")]
     fn bit_reads_propagate_arbitrary_io_errors() {
         for order in [Order::Msb0, Order::Lsb0] {
-            let mut reader = Reader::new(ErrorReader);
+            let mut reader = Reader::new(ErrorReader {
+                kind: ErrorKind::Other,
+            });
             let mut bits = bitarr!(u8, Msb0; 0; 8);
 
             let result = reader.read_bits_into(&mut bits, order);
 
             assert_eq!(result, Err(DekuError::Io(ErrorKind::Other)));
+        }
+    }
+
+    fn assert_io_error<T>(label: &str, result: Result<T, DekuError>, expected: ErrorKind) {
+        match result {
+            Err(DekuError::Io(actual)) => assert_eq!(actual, expected, "{label}"),
+            Err(error) => panic!("{label}: unexpected error {error:?}"),
+            Ok(_) => panic!("{label}: expected an I/O error"),
         }
     }
 
@@ -896,6 +923,274 @@ mod tests {
         let _ = reader.read_bytes(1, &mut buf, Order::Lsb0).unwrap();
         assert_eq!([0xaa], buf);
         assert_eq!(reader.bits_read, 8);
+    }
+
+    #[test]
+    fn test_into_inner() {
+        let mut reader = Reader::new(Cursor::new(hex!("aabb")));
+        let mut buf = [0; 1];
+        reader.read_bytes(1, &mut buf, Order::Msb0).unwrap();
+
+        let mut inner = reader.into_inner();
+        inner.read_exact(&mut buf).unwrap();
+        assert_eq!([0xbb], buf);
+    }
+
+    #[cfg(all(feature = "alloc", feature = "bits"))]
+    #[test]
+    fn test_byte_leftover_rest() {
+        let mut reader = Reader::new(Cursor::new(hex!("aabb")));
+        assert!(!reader.try_end().unwrap());
+        assert_eq!(
+            reader.rest(),
+            vec![true, false, true, false, true, false, true, false]
+        );
+    }
+
+    #[test]
+    fn test_non_eof_errors_are_preserved() {
+        let error_kind = ErrorKind::PermissionDenied;
+
+        let mut reader = Reader::new(ErrorReader { kind: error_kind });
+        assert_io_error(
+            "read_bytes",
+            reader.read_bytes(1, &mut [0], Order::Msb0),
+            error_kind,
+        );
+
+        let mut reader = Reader::new(ErrorReader { kind: error_kind });
+        assert_io_error(
+            "read_bytes_const",
+            reader.read_bytes_const::<1>(&mut [0], Order::Msb0),
+            error_kind,
+        );
+
+        let mut reader = Reader::new(ErrorReader { kind: error_kind });
+        assert_io_error(
+            "read_bytes_const_into",
+            reader.read_bytes_const_into::<1>(&mut [0], Order::Msb0),
+            error_kind,
+        );
+
+        let mut reader = Reader::new(ErrorReader { kind: error_kind });
+        reader.leftover = Some(Leftover::Byte(0xaa));
+        assert_io_error(
+            "read_bytes_leftover",
+            reader.read_bytes(2, &mut [0; 2], Order::Msb0),
+            error_kind,
+        );
+
+        let mut reader = Reader::new(ErrorReader { kind: error_kind });
+        reader.leftover = Some(Leftover::Byte(0xaa));
+        assert_io_error(
+            "read_bytes_const_leftover",
+            reader.read_bytes_const::<2>(&mut [0; 2], Order::Msb0),
+            error_kind,
+        );
+
+        let mut reader = Reader::new(ErrorReader { kind: error_kind });
+        reader.leftover = Some(Leftover::Byte(0xaa));
+        assert_io_error(
+            "read_bytes_const_into_leftover",
+            reader.read_bytes_const_into::<2>(&mut [0; 2], Order::Msb0),
+            error_kind,
+        );
+
+        #[cfg(feature = "bits")]
+        {
+            for order in [Order::Lsb0, Order::Msb0] {
+                let mut reader = Reader::new(ErrorReader { kind: error_kind });
+                let mut bits = bitarr![u8, Msb0; 0; 1];
+                let label = match order {
+                    Order::Lsb0 => "read_bits_into_lsb0",
+                    Order::Msb0 => "read_bits_into_msb0",
+                };
+                assert_io_error(
+                    label,
+                    reader.read_bits_into(&mut bits[..1], order),
+                    error_kind,
+                );
+
+                let mut reader = Reader::new(ErrorReader { kind: error_kind });
+                let mut bits = bitarr![u8, Msb0; 0; 8];
+                let label = match order {
+                    Order::Lsb0 => "read_bits_into_full_byte_lsb0",
+                    Order::Msb0 => "read_bits_into_full_byte_msb0",
+                };
+                assert_io_error(
+                    label,
+                    reader.read_bits_into(&mut bits[..8], order),
+                    error_kind,
+                );
+            }
+
+            let mut reader = Reader::new(ErrorReader { kind: error_kind });
+            assert_io_error(
+                "read_bits_uint_msb0",
+                reader.read_bits_uint_msb0(1),
+                error_kind,
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "alloc", not(feature = "bits")))]
+    fn test_rest_without_bits_is_empty() {
+        let mut reader = Reader::new(Cursor::new([0xaa]));
+        assert!(reader.rest().is_empty());
+    }
+
+    #[test]
+    #[cfg(not(feature = "bits"))]
+    fn test_skip_bits_without_bits_returns_error() {
+        let mut reader = Reader::new(Cursor::new([]));
+        assert!(matches!(
+            reader.skip_bits(1, Order::Msb0),
+            Err(DekuError::InvalidParam(_))
+        ));
+    }
+
+    #[test]
+    fn test_byte_read_eof_is_incomplete() {
+        let mut reader = Reader::new(Cursor::new([]));
+        assert_need_eight(reader.read_bytes(1, &mut [0], Order::Msb0));
+
+        let mut reader = Reader::new(Cursor::new([]));
+        assert_need_eight(reader.read_bytes_const::<1>(&mut [0], Order::Msb0));
+
+        let mut reader = Reader::new(Cursor::new([]));
+        assert_need_eight(reader.read_bytes_const_into::<1>(&mut [0], Order::Msb0));
+    }
+
+    #[test]
+    #[cfg(feature = "bits")]
+    fn test_bits_into_consumes_cached_bits_in_each_order() {
+        for order in [Order::Lsb0, Order::Msb0] {
+            let mut reader = Reader::new(Cursor::new([]));
+            reader.leftover = Some(Leftover::Bits(
+                [true, false, true, false, true, false, true, false]
+                    .as_slice()
+                    .into(),
+            ));
+
+            let mut dst = bitarr![u8, Msb0; 0; 3];
+            reader.read_bits_into(&mut dst[..3], order).unwrap();
+
+            match order {
+                Order::Lsb0 => {
+                    let expected = bitarr![u8, Msb0; 0, 1, 0];
+                    assert_eq!(&dst[..3], &expected[..3]);
+                    let Some(Leftover::Bits(bits)) = reader.leftover else {
+                        panic!("expected cached bits");
+                    };
+                    let expected = bitarr![u8, Msb0; 1, 0, 1, 0, 1];
+                    assert_eq!(bits.as_bitslice(), &expected[..5]);
+                }
+                Order::Msb0 => {
+                    let expected = bitarr![u8, Msb0; 1, 0, 1];
+                    assert_eq!(&dst[..3], &expected[..3]);
+                    let Some(Leftover::Bits(bits)) = reader.leftover else {
+                        panic!("expected cached bits");
+                    };
+                    let expected = bitarr![u8, Msb0; 0, 1, 0, 1, 0];
+                    assert_eq!(bits.as_bitslice(), &expected[..5]);
+                }
+            }
+            assert_eq!(reader.bits_read, 3);
+        }
+
+        let mut reader = Reader::new(Cursor::new([]));
+        reader.leftover = Some(Leftover::Bits(
+            [true, false, true, false, true, false, true, false]
+                .as_slice()
+                .into(),
+        ));
+        let mut dst = bitarr![u8, Msb0; 0; 8];
+        reader.read_bits_into(&mut dst[..8], Order::Msb0).unwrap();
+        assert_eq!(dst, bitarr![u8, Msb0; 1, 0, 1, 0, 1, 0, 1, 0]);
+        assert!(reader.leftover.is_none());
+        assert_eq!(reader.bits_read, 8);
+    }
+
+    #[cfg(feature = "bits")]
+    #[rstest(bits, case::full_byte(8), case::partial_byte(3))]
+    fn test_bits_into_reports_incomplete_at_eof(bits: usize) {
+        for order in [Order::Lsb0, Order::Msb0] {
+            let mut reader = Reader::new(Cursor::new([]));
+            let mut dst = bitarr![u8, Msb0; 0; 8];
+            let result = reader.read_bits_into(&mut dst[..bits], order);
+            assert!(matches!(
+                result,
+                Err(DekuError::Incomplete(size)) if size == NeedSize::new(bits)
+            ));
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "bits")]
+    fn test_bits_uint_msb0_consumes_a_cached_byte() {
+        let mut reader = Reader::new(Cursor::new([]));
+        reader.leftover = Some(Leftover::Byte(0xab));
+
+        assert_eq!(reader.read_bits_uint_msb0(4).unwrap(), 0x0a);
+        assert_eq!(reader.read_bits_uint_msb0(4).unwrap(), 0x0b);
+        assert!(reader.leftover.is_none());
+        assert_eq!(reader.bits_read, 8);
+    }
+
+    fn set_leftover_byte<R: Read + Seek>(reader: &mut Reader<R>) {
+        reader.leftover = Some(Leftover::Byte(0xaa));
+    }
+
+    #[cfg(feature = "bits")]
+    fn set_leftover_bits<R: Read + Seek>(reader: &mut Reader<R>) {
+        reader.leftover = Some(Leftover::Bits([true, false, true, false].as_slice().into()));
+    }
+
+    #[cfg(feature = "bits")]
+    #[rstest(
+        order,
+        expected,
+        case::msb0(Order::Msb0, 0xab),
+        case::lsb0(Order::Lsb0, 0xca)
+    )]
+    fn test_byte_reads_from_cached_bits(order: Order, expected: u8) {
+        let mut reader = Reader::new(Cursor::new([0xbc]));
+        set_leftover_bits(&mut reader);
+
+        let mut buf = [0u8; 1];
+        let _ = reader.read_bytes(1, &mut buf, order).unwrap();
+        assert_eq!(buf, [expected]);
+        assert_eq!(reader.bits_read, 8);
+
+        let mut reader = Reader::new(Cursor::new([0xbc]));
+        set_leftover_bits(&mut reader);
+        let mut buf = [0u8; 1];
+        let _ = reader.read_bytes_const::<1>(&mut buf, order).unwrap();
+        assert_eq!(buf, [expected]);
+        assert_eq!(reader.bits_read, 8);
+
+        let mut reader = Reader::new(Cursor::new([0xbc]));
+        set_leftover_bits(&mut reader);
+        let mut buf = [0u8; 1];
+        reader.read_bytes_const_into::<1>(&mut buf, order).unwrap();
+        assert_eq!(buf, [expected]);
+        assert_eq!(reader.bits_read, 8);
+    }
+
+    #[test]
+    fn test_byte_leftover_eof_is_incomplete() {
+        let mut reader = Reader::new(Cursor::new([]));
+        set_leftover_byte(&mut reader);
+        assert_need_eight(reader.read_bytes(2, &mut [0; 2], Order::Msb0));
+
+        let mut reader = Reader::new(Cursor::new([]));
+        set_leftover_byte(&mut reader);
+        assert_need_eight(reader.read_bytes_const::<2>(&mut [0; 2], Order::Msb0));
+
+        let mut reader = Reader::new(Cursor::new([]));
+        set_leftover_byte(&mut reader);
+        assert_need_eight(reader.read_bytes_const_into::<2>(&mut [0; 2], Order::Msb0));
     }
 
     #[cfg(all(feature = "alloc", feature = "bits"))]

@@ -2,6 +2,7 @@ use no_std_io::io::{Cursor, Read, Seek};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use deku::prelude::*;
+use std::hint::black_box;
 
 #[path = "shapes/mod.rs"]
 mod shapes;
@@ -10,12 +11,13 @@ use shapes::{AllWrapper, CountNonSpecialize, CountWrapper, DekuBytes, DekuEnum, 
 use shapes::{DekuBits, DekuBitsBeU32, DekuBitsBeU64, DekuBitsLeU64};
 
 fn deku_write<T: DekuContainerWrite>(input: &T) {
-    let _v = input.to_bytes().unwrap();
+    black_box(input.to_bytes().unwrap());
 }
 
-fn deku_read<T: for<'a> DekuContainerRead<'a>>(mut reader: impl Read + Seek) {
+fn deku_read<T: for<'a> DekuContainerRead<'a>>(reader: impl Read + Seek) {
+    let mut reader = black_box(reader);
     let mut reader = Reader::new(&mut reader);
-    let _v = T::from_reader_with_ctx(&mut reader, ()).unwrap();
+    black_box(T::from_reader_with_ctx(&mut reader, ()).unwrap());
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -38,7 +40,8 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     #[cfg(feature = "bits")]
     c.bench_function("deku_read_bits", |b| {
-        let reader = Cursor::new(&[0x01; 1]);
+        let input = black_box([0x01; 1]);
+        let reader = Cursor::new(input.as_ref());
         b.iter_batched(
             || reader.clone(),
             |mut reader| deku_read::<DekuBits>(&mut reader),
@@ -61,7 +64,8 @@ fn criterion_benchmark(c: &mut Criterion) {
     // on the bit paths, so a difference here needs both harnesses to explain.
     #[cfg(feature = "bits")]
     c.bench_function("deku_read_bits_be_u64", |b| {
-        let reader = Cursor::new(&[0xab; 8]);
+        let input = black_box([0xab; 8]);
+        let reader = Cursor::new(input.as_ref());
         b.iter_batched(
             || reader.clone(),
             |mut reader| deku_read::<DekuBitsBeU64>(&mut reader),
@@ -70,7 +74,8 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     #[cfg(feature = "bits")]
     c.bench_function("deku_read_bits_be_u32", |b| {
-        let reader = Cursor::new(&[0xab; 4]);
+        let input = black_box([0xab; 4]);
+        let reader = Cursor::new(input.as_ref());
         b.iter_batched(
             || reader.clone(),
             |mut reader| deku_read::<DekuBitsBeU32>(&mut reader),
@@ -79,7 +84,8 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     #[cfg(feature = "bits")]
     c.bench_function("deku_read_bits_le_u64", |b| {
-        let reader = Cursor::new(&[0xab; 8]);
+        let input = black_box([0xab; 8]);
+        let reader = Cursor::new(input.as_ref());
         b.iter_batched(
             || reader.clone(),
             |mut reader| deku_read::<DekuBitsLeU64>(&mut reader),

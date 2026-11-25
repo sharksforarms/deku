@@ -59,20 +59,23 @@ fn calculate_fields_size<'a>(
         }
 
         let field_type = &f.ty;
-        #[cfg(feature = "bits")]
-        if let Some(bits) = &f.bits {
-            components.push(quote! { (#bits) });
-        } else if let Some(bytes) = &f.bytes {
-            components.push(quote! { (#bytes) * 8 });
-        } else {
-            components.push(quote! { <#field_type as ::#crate_::DekuSize>::SIZE_BITS });
-        }
+        // A skipped field keeps its magic and padding, but not its value
+        if !skips_value(f) {
+            #[cfg(feature = "bits")]
+            if let Some(bits) = &f.bits {
+                components.push(quote! { (#bits) });
+            } else if let Some(bytes) = &f.bytes {
+                components.push(quote! { (#bytes) * 8 });
+            } else {
+                components.push(quote! { <#field_type as ::#crate_::DekuSize>::SIZE_BITS });
+            }
 
-        #[cfg(not(feature = "bits"))]
-        if let Some(bytes) = &f.bytes {
-            components.push(quote! { (#bytes) * 8 });
-        } else {
-            components.push(quote! { <#field_type as ::#crate_::DekuSize>::SIZE_BITS });
+            #[cfg(not(feature = "bits"))]
+            if let Some(bytes) = &f.bytes {
+                components.push(quote! { (#bytes) * 8 });
+            } else {
+                components.push(quote! { <#field_type as ::#crate_::DekuSize>::SIZE_BITS });
+            }
         }
 
         #[cfg(feature = "bits")]
@@ -98,6 +101,11 @@ fn calculate_fields_size<'a>(
     });
 
     quote! { 0 #(+ (#field_components))* }
+}
+
+/// True if the field's value is never read or written: `skip` without `cond`
+fn skips_value(field: &FieldData) -> bool {
+    matches!(field.skip, Some(crate::SkipMode::All)) && field.cond.is_none()
 }
 
 /// Check if struct/enum has seek attributes
@@ -156,7 +164,7 @@ fn add_field_bounds<'a>(
             continue;
         }
 
-        if !field.temp {
+        if !field.temp && !skips_value(field) {
             let field_type = &field.ty;
             #[cfg(feature = "bits")]
             let needs_bound = field.bits.is_none() && field.bytes.is_none();

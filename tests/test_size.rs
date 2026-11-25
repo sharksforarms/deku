@@ -701,3 +701,69 @@ fn test_enum_id_pat_storage_is_not_counted() {
     assert_eq!(HeaderType::SIZE_BITS, 4);
     assert_eq!(HeaderType::SIZE_BYTES, None);
 }
+
+#[test]
+fn test_struct_with_skip_field() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct SkipStruct {
+        field_a: u8,
+        #[deku(skip, default = "5")]
+        field_b: u8,
+        field_c: u16,
+    }
+
+    assert_eq!(SkipStruct::SIZE_BYTES, Some(3));
+    assert_eq!(SkipStruct::SIZE_BITS, 24);
+
+    let data: &[u8] = &[0x01, 0x02, 0x03];
+    let (rest, value) = SkipStruct::from_bytes((data, 0)).unwrap();
+    assert!(rest.0.is_empty());
+    let mut buf = [0u8; 4];
+    assert_eq!(
+        value.to_slice(&mut buf).unwrap(),
+        SkipStruct::SIZE_BYTES.unwrap()
+    );
+
+    // The padding of a skipped field is still read and written
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct SkipPadStruct {
+        field_a: u8,
+        #[deku(skip, default = "0", pad_bytes_before = "1")]
+        field_b: u8,
+    }
+
+    assert_eq!(SkipPadStruct::SIZE_BYTES, Some(2));
+
+    // A conditional skip may still read the field
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct SkipCondStruct {
+        field_a: u8,
+        #[deku(skip, cond = "*field_a == 0", default = "0")]
+        field_b: u8,
+    }
+
+    assert_eq!(SkipCondStruct::SIZE_BYTES, Some(2));
+
+    // `skip(write)` still reads the field
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct SkipWriteStruct {
+        field_a: u8,
+        #[deku(skip(write))]
+        field_b: u8,
+    }
+
+    assert_eq!(SkipWriteStruct::SIZE_BYTES, Some(2));
+}
+
+#[test]
+fn test_struct_with_skip_option_field() {
+    #[derive(DekuRead, DekuWrite, DekuSize)]
+    struct SkipOptionStruct {
+        field_a: u8,
+        #[deku(skip)]
+        field_b: Option<u8>,
+        field_c: u8,
+    }
+
+    assert_eq!(SkipOptionStruct::SIZE_BYTES, Some(2));
+}

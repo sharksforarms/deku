@@ -17,6 +17,8 @@
   whole bytes of the `Msb0` write that follows it ([#677](https://github.com/sharksforarms/deku/pull/677))
 - `deku_derive`: an enum struct or tuple variant whose fields are all `temp` no longer
   fails to compile with `E0533`
+- `DekuSize`: a `skip` field without `cond` no longer counts its value, which is
+  never read or written
 
 ### Other
 
